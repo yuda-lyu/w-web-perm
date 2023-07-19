@@ -3,7 +3,7 @@ import keys from 'lodash/keys'
 import genID from 'wsemi/src/genID.mjs'
 import dtmapping from 'wsemi/src/dtmapping.mjs'
 import dtpick from 'wsemi/src/dtpick.mjs'
-import nowms2str from 'wsemi/src/nowms2str.mjs'
+// import nowms2str from 'wsemi/src/nowms2str.mjs'
 import now2strp from 'wsemi/src/now2strp.mjs'
 
 
@@ -38,9 +38,9 @@ let settings = {
 let funNew = (ndata = {}) => {
     let o = dtmapping(ndata, keys(settings))
     o.id = `${now2strp()}-${genID()}`
-    o.timeCreate = nowms2str()
-    o.timeUpdate = o.timeCreate
-    o.isActive = 'y'
+    // o.timeCreate = nowms2str()
+    // o.timeUpdate = o.timeCreate
+    // o.isActive = 'y'
     return o
 }
 

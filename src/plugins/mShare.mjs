@@ -1,169 +1,17 @@
 //前後端共用函數區
-// import min from 'lodash/min'
-// import size from 'lodash/size'
-// import take from 'lodash/take'
-// import isEqual from 'lodash/isEqual'
-import uniq from 'lodash/uniq'
-// import set from 'lodash/set'
 import get from 'lodash/get'
 import each from 'lodash/each'
 import map from 'lodash/map'
 import find from 'lodash/find'
-import filter from 'lodash/filter'
-// import last from 'lodash/last'
-// import size from 'lodash/size'
-import split from 'lodash/split'
 import join from 'lodash/join'
 import cloneDeep from 'lodash/cloneDeep'
 import takeRight from 'lodash/takeRight'
 import dropRight from 'lodash/dropRight'
 import sortBy from 'lodash/sortBy'
 import sep from 'wsemi/src/sep.mjs'
-import isarr from 'wsemi/src/isarr.mjs'
-import isstr from 'wsemi/src/isstr.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import haskey from 'wsemi/src/haskey.mjs'
 import composeToTree from 'wsemi/src/composeToTree.mjs'
-// import getFileAccept from 'wsemi/src/getFileAccept.mjs'
-
-
-// function atSep(attachmentsIds) {
-
-//     //ts
-//     let ts = sep(attachmentsIds, ';')
-
-//     return ts
-// }
-
-
-// function atJoin(ts) {
-
-//     //uniq
-//     ts = uniq(ts)
-
-//     //str
-//     let str = join(ts, ';')
-
-//     return str
-// }
-
-
-// function atParse(attachmentsIds) {
-
-//     //ts
-//     let ts = atSep(attachmentsIds)
-
-//     //ids
-//     let ids = map(ts, (v) => {
-//         let s = sep(v, '@')
-//         let table = get(s, 0, '')
-//         let id = get(s, 1, '')
-//         if (table === '') {
-//             console.log('atParse: invalid table in attachmentsIds', attachmentsIds)
-//         }
-//         if (id === '') {
-//             console.log('atParse: invalid id in attachmentsIds', attachmentsIds)
-//         }
-//         return {
-//             table,
-//             id,
-//         }
-//     })
-
-//     return ids
-// }
-
-
-// function atRemove(inp, removeId, opt = {}) {
-
-//     //removeId
-//     if (!isstr(removeId)) {
-//         removeId = ''
-//     }
-//     if (removeId.indexOf('@') >= 0) {
-//         removeId = split(removeId, '@')[1] //取後面id
-//     }
-
-//     //ids
-//     let ids = []
-//     let returnTypeTemp = ''
-//     if (isarr(inp)) {
-//         ids = inp
-//         returnTypeTemp = 'array'
-//     }
-//     else if (isstr(inp)) {
-//         ids = atParse(inp)
-//         returnTypeTemp = 'string'
-//     }
-
-//     //returnType
-//     let returnType = get(opt, 'returnType', null)
-//     if (returnType !== 'array' && returnType !== 'string') {
-//         returnType = returnTypeTemp
-//     }
-
-
-//     //filter
-//     ids = filter(ids, (v) => {
-//         return v.id !== removeId
-//     })
-
-//     if (returnType === 'array') {
-//         return ids
-//     }
-//     return atMerge(ids)
-// }
-
-
-// function atMerge(ids) {
-
-//     //ts
-//     let ts = map(ids, (v) => {
-//         let table = get(v, 'table', '')
-//         let id = get(v, 'id', '')
-//         if (table === '') {
-//             console.log('atMerge: invalid table in ids', ids)
-//         }
-//         if (id === '') {
-//             console.log('atMerge: invalid id in ids', ids)
-//         }
-//         return `${table}@${id}`
-//     })
-
-//     return atJoin(ts)
-// }
-
-
-// function isNumOrEng(str) {
-//     let regExp = /^[\d|a-zA-Z]+$/
-//     if (regExp.test(str)) {
-//         return true
-//     }
-//     else {
-//         return false
-//     }
-// }
-
-
-// function extractFileType(fileName, fileType) {
-//     let r = ''
-
-//     //find
-//     let ar = getFileAccept()
-//     for (let i = 0; i < ar.length; i++) {
-//         if (ar[i].acp === fileType) {
-//             return ar[i].name
-//         }
-//     }
-
-//     //from name ext
-//     let s = split(fileName, '.')
-//     if (size(s) > 1) {
-//         return last(s)
-//     }
-
-//     return r
-// }
 
 
 function getAllBlocks(targets) {

@@ -61,7 +61,7 @@ let funNew = (ndata = {}) => {
     o.userIdUpdate = o.userId
     o.timeCreate = nowms2str()
     o.timeUpdate = o.timeCreate
-    o.isActive = 'y'
+    // o.isActive = 'y'
     return o
 }
 

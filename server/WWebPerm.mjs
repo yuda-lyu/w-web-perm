@@ -239,7 +239,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, opt = {}) {
         //userFind
         let userFind = await woItems.users.select({ [mappingBy]: vSelf, isActive: 'y' })
         userFind = get(userFind, 0, null)
-        console.log('userFind', userFind)
+        // console.log('userFind', userFind)
 
         //複寫isAdmin
         let isAdminSrc = get(userSelf, 'isAdmin', '')
@@ -247,7 +247,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, opt = {}) {
         if (isAdminSrc !== isAdminSelf) {
             userFind.isAdmin = isAdminSelf
         }
-        console.log('userFind(isAdmin)', userFind)
+        // console.log('userFind(isAdmin)', userFind)
 
         return userFind
     }
@@ -292,7 +292,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, opt = {}) {
         // console.log('userFind', userFind)
 
         //ruleGroups
-        let ruleGroups = await woItems.ruleGroups.select({})
+        let ruleGroups = await woItems.ruleGroups.select()
         // console.log('ruleGroups', ruleGroups)
 
         //targets
@@ -311,7 +311,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, opt = {}) {
 
         return {
             user: userFind,
-            roles: urs,
+            rules: urs,
         }
     }
 

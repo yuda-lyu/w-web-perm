@@ -104,7 +104,7 @@ let funTest = () => {
     rs[3].from = 'teamB'
     rs[4].from = 'teamB'
     rs[4].isActive = 'n'
-    rs[5].ruleGroupsIds = `id-for-L1權限群組`
+    rs[5].ruleGroupsIds = `id-for-權限群組1`
     rs[5].description = '測試系統管理員描述說明'
     rs[5].isAdmin = 'y' //admin
     console.log(`已產生: ${keyTable} 測試資料`, rs)
