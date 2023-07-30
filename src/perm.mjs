@@ -8,6 +8,7 @@ import pmInvResolve from 'wsemi/src/pmInvResolve.mjs'
 
 
 function perm() {
+    //供外部系統引用並進行取得權限之操作
 
     //pmd
     let pmd = null
