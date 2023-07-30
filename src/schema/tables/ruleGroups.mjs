@@ -11,6 +11,7 @@ let keyTable = 'ruleGroups'
 let tableNameCht = '權限群組'
 let tableNameEng = 'Rule groups'
 
+
 let settings = {
     id: {
         pk: true,
@@ -70,8 +71,6 @@ let funTest = () => {
         ['權限群組1', `{ "___all___": { "show": "y", "active": "n" }, "專案A.頁A": { "show": "y", "active": "y" }, "專案A.頁B": { "show": "n", "active": "n" } }`],
         ['權限群組2', `{ "___all___": { "show": "y", "active": "n" } }`],
         ['權限群組3', `{ "___all___": { "show": "y", "active": "y" } }`],
-        // ['L0權限群組', `{ "___all___": { "show": "n", "active": "n" }, "主題列表": { "show": "y", "active": "n" } }`],
-        // ['L1權限群組', `{ "___all___": { "show": "y", "active": "y" } }`],
     ]
     rs = map(rs, ([g, crules], k) => {
         let v = funNew({ userId: 'id-for-admin', crules })

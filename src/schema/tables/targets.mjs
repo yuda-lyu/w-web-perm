@@ -11,6 +11,7 @@ let keyTable = 'targets'
 let tableNameCht = '管控對象'
 let tableNameEng = 'Targets'
 
+
 let settings = {
     id: {
         pk: true,
@@ -47,37 +48,29 @@ let funNew = (ndata = {}) => {
 let funTest = () => {
     let rs = [
         '專案A',
-        '專案A.頁A',
-        '專案A.頁A.區塊A',
-        '專案A.頁A.區塊A.執行按鈕',
-        '專案A.頁A.區塊A.分析按鈕',
-        '專案A.頁B',
-        '專案A.頁B.區塊A',
-        '專案A.頁B.區塊A.執行按鈕',
-        '專案A.頁B.區塊A.分析按鈕',
-        '專案A.頁B.區塊B',
-        '專案A.頁B.區塊B.展開按鈕',
-        '專案A.頁B.區塊B.下載按鈕',
+        '專案A/頁A',
+        '專案A/頁A/區塊A',
+        '專案A/頁A/區塊A/執行按鈕',
+        '專案A/頁A/區塊A/分析按鈕',
+        '專案A/頁B',
+        '專案A/頁B/區塊A',
+        '專案A/頁B/區塊A/執行按鈕',
+        '專案A/頁B/區塊A/分析按鈕',
+        '專案A/頁B/區塊B',
+        '專案A/頁B/區塊B/展開按鈕',
+        '專案A/頁B/區塊B/下載按鈕',
         '專案B',
-        '專案B.頁A',
-        '專案B.頁A.區塊A',
-        '專案B.頁A.區塊A.下載報表按鈕',
-        '專案B.頁A.區塊A.下載數據按鈕',
-        '專案B.頁B.區塊A',
-        '專案B.頁B.區塊B',
-        '專案B.頁B.區塊B.顯示後台按鈕',
-        '專案B.頁B.區塊B.轉跳主站按鈕',
-        // '主題列表',
-        // '主題列表.隱藏已刪除',
-        // '主題列表.新增主題',
-        // '主題列表.主題排序',
-        // '主題列表.編輯主題',
-        // '主題列表.刪除主題',
-        // '後台管理',
-        // '權限管理',
+        '專案B/頁A',
+        '專案B/頁A/區塊A',
+        '專案B/頁A/區塊A/下載報表按鈕',
+        '專案B/頁A/區塊A/下載數據按鈕',
+        '專案B/頁B/區塊A',
+        '專案B/頁B/區塊B',
+        '專案B/頁B/區塊B/顯示後台按鈕',
+        '專案B/頁B/區塊B/轉跳主站按鈕',
     ]
     rs = map(rs, (key, k) => {
-        let v = funNew({ userId: 'id-for-admin', description: key })
+        let v = funNew({ description: key })
         v.id = `id-for-${key}`
         v = dtpick(v, keys(settings))
         return v

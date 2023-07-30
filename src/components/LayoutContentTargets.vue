@@ -123,6 +123,7 @@
 
 <script>
 import { mdiGamepadCircle, mdiStackOverflow, mdiAccountGroupOutline, mdiBallotRecountOutline, mdiCloudUploadOutline } from '@mdi/js/mdi.js'
+import JSON5 from 'json5'
 import get from 'lodash/get'
 import set from 'lodash/set'
 import each from 'lodash/each'
@@ -139,6 +140,10 @@ import WButtonChip from 'w-component-vue/src/components/WButtonChip.vue'
 import WSwitch from 'w-component-vue/src/components/WSwitch.vue'
 import WTree from 'w-component-vue/src/components/WTree.vue'
 import { getTreeBlocks } from '../plugins/mShare.mjs'
+
+
+//dlm
+let dlm = '.'
 
 
 export default {
@@ -202,6 +207,8 @@ export default {
 
             //getTreeBlocks
             let treeBlocks = getTreeBlocks(vo.targets)
+            // console.log('targets', vo.targets)
+            // console.log('treeBlocks', treeBlocks)
 
             //save
             vo.treeBlocks = treeBlocks
@@ -379,7 +386,7 @@ export default {
                     let nkParent = dropRight(v.nk, 2)
                     let p = get(treeBlocksTemp, nkParent)
                     v.parentId = p.id
-                    v.id = `${v.parentId}.${v.text}`
+                    v.id = `${v.parentId}${dlm}${v.text}` //[tag:dlm]
                 }
                 v.order = k //需重新給予order
                 set(treeBlocksTemp, v.nk, v)
@@ -448,7 +455,7 @@ export default {
                 //gs
                 let gs = []
                 each(vo.ruleGroups, (v) => {
-                    let rules = JSON.parse(v.crules)
+                    let rules = JSON5.parse(v.crules)
                     let r = replaceObjKeys(rules, kpDiffs)
                     if (r.isChanged) {
                         gs.push({

@@ -30,15 +30,32 @@ let opt = {
 }
 
 let getUserByToken = async (token) => {
-    if (token !== 'sys') { //僅允許localhost給予token=sys瀏覽
-        return {}
+    // if (token === '{token-for-application}') { //提供外部應用系統作為存取使用者
+    //     return {
+    //         id: 'id-for-application',
+    //         name: 'application',
+    //         email: 'admin@example.com',
+    //         isAdmin: 'y',
+    //     }
+    // }
+    if (token === 'token-for-sys-application') { //將主系統視為外部應用系統, 依據指定token作為授權使用者
+        return {
+            id: 'id-for-application',
+            name: 'application',
+            email: 'admin@example.com',
+            isAdmin: 'y',
+        }
     }
-    return {
-        id: 'id-for-admin',
-        name: '測試者',
-        email: 'admin@example.com',
-        isAdmin: 'y',
+    if (token === 'sys') { //開發階段w-ui-loginout自動給予browser使用者(且位於localhost)的token為sys
+        return {
+            id: 'id-for-admin',
+            name: 'tester',
+            email: 'admin@example.com',
+            isAdmin: 'y',
+        }
     }
+    console.log('invalid token', token)
+    return {}
 }
 
 //WWebPerm

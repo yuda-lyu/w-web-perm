@@ -9,7 +9,7 @@ import ds from '../schema/index.mjs'
 let userDef = {
     id: '', //id-for-admin
     name: '', //測試者
-    email: '', //id-for-admin@example.com
+    email: '', //admin@example.com
     // isVirtual: 'n',
     isAdmin: 'n',
     // isActive: 'n',

@@ -92,9 +92,10 @@
 
         <WTree
             :viewHeightMax="treeHeight"
-            :icon-toggle-color="'#666'"
-            :icon-toggle-background-color="'transparent'"
-            :icon-toggle-background-color-hover="'transparent'"
+            :indent="0.5"
+            :iconToggleColor="'#666'"
+            :iconToggleBackgroundColor="'transparent'"
+            :iconToggleBackgroundColorHover="'transparent'"
             :data="treeBlocks"
         >
             <template v-slot:item="props">
@@ -207,6 +208,7 @@
 
 <script>
 import { mdiEyeCheck, mdiEyeOff, mdiEyedropper, mdiEyedropperOff } from '@mdi/js/mdi.js'
+import JSON5 from 'json5'
 import get from 'lodash/get'
 import set from 'lodash/set'
 import each from 'lodash/each'
@@ -275,7 +277,7 @@ export default {
             let group = cloneDeep(vo.group)
 
             //save rules
-            let rules = JSON.parse(group.crules)
+            let rules = JSON5.parse(group.crules)
             group.rules = rules
             // console.log('rules', rules)
 
@@ -302,30 +304,6 @@ export default {
         targets: function() {
             return get(this, `$store.state.targets`)
         },
-
-        // blocks: function() {
-        //     // console.log('computed blocks')
-
-        //     let vo = this
-
-        //     //rs
-        //     let rs = map(vo.targets, (v) => {
-
-        //         //text, parentId
-        //         let s = sep(v.id, '.')
-        //         let text = get(takeRight(s), 0) //取最後節點
-        //         s = dropRight(s, 1)
-        //         let parentId = join(s, '.') //取父節點
-
-        //         return {
-        //             ...v,
-        //             parentId,
-        //             text,
-        //         }
-        //     })
-
-        //     return rs
-        // },
 
         treeBlocks: function() {
             // console.log('computed treeBlocks')

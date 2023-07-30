@@ -1,65 +1,108 @@
 import axios from 'axios'
+import get from 'lodash/get'
 import isestr from 'wsemi/src/isestr.mjs'
+import isbol from 'wsemi/src/isbol.mjs'
+import isfun from 'wsemi/src/isfun.mjs'
+import genPm from 'wsemi/src/genPm.mjs'
+import pmInvResolve from 'wsemi/src/pmInvResolve.mjs'
 
 
-let _url = ''
+function perm() {
 
+    //pmd
+    let pmd = null
 
-function iniPerm(url) {
-    _url = url
-}
+    //conn
+    let conn = (url, opt = {}) => {
 
+        //check
+        if (!isestr(url)) {
+            throw new Error(`invalid url`)
+        }
+        if (url.indexOf('token=') === 0) {
+            throw new Error(`url does not include 'token='`)
+        }
+        if (url.indexOf('userId=') === 0) {
+            throw new Error(`url does not include 'userId='`)
+        }
 
-function getPerm(token = '') {
+        //thenExtractData
+        let thenExtractData = get(opt, 'thenExtractData')
+        if (!isbol(thenExtractData)) {
+            thenExtractData = false //通過axios取數據時須給予true
+        }
 
-    //check
-    if (!isestr(_url)) {
-        throw new Error(`invalid url, need to use iniPerm to set url`)
+        //useAsync
+        let useAsync = get(opt, 'useAsync')
+        if (!isbol(useAsync)) {
+            useAsync = false
+        }
+
+        //permSuccess
+        let permSuccess = get(opt, 'permSuccess')
+
+        //permError
+        let permError = get(opt, 'permError')
+
+        //pm
+        let pm = null
+        if (useAsync) {
+            pm = genPm()
+        }
+
+        //get
+        let pms = axios.get(url)
+        pms = pmInvResolve(pms, { thenExtractData })
+        pms
+            .then((res) => {
+                // console.log('perm.getPerm then', res)
+                pmd = res
+                if (isfun(permSuccess)) {
+                    permSuccess(pmd)
+                }
+                if (useAsync) {
+                    pm.resolve(kp)
+                }
+            })
+            .catch((err) => {
+                // console.log('perm.getPerm catch', err)
+                if (isfun(permError)) {
+                    permError(err)
+                }
+                if (useAsync) {
+                    pm.reject()
+                }
+            })
+
+        if (useAsync) {
+            return pm
+        }
+        return kp
     }
 
-    // //pm
-    // let pm = genPm()
-
-    //url
-    let url = ''
-    if (isestr(token)) {
-        url = `${_url}?token=${token}`
+    //kp
+    let kp = {
+        conn,
+        getUser: () => {
+            let u = get(pmd, `user`, {})
+            // console.log('u', u)
+            return u
+        },
+        getRules: () => {
+            return get(pmd, `rules`, {})
+        },
+        rule: (key) => {
+            return get(pmd, `rules.${key}`, {})
+        },
+        show: (key) => {
+            return get(pmd, `rules.${key}.show`, 'n')
+        },
+        active: (key) => {
+            return get(pmd, `rules.${key}.active`, 'n')
+        },
     }
-    else {
-        url = _url
-    }
 
-    //axios
-    let pm = axios({
-        method: 'get',
-        url,
-        // headers: { 'Content-Type': 'application/json; charset=utf-8' },
-        // data: rin,
-    })
-    // .then((res) => {
-    //     console.log(res)
-    //     let r = {
-    //         msg: '成功取得使用者權限',
-    //         res,
-    //     }
-    //     pm.resolve(r)
-    // })
-    // .catch((err) => {
-    //     console.log(err)
-    //     let r = {
-    //         msg: '取得使用者權限發生錯誤',
-    //         res: err,
-    //     }
-    //     pm.reject(r)
-    // })
-
-    return pm
-}
-
-
-let perm = {
-    iniPerm,
-    getPerm,
+    return kp
 }
 
 

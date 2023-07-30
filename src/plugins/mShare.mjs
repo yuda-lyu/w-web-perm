@@ -1,4 +1,5 @@
 //前後端共用函數區
+import JSON5 from 'json5'
 import get from 'lodash/get'
 import each from 'lodash/each'
 import map from 'lodash/map'
@@ -14,16 +15,20 @@ import haskey from 'wsemi/src/haskey.mjs'
 import composeToTree from 'wsemi/src/composeToTree.mjs'
 
 
+//dlm
+let dlm = '/'
+
+
 function getAllBlocks(targets) {
 
     //rs
     let rs = map(targets, (v) => {
 
         //text, parentId
-        let s = sep(v.id, '.')
+        let s = sep(v.id, dlm) //[tag:dlm]
         let text = get(takeRight(s), 0) //取最後節點
         s = dropRight(s, 1)
-        let parentId = join(s, '.') //取父節點
+        let parentId = join(s, dlm) //[tag:dlm] 取父節點
 
         return {
             ...v,
@@ -32,9 +37,11 @@ function getAllBlocks(targets) {
             text,
         }
     })
+    // console.log('rs', rs)
 
     //sortBy
     rs = sortBy(rs, 'order')
+    // console.log('rs sortBy', rs)
 
     return rs
 }
@@ -44,6 +51,7 @@ function getTreeBlocks(targets) {
 
     //getAllBlocks
     let blocks = getAllBlocks(targets)
+    // console.log('blocks', blocks)
 
     //opt
     let opt = {
@@ -86,7 +94,7 @@ function getUserGroups(user, ruleGroups) {
 
     //add rules
     gs = map(gs, (g) => {
-        let rules = JSON.parse(g.crules)
+        let rules = JSON5.parse(g.crules)
         g.rules = rules
         return g
     })
@@ -107,7 +115,7 @@ function getTargetsByGroup(targets, group) {
     group = cloneDeep(group)
 
     //rules
-    let rules = JSON.parse(group.crules)
+    let rules = JSON5.parse(group.crules)
 
     //rulesDisplay
     let rulesDisplay = {}
@@ -157,10 +165,18 @@ function getTargetsByGroup(targets, group) {
 
 
 function getUserRules(user, ruleGroups, targets) {
+    //依照使用者所允許之ruleGroups轉出對全部targets權限
+
+    //ruleGroupsIds
+    let ruleGroupsIds = get(user, 'ruleGroupsIds', '')
 
     //getUserGroups
     let gs = getUserGroups(user, ruleGroups)
     // console.log('gs', gs)
+
+    //ruleGroupsNames
+    let ruleGroupsNames = map(gs, 'name')
+    ruleGroupsNames = join(ruleGroupsNames, ';')
 
     //getTargetsByGroup
     let rulesDisplay = {}
@@ -196,7 +212,11 @@ function getUserRules(user, ruleGroups, targets) {
     })
     // console.log('rulesDisplay', rulesDisplay)
 
-    return rulesDisplay
+    return {
+        ruleGroupsIds,
+        ruleGroupsNames,
+        rules: rulesDisplay,
+    }
 }
 
 

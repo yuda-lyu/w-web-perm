@@ -153,6 +153,7 @@
 <script>
 import { mdiAccountEdit, mdiFileTree } from '@mdi/js/mdi.js'
 import Vue from 'vue'
+// import JSON5 from 'json5'
 import get from 'lodash/get'
 import each from 'lodash/each'
 import map from 'lodash/map'
@@ -227,9 +228,9 @@ export default {
 
             let vo = this
 
-            //rs, 此區程式碼等同於ruleGroups, 若確認後續無需求再移除
+            //rs
             let rs = map(vo.ruleGroups, (v) => {
-                // let rules = JSON.parse(v.crules)
+                // let rules = JSON5.parse(v.crules)
                 return {
                     ...v,
                     // rules,
@@ -311,8 +312,8 @@ export default {
             //mergedGroup
             let mergedGroup = {
                 id: 'merged-group',
-                name: 'merged-group',
-                crules: JSON.stringify(urs),
+                name: urs.ruleGroupsNames,
+                crules: JSON.stringify(urs.rules),
             }
 
             //mergedGroup
