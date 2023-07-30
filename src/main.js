@@ -1,9 +1,5 @@
-import get from 'lodash/get'
-// import '@babel/polyfill' //需提供Vuetify的Symbol等API
-// import 'core-js/stable' //需提供Vuetify的Symbol等API, 官網說使用transpileDependencies但不夠, 改用之前提到的@babel/polyfill會被提示已廢棄, 改使用給webpack的polyfill方式才行
-// import 'regenerator-runtime/runtime'
-// import 'intersection-observer' //需供Vuetify的Intersection Observer, 專案內有使用v-intersect才需引入, 而w-component-vue沒用v-intersect
 import Vue from 'vue'
+import get from 'lodash/get'
 import WServHapiClient from 'w-serv-hapi/src/WServHapiClient.mjs'
 import WAlert from 'w-component-vue/src/components/WAlert.mjs'
 import domMutation from 'w-component-vue/src/js/domMutation.mjs'
@@ -14,10 +10,9 @@ import store from './store/index.mjs'
 import mVuetify from './plugins/mVuetify.mjs'
 import ui from './plugins/mUI.mjs'
 import mDataSelectorSchema from './plugins/mDataSelectorSchema.mjs'
-import mDataSupport from './plugins/mDataSupport.mjs'
+// import mDataSupport from './plugins/mDataSupport.mjs'
 import * as s from './plugins/mShare.mjs'
 import ds from './schema/index.mjs'
-// console.log('globalState', globalState)
 // console.log('ds', ds)
 
 
@@ -36,15 +31,15 @@ Vue.prototype.$alert = function() {
 //dssm
 let dssm = mDataSelectorSchema(ds)
 
-//dspt
-let dspt = mDataSupport(Vue.prototype)
+// //dspt
+// let dspt = mDataSupport(Vue.prototype)
 
 //prototype
 Vue.prototype.$ui = ui
 Vue.prototype.$t = ui.getKpText
 Vue.prototype.$s = s
 Vue.prototype.$dssm = dssm
-Vue.prototype.$dspt = dspt
+// Vue.prototype.$dspt = dspt
 // Vue.prototype.$ds = ds
 Vue.prototype.$dg = {}
 
