@@ -27,12 +27,6 @@ function perm() {
             throw new Error(`url does not include 'userId='`)
         }
 
-        //thenExtractData
-        let thenExtractData = get(opt, 'thenExtractData')
-        if (!isbol(thenExtractData)) {
-            thenExtractData = false //通過axios取數據時須給予true
-        }
-
         //useAsync
         let useAsync = get(opt, 'useAsync')
         if (!isbol(useAsync)) {
@@ -53,7 +47,7 @@ function perm() {
 
         //get
         let pms = axios.get(url)
-        pms = pmInvResolve(pms, { thenExtractData })
+        pms = pmInvResolve(pms, { thenExtractData: true })
         pms
             .then((res) => {
                 // console.log('perm.getPerm then', res)
