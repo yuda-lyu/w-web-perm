@@ -54,7 +54,7 @@ let getUserByToken = async (token) => {
             isAdmin: 'y',
         }
     }
-    console.log('invalid token', token)
+    console.log('生產時得加入SSO等驗證token機制, invalid token', token)
     return {}
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "w-web-perm",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "main": "dist/w-web-perm.umd.js",
   "dependencies": {
     "@mdi/js": "^7.2.96",
@@ -8,12 +8,12 @@
     "json5": "^2.2.3",
     "lodash": "^4.17.21",
     "showdown": "^2.1.0",
-    "w-component-vue": "^2.3.18",
+    "w-component-vue": "^2.3.37",
     "w-data-collector": "^1.0.19",
     "w-serv-hapi": "^1.0.11",
     "w-serv-orm": "^1.0.7",
     "w-ui-loginout": "^1.0.4",
-    "wsemi": "^1.7.19"
+    "wsemi": "^1.7.38"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^5.0.8",
@@ -35,7 +35,7 @@
     "vuetify-loader": "^1.9.2",
     "vuex": "^3.6.2",
     "w-orm-mongodb": "^1.1.29",
-    "w-package-tools": "^1.0.69"
+    "w-package-tools": "^1.0.70"
   },
   "scripts": {
     "serve": "vue-cli-service serve",

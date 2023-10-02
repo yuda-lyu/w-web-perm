@@ -123,6 +123,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, opt = {}) {
     if (mappingBy !== 'id' && mappingBy !== 'email' && mappingBy !== 'name') {
         mappingBy = 'email'
     }
+    // console.log('mappingBy', mappingBy)
 
 
     //WServOrm
@@ -240,6 +241,12 @@ function WWebPerm(WOrm, url, db, getUserByToken, opt = {}) {
         let userFind = await woItems.users.select({ [mappingBy]: vSelf, isActive: 'y' })
         userFind = get(userFind, 0, null)
         // console.log('userFind', userFind)
+
+        //check
+        if (!iseobj(userFind)) {
+            console.log('invalid userFind')
+            return null
+        }
 
         //複寫isAdmin
         let isAdminSrc = get(userSelf, 'isAdmin', '')
