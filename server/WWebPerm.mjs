@@ -16,6 +16,7 @@ import strright from 'wsemi/src/strright.mjs'
 import strdelright from 'wsemi/src/strdelright.mjs'
 import pm2resolve from 'wsemi/src/pm2resolve.mjs'
 import fsIsFolder from 'wsemi/src/fsIsFolder.mjs'
+import fsIsFile from 'wsemi/src/fsIsFile.mjs'
 import replace from 'wsemi/src/replace.mjs'
 import WServHapiServer from 'w-serv-hapi/src/WServHapiServer.mjs'
 import WServOrm from 'w-serv-orm/src/WServOrm.mjs'
@@ -41,6 +42,7 @@ import { getUserRules } from '../src/plugins/mShare.mjs'
  * @param {Object} [opt.webDescription={}] 輸入站台描述物件，至少包含語系eng與cht鍵的名稱，預設{}
  * @param {String} [opt.webLogo=''] 輸入站台logo字串，採base64格式，預設''
  * @param {String} [opt.subfolder=''] 輸入站台所在子目錄字串，提供站台位於內網採反向代理進行服務時，故需支援位於子目錄情形，預設''
+ * @param {String} [opt.urlRedirect=''] 輸入錯誤時自動轉址字串，提供站台例如無法登入或驗證失敗時須自動轉址，預設''
  * @param {String} [opt.mappingBy='email'] 輸入外部系統識別使用者token後所提供之資料物件，與權限系統之使用者資料物件，兩者間查找之對應欄位，可選'id'、'email'、'name'，預設'email'
  * @returns {Object} 回傳物件，其內server為hapi伺服器實體，wsrv為w-converhp的伺服器事件物件，wsds為w-serv-webdata的伺服器事件物件，可監聽error事件
  * @example
@@ -193,6 +195,10 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
     }
 
 
+    //urlRedirect
+    let urlRedirect = get(opt, 'urlRedirect', '')
+
+
     //mappingBy
     let mappingBy = get(opt, 'mappingBy', '')
     if (mappingBy !== 'id' && mappingBy !== 'email' && mappingBy !== 'name') {
@@ -274,7 +280,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
 
         //check
         if (!iseobj(userSelf)) {
-            console.log(`can not find the user from token`, token)
+            console.log(`token`, token)
+            console.log(`can not find the user from token`)
             return Promise.reject(`can not find the user from token`)
         }
 
@@ -283,22 +290,26 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
             let id = get(userSelf, 'id', '')
             if (!isestr(id)) {
                 console.log('userSelf', userSelf)
+                console.log('can not get the userId')
                 return Promise.reject(`can not get the userId`)
             }
             let email = get(userSelf, 'email', '')
             if (!isestr(email)) {
                 console.log('userSelf', userSelf)
+                console.log('can not get the email of user')
                 return Promise.reject(`can not get the email of user`)
             }
             let name = get(userSelf, 'name', '')
             if (!isestr(name)) {
                 console.log('userSelf', userSelf)
+                console.log('can not get userName')
                 return Promise.reject(`can not get userName`)
             }
             let isAdmin = get(userSelf, 'isAdmin', '')
             if (isAdmin !== 'y' && isAdmin !== 'n') {
                 console.log('userSelf', userSelf)
                 console.log('userSelf.isAdmin is not y or n', userSelf.isAdmin)
+                console.log('can not get the role of user')
                 return Promise.reject(`can not get the role of user`)
             }
         }
@@ -311,6 +322,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
         if (!isestr(vSelf)) {
             console.log('userSelf', userSelf)
             console.log('mappingBy', mappingBy)
+            console.log('can not get the prop of user by mappingBy')
             return Promise.reject(`can not get the prop of user by mappingBy`)
         }
 
@@ -323,6 +335,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
         if (!iseobj(userFind)) {
             console.log('userSelf', userSelf)
             console.log('mappingBy', mappingBy)
+            console.log('can not get the user from perm')
             return Promise.reject(`can not get the user from perm`)
         }
 
@@ -343,7 +356,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
         //check
         if (!b) {
             console.log('userSelf', userSelf)
-            console.log('verifyUser/userFind', userFind)
+            console.log('userFind', userFind)
+            console.log('user does not have permission')
             return Promise.reject(`user does not have permission`)
         }
 
@@ -353,6 +367,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
 
     //parsePayload
     let parsePayload = async (req, key) => {
+
+        //inp
         let inp = get(req, 'payload')
 
         //to obj
@@ -363,6 +379,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
         //check
         if (!iseobj(inp)) {
             console.log('inp', inp)
+            console.log('invalid inp from req')
             return Promise.reject(`invalid inp from req`)
         }
 
@@ -373,6 +390,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
         if (!isestr(from)) {
             console.log('inp', inp)
             console.log('from', from)
+            console.log('invalid from from inp')
             return Promise.reject(`invalid from from inp`)
         }
 
@@ -387,6 +405,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
         if (!isearr(vs)) {
             console.log('inp', inp)
             console.log(key, vs)
+            console.log(`invalid ${key} from inp`)
             return Promise.reject(`invalid ${key} from inp`)
         }
 
@@ -411,6 +430,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
         if (!isestr(from)) {
             console.log('params', params)
             console.log('from', from)
+            console.log(`invalid from`)
             return Promise.reject(`invalid from`)
         }
 
@@ -422,6 +442,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
         if (!isearr(vs)) {
             console.log('params', params)
             console.log(key, vs)
+            console.log(`invalid ${key}`)
             return Promise.reject(`invalid ${key}`)
         }
 
@@ -492,7 +513,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
 
         //check
         if (!iseobj(urs)) {
-            console.log('can not get permrules', userId)
+            console.log('userId', userId)
+            console.log(`can not get permrules`)
             return Promise.reject(`can not get permrules`)
         }
 
@@ -520,9 +542,18 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
     let fnEntryOut = 'index.html'
     try {
         let fpEntryIn = path.resolve(pathStaticFiles, fnEntryIn)
+        if (!fsIsFile(fpEntryIn)) {
+            fpEntryIn = path.resolve(pathStaticFiles, fnEntryOut) //本機開發另使用html替代tmp
+        }
+        if (!fsIsFile(fpEntryIn)) {
+            console.log('fpEntryIn', fpEntryIn)
+            throw new Error(`invalid fpEntryIn`)
+        }
         let fpEntryOut = path.resolve(pathStaticFiles, fnEntryOut)
         let c = fs.readFileSync(fpEntryIn, 'utf8')
+        c = replace(c, '/mperm/', '{sfd}/') //方法同genEntry
         c = replace(c, '{sfd}', subfolder)
+        c = replace(c, '{urlRedirect}', urlRedirect)
         fs.writeFileSync(fpEntryOut, c, 'utf8')
     }
     catch (err) {
@@ -572,6 +603,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
                     if (!iseobj(userSelf)) {
                         console.log('token', token)
                         console.log('[API]getUserByToken/check userSelf: invalid userSelf')
+                        console.log(`token does not have permission`)
                         return Promise.reject(`token does not have permission`)
                     }
 
@@ -611,6 +643,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
                     if (!iseobj(userLogin)) {
                         console.log('token', token)
                         console.log('[API]getPerm/check userLogin: invalid userLogin')
+                        console.log(`token does not have permission`)
                         return Promise.reject(`token does not have permission`)
                     }
 
@@ -622,6 +655,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
                     if (!isestr(userId)) {
                         console.log('userLogin', userLogin)
                         console.log('[API]getPerm/check userId: invalid userId')
+                        console.log(`token does not have permission`)
                         return Promise.reject(`token does not have permission`)
                     }
 
@@ -633,6 +667,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
                     if (!iseobj(r)) {
                         console.log('userLogin', userLogin)
                         console.log('[API]getPerm/getGenUserAndRulesByUserId: user does not have permrules')
+                        console.log(`token does not have permission`)
                         return Promise.reject(`token does not have permission`)
                     }
 
@@ -667,6 +702,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
                     if (!iseobj(userSelf)) {
                         console.log('token', token)
                         console.log('[API]getPermById/check userSelf: invalid userSelf')
+                        console.log(`token does not have permission`)
                         return Promise.reject(`token does not have permission`)
                     }
 
@@ -687,6 +723,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
                     if (!iseobj(r)) {
                         console.log('userSelf', userSelf)
                         console.log('[API]getPermById/getGenUserAndRulesByUserId: user does not have permrules')
+                        console.log(`user does not have permrules`)
                         return Promise.reject(`user does not have permrules`)
                     }
 
@@ -719,6 +756,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
                     if (!iseobj(user)) {
                         console.log('token', token)
                         console.log('[API]syncAndReplaceUsers/check user: invalid user')
+                        console.log(`token does not have permission`)
                         return Promise.reject(`token does not have permission`)
                     }
 
@@ -757,6 +795,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
                     if (!iseobj(user)) {
                         console.log('token', token)
                         console.log('[API]syncAndReplaceTargets/check user: invalid user')
+                        console.log(`token does not have permission`)
                         return Promise.reject(`token does not have permission`)
                     }
 
@@ -795,6 +834,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
                     if (!iseobj(user)) {
                         console.log('token', token)
                         console.log('[API]syncAndReplaceRuleGroups/check user: invalid user')
+                        console.log(`token does not have permission`)
                         return Promise.reject(`token does not have permission`)
                     }
 

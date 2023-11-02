@@ -16,6 +16,7 @@ let opt = {
 
     serverPort: 11006,
     subfolder: '', //mperm
+    urlRedirect: 'https://www.google.com/', //本機測試時得先編譯, 再瀏覽: http://localhost:11006/
 
     webName: {
         'eng': 'Permission Service',
@@ -35,7 +36,7 @@ let getUserByToken = async (token) => {
         return {
             id: 'id-for-application',
             name: 'application',
-            email: 'admin@example.com',
+            email: 'application@example.com',
             isAdmin: 'y',
         }
     }
@@ -43,7 +44,7 @@ let getUserByToken = async (token) => {
         return {
             id: 'id-for-admin',
             name: 'tester',
-            email: 'admin@example.com',
+            email: 'admin@example.com', //mappingBy為email, 開發階段時會使用email找到所建置之使用者資料
             isAdmin: 'y',
         }
     }
@@ -53,6 +54,7 @@ let getUserByToken = async (token) => {
 }
 
 let verifyUser = (user) => {
+    // return false //測試無法登入
     console.log('於生產環境時得加入驗證user機制')
     return user.isAdmin === 'y' //測試僅系統管理者使用
 }
