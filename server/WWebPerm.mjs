@@ -46,9 +46,11 @@ import { getUserRules } from '../src/plugins/mShare.mjs'
  * @param {String} [opt.mappingBy='email'] 輸入外部系統識別使用者token後所提供之資料物件，與權限系統之使用者資料物件，兩者間查找之對應欄位，可選'id'、'email'、'name'，預設'email'
  * @returns {Object} 回傳物件，其內server為hapi伺服器實體，wsrv為w-converhp的伺服器事件物件，wsds為w-serv-webdata的伺服器事件物件，可監聽error事件
  * @example
+ *
  * import WOrm from 'w-orm-mongodb/src/WOrmMongodb.mjs' //自行選擇引用ORM, 使用Mongodb測試
  * import WWebPerm from './server/WWebPerm.mjs'
  * import getSettings from './g.getSettings.mjs'
+ *
  *
  * //st
  * let st = getSettings()
@@ -63,6 +65,7 @@ import { getUserRules } from '../src/plugins/mShare.mjs'
  *
  *     serverPort: 11006,
  *     subfolder: '', //mperm
+ *     urlRedirect: 'https://www.google.com/', //本機測試時得先編譯, 再瀏覽: http://localhost:11006/
  *
  *     webName: {
  *         'eng': 'Permission Service',
@@ -72,7 +75,7 @@ import { getUserRules } from '../src/plugins/mShare.mjs'
  *         'eng': 'A web service package for user permissions and management targets.',
  *         'cht': 'A web service package for user permissions and management targets.',
  *     },
- *     webLogo: 'data:image/svg+xml;base64,...',
+ *     webLogo: 'data:image/svg+xml;base64,PHN2ZyBmaWxsPSJub25lIiBoZWlnaHQ9IjQ4IiB3aWR0aD0iNDgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTQ4IDBIMHY0OGg0OFYwWiIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuMDEiLz48cGF0aCBkPSJNMzcuODU2IDIwdjhNMjcuNDY0IDM4bDMuNDY0LTIgMy40NjQtMk0yMC41MzYgMzhsLTMuNDY1LTItMy40NjQtMk0xMC4xNDQgMjB2OE0xMy42MDcgMTRsMy40NjUtMiAzLjQ2NC0yTTI3LjQ2NCAxMGwzLjQ2NCAyIDMuNDY0IDIiIHN0cm9rZT0iI0ZGOTgwMCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBzdHJva2Utd2lkdGg9IjIiLz48cGF0aCBkPSJNMjQgNDRhNCA0IDAgMSAwIDAtOCA0IDQgMCAwIDAgMCA4Wk0yNCAxMmE0IDQgMCAxIDAgMC04IDQgNCAwIDAgMCAwIDhaTTI0IDI4YTQgNCAwIDEgMCAwLTggNCA0IDAgMCAwIDAgOFpNMzggMjBhNCA0IDAgMSAwIDAtOCA0IDQgMCAwIDAgMCA4Wk0zOCAzNmE0IDQgMCAxIDAgMC04IDQgNCAwIDAgMCAwIDhaTTEwIDIwYTQgNCAwIDEgMCAwLTggNCA0IDAgMCAwIDAgOFpNMTAgMzZhNCA0IDAgMSAwIDAtOCA0IDQgMCAwIDAgMCA4WiIgZmlsbD0iI0ZGRTBCMiIgc3Ryb2tlPSIjRkY5ODAwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIHN0cm9rZS13aWR0aD0iMiIvPjwvc3ZnPg==',
  *
  * }
  *
@@ -82,7 +85,7 @@ import { getUserRules } from '../src/plugins/mShare.mjs'
  *         return {
  *             id: 'id-for-application',
  *             name: 'application',
- *             email: 'admin@example.com',
+ *             email: 'application@example.com',
  *             isAdmin: 'y',
  *         }
  *     }
@@ -90,7 +93,7 @@ import { getUserRules } from '../src/plugins/mShare.mjs'
  *         return {
  *             id: 'id-for-admin',
  *             name: 'tester',
- *             email: 'admin@example.com',
+ *             email: 'admin@example.com', //mappingBy為email, 開發階段時會使用email找到所建置之使用者資料
  *             isAdmin: 'y',
  *         }
  *     }
@@ -100,6 +103,7 @@ import { getUserRules } from '../src/plugins/mShare.mjs'
  * }
  *
  * let verifyUser = (user) => {
+ *     // return false //測試無法登入
  *     console.log('於生產環境時得加入驗證user機制')
  *     return user.isAdmin === 'y' //測試僅系統管理者使用
  * }
