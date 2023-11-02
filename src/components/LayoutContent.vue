@@ -20,9 +20,7 @@
             >
 
                 <template v-slot:drawer="props">
-
-                    <!-- 因drawer內部resize觸發可能不足或有容許誤差, 使用props.height可能會有多1px情形, 導致出現垂直捲軸 -->
-                    <div :style="`height:${panelHeight}px; background:#fff; position:relative;`">
+                    <div :style="`height:${props.height}px; background:#fff; position:relative;`">
 
                         <WListVertical
                             style="height:100%;"
@@ -62,12 +60,10 @@
                         </div>
 
                     </div>
-
                 </template>
 
                 <template v-slot:content="props">
-                    <!-- 因drawer內部resize觸發可能不足或有容許誤差, 使用props.height可能會有多1px情形, 導致出現垂直捲軸 -->
-                    <div :style="`height:${panelHeight}px; width:${props.width}px; position:relative;`">
+                    <div :style="`height:${props.height}px; width:${props.width}px; position:relative;`">
 
                         <template>
 

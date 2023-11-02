@@ -1,6 +1,6 @@
 {
   "name": "w-web-perm",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "main": "dist/w-web-perm.umd.js",
   "dependencies": {
     "@mdi/js": "^7.2.96",
@@ -8,7 +8,7 @@
     "json5": "^2.2.3",
     "lodash": "^4.17.21",
     "showdown": "^2.1.0",
-    "w-component-vue": "^2.3.46",
+    "w-component-vue": "^2.3.47",
     "w-data-collector": "^1.0.19",
     "w-serv-hapi": "^1.0.11",
     "w-serv-orm": "^1.0.7",
