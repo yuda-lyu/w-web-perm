@@ -48,13 +48,16 @@
             <pre class="prettyprint source linenums"><code>import path from 'path'
 import fs from 'fs'
 import get from 'lodash/get'
+import each from 'lodash/each'
 import keys from 'lodash/keys'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import ispint from 'wsemi/src/ispint.mjs'
+import isearr from 'wsemi/src/isearr.mjs'
 import isfun from 'wsemi/src/isfun.mjs'
 import ispm from 'wsemi/src/ispm.mjs'
 import cint from 'wsemi/src/cint.mjs'
+import j2o from 'wsemi/src/j2o.mjs'
 import strleft from 'wsemi/src/strleft.mjs'
 import strright from 'wsemi/src/strright.mjs'
 import strdelright from 'wsemi/src/strdelright.mjs'
@@ -68,13 +71,14 @@ import { getUserRules } from '../src/plugins/mShare.mjs'
 
 
 /**
- * 基於hapi之API伺服器
+ * 權限伺服器
  *
  * @class
  * @param {Function} WOrm 輸入資料庫ORM函數
  * @param {String} url 輸入資料庫連線字串，例如'mongodb://sername:password@$127.0.0.1:27017'
  * @param {String} db 輸入資料庫名稱字串
  * @param {Function} getUserByToken 輸入處理函數，函數會傳入使用者token，通過此函數處理後並回傳使用者資訊物件，並至少須提供'id'、'email'、'name'、'isAdmin'欄位，且'isAdmin'限輸入'y'或'n'，且輸入'y'時會複寫權限系統該使用者之'isAdmin'欄位值
+ * @param {Function} verifyUser 輸入處理函數，函數會傳入使用者資訊物件，通過此函數識別後回傳布林值，允許使用者回傳true，反之回傳false
  * @param {Object} [opt={}] 輸入設定物件，預設{}
  * @param {Integer} [opt.serverPort=11006] 輸入伺服器通訊port，預設11006
  * @param {Boolean} [opt.bCheckUser=false] 輸入是否檢查使用者資訊布林值，預設false
@@ -87,9 +91,73 @@ import { getUserRules } from '../src/plugins/mShare.mjs'
  * @param {String} [opt.mappingBy='email'] 輸入外部系統識別使用者token後所提供之資料物件，與權限系統之使用者資料物件，兩者間查找之對應欄位，可選'id'、'email'、'name'，預設'email'
  * @returns {Object} 回傳物件，其內server為hapi伺服器實體，wsrv為w-converhp的伺服器事件物件，wsds為w-serv-webdata的伺服器事件物件，可監聽error事件
  * @example
-
+ * import WOrm from 'w-orm-mongodb/src/WOrmMongodb.mjs' //自行選擇引用ORM, 使用Mongodb測試
+ * import WWebPerm from './server/WWebPerm.mjs'
+ * import getSettings from './g.getSettings.mjs'
+ *
+ * //st
+ * let st = getSettings()
+ *
+ * let url = `mongodb://${st.dbUsername}:${st.dbPassword}@${st.dbIP}:${st.dbPort}` //使用Mongodb測試
+ * let db = st.dbName
+ * let opt = {
+ *
+ *     bCheckUser: false,
+ *     getUserById: null,
+ *     bExcludeWhenNotAdmin: false,
+ *
+ *     serverPort: 11006,
+ *     subfolder: '', //mperm
+ *
+ *     webName: {
+ *         'eng': 'Permission Service',
+ *         'cht': '權限管理系統',
+ *     },
+ *     webDescription: {
+ *         'eng': 'A web service package for user permissions and management targets.',
+ *         'cht': 'A web service package for user permissions and management targets.',
+ *     },
+ *     webLogo: 'data:image/svg+xml;base64,...',
+ *
+ * }
+ *
+ * let getUserByToken = async (token) => {
+ *     // return {} //測試無法登入
+ *     if (token === '{token-for-application}') { //提供外部應用系統作為存取使用者
+ *         return {
+ *             id: 'id-for-application',
+ *             name: 'application',
+ *             email: 'admin@example.com',
+ *             isAdmin: 'y',
+ *         }
+ *     }
+ *     if (token === 'sys') { //開發階段w-ui-loginout自動給予browser使用者(且位於localhost)的token為sys
+ *         return {
+ *             id: 'id-for-admin',
+ *             name: 'tester',
+ *             email: 'admin@example.com',
+ *             isAdmin: 'y',
+ *         }
+ *     }
+ *     console.log('invalid token', token)
+ *     console.log('於生產環境時得加入SSO等驗證token機制')
+ *     return {}
+ * }
+ *
+ * let verifyUser = (user) => {
+ *     console.log('於生產環境時得加入驗證user機制')
+ *     return user.isAdmin === 'y' //測試僅系統管理者使用
+ * }
+ *
+ * //WWebPerm
+ * let instWWebPerm = WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt)
+ *
+ * instWWebPerm.on('error', (err) => {
+ *     console.log(err)
+ * })
+ *
  */
-function WWebPerm(WOrm, url, db, getUserByToken, opt = {}) {
+function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
     let instWServHapiServer = null
 
 
@@ -118,6 +186,13 @@ function WWebPerm(WOrm, url, db, getUserByToken, opt = {}) {
     if (!isfun(getUserByToken)) {
         console.log('invalid getUserByToken', getUserByToken)
         throw new Error('invalid getUserByToken')
+    }
+
+
+    //check verifyUser
+    if (!isfun(verifyUser)) {
+        console.log('invalid verifyUser', verifyUser)
+        throw new Error('invalid verifyUser')
     }
 
 
@@ -246,31 +321,32 @@ function WWebPerm(WOrm, url, db, getUserByToken, opt = {}) {
 
         //check
         if (!iseobj(userSelf)) {
-            console.log('invalid userSelf')
-            return null
+            console.log(`can not find the user from token`, token)
+            return Promise.reject(`can not find the user from token`)
         }
 
         //check userSelf
         if (true) {
             let id = get(userSelf, 'id', '')
             if (!isestr(id)) {
-                console.log('invalid userSelf.id')
-                return null
+                console.log('userSelf', userSelf)
+                return Promise.reject(`can not get the userId`)
             }
             let email = get(userSelf, 'email', '')
             if (!isestr(email)) {
-                console.log('invalid userSelf.email')
-                return null
+                console.log('userSelf', userSelf)
+                return Promise.reject(`can not get the email of user`)
             }
             let name = get(userSelf, 'name', '')
             if (!isestr(name)) {
-                console.log('invalid userSelf.name')
-                return null
+                console.log('userSelf', userSelf)
+                return Promise.reject(`can not get userName`)
             }
             let isAdmin = get(userSelf, 'isAdmin', '')
             if (isAdmin !== 'y' &amp;&amp; isAdmin !== 'n') {
-                console.log('userSelf.isAdmin is not y or n')
-                return null
+                console.log('userSelf', userSelf)
+                console.log('userSelf.isAdmin is not y or n', userSelf.isAdmin)
+                return Promise.reject(`can not get the role of user`)
             }
         }
 
@@ -280,8 +356,9 @@ function WWebPerm(WOrm, url, db, getUserByToken, opt = {}) {
 
         //check
         if (!isestr(vSelf)) {
-            console.log('invalid vSelf')
-            return null
+            console.log('userSelf', userSelf)
+            console.log('mappingBy', mappingBy)
+            return Promise.reject(`can not get the prop of user by mappingBy`)
         }
 
         //userFind
@@ -291,8 +368,9 @@ function WWebPerm(WOrm, url, db, getUserByToken, opt = {}) {
 
         //check
         if (!iseobj(userFind)) {
-            console.log('invalid userFind')
-            return null
+            console.log('userSelf', userSelf)
+            console.log('mappingBy', mappingBy)
+            return Promise.reject(`can not get the user from perm`)
         }
 
         //複寫isAdmin
@@ -303,7 +381,109 @@ function WWebPerm(WOrm, url, db, getUserByToken, opt = {}) {
         }
         // console.log('userFind(isAdmin)', userFind)
 
+        //verifyUser
+        let b = verifyUser(userFind)
+        if (ispm(b)) {
+            b = await b
+        }
+
+        //check
+        if (!b) {
+            console.log('userSelf', userSelf)
+            console.log('verifyUser/userFind', userFind)
+            return Promise.reject(`user does not have permission`)
+        }
+
         return userFind
+    }
+
+
+    //parsePayload
+    let parsePayload = async (req, key) => {
+        let inp = get(req, 'payload')
+
+        //to obj
+        if (isestr(inp)) {
+            inp = j2o(inp)
+        }
+
+        //check
+        if (!iseobj(inp)) {
+            console.log('inp', inp)
+            return Promise.reject(`invalid inp from req`)
+        }
+
+        //from
+        let from = get(inp, 'from', '')
+
+        //check
+        if (!isestr(from)) {
+            console.log('inp', inp)
+            console.log('from', from)
+            return Promise.reject(`invalid from from inp`)
+        }
+
+
+        //vs
+        let vs = get(inp, key, [])
+        //users
+        //targets
+        //ruleGroups
+
+        //check
+        if (!isearr(vs)) {
+            console.log('inp', inp)
+            console.log(key, vs)
+            return Promise.reject(`invalid ${key} from inp`)
+        }
+
+        //resave
+        inp = {
+            from,
+            [key]: vs,
+        }
+
+        return inp
+    }
+
+
+    //syncAndReplaceRows
+    let syncAndReplaceRows = async (params, key) => {
+
+        //from
+        let from = get(params, 'from', '')
+        // console.log('from', from)
+
+        //check
+        if (!isestr(from)) {
+            console.log('params', params)
+            console.log('from', from)
+            return Promise.reject(`invalid from`)
+        }
+
+        //vs
+        let vs = get(params, key, [])
+        // console.log(key, vs)
+
+        //check
+        if (!isearr(vs)) {
+            console.log('params', params)
+            console.log(key, vs)
+            return Promise.reject(`invalid ${key}`)
+        }
+
+        //save from
+        each(vs, (v, k) => {
+            vs[k].from = from
+        })
+
+        //delAll from
+        await woItems[key].delAll({ from })
+
+        //insert
+        let r = await woItems[key].insert(vs)
+
+        return r
     }
 
 
@@ -436,9 +616,16 @@ function WWebPerm(WOrm, url, db, getUserByToken, opt = {}) {
                     // console.log('userSelf', userSelf)
 
                     //check
-                    if (get(userSelf, 'isAdmin') !== 'y') { //權限系統須系統管理員才能使用
-                        return Promise.reject(`user does not have permission`)
+                    if (!iseobj(userSelf)) {
+                        console.log('token', token)
+                        console.log('[API]getUserByToken/check userSelf: invalid userSelf')
+                        return Promise.reject(`token does not have permission`)
                     }
+
+                    // //check
+                    // if (get(userSelf, 'isAdmin') !== 'y') { //權限系統須系統管理員才能使用
+                    //     return Promise.reject(`user does not have permission`)
+                    // }
 
                     return userSelf
                 }
@@ -469,7 +656,9 @@ function WWebPerm(WOrm, url, db, getUserByToken, opt = {}) {
 
                     //check
                     if (!iseobj(userLogin)) {
-                        return Promise.reject(`user does not have permission`)
+                        console.log('token', token)
+                        console.log('[API]getPerm/check userLogin: invalid userLogin')
+                        return Promise.reject(`token does not have permission`)
                     }
 
                     //parseUserId
@@ -478,7 +667,9 @@ function WWebPerm(WOrm, url, db, getUserByToken, opt = {}) {
 
                     //check
                     if (!isestr(userId)) {
-                        return Promise.reject(`invalid user`)
+                        console.log('userLogin', userLogin)
+                        console.log('[API]getPerm/check userId: invalid userId')
+                        return Promise.reject(`token does not have permission`)
                     }
 
                     //getGenUserAndRulesByUserId
@@ -487,7 +678,9 @@ function WWebPerm(WOrm, url, db, getUserByToken, opt = {}) {
 
                     //check
                     if (!iseobj(r)) {
-                        return Promise.reject(`user does not have permrules`)
+                        console.log('userLogin', userLogin)
+                        console.log('[API]getPerm/getGenUserAndRulesByUserId: user does not have permrules')
+                        return Promise.reject(`token does not have permission`)
                     }
 
                     return r
@@ -518,9 +711,16 @@ function WWebPerm(WOrm, url, db, getUserByToken, opt = {}) {
                     // console.log('userSelf', userSelf)
 
                     //check
-                    if (get(userSelf, 'isAdmin') !== 'y') { //權限系統須系統管理員才能使用
-                        return Promise.reject(`user does not have permission`)
+                    if (!iseobj(userSelf)) {
+                        console.log('token', token)
+                        console.log('[API]getPermById/check userSelf: invalid userSelf')
+                        return Promise.reject(`token does not have permission`)
                     }
+
+                    // //check
+                    // if (get(userSelf, 'isAdmin') !== 'y') { //權限系統須系統管理員才能使用
+                    //     return Promise.reject(`user does not have permission`)
+                    // }
 
                     //userId
                     let userId = get(req, 'query.userId', '')
@@ -532,6 +732,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, opt = {}) {
 
                     //check
                     if (!iseobj(r)) {
+                        console.log('userSelf', userSelf)
+                        console.log('[API]getPermById/getGenUserAndRulesByUserId: user does not have permrules')
                         return Promise.reject(`user does not have permrules`)
                     }
 
@@ -541,6 +743,120 @@ function WWebPerm(WOrm, url, db, getUserByToken, opt = {}) {
                 //pm2resolve core
                 let r = await pm2resolve(core)() //w-ui-loginout接收已預設格式用pm2resolve轉過, 須另提取state進行判斷
                 // console.log('getUserByToken', r)
+
+                return r
+            },
+        },
+        {
+            method: 'POST',
+            path: '/syncAndReplaceUsers',
+            handler: async function (req, res) {
+                // console.log('syncAndReplaceUsers', req)
+                // console.log('payload', req.payload)
+
+                async function core() {
+
+                    //token
+                    let token = get(req, 'query.token', '')
+
+                    //getTokenUserForSelf
+                    let user = await getTokenUserForSelf(token)
+
+                    //check
+                    if (!iseobj(user)) {
+                        console.log('token', token)
+                        console.log('[API]syncAndReplaceUsers/check user: invalid user')
+                        return Promise.reject(`token does not have permission`)
+                    }
+
+                    //parsePayload
+                    let inp = await parsePayload(req, 'users')
+
+                    //syncAndReplaceRows
+                    let r = await syncAndReplaceRows(inp, 'users')
+
+                    return r
+                }
+
+                //pm2resolve core
+                let r = await pm2resolve(core)()
+                // console.log('verifyIdentity', r)
+
+                return r
+            },
+        },
+        {
+            method: 'POST',
+            path: '/syncAndReplaceTargets',
+            handler: async function (req, res) {
+                // console.log('syncAndReplaceTargets', req)
+                // console.log('payload', req.payload)
+
+                async function core() {
+
+                    //token
+                    let token = get(req, 'query.token', '')
+
+                    //getTokenUserForSelf
+                    let user = await getTokenUserForSelf(token)
+
+                    //check
+                    if (!iseobj(user)) {
+                        console.log('token', token)
+                        console.log('[API]syncAndReplaceTargets/check user: invalid user')
+                        return Promise.reject(`token does not have permission`)
+                    }
+
+                    //parsePayload
+                    let inp = await parsePayload(req, 'targets')
+
+                    //syncAndReplaceRows
+                    let r = await syncAndReplaceRows(inp, 'targets')
+
+                    return r
+                }
+
+                //pm2resolve core
+                let r = await pm2resolve(core)()
+                // console.log('verifyIdentity', r)
+
+                return r
+            },
+        },
+        {
+            method: 'POST',
+            path: '/syncAndReplaceRuleGroups',
+            handler: async function (req, res) {
+                // console.log('syncAndReplaceRuleGroups', req)
+                // console.log('payload', req.payload)
+
+                async function core() {
+
+                    //token
+                    let token = get(req, 'query.token', '')
+
+                    //getTokenUserForSelf
+                    let user = await getTokenUserForSelf(token)
+
+                    //check
+                    if (!iseobj(user)) {
+                        console.log('token', token)
+                        console.log('[API]syncAndReplaceRuleGroups/check user: invalid user')
+                        return Promise.reject(`token does not have permission`)
+                    }
+
+                    //parsePayload
+                    let inp = await parsePayload(req, 'ruleGroups')
+
+                    //syncAndReplaceRows
+                    let r = await syncAndReplaceRows(inp, 'ruleGroups')
+
+                    return r
+                }
+
+                //pm2resolve core
+                let r = await pm2resolve(core)()
+                // console.log('verifyIdentity', r)
 
                 return r
             },
@@ -602,7 +918,7 @@ export default WWebPerm
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.2</a> on Mon Oct 02 2023 22:10:57 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.2</a> on Thu Nov 02 2023 10:30:51 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
