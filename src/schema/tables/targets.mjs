@@ -22,17 +22,13 @@ let settings = {
         name: '順序',
         type: 'INTEGER',
     },
-    // key: {
-    //     name: '所屬區塊識別鍊',
-    //     type: 'STRING',
-    // },
-    // name: {
-    //     name: '區塊名稱',
-    //     type: 'STRING',
-    // },
     description: {
         name: '說明',
         type: 'TEXT',
+    },
+    from: {
+        name: '來源',
+        type: 'STRING',
     },
 }
 
@@ -71,7 +67,8 @@ let funTest = () => {
     ]
     rs = map(rs, (key, k) => {
         let v = funNew({ description: key })
-        v.id = `id-for-${key}`
+        v.id = key
+        v.order = k
         v = dtpick(v, keys(settings))
         return v
     })

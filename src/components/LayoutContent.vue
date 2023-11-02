@@ -14,8 +14,9 @@
                 :drawerWidthMin="drawerWidthMin"
                 :drawerWidthMax="drawerWidthMax"
                 :mode="'from-left'"
-                :afloat="drawerAfloat"
                 :dragDrawerWidth="true"
+                :autoSwitch="true"
+                :switchWidth="drawerWidth*2.3"
             >
 
                 <template v-slot:drawer="props">
@@ -71,7 +72,7 @@
                         <template>
 
                             <LayoutContentTargets
-                                v-if="menuKey==='blocks'"
+                                v-if="menuKey==='targets'"
                             ></LayoutContentTargets>
 
                             <LayoutContentGroups
@@ -123,12 +124,9 @@
 </template>
 
 <script>
-import { mdiGamepadCircle, mdiStackOverflow, mdiAccountGroupOutline, mdiBallotRecountOutline } from '@mdi/js/mdi.js'
+import { mdiGamepadCircle, mdiStackOverflow, mdiAccountGroupOutline } from '@mdi/js/mdi.js'
 import get from 'lodash/get'
-// import map from 'lodash/map'
-// import each from 'lodash/each'
-// import cloneDeep from 'lodash/cloneDeep'
-// import pmSeries from 'wsemi/src/pmSeries.mjs'
+import find from 'lodash/find'
 import WDrawer from 'w-component-vue/src/components/WDrawer.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
 import WListVertical from 'w-component-vue/src/components/WListVertical.vue'
@@ -147,46 +145,16 @@ export default {
         LayoutContentUsers,
     },
     props: {
-        // menuKey: {
-        //     type: String,
-        //     default: '',
-        // },
     },
     data: function() {
-        let menus = [
-            {
-                key: 'blocks',
-                text: '管理區塊',
-                icon: mdiGamepadCircle,
-            },
-            {
-                key: 'groups',
-                text: '權限群組',
-                icon: mdiStackOverflow,
-            },
-            {
-                key: 'users',
-                text: '使用者權限',
-                icon: mdiAccountGroupOutline,
-            },
-            // {
-            //     key: 'logs',
-            //     text: '事件紀錄',
-            //     icon: mdiBallotRecountOutline,
-            // },
-        ]
         return {
 
-            menuKey: 'blocks',
-            menus,
-            menuActive: menus[0],
+            menuKey: 'targets',
 
             panelWidth: 0,
-            panelWidthTemp: 0,
             panelHeight: 0,
 
             drawer: true,
-            drawerAfloat: false,
             drawerWidth: 180,
             drawerWidthMin: 150,
             drawerWidthMax: 300,
@@ -197,6 +165,35 @@ export default {
 
         syncState: function() {
             return get(this, '$store.state.syncState')
+        },
+
+        menus: function() {
+            let vo = this
+            let ms = [
+                {
+                    key: 'targets',
+                    text: vo.$t('managementTargets'),
+                    icon: mdiGamepadCircle,
+                },
+                {
+                    key: 'groups',
+                    text: vo.$t('permissionGroups'),
+                    icon: mdiStackOverflow,
+                },
+                {
+                    key: 'users',
+                    text: vo.$t('userPermissions'),
+                    icon: mdiAccountGroupOutline,
+                },
+            ]
+            return ms
+        },
+
+        menuActive: function() {
+            let vo = this
+            let r = find(vo.menus, { key: vo.menuKey })
+            // console.log(r)
+            return r
         },
 
     },
@@ -211,30 +208,6 @@ export default {
             vo.panelWidth = msg.snew.clientWidth
             vo.panelHeight = msg.snew.clientHeight
             // console.log('vo.panelHeight', vo.panelHeight)
-
-            //modeResize
-            let modeResize = '' //寬度可能相同故得有預設空字串的種類
-            if (vo.panelWidth > vo.panelWidthTemp) {
-                modeResize = 'toLarge'
-            }
-            else if (vo.panelWidth < vo.panelWidthTemp) {
-                modeResize = 'toSmall'
-            }
-            // console.log('modeResize', modeResize, vo.panelWidth, vo.panelWidthTemp)
-
-            //drawer
-            if (vo.drawer && modeResize === 'toSmall' && vo.panelWidth < 1.7 * vo.drawerWidthMax) { //已開啟抽屜且為變窄時才偵測
-                vo.drawer = false
-            }
-            else if (!vo.drawer && modeResize === 'toLarge' && vo.panelWidth >= 1.7 * vo.drawerWidthMax) { //已隱藏抽屜且為變寬時才偵測
-                vo.drawer = true
-            }
-
-            //drawerAfloat
-            vo.drawerAfloat = vo.panelWidth < 1.7 * vo.drawerWidthMax
-
-            //save
-            vo.panelWidthTemp = vo.panelWidth
 
         },
 

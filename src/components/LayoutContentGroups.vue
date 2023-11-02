@@ -7,37 +7,35 @@
     >
 
         <div
-            style="border-bottom:1px solid #ddd;"
+            style="border-bottom:1px solid #ddd; background:#fff;"
             v-domresize
             @domresize="resizeHead"
         >
 
             <!-- 標題區 -->
-            <div style="padding:30px 25px 0px 20px; background:#fff;">
-                <div style="padding:5px 15px 5px 5px; display:inline-block; border-bottom:3px solid #FF9100;">
-                    <div style="display:flex; align-items:center;">
+            <div style="display:inline-block; vertical-align:top; padding:10px 0px 5px 20px;">
+                <div style="display:flex; align-items:center; padding:5px 15px 5px 5px; border-bottom:3px solid #FF9100;">
 
-                        <WIcon
-                            :icon="mdiStackOverflow"
-                            :color="'#FF9800'"
-                        ></WIcon>
+                    <WIcon
+                        :icon="mdiStackOverflow"
+                        :color="'#FF9800'"
+                    ></WIcon>
 
-                        <div style="padding-left:10px; font-size:1.3rem; color:#d3912c;">
-                            管理權限群組
-                        </div>
-
+                    <div style="padding-left:10px; font-size:1.3rem; color:#d3912c;">
+                        {{$t('permissionGroups')}}
                     </div>
+
                 </div>
             </div>
 
             <!-- 編輯設定區 -->
-            <div style="background:#fff;">
+            <div style="display:inline-block; vertical-align:top;">
 
-                <div style="padding:20px 20px 15px 20px; background:#fff;">
+                <div style="padding:15px 20px 15px 20px; background:#fff;">
 
                     <div style="display:flex;">
                         <WSwitch
-                            :text="'是否編輯'"
+                            :text="$t('isEditabled')"
                             :checkedSwitchCircleColor="'#D81B60'"
                             :checkedSwitchCircleColorHover="'#f26'"
                             :checkedSwitchBarColor="'#F8BBD0'"
@@ -48,37 +46,35 @@
 
                     <div style="padding-top:5px; font-size:0.8rem; _color:#f26;" v-if="isOperatable">
                         <div style="padding:3px 0px;">
-                            1. 請依照系統管理需求創建適合各類使用者適合的權限群組。
+                            1. {{$t('groupMsg1')}}
                         </div>
                         <div style="padding:3px 0px;">
-                            2. 開啟編輯時可拖曳權限群組變更其相對順序。
-                        </div>
-                        <div style="padding:3px 0px;">
-                            3. 此區域變更時將自動儲存。
+                            2. {{$t('groupMsg2')}}
                         </div>
                     </div>
 
                 </div>
 
-                <div
-                    style="padding:10px 10px 12px 10px; border-top:1px solid #F48FB1; border-bottom:1px solid #F48FB1; background:#FCE4EC; display:flex; align-items:center; justify-content:flex-end;"
-                    v-if="isModified"
-                >
+            </div>
 
-                    <WButtonChip
-                        :paddingStyle="{v:0,h:11}"
-                        :text="'儲存變更'"
-                        :icon="mdiCloudUploadOutline"
-                        :backgroundColor="'rgba(255,0,50,0.7)'"
-                        :backgroundColorHover="'rgba(255,0,50,0.8)'"
-                        :textColor="'#eee'"
-                        :textColorHover="'#fff'"
-                        :iconColor="'#eee'"
-                        :iconColorHover="'#fff'"
-                        @click="saveGroups"
-                    ></WButtonChip>
+            <!-- 儲存變更提示區 -->
+            <div
+                style="padding:10px 10px 12px 10px; border-top:1px solid #F48FB1; border-bottom:1px solid #F48FB1; background:#FCE4EC; display:flex; align-items:center; justify-content:flex-end;"
+                v-if="isModified"
+            >
 
-                </div>
+                <WButtonChip
+                    :paddingStyle="{v:0,h:11}"
+                    :text="$t('saveChanges')"
+                    :icon="mdiCloudUploadOutline"
+                    :backgroundColor="'rgba(255,0,50,0.7)'"
+                    :backgroundColorHover="'rgba(255,0,50,0.8)'"
+                    :textColor="'#eee'"
+                    :textColorHover="'#fff'"
+                    :iconColor="'#eee'"
+                    :iconColorHover="'#fff'"
+                    @click="saveGroups"
+                ></WButtonChip>
 
             </div>
 
@@ -101,8 +97,8 @@
                             :draggable="isOperatable"
                             :editableClose="isOperatable"
                             :editableInput="isOperatable"
-                            :addButtonText="'新增群組'"
-                            :addButtonTooltip="'新增權限群組'"
+                            :addButtonText="$t('addGroup')"
+                            :addButtonTooltip="$t('addPermissionGroup')"
                             :addButtonTextColor="'#eee'"
                             :addButtonTextColorHover="'#fff'"
                             :addButtonIconColor="'#eee'"
@@ -132,7 +128,7 @@
                     style="padding:20px; _color:#666; font-size:0.85rem;"
                     v-else
                 >
-                    未選擇權限群組，請點擇上方任一權限群組以顯示管理範圍。
+                    {{$t('groupMsgNoPick')}}
                 </div>
 
             </div>
@@ -140,7 +136,7 @@
         </div>
 
         <div style="padding:10px 15px; font-size:0.8rem;" v-else>
-            載入中...
+            {{$t('waitingData')}}
         </div>
 
     </div>
@@ -161,6 +157,7 @@ import cloneDeep from 'lodash/cloneDeep'
 import genID from 'wsemi/src/genID.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
+import cstr from 'wsemi/src/cstr.mjs'
 import waitFun from 'wsemi/src/waitFun.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
 import WButtonChip from 'w-component-vue/src/components/WButtonChip.vue'
@@ -192,7 +189,7 @@ export default {
             groupInforHeight: 100,
 
             firstLoading: true,
-            isOperatable: false,
+            isOperatable: true,
             isModified: false,
 
             groupsTrans: [],
@@ -318,12 +315,14 @@ export default {
         getDescription: function(g) {
             // console.log('methods getDescription', g)
 
+            let vo = this
+
             //r
             let r = get(g, 'description', '')
 
             //check
             if (!isestr(r)) {
-                r = '無說明'
+                r = vo.$t('noDescription')
             }
 
             return r
@@ -365,7 +364,7 @@ export default {
                 //g
                 let g = {
                     id: genID(),
-                    name: '新權限群組',
+                    name: vo.$t('newGroup'),
                     crules: `{ "___all___": { "show": "n", "active": "n" } }`,
                     order: orderMax,
                 }
@@ -378,7 +377,7 @@ export default {
 
                 //check
                 if (errTemp !== null) {
-                    vo.$alert(`新增權限群組失敗: ${errTemp}`, { type: 'error' })
+                    vo.$alert(`${vo.$t('failedToAddPermissionGroup')}: ${errTemp}`, { type: 'error' })
                 }
 
                 //gn
@@ -392,7 +391,7 @@ export default {
                 // console.log('gn', gn)
 
                 //alert
-                vo.$alert(`新增權限群組成功`)
+                vo.$alert(vo.$t('successfulToAddPermissionGroup'))
 
             }
 
@@ -403,7 +402,7 @@ export default {
                 // })
                 .catch((err) => {
                     console.log('catch', err)
-                    vo.$alert(`發生非預期錯誤，請洽管理員`, { type: 'error' })
+                    vo.$alert(vo.$t('anUnexpectedErrorOccurred'), { type: 'error' })
                 })
                 .finally(() => {
 
@@ -426,11 +425,13 @@ export default {
                 let g = get(msg, 'item', {})
 
                 //name
-                let name = get(g, 'name', '未知')
+                let name = get(g, 'name', vo.$t('unknow'))
 
                 //showCheckYesNo
                 let bExit = false
-                await vo.$dg.showCheckYesNo(`確認是否刪除權限群組「${name}」?`)
+                let t_confirmToDeletePermissionGroup = vo.$t('confirmToDeletePermissionGroup')
+                t_confirmToDeletePermissionGroup = t_confirmToDeletePermissionGroup.replace('{name}', name)
+                await vo.$dg.showCheckYesNo(t_confirmToDeletePermissionGroup)
                     .catch(() => {
                         bExit = true
                     })
@@ -449,7 +450,7 @@ export default {
 
                 //check
                 if (errTemp !== null) {
-                    vo.$alert(`刪除權限群組失敗: ${errTemp}`, { type: 'error' })
+                    vo.$alert(`${vo.$t('failedToDeletePermissionGroup')}: ${errTemp}`, { type: 'error' })
                     return
                 }
 
@@ -464,7 +465,7 @@ export default {
                 // console.log('gn', gn)
 
                 //alert
-                vo.$alert(`刪除權限群組成功`)
+                vo.$alert(vo.$t('successfulToDeletePermissionGroup'))
 
             }
 
@@ -475,7 +476,7 @@ export default {
                 // })
                 .catch((err) => {
                     console.log('catch', err)
-                    vo.$alert(`發生非預期錯誤，請洽管理員`, { type: 'error' })
+                    vo.$alert(vo.$t('anUnexpectedErrorOccurred'), { type: 'error' })
                 })
                 .finally(() => {
 
@@ -522,7 +523,7 @@ export default {
 
                 //check
                 if (errTemp !== null) {
-                    vo.$alert(`變更權限群組順序失敗: ${errTemp}`, { type: 'error' })
+                    vo.$alert(`${vo.$t('failedToChangeOrderPermissionGroup')}: ${errTemp}`, { type: 'error' })
                     return
                 }
 
@@ -540,7 +541,7 @@ export default {
                 // console.log('gsn', gsn)
 
                 //alert
-                vo.$alert(`變更權限群組順序成功`)
+                vo.$alert(vo.$t('successfulToChangeOrderPermissionGroup'))
 
             }
 
@@ -551,7 +552,7 @@ export default {
                 // })
                 .catch((err) => {
                     console.log('catch', err)
-                    vo.$alert(`發生非預期錯誤，請洽管理員`, { type: 'error' })
+                    vo.$alert(vo.$t('anUnexpectedErrorOccurred'), { type: 'error' })
                 })
                 .finally(() => {
 
@@ -569,7 +570,7 @@ export default {
 
             //check
             if (!isestr(group.name)) {
-                vo.$alert(`權限群組名稱請記得給予`, { type: 'warning' })
+                vo.$alert(vo.$t('rememberToGivePermissionGroupName'), { type: 'warning' })
             }
 
             //modify
@@ -597,7 +598,9 @@ export default {
                 let b = false
                 each(vo.groupsTrans, (v, k) => {
                     if (!isestr(v.name)) {
-                        vo.$alert(`第 ${k + 1} 個權限群組名稱為空`, { type: 'error' })
+                        let t_isPermissionGroupNameEmpty = vo.$t('isPermissionGroupNameEmpty')
+                        t_isPermissionGroupNameEmpty = t_isPermissionGroupNameEmpty.replace('{n}', cstr(k + 1))
+                        vo.$alert(t_isPermissionGroupNameEmpty, { type: 'error' })
                         b = true
                     }
                 })
@@ -627,7 +630,7 @@ export default {
 
                 //check
                 if (errTemp !== null) {
-                    vo.$alert(`儲存權限群組失敗: ${errTemp}`, { type: 'error' })
+                    vo.$alert(`${vo.$t('failedToSavePermissionGroup')}: ${errTemp}`, { type: 'error' })
                     return
                 }
 
@@ -635,7 +638,7 @@ export default {
                 vo.isModified = false
 
                 //alert
-                vo.$alert(`儲存權限群組成功`)
+                vo.$alert(vo.$t('successfulToSavePermissionGroup'))
 
             }
 
@@ -646,7 +649,7 @@ export default {
                 // })
                 .catch((err) => {
                     console.log('catch', err)
-                    vo.$alert(`發生非預期錯誤，請洽管理員`, { type: 'error' })
+                    vo.$alert(vo.$t('anUnexpectedErrorOccurred'), { type: 'error' })
                 })
                 .finally(() => {
 

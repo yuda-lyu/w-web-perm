@@ -1,5 +1,5 @@
 <template>
-    <v-app
+    <div
         v-domresize
         @domresize="resize"
     >
@@ -16,7 +16,7 @@
 
         <VeUser></VeUser>
 
-    </v-app>
+    </div>
 </template>
 
 <script>
@@ -122,14 +122,6 @@ input,
 textarea,
 button {
     font-family: inherit;
-}
-
-.v-application, .v-application--wrap {
-    font-family: inherit;
-}
-
-.v-chip {
-    cursor: inherit;
 }
 
 .fade-enter-active {

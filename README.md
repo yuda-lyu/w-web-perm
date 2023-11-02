@@ -24,7 +24,6 @@ import WOrm from 'w-orm-mongodb/src/WOrmMongodb.mjs' //自行選擇引用ORM, �
 import WWebPerm from './server/WWebPerm.mjs'
 import getSettings from './g.getSettings.mjs'
 
-
 //st
 let st = getSettings()
 
@@ -47,11 +46,12 @@ let opt = {
         'eng': 'A web service package for user permissions and management targets.',
         'cht': 'A web service package for user permissions and management targets.',
     },
-    webLogo: '{base64 img}',
+    webLogo: 'data:image/svg+xml;base64,...',
 
 }
 
 let getUserByToken = async (token) => {
+    // return {} //測試無法登入
     if (token === '{token-for-application}') { //提供外部應用系統作為存取使用者
         return {
             id: 'id-for-application',
@@ -69,14 +69,19 @@ let getUserByToken = async (token) => {
         }
     }
     console.log('invalid token', token)
+    console.log('於生產環境時得加入SSO等驗證token機制')
     return {}
 }
 
+let verifyUser = (user) => {
+    console.log('於生產環境時得加入驗證user機制')
+    return user.isAdmin === 'y' //測試僅系統管理者使用
+}
+
 //WWebPerm
-let instWWebPerm = WWebPerm(WOrm, url, db, getUserByToken, opt)
+let instWWebPerm = WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt)
 
 instWWebPerm.on('error', (err) => {
     console.log(err)
 })
-
 ```

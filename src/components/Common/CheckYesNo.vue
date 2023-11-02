@@ -1,15 +1,15 @@
 <template>
     <WConfirm
         :show.sync="bShow"
-        :title="'系統確認訊息'"
+        :title="$t('systemMessage')"
         :content="content"
         :_contentColor="'white'"
         :_contentIconColor="'white'"
         :_contentBackgroundColor="'orange lighten-5'"
         :_titleColor="'white'"
         :headerBackgroundColor="'grey lighten-3'"
-        :noBtnText="'取消'"
-        :yesBtnText="'確定'"
+        :noBtnText="$t('no')"
+        :yesBtnText="$t('yes')"
         @click-no="clickBtn(false)"
         @click-yes="clickBtn(true)"
     ></WConfirm>

@@ -7,7 +7,6 @@ import domResize from 'w-component-vue/src/js/domResize.mjs'
 import domDragDrop from 'w-component-vue/src/js/domDragDrop.mjs'
 import App from './App.vue'
 import store from './store/index.mjs'
-import mVuetify from './plugins/mVuetify.mjs'
 import ui from './plugins/mUI.mjs'
 import mDataSelectorSchema from './plugins/mDataSelectorSchema.mjs'
 // import mDataSupport from './plugins/mDataSupport.mjs'
@@ -91,7 +90,6 @@ WServHapiClient({
 
 //new
 new Vue({
-    vuetify: mVuetify,
     store,
     render: h => h(App)
 }).$mount('#app')

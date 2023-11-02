@@ -18,6 +18,10 @@ let settings = {
         name: '主鍵',
         type: 'STRING',
     },
+    order: {
+        name: '順序',
+        type: 'INTEGER',
+    },
     name: {
         name: '姓名',
         type: 'STRING',
@@ -36,10 +40,6 @@ let settings = {
     },
     ruleGroupsIds: {
         name: '所屬權限群組主鍵', //多主鍵用分號區隔
-        type: 'STRING',
-    },
-    isVirtual: {
-        name: '是否為虛擬使用者', //代表由外部系統(如SSO或AD)提供之使用者
         type: 'STRING',
     },
     isAdmin: {
@@ -71,7 +71,6 @@ let settings = {
 let funNew = (ndata = {}) => {
     let o = dtmapping(ndata, keys(settings))
     o.id = `${now2strp()}-${genID()}`
-    o.isVirtual = 'n'
     o.isAdmin = 'n'
     o.userIdUpdate = o.userId
     o.timeCreate = nowms2str()
@@ -92,6 +91,7 @@ let funTest = () => {
     rs = map(rs, (name, k) => {
         let v = funNew({ userId: 'id-for-admin', name })
         v.id = `id-for-${name}`
+        v.order = k
         v.email = `${name}@example.com`
         v = dtpick(v, keys(settings))
         return v

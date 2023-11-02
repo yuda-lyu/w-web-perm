@@ -5,9 +5,9 @@
         _maxWidth="1200"
         _minWidth="1200"
         :fullscreen="true"
-        :title="'編修使用者'"
-        :save-btn-tooltip="'儲存'"
-        :close-btn-tooltip="'關閉'"
+        :title="$t('editUser')"
+        :save-btn-tooltip="$t('save')"
+        :close-btn-tooltip="$t('close')"
         @click-save="clickSave"
         @click-close="clickClose"
         @resize="resize"
@@ -19,7 +19,7 @@
 
                 <div style="padding:0px 20px 20px 20px; display:flex; align-items:center;">
 
-                    <div style="padding-right:10px; color:#777; white-space:nowrap;">使用者姓名:</div>
+                    <div style="padding-right:10px; color:#777; white-space:nowrap;">{{$t('username')}}:</div>
 
                     <WText
                         style="width:100%;"
@@ -30,7 +30,7 @@
 
                 <div style="padding:0px 20px 20px 20px; display:flex; align-items:center;">
 
-                    <div style="padding-right:10px; color:#777; white-space:nowrap;">電子郵件:</div>
+                    <div style="padding-right:10px; color:#777; white-space:nowrap;">{{$t('email')}}:</div>
 
                     <WText
                         style="width:100%;"
@@ -41,7 +41,7 @@
 
                 <div style="padding:0px 20px 20px 20px; display:flex; align-items:center;">
 
-                    <div style="padding-right:10px; color:#777; white-space:nowrap;">來源:</div>
+                    <div style="padding-right:10px; color:#777; white-space:nowrap;">{{$t('from')}}:</div>
 
                     <WTextSuggest
                         style="width:200px;"
@@ -56,7 +56,7 @@
 
                 <div style="padding:0px 20px 20px 20px;">
 
-                    <div style="padding-bottom:5px; color:#777; white-space:nowrap;">隸屬權限群組:</div>
+                    <div style="padding-bottom:5px; color:#777; white-space:nowrap;">{{$t('belongToPermissionGroup')}}:</div>
 
                     <div
                         style="display:inline-block; padding:0px 15px 15px 0px;"
@@ -81,7 +81,7 @@
 
                     </div>
 
-                    <div style="padding-bottom:5px; color:#777; white-space:nowrap;">使用者可用區塊:</div>
+                    <div style="padding-bottom:5px; color:#777; white-space:nowrap;">{{$t('availableTarget')}}:</div>
 
                     <div style="border:1px dashed #f26; background:rgba(255,50,100,0.05);">
 
@@ -100,7 +100,7 @@
 
                 <div style="padding:0px 20px 20px 20px; display:flex; align-items:center;">
 
-                    <div style="padding-right:10px; color:#777; white-space:nowrap;">是否為管理者:</div>
+                    <div style="padding-right:10px; color:#777; white-space:nowrap;">{{$t('isAManager')}}:</div>
 
                     <WSwitch
                         :value="u.isAdmin==='y'"
@@ -111,7 +111,7 @@
 
                 <div style="padding:0px 20px 20px 20px; display:flex; align-items:center;">
 
-                    <div style="padding-right:10px; color:#777; white-space:nowrap;">是否有效:</div>
+                    <div style="padding-right:10px; color:#777; white-space:nowrap;">{{$t('isActive')}}:</div>
 
                     <WSwitch
                         :value="u.isActive==='y'"
@@ -124,7 +124,7 @@
 
                 <div style="padding:0px 20px 20px 20px; display:flex; align-items:center;">
 
-                    <div style="padding-right:10px; color:#777; white-space:nowrap;">備註:</div>
+                    <div style="padding-right:10px; color:#777; white-space:nowrap;">{{$t('remark')}}:</div>
 
                     <WText
                         style="width:100%;"
@@ -137,7 +137,7 @@
 
                 <div style="padding:0px 20px 20px 20px; display:flex; align-items:center;">
 
-                    <div style="padding-right:10px; color:#777; white-space:nowrap;">創建日期:</div>
+                    <div style="padding-right:10px; color:#777; white-space:nowrap;">{{$t('dayCreate')}}:</div>
 
                     <div style="padding:0px 7px; border-radius:20px; font-size:0.8rem; color:#fff; background:#A1887F;">
                         {{getCreateDay(u)}}
@@ -262,7 +262,7 @@ export default {
         resize: function(msg) {
             // console.log('methods resize', msg)
 
-            let vo = this
+            // let vo = this
 
             // //panelHeight
             // vo.panelHeight = msg.contentHeightMax - 59 //- 61.6
@@ -331,7 +331,7 @@ export default {
 
                 //check
                 if (!isestr(vo.u.name)) {
-                    vo.$alert(`使用者名稱不得為空`, { type: 'error' })
+                    vo.$alert(vo.$t('isUsernameEmpty'), { type: 'error' })
                     return
                 }
 
@@ -346,7 +346,6 @@ export default {
                     description: trim(vo.u.description),
                     ruleGroupsIds: trim(vo.u.ruleGroupsIds),
                     from: trim(vo.u.from),
-                    isVirtual: 'n', //儲存時則更改為非虛擬使用者, 也就是將外部系統(如SSO或AD)使用者資料另存至資料庫中, 用以識別
                     isAdmin: vo.u.isAdmin,
                     isActive: vo.u.isActive,
                     // userId, //insert時自動由後端給予
@@ -355,27 +354,20 @@ export default {
                     // timeUpdate: timeCreate,
                 }
 
-                //mode
-                let mode = 'save'
-                if (vo.u.isVirtual === 'y') { //若是儲存虛擬使用者, 代表是第1次儲存至資料庫中, 故需要insert來自動給予userId與timeCreate
-                    mode = 'insert'
-                }
-                // console.log('vo.u.isVirtual', vo.u.isVirtual)
-
-                //insert or save
-                await vo.$fapi.users[mode](u)
+                //save
+                await vo.$fapi.users.save(u)
                     .catch((err) => {
                         errTemp = err
                     })
 
                 //check
                 if (errTemp !== null) {
-                    vo.$alert(`變更使用者失敗: ${errTemp}`, { type: 'error' })
+                    vo.$alert(`${vo.$t('failedToSaveUser')}: ${errTemp}`, { type: 'error' })
                     return
                 }
 
                 //alert
-                vo.$alert(`變更使用者成功`)
+                vo.$alert(vo.$t('successfulToSaveUser'))
 
             }
 

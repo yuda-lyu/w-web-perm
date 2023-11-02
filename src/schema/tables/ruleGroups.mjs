@@ -18,24 +18,24 @@ let settings = {
         name: '主鍵',
         type: 'STRING',
     },
-    name: {
-        name: '名稱',
-        type: 'STRING',
-    },
     order: {
         name: '順序',
         type: 'INTEGER',
     },
-    // type: { //可依照type分組
-    //     name: '類別',
-    //     type: 'STRING',
-    // },
+    name: {
+        name: '名稱',
+        type: 'STRING',
+    },
     description: {
         name: '說明',
         type: 'TEXT',
     },
+    from: {
+        name: '來源',
+        type: 'STRING',
+    },
     crules: {
-        name: '規則', //為json字串, 例如{ '___all___': {show:'y',active:'n'}, '專案A.頁A': {show:'y',active:'y'}, '專案A.頁B': {show:'n',active:'n'} }
+        name: '規則', //為json字串, 例如{ '___all___': {show:'y',active:'n'}, '專案A/頁A': {show:'y',active:'y'}, '專案A/頁B': {show:'n',active:'n'} }
         type: 'TEXT',
     },
     userId: {
@@ -68,15 +68,15 @@ let funNew = (ndata = {}) => {
 
 let funTest = () => {
     let rs = [
-        ['權限群組1', `{ "___all___": { "show": "y", "active": "n" }, "專案A.頁A": { "show": "y", "active": "y" }, "專案A.頁B": { "show": "n", "active": "n" } }`],
+        ['權限群組1', `{ "___all___": { "show": "y", "active": "n" }, "專案A/頁A": { "show": "y", "active": "y" }, "專案A/頁B": { "show": "n", "active": "n" } }`],
         ['權限群組2', `{ "___all___": { "show": "y", "active": "n" } }`],
         ['權限群組3', `{ "___all___": { "show": "y", "active": "y" } }`],
     ]
     rs = map(rs, ([g, crules], k) => {
         let v = funNew({ userId: 'id-for-admin', crules })
         v.id = `id-for-${g}`
-        v.name = g
         v.order = k
+        v.name = g
         v.description = `${g}的說明`
         v = dtpick(v, keys(settings))
         return v

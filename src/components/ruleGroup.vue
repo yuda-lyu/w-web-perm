@@ -18,7 +18,7 @@
 
                 <div style="padding:5px 0px; display:flex; align-items:center;">
                     <div style="padding-right:5px; font-size:0.9rem; color:#888;">
-                        名稱:
+                        {{$t('name')}}:
                     </div>
                     <div style="">
                         <WText
@@ -31,7 +31,7 @@
 
                 <div style="padding:5px 0px; display:flex; align-items:center;">
                     <div style="padding-right:5px; font-size:0.9rem; color:#888;">
-                        說明:
+                        {{$t('description')}}:
                     </div>
                     <div style="">
                         <WText
@@ -64,10 +64,10 @@
                 v-if="false"
             >
 
-                <div style="margin-right:10px;">全部項目預設值：</div>
+                <div style="margin-right:10px;">{{$t('allDefaults')}}:</div>
 
                 <div style="margin-right:10px; display:flex; align-items:center;">
-                    <div style="margin-right:5px;">顯示</div>
+                    <div style="margin-right:5px;">{{$t('show')}}</div>
                     <div>
                         <WSwitch
                             :value="defaultShow"
@@ -77,7 +77,7 @@
                 </div>
 
                 <div style="margin-right:10px; display:flex; align-items:center;">
-                    <div style="margin-right:5px;">啟用</div>
+                    <div style="margin-right:5px;">{{$t('active')}}</div>
                     <div>
                         <WSwitch
                             :value="defaultActive"
@@ -115,7 +115,7 @@
                             :iconSize="18"
                             :paddingStyle="{v:4,h:4}"
                             :shadow="false"
-                            :tooltip="'所屬顯示'"
+                            :tooltip="$t('showChildren')"
                             :backgroundColor="'rgba(200,200,200,0.2)'"
                             :backgroundColorHover="'rgba(255,150,100,0.2)'"
                             :backgroundColorFocus="'rgba(255,150,100,0.2)'"
@@ -130,7 +130,7 @@
                             :iconSize="18"
                             :paddingStyle="{v:4,h:4}"
                             :shadow="false"
-                            :tooltip="'所屬不顯示'"
+                            :tooltip="$t('hideChildren')"
                             :backgroundColor="'rgba(200,200,200,0.2)'"
                             :backgroundColorHover="'rgba(255,150,100,0.2)'"
                             :backgroundColorFocus="'rgba(255,150,100,0.2)'"
@@ -145,7 +145,7 @@
                             :iconSize="18"
                             :paddingStyle="{v:4,h:4}"
                             :shadow="false"
-                            :tooltip="'所屬啟用'"
+                            :tooltip="$t('activateChildren')"
                             :backgroundColor="'rgba(200,200,200,0.2)'"
                             :backgroundColorHover="'rgba(255,150,100,0.2)'"
                             :backgroundColorFocus="'rgba(255,150,100,0.2)'"
@@ -160,7 +160,7 @@
                             :iconSize="18"
                             :paddingStyle="{v:4,h:4}"
                             :shadow="false"
-                            :tooltip="'所屬不啟用'"
+                            :tooltip="$t('deactivateChildren')"
                             :backgroundColor="'rgba(200,200,200,0.2)'"
                             :backgroundColorHover="'rgba(255,150,100,0.2)'"
                             :backgroundColorFocus="'rgba(255,150,100,0.2)'"
@@ -174,7 +174,7 @@
 
                     <div style="margin-left:10px; display:inline-block;">
                         <div style="display:flex; align-items:center;">
-                            <div style="margin-right:3px; font-size:0.8rem;">顯示</div>
+                            <div style="margin-right:3px; font-size:0.8rem;">{{$t('show')}}</div>
                             <WCheckbox
                                 :checkedIconColor="'yellow darken-4'"
                                 :uncheckedIconColor="'yellow darken-4'"
@@ -187,7 +187,7 @@
 
                     <div style="margin-left:10px; display:inline-block;">
                         <div style="display:flex; align-items:center;">
-                            <div style="margin-right:3px; font-size:0.8rem;">啟用</div>
+                            <div style="margin-right:3px; font-size:0.8rem;">{{$t('active')}}</div>
                             <WCheckbox
                                 :checkedIconColor="'yellow darken-4'"
                                 :uncheckedIconColor="'yellow darken-4'"
