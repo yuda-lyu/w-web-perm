@@ -1,6 +1,6 @@
 {
   "name": "w-web-perm",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "main": "dist/w-web-perm.umd.js",
   "dependencies": {
     "@mdi/js": "^7.2.96",
@@ -12,7 +12,7 @@
     "w-data-collector": "^1.0.19",
     "w-serv-hapi": "^1.0.11",
     "w-serv-orm": "^1.0.7",
-    "w-ui-loginout": "^1.0.5",
+    "w-ui-loginout": "^1.0.6",
     "wsemi": "^1.7.38"
   },
   "devDependencies": {
