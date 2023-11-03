@@ -648,7 +648,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
                     // console.log('token', token)
 
                     //getAndVerifyBrowserTokenUser
-                    let userSelf = await getAndVerifyBrowserTokenUser(token)
+                    let userSelf = await getAndVerifyBrowserTokenUser(token, 'getUserByToken')
                     // console.log('userSelf', userSelf)
 
                     //check
@@ -683,7 +683,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
                     // console.log('token', token)
 
                     //getAndVerifyBrowserTokenUser
-                    let userLogin = await getAndVerifyBrowserTokenUser(token)
+                    let userLogin = await getAndVerifyBrowserTokenUser(token, 'getPerm')
                     // console.log('userLogin', userLogin)
 
                     //check
