@@ -32,7 +32,8 @@ import { getUserRules } from '../src/plugins/mShare.mjs'
  * @param {String} url 輸入資料庫連線字串，例如'mongodb://sername:password@$127.0.0.1:27017'
  * @param {String} db 輸入資料庫名稱字串
  * @param {Function} getUserByToken 輸入處理函數，函數會傳入使用者token，通過此函數處理後並回傳使用者資訊物件，並至少須提供'id'、'email'、'name'、'isAdmin'欄位，且'isAdmin'限輸入'y'或'n'，且輸入'y'時會複寫權限系統該使用者之'isAdmin'欄位值
- * @param {Function} verifyUser 輸入處理函數，函數會傳入使用者資訊物件，通過此函數識別後回傳布林值，允許使用者回傳true，反之回傳false
+ * @param {Function} verifyBrowserUser 輸入驗證瀏覽使用者身份之處理函數，函數會傳入使用者資訊物件，通過此函數識別後回傳布林值，允許使用者回傳true，反之回傳false
+ * @param {Function} verifyAppUser 輸入驗證應用程序使用者身份之處理函數，函數會傳入使用者資訊物件，通過此函數識別後回傳布林值，允許使用者回傳true，反之回傳false
  * @param {Object} [opt={}] 輸入設定物件，預設{}
  * @param {Integer} [opt.serverPort=11006] 輸入伺服器通訊port，預設11006
  * @param {Boolean} [opt.bCheckUser=false] 輸入是否檢查使用者資訊布林值，預設false
@@ -75,7 +76,7 @@ import { getUserRules } from '../src/plugins/mShare.mjs'
  *         'eng': 'A web service package for user permissions and management targets.',
  *         'cht': 'A web service package for user permissions and management targets.',
  *     },
- *     webLogo: 'data:image/svg+xml;base64,PHN2ZyBmaWxsPSJub25lIiBoZWlnaHQ9IjQ4IiB3aWR0aD0iNDgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTQ4IDBIMHY0OGg0OFYwWiIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuMDEiLz48cGF0aCBkPSJNMzcuODU2IDIwdjhNMjcuNDY0IDM4bDMuNDY0LTIgMy40NjQtMk0yMC41MzYgMzhsLTMuNDY1LTItMy40NjQtMk0xMC4xNDQgMjB2OE0xMy42MDcgMTRsMy40NjUtMiAzLjQ2NC0yTTI3LjQ2NCAxMGwzLjQ2NCAyIDMuNDY0IDIiIHN0cm9rZT0iI0ZGOTgwMCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBzdHJva2Utd2lkdGg9IjIiLz48cGF0aCBkPSJNMjQgNDRhNCA0IDAgMSAwIDAtOCA0IDQgMCAwIDAgMCA4Wk0yNCAxMmE0IDQgMCAxIDAgMC04IDQgNCAwIDAgMCAwIDhaTTI0IDI4YTQgNCAwIDEgMCAwLTggNCA0IDAgMCAwIDAgOFpNMzggMjBhNCA0IDAgMSAwIDAtOCA0IDQgMCAwIDAgMCA4Wk0zOCAzNmE0IDQgMCAxIDAgMC04IDQgNCAwIDAgMCAwIDhaTTEwIDIwYTQgNCAwIDEgMCAwLTggNCA0IDAgMCAwIDAgOFpNMTAgMzZhNCA0IDAgMSAwIDAtOCA0IDQgMCAwIDAgMCA4WiIgZmlsbD0iI0ZGRTBCMiIgc3Ryb2tlPSIjRkY5ODAwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIHN0cm9rZS13aWR0aD0iMiIvPjwvc3ZnPg==',
+ *     webLogo: 'data:image/svg+xml;base64,...',
  *
  * }
  *
@@ -102,21 +103,29 @@ import { getUserRules } from '../src/plugins/mShare.mjs'
  *     return {}
  * }
  *
- * let verifyUser = (user) => {
+ * let verifyBrowserUser = (user, caller) => {
+ *     console.log('verifyBrowserUser/user', user)
  *     // return false //測試無法登入
- *     console.log('於生產環境時得加入驗證user機制')
+ *     console.log('於生產環境時得加入限制瀏覽器使用者身份機制')
+ *     return user.isAdmin === 'y' //測試僅系統管理者使用
+ * }
+ *
+ * let verifyAppUser = (user, caller) => {
+ *     console.log('verifyAppUser/user', user)
+ *     // return false //測試無法登入
+ *     console.log('於生產環境時得加入限制應用程式使用者身份機制')
  *     return user.isAdmin === 'y' //測試僅系統管理者使用
  * }
  *
  * //WWebPerm
- * let instWWebPerm = WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt)
+ * let instWWebPerm = WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUser, opt)
  *
  * instWWebPerm.on('error', (err) => {
  *     console.log(err)
  * })
  *
  */
-function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
+function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUser, opt = {}) {
     let instWServHapiServer = null
 
 
@@ -148,10 +157,17 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
     }
 
 
-    //check verifyUser
-    if (!isfun(verifyUser)) {
-        console.log('invalid verifyUser', verifyUser)
-        throw new Error('invalid verifyUser')
+    //check verifyBrowserUser
+    if (!isfun(verifyBrowserUser)) {
+        console.log('invalid verifyBrowserUser', verifyBrowserUser)
+        throw new Error('invalid verifyBrowserUser')
+    }
+
+
+    //check verifyAppUser
+    if (!isfun(verifyAppUser)) {
+        console.log('invalid verifyAppUser', verifyAppUser)
+        throw new Error('invalid verifyAppUser')
     }
 
 
@@ -269,8 +285,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
     }
 
 
-    //getTokenUserForSelf
-    let getTokenUserForSelf = async(token) => {
+    //getTokenUser
+    let getTokenUser = async(token) => {
 
         //userSelf
         let userSelf = null
@@ -351,8 +367,18 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
         }
         // console.log('userFind(isAdmin)', userFind)
 
-        //verifyUser
-        let b = verifyUser(userFind)
+        return userFind
+    }
+
+
+    //getAndVerifyBrowserTokenUser
+    let getAndVerifyBrowserTokenUser = async (token, caller = '') => {
+
+        //getTokenUser
+        let userSelf = await getTokenUser(token)
+
+        //verifyBrowserUser
+        let b = verifyBrowserUser(userSelf, caller)
         if (ispm(b)) {
             b = await b
         }
@@ -360,12 +386,34 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
         //check
         if (!b) {
             console.log('userSelf', userSelf)
-            console.log('userFind', userFind)
-            console.log('user does not have permission')
+            console.log(`user does not have permission`)
             return Promise.reject(`user does not have permission`)
         }
 
-        return userFind
+        return userSelf
+    }
+
+
+    //getAndVerifyAppTokenUser
+    let getAndVerifyAppTokenUser = async (token, caller = '') => {
+
+        //getTokenUser
+        let userSelf = await getTokenUser(token)
+
+        //verifyAppUser
+        let b = verifyAppUser(userSelf, caller)
+        if (ispm(b)) {
+            b = await b
+        }
+
+        //check
+        if (!b) {
+            console.log('userSelf', userSelf)
+            console.log(`user does not have permission`)
+            return Promise.reject(`user does not have permission`)
+        }
+
+        return userSelf
     }
 
 
@@ -593,14 +641,14 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
                 // console.log('getUserByToken', req)
 
                 async function core() {
-                    //提供對象為browser使用者, 且認定權限系統須系統管理員才能使用, 須先檢測token是否為系統管理員, 確認後回傳該使用者(系統管理員)資訊物件
+                    //提供對象為browser使用者, 須先檢測token是否有效, 確認後回傳該使用者之資訊物件
 
                     //token
                     let token = get(req, 'query.token', '')
                     // console.log('token', token)
 
-                    //getGenUserByUserId
-                    let userSelf = await getTokenUserForSelf(token)
+                    //getAndVerifyBrowserTokenUser
+                    let userSelf = await getAndVerifyBrowserTokenUser(token)
                     // console.log('userSelf', userSelf)
 
                     //check
@@ -610,11 +658,6 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
                         console.log(`token does not have permission`)
                         return Promise.reject(`token does not have permission`)
                     }
-
-                    // //check
-                    // if (get(userSelf, 'isAdmin') !== 'y') { //權限系統須系統管理員才能使用
-                    //     return Promise.reject(`user does not have permission`)
-                    // }
 
                     return userSelf
                 }
@@ -633,14 +676,14 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
                 // console.log('getPerm', req)
 
                 async function core() {
-                    //提供對象為node與browser使用者, 須先檢測token是否有效, 再依照token取得使用者資訊物件, 再由其userId查詢回傳該使用者權限資訊物件
+                    //提供對象為node與browser使用者, node實際也為轉發之browser使用者, 須先檢測token是否有效, 再依照token取得使用者資訊物件, 再由其userId查詢回傳該使用者之權限資訊物件
 
                     //parseToken
                     let token = parseToken(req)
                     // console.log('token', token)
 
-                    //getGenUserByUserId
-                    let userLogin = await getTokenUserForSelf(token)
+                    //getAndVerifyBrowserTokenUser
+                    let userLogin = await getAndVerifyBrowserTokenUser(token)
                     // console.log('userLogin', userLogin)
 
                     //check
@@ -692,14 +735,14 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
                 // console.log('getPermById', req)
 
                 async function core() {
-                    //提供對象為node使用者, 且認定權限系統須系統管理員才能使用, 須先檢測token是否為系統管理員, 再由query取得欲查詢的使用者userId, 再由其userId查詢回傳該使用者權限資訊物件
+                    //提供對象為node使用者, 須為系統管理者, 須先檢測token是否有效, 再由query取得欲查詢的使用者userId, 再由其userId查詢回傳該使用者權限資訊物件
 
                     //token
                     let token = get(req, 'query.token', '')
                     // console.log('token', token)
 
-                    //getGenUserByUserId
-                    let userSelf = await getTokenUserForSelf(token)
+                    //getAndVerifyAppTokenUser
+                    let userSelf = await getAndVerifyAppTokenUser(token, 'getPermById')
                     // console.log('userSelf', userSelf)
 
                     //check
@@ -709,11 +752,6 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
                         console.log(`token does not have permission`)
                         return Promise.reject(`token does not have permission`)
                     }
-
-                    // //check
-                    // if (get(userSelf, 'isAdmin') !== 'y') { //權限系統須系統管理員才能使用
-                    //     return Promise.reject(`user does not have permission`)
-                    // }
 
                     //userId
                     let userId = get(req, 'query.userId', '')
@@ -749,12 +787,13 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
                 // console.log('payload', req.payload)
 
                 async function core() {
+                    //提供對象為node使用者, 須為系統管理者, 須先檢測token是否有效, 再進行數據變更
 
                     //token
                     let token = get(req, 'query.token', '')
 
-                    //getTokenUserForSelf
-                    let user = await getTokenUserForSelf(token)
+                    //getAndVerifyAppTokenUser
+                    let user = await getAndVerifyAppTokenUser(token, 'syncAndReplaceUsers')
 
                     //check
                     if (!iseobj(user)) {
@@ -788,12 +827,13 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
                 // console.log('payload', req.payload)
 
                 async function core() {
+                    //提供對象為node使用者, 須為系統管理者, 須先檢測token是否有效, 再進行數據變更
 
                     //token
                     let token = get(req, 'query.token', '')
 
-                    //getTokenUserForSelf
-                    let user = await getTokenUserForSelf(token)
+                    //getAndVerifyAppTokenUser
+                    let user = await getAndVerifyAppTokenUser(token, 'syncAndReplaceTargets')
 
                     //check
                     if (!iseobj(user)) {
@@ -827,12 +867,13 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyUser, opt = {}) {
                 // console.log('payload', req.payload)
 
                 async function core() {
+                    //提供對象為node使用者, 須為系統管理者, 須先檢測token是否有效, 再進行數據變更
 
                     //token
                     let token = get(req, 'query.token', '')
 
-                    //getTokenUserForSelf
-                    let user = await getTokenUserForSelf(token)
+                    //getAndVerifyAppTokenUser
+                    let user = await getAndVerifyAppTokenUser(token, 'syncAndReplaceRuleGroups')
 
                     //check
                     if (!iseobj(user)) {
