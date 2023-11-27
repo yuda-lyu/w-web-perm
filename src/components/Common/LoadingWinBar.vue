@@ -1,7 +1,8 @@
 <template>
     <WDialog
         :show.sync="loading"
-        :maxWidth="barWidth+barPadding*2"
+        :maxWidth="dialogWidth"
+        @resize="resizeDialog"
     >
 
         <template v-slot:panel>
@@ -13,7 +14,7 @@
 
                     <span v-if="msg!==''">{{msg}}</span>
 
-                    <span v-else>{{$t('processing')}}</span>
+                    <span v-else>處理中請稍後...</span>
 
                 </div>
 
@@ -48,9 +49,14 @@ export default {
     },
     data: function() {
         return {
+
+            dialogWidth: 0,
+            dialogWidthMax: 600,
+
             barPadding: 20,
-            barWidth: 600,
+            barWidth: 0,
             msg: '',
+
         }
     },
     mounted: function() {
@@ -65,11 +71,10 @@ export default {
     computed: {
 
         loading: function() {
-            //console.log('computed loading')
-
             let vo = this
-
-            return get(vo, `$store.state.loading`)
+            let b = get(vo, `$store.state.loading`)
+            // console.log('loading', b)
+            return b
         },
 
     },
@@ -77,6 +82,29 @@ export default {
 
         setMessage: function(msg) {
             this.msg = msg
+        },
+
+        resizeDialog: function(msg) {
+            // console.log('methods resizeDialog', msg)
+
+            let vo = this
+
+            let w = window.innerWidth
+            // console.log('window.innerWidth', window.innerWidth)
+
+            //dialogWidth
+            let dialogWidth = w - vo.barPadding * 2
+            dialogWidth = Math.max(dialogWidth, 0)
+            dialogWidth = Math.min(dialogWidth, vo.dialogWidthMax)
+            vo.dialogWidth = dialogWidth
+            // console.log('dialogWidth', dialogWidth)
+
+            //barWidth
+            let barWidth = dialogWidth - vo.barPadding * 2
+            barWidth = Math.max(barWidth, 0)
+            vo.barWidth = barWidth
+            // console.log('barWidth', barWidth)
+
         },
 
     }
