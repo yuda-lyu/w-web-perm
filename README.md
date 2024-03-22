@@ -6,6 +6,7 @@ A web service for permissions.
 [![license](https://img.shields.io/npm/l/w-web-perm.svg?style=flat)](https://npmjs.org/package/w-web-perm) 
 [![gzip file size](http://img.badgesize.io/yuda-lyu/w-web-perm/master/dist/w-web-perm-server.umd.js.svg?compression=gzip)](https://github.com/yuda-lyu/w-web-perm)
 [![npm download](https://img.shields.io/npm/dt/w-web-perm.svg)](https://npmjs.org/package/w-web-perm) 
+[![npm download](https://img.shields.io/npm/dm/w-web-perm.svg)](https://npmjs.org/package/w-web-perm) 
 [![jsdelivr download](https://img.shields.io/jsdelivr/npm/hm/w-web-perm.svg)](https://www.jsdelivr.com/package/npm/w-web-perm)
 
 ## Documentation

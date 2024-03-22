@@ -35,7 +35,7 @@
 
 <script>
 import Vue from 'vue'
-import get from 'lodash/get'
+import get from 'lodash-es/get'
 import WDialog from 'w-component-vue/src/components/WDialog.vue'
 import WProgressBar from 'w-component-vue/src/components/WProgressBar.vue'
 

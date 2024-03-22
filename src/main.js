@@ -1,5 +1,5 @@
 import Vue from 'vue'
-import get from 'lodash/get'
+import get from 'lodash-es/get'
 import WServHapiClient from 'w-serv-hapi/src/WServHapiClient.mjs'
 import WAlert from 'w-component-vue/src/components/WAlert.mjs'
 import domMutation from 'w-component-vue/src/js/domMutation.mjs'

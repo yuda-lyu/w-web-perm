@@ -121,8 +121,8 @@
 
 <script>
 import { mdiGamepadCircle, mdiStackOverflow, mdiAccountGroupOutline } from '@mdi/js/mdi.js'
-import get from 'lodash/get'
-import find from 'lodash/find'
+import get from 'lodash-es/get'
+import find from 'lodash-es/find'
 import WDrawer from 'w-component-vue/src/components/WDrawer.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
 import WListVertical from 'w-component-vue/src/components/WListVertical.vue'

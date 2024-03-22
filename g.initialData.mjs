@@ -1,4 +1,4 @@
-import map from 'lodash/map'
+import map from 'lodash-es/map'
 import ds from './src/schema/index.mjs'
 import { woItems } from './g.mOrm.mjs'
 

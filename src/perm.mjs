@@ -1,5 +1,5 @@
 import axios from 'axios'
-import get from 'lodash/get'
+import get from 'lodash-es/get'
 import isestr from 'wsemi/src/isestr.mjs'
 import isbol from 'wsemi/src/isbol.mjs'
 import isfun from 'wsemi/src/isfun.mjs'
