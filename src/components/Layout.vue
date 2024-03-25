@@ -51,8 +51,8 @@
 
 <script>
 import { mdiMenu } from '@mdi/js/mdi.js'
-import get from 'lodash-es/get'
-// import cloneDeep from 'lodash-es/cloneDeep'
+import get from 'lodash-es/get.js'
+// import cloneDeep from 'lodash-es/cloneDeep.js'
 import isestr from 'wsemi/src/isestr.mjs'
 import WTextSelect from 'w-component-vue/src/components/WTextSelect.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
