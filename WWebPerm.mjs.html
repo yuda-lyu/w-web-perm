@@ -48,8 +48,9 @@
             <pre class="prettyprint source linenums"><code>import path from 'path'
 import fs from 'fs'
 import get from 'lodash-es/get.js'
-import each from 'lodash-es/each.js'
+import map from 'lodash-es/map.js'
 import keys from 'lodash-es/keys.js'
+import size from 'lodash-es/size.js'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import ispint from 'wsemi/src/ispint.mjs'
@@ -65,6 +66,8 @@ import pm2resolve from 'wsemi/src/pm2resolve.mjs'
 import fsIsFolder from 'wsemi/src/fsIsFolder.mjs'
 import fsIsFile from 'wsemi/src/fsIsFile.mjs'
 import replace from 'wsemi/src/replace.mjs'
+import ltdtDiffByKey from 'wsemi/src/ltdtDiffByKey.mjs'
+import ltdtmapping from 'wsemi/src/ltdtmapping.mjs'
 import WServHapiServer from 'w-serv-hapi/src/WServHapiServer.mjs'
 import WServOrm from 'w-serv-orm/src/WServOrm.mjs'
 import ds from '../src/schema/index.mjs'
@@ -301,23 +304,99 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
 
 
     //getUsersList
-    let getUsersList = async (userId, token) => {
+    let getUsersList = async (userId) => {
         let rs = await woItems.users.select() //isActive為y或n都需要提供, 給前端編輯
         return rs
     }
 
 
     //getRuleGroupsList
-    let getRuleGroupsList = async (userId, token) => {
-        let rs = await woItems.ruleGroups.select()
+    let getRuleGroupsList = async (userId) => {
+        let rs = await woItems.pemis.select()
         return rs
     }
 
 
     //getTargetsList
-    let getTargetsList = async (userId, token) => {
+    let getTargetsList = async (userId) => {
         let rs = await woItems.targets.select()
         return rs
+    }
+
+
+    //updateTabItems
+    let updateTabItems = async (woName, userId, rows, keyDetect) => {
+        // console.log('updateTabItems', woName, userId, rows.length, keyDetect)
+
+        //ltdtmapping
+        rows = ltdtmapping(rows, ds[woName].keys)
+        // console.log('ltdtmapping rows', rows)
+
+        //重給order
+        rows = map(rows, (r, k) => {
+            r.order = k + 1
+            return r
+        })
+
+        //ltdtDiffByKey
+        let ltdtOld = await woItems[woName].select()
+        let ltdtNew = rows
+        let r = ltdtDiffByKey(ltdtOld, ltdtNew, keyDetect)
+        // console.log('ltdtDiffByKey r', r)
+
+        //del
+        if (size(r.del) > 0) {
+            await procOrm(userId, woName, 'del', r.del) //須使用procOrm才有辦法自動給予相關欄位
+            // .catch((err) => {
+            //     console.log('woItems[woName].del err', err)
+            // })
+        }
+
+        //add
+        if (size(r.add) > 0) {
+            await procOrm(userId, woName, 'insert', r.add) //須使用procOrm才有辦法自動給予相關欄位
+            // .catch((err) => {
+            //     console.log('woItems[woName].insert err', err)
+            // })
+        }
+
+        //diff
+        if (size(r.diff) > 0) {
+            await procOrm(userId, woName, 'save', r.diff) //須使用procOrm才有辦法自動給予相關欄位
+            // .catch((err) => {
+            //     console.log('woItems[woName].save err', err)
+            // })
+        }
+
+        return ltdtNew
+    }
+
+
+    //updateTargets
+    let updateTargets = async (userId, rows) => {
+        rows = await updateTabItems('targets', userId, rows, 'id')
+        return rows
+    }
+
+
+    //updatePemis
+    let updatePemis = async (userId, rows) => {
+        rows = await updateTabItems('pemis', userId, rows, 'name')
+        return rows
+    }
+
+
+    //updateGrups
+    let updateGrups = async (userId, rows) => {
+        rows = await updateTabItems('grups', userId, rows, 'name')
+        return rows
+    }
+
+
+    //updateUsers
+    let updateUsers = async (userId, rows) => {
+        rows = await updateTabItems('users', userId, rows, 'id')
+        return rows
     }
 
 
@@ -493,12 +572,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
             return Promise.reject(`invalid from from inp`)
         }
 
-
         //vs
         let vs = get(inp, key, [])
-        //users
-        //targets
-        //ruleGroups
 
         //check
         if (!isearr(vs)) {
@@ -519,7 +594,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
 
 
     //syncAndReplaceRows
-    let syncAndReplaceRows = async (params, key) => {
+    let syncAndReplaceRows = async (userId, params, woName) => {
 
         //from
         let from = get(params, 'from', '')
@@ -533,28 +608,34 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
             return Promise.reject(`invalid from`)
         }
 
-        //vs
-        let vs = get(params, key, [])
-        // console.log(key, vs)
+        //rows
+        let rows = get(params, woName, [])
+        // console.log(woName, rows)
 
         //check
-        if (!isearr(vs)) {
+        if (!isearr(rows)) {
             console.log('params', params)
-            console.log(key, vs)
-            console.log(`invalid ${key}`)
-            return Promise.reject(`invalid ${key}`)
+            console.log('woName', woName)
+            return Promise.reject(`invalid ${woName}`)
         }
 
         //save from
-        each(vs, (v, k) => {
-            vs[k].from = from
+        rows = map(rows, (v, k) => {
+            // v.order = k + 1 //order大部分由外部給予, 不能複寫
+            v.from = from
+            return v
         })
 
+        //ltdtmapping
+        rows = ltdtmapping(rows, ds[woName].keys)
+        // console.log('ltdtmapping rows', rows)
+
         //delAll from
-        await woItems[key].delAll({ from })
+        await woItems[woName].delAll({ from })
 
         //insert
-        let r = await woItems[key].insert(vs)
+        // let r = await woItems[woName].insert(rows)
+        let r = await procOrm(userId, woName, 'insert', rows) //須使用procOrm才有辦法自動給予相關欄位
 
         return r
     }
@@ -591,38 +672,39 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
     }
 
 
-    //getGenUserAndRulesByUserId
+    //getGenUserAndRulesByUserId bbb
     let getGenUserAndRulesByUserId = async (userId) => {
 
         //userFind
         let userFind = await getGenUserByUserId(userId)
         // console.log('userFind', userFind)
 
-        //ruleGroups
-        let ruleGroups = await woItems.ruleGroups.select()
-        // console.log('ruleGroups', ruleGroups)
+        //grups
+        let grups = await woItems.grups.select()
+        // console.log('grups', grups)
+
+        //pemis
+        let pemis = await woItems.pemis.select()
+        // console.log('pemis', pemis)
 
         //targets
         let targets = await woItems.targets.select()
         // console.log('targets', targets)
 
         //getUserRules
-        let urs = getUserRules(userFind, ruleGroups, targets)
-        // console.log('getUserRules', urs)
+        let kur = getUserRules(userFind, grups, pemis, targets)
+        // console.log('getUserRules', kur)
 
         //check
-        if (!iseobj(urs)) {
+        if (!iseobj(kur)) {
             console.log('userId', userId)
-            console.log(`can not get permrules`)
-            return Promise.reject(`can not get permrules`)
+            console.log(`can not get rules of user`)
+            return Promise.reject(`can not get rules of user`)
         }
 
         return {
-            user: {
-                ...userFind,
-                ruleGroupsNames: urs.ruleGroupsNames, //ruleGroupsNames併入user內顯示
-            },
-            rules: urs.rules,
+            user: userFind,
+            kur,
         }
     }
 
@@ -723,7 +805,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
                 // console.log('getPerm', req)
 
                 async function core() {
-                    //提供對象為node與browser使用者, node實際也為轉發之browser使用者, 須先檢測token是否有效, 再依照token取得使用者資訊物件, 再由其userId查詢回傳該使用者之權限資訊物件
+                    //提供對象為node與browser使用者, node通常也為其他系統之browser使用者因須驗證而由node轉發, 皆須先檢測token是否有效, 再依照token取得使用者資訊物件, 再由其userId查詢回傳該使用者之權限資訊物件
 
                     //parseToken
                     let token = parseToken(req)
@@ -828,10 +910,139 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
         },
         {
             method: 'POST',
+            path: '/syncAndReplaceTargets',
+            handler: async function (req, res) {
+                // console.log('syncAndReplaceTargets', req)
+                // console.log('syncAndReplaceTargets payload', req.payload)
+
+                async function core() {
+                    //提供對象為node使用者, 須為系統管理者, 須先檢測token是否有效, 再進行數據變更
+
+                    //token
+                    let token = get(req, 'query.token', '')
+
+                    //getAndVerifyAppTokenUser
+                    let user = await getAndVerifyAppTokenUser(token, 'syncAndReplaceTargets')
+
+                    //check
+                    if (!iseobj(user)) {
+                        console.log('token', token)
+                        console.log('[API]syncAndReplaceTargets/check user: invalid user')
+                        console.log(`token does not have permission`)
+                        return Promise.reject(`token does not have permission`)
+                    }
+
+                    //userId
+                    let userId = get(user, 'id', '')
+
+                    //parsePayload
+                    let inp = await parsePayload(req, 'targets')
+
+                    //syncAndReplaceRows
+                    let r = await syncAndReplaceRows(userId, inp, 'targets')
+
+                    return r
+                }
+
+                //pm2resolve core
+                let r = await pm2resolve(core)()
+                // console.log('verifyIdentity', r)
+
+                return r
+            },
+        },
+        {
+            method: 'POST',
+            path: '/syncAndReplacePemis',
+            handler: async function (req, res) {
+                // console.log('syncAndReplacePemis', req)
+                // console.log('syncAndReplacePemis payload', req.payload)
+
+                async function core() {
+                    //提供對象為node使用者, 須為系統管理者, 須先檢測token是否有效, 再進行數據變更
+
+                    //token
+                    let token = get(req, 'query.token', '')
+
+                    //getAndVerifyAppTokenUser
+                    let user = await getAndVerifyAppTokenUser(token, 'syncAndReplacePemis')
+
+                    //check
+                    if (!iseobj(user)) {
+                        console.log('token', token)
+                        console.log('[API]syncAndReplacePemis/check user: invalid user')
+                        console.log(`token does not have permission`)
+                        return Promise.reject(`token does not have permission`)
+                    }
+
+                    //parsePayload
+                    let inp = await parsePayload(req, 'pemis')
+
+                    //userId
+                    let userId = get(user, 'id', '')
+
+                    //syncAndReplaceRows
+                    let r = await syncAndReplaceRows(userId, inp, 'pemis')
+
+                    return r
+                }
+
+                //pm2resolve core
+                let r = await pm2resolve(core)()
+                // console.log('verifyIdentity', r)
+
+                return r
+            },
+        },
+        {
+            method: 'POST',
+            path: '/syncAndReplaceGrups',
+            handler: async function (req, res) {
+                // console.log('syncAndReplaceGrups', req)
+                // console.log('syncAndReplaceGrups payload', req.payload)
+
+                async function core() {
+                    //提供對象為node使用者, 須為系統管理者, 須先檢測token是否有效, 再進行數據變更
+
+                    //token
+                    let token = get(req, 'query.token', '')
+
+                    //getAndVerifyAppTokenUser
+                    let user = await getAndVerifyAppTokenUser(token, 'syncAndReplaceGrups')
+
+                    //check
+                    if (!iseobj(user)) {
+                        console.log('token', token)
+                        console.log('[API]syncAndReplaceGrups/check user: invalid user')
+                        console.log(`token does not have permission`)
+                        return Promise.reject(`token does not have permission`)
+                    }
+
+                    //parsePayload
+                    let inp = await parsePayload(req, 'grups')
+
+                    //userId
+                    let userId = get(user, 'id', '')
+
+                    //syncAndReplaceRows
+                    let r = await syncAndReplaceRows(userId, inp, 'grups')
+
+                    return r
+                }
+
+                //pm2resolve core
+                let r = await pm2resolve(core)()
+                // console.log('verifyIdentity', r)
+
+                return r
+            },
+        },
+        {
+            method: 'POST',
             path: '/syncAndReplaceUsers',
             handler: async function (req, res) {
                 // console.log('syncAndReplaceUsers', req)
-                // console.log('payload', req.payload)
+                // console.log('syncAndReplaceUsers payload', req.payload)
 
                 async function core() {
                     //提供對象為node使用者, 須為系統管理者, 須先檢測token是否有效, 再進行數據變更
@@ -853,88 +1064,11 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
                     //parsePayload
                     let inp = await parsePayload(req, 'users')
 
-                    //syncAndReplaceRows
-                    let r = await syncAndReplaceRows(inp, 'users')
-
-                    return r
-                }
-
-                //pm2resolve core
-                let r = await pm2resolve(core)()
-                // console.log('verifyIdentity', r)
-
-                return r
-            },
-        },
-        {
-            method: 'POST',
-            path: '/syncAndReplaceTargets',
-            handler: async function (req, res) {
-                // console.log('syncAndReplaceTargets', req)
-                // console.log('payload', req.payload)
-
-                async function core() {
-                    //提供對象為node使用者, 須為系統管理者, 須先檢測token是否有效, 再進行數據變更
-
-                    //token
-                    let token = get(req, 'query.token', '')
-
-                    //getAndVerifyAppTokenUser
-                    let user = await getAndVerifyAppTokenUser(token, 'syncAndReplaceTargets')
-
-                    //check
-                    if (!iseobj(user)) {
-                        console.log('token', token)
-                        console.log('[API]syncAndReplaceTargets/check user: invalid user')
-                        console.log(`token does not have permission`)
-                        return Promise.reject(`token does not have permission`)
-                    }
-
-                    //parsePayload
-                    let inp = await parsePayload(req, 'targets')
+                    //userId
+                    let userId = get(user, 'id', '')
 
                     //syncAndReplaceRows
-                    let r = await syncAndReplaceRows(inp, 'targets')
-
-                    return r
-                }
-
-                //pm2resolve core
-                let r = await pm2resolve(core)()
-                // console.log('verifyIdentity', r)
-
-                return r
-            },
-        },
-        {
-            method: 'POST',
-            path: '/syncAndReplaceRuleGroups',
-            handler: async function (req, res) {
-                // console.log('syncAndReplaceRuleGroups', req)
-                // console.log('payload', req.payload)
-
-                async function core() {
-                    //提供對象為node使用者, 須為系統管理者, 須先檢測token是否有效, 再進行數據變更
-
-                    //token
-                    let token = get(req, 'query.token', '')
-
-                    //getAndVerifyAppTokenUser
-                    let user = await getAndVerifyAppTokenUser(token, 'syncAndReplaceRuleGroups')
-
-                    //check
-                    if (!iseobj(user)) {
-                        console.log('token', token)
-                        console.log('[API]syncAndReplaceRuleGroups/check user: invalid user')
-                        console.log(`token does not have permission`)
-                        return Promise.reject(`token does not have permission`)
-                    }
-
-                    //parsePayload
-                    let inp = await parsePayload(req, 'ruleGroups')
-
-                    //syncAndReplaceRows
-                    let r = await syncAndReplaceRows(inp, 'ruleGroups')
+                    let r = await syncAndReplaceRows(userId, inp, 'users')
 
                     return r
                 }
@@ -963,7 +1097,15 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
         pathStaticFiles,
         apis,
         getUserIDFromToken: async (token) => { //可使用async或sync函數
-            return ''
+            // console.log('getUserIDFromToken', token)
+            let user = await getUserByToken(token)
+            let userId = get(user, 'id', '')
+            if (!isestr(userId)) {
+                console.log('token', token)
+                console.log('userId', userId)
+                return Promise.reject(`can not find user.id`)
+            }
+            return userId
         },
         useDbORM: true,
         dbORMs: woItems,
@@ -973,10 +1115,16 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
         tableNamesSync,
         extFuncs: { //接收參數第1個為userId, 之後才是前端給予參數
             getWebInfor,
-            getUsersList,
-            getRuleGroupsList,
+
             getTargetsList,
-            //...
+            getRuleGroupsList,
+            getUsersList,
+
+            updateTargets,
+            updatePemis,
+            updateGrups,
+            updateUsers,
+
         },
         hookBefores: null,
         hookAfters: null,
@@ -1003,7 +1151,7 @@ export default WWebPerm
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.2</a> on Mon Mar 25 2024 23:59:58 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.2</a> on Tue Sep 24 2024 15:29:14 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
