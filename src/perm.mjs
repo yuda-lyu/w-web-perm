@@ -1,5 +1,6 @@
 import axios from 'axios'
 import get from 'lodash-es/get.js'
+import each from 'lodash-es/each.js'
 import isestr from 'wsemi/src/isestr.mjs'
 import isbol from 'wsemi/src/isbol.mjs'
 import isfun from 'wsemi/src/isfun.mjs'
@@ -75,25 +76,50 @@ function perm() {
         return kp
     }
 
+    //user
+    let user = get(pmd, `user`, {})
+
+    //rules
+    let rules = get(pmd, `rules`, [])
+
+    //kpRule
+    let kpRule = {}
+    each(rules, (v) => {
+
+        //name
+        let name = get(v, 'name', '')
+        if (!isestr(name)) {
+            return true //跳出換下一個
+        }
+
+        //isActive
+        let _isActive = get(v, 'isActive', '')
+        let isActive = _isActive === 'y' ? 'y' : 'n'
+
+        //save
+        kpRule[name] = isActive
+
+    })
+
     //kp
     let kp = {
         conn,
         getUser: () => {
-            let u = get(pmd, `user`, {})
-            // console.log('u', u)
-            return u
+            return user
         },
         getRules: () => {
-            return get(pmd, `pemis`, {})
+            return rules
         },
-        rule: (key) => {
-            return get(pmd, `pemis.${key}`, {})
+        getKpRule: () => {
+            return kpRule
         },
-        show: (key) => {
-            return get(pmd, `pemis.${key}.show`, 'n')
-        },
+        // rule: (key) => {
+        //     return get(kpRule, key, '')
+        // },
         active: (key) => {
-            return get(pmd, `pemis.${key}.active`, 'n')
+            let _isActive = get(kpRule, key, '')
+            let isActive = _isActive === 'y' ? 'y' : 'n'
+            return isActive
         },
     }
 

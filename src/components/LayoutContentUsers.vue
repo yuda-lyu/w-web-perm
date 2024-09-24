@@ -907,9 +907,9 @@ export default {
                 return
             }
 
-            // //getUserRules
-            // let kur = vo.$s.getUserRules(r, vo.grups, vo.pemis, vo.targets)
-            // console.log('getUserRules kur', kur)
+            //getUserRules
+            let kur = vo.$s.getUserRules(r, vo.grups, vo.pemis, vo.targets)
+            console.log('getUserRules kur', kur)
 
             //showVeCgrups
             vo.$dg.showVeCgrups(r)
