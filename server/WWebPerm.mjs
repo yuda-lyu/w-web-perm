@@ -367,6 +367,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
 
     //getTokenUser
     let getTokenUser = async(token) => {
+        //基於token查找使用者, 會基於外部getUserByToken以及perm內部users進行查找並比對
 
         //userSelf
         let userSelf = null
@@ -476,9 +477,24 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
 
     //getAndVerifyAppTokenUser
     let getAndVerifyAppTokenUser = async (token, caller = '') => {
+        //基於token查找使用者, 會基於外部getUserByToken進行查找, 故只要getUserByToken提供使用者即可, 可支援getUserByToken給予針對應用程式所產生之虛擬使用者
 
-        //getTokenUser
-        let userSelf = await getTokenUser(token)
+        //userSelf
+        let userSelf = null
+        if (isestr(token)) {
+            userSelf = getUserByToken(token)
+            if (ispm(userSelf)) {
+                userSelf = await userSelf
+            }
+        }
+        // console.log('userSelf', userSelf)
+
+        //check
+        if (!iseobj(userSelf)) {
+            console.log(`token`, token)
+            console.log(`can not find the user from token`)
+            return Promise.reject(`can not find the user from token`)
+        }
 
         //verifyAppUser
         let b = verifyAppUser(userSelf, caller)
