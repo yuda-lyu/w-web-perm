@@ -657,7 +657,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
         }
 
         //grupsNames
-        let grupsNames = map(get(kur, 'grups', []), 'name')
+        let grupsNames = map(get(kur, 'grups', []), 'name') //kur.grups僅會提供isActive='y', 故grupsNames為有效權限群組名稱
         grupsNames = join(grupsNames, ';')
 
         return {
@@ -665,7 +665,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
                 ...userFind,
                 grupsNames,
             },
-            kur,
+            // grups: get(kur, 'grups', []),
+            rules: get(kur, 'rules', []),
         }
     }
 
