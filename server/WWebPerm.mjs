@@ -226,7 +226,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
     //mappingBy
     let mappingBy = get(opt, 'mappingBy', '')
     if (mappingBy !== 'id' && mappingBy !== 'email' && mappingBy !== 'name') {
-        mappingBy = 'email'
+        mappingBy = 'id'
     }
     // console.log('mappingBy', mappingBy)
 
