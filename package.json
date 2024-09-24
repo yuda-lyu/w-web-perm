@@ -1,6 +1,6 @@
 {
   "name": "w-web-perm",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "main": "dist/w-web-perm.umd.js",
   "dependencies": {
     "@mdi/js": "^7.4.47",
