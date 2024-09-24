@@ -65,6 +65,10 @@ function perm() {
         return pm
     }
 
+    let isInit = () => {
+        return pmd !== null
+    }
+
     let genUser = () => {
         _user = get(pmd, `user`, {})
     }
@@ -97,6 +101,7 @@ function perm() {
     //kp
     let kp = {
         conn,
+        isInit,
         getUser: () => {
             return _user
         },
