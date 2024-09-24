@@ -4,6 +4,7 @@ import get from 'lodash-es/get.js'
 import map from 'lodash-es/map.js'
 import keys from 'lodash-es/keys.js'
 import size from 'lodash-es/size.js'
+import join from 'lodash-es/join.js'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import ispint from 'wsemi/src/ispint.mjs'
@@ -625,7 +626,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
     }
 
 
-    //getGenUserAndRulesByUserId bbb
+    //getGenUserAndRulesByUserId
     let getGenUserAndRulesByUserId = async (userId) => {
 
         //userFind
@@ -655,8 +656,15 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
             return Promise.reject(`can not get rules of user`)
         }
 
+        //grupsNames
+        let grupsNames = map(get(kur, 'grups', []), 'name')
+        grupsNames = join(grupsNames, ';')
+
         return {
-            user: userFind,
+            user: {
+                ...userFind,
+                grupsNames,
+            },
             kur,
         }
     }
