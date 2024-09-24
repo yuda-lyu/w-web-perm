@@ -35,12 +35,12 @@ let settings = {
         type: 'TEXT',
     },
     from: {
-        name: '來源',
+        name: '來源', //標注使用者來源, 亦供外部批次變更使用
         type: 'STRING',
     },
-    ruleGroupsIds: {
-        name: '所屬權限群組主鍵', //多主鍵用分號區隔
-        type: 'STRING',
+    cgrups: {
+        name: '權限群組清單', //為json字串
+        type: 'TEXT',
     },
     isAdmin: {
         name: '是否為系統管理員',
@@ -74,6 +74,7 @@ let funNew = (ndata = {}) => {
     o.isAdmin = 'n'
     o.userIdUpdate = o.userId
     o.timeCreate = nowms2str()
+    o.userIdUpdate = o.userId
     o.timeUpdate = o.timeCreate
     o.isActive = 'y'
     return o
@@ -81,32 +82,59 @@ let funNew = (ndata = {}) => {
 
 let funTest = () => {
     let rs = [
-        '王小明',
-        'peter',
-        'mary',
-        'john',
-        'bill',
-        'admin',
+
+        ['peter', 'teamA', `
+            { 
+                '權限群組M1': {
+                    'mode': 'OR',
+                    'isActive': 'y',
+                }
+            }
+        `, 'n'],
+        ['mary', 'teamA', `
+            { 
+                '權限群組M2': {
+                    'mode': 'OR',
+                    'isActive': 'y',
+                }
+            }
+        `, 'n'],
+        ['john', 'teamA', `
+            { 
+                '權限群組M3': {
+                    'mode': 'OR',
+                    'isActive': 'y',
+                }
+            }
+        `, 'n'],
+        ['admin', '', `
+            { 
+                '權限群組M4': {
+                    'mode': 'OR',
+                    'isActive': 'y',
+                }
+            }
+        `, 'y'],
+
     ]
-    rs = map(rs, (name, k) => {
-        let v = funNew({ userId: 'id-for-admin', name })
+    rs = map(rs, ([name, from, cgrups, isAdmin], k) => {
+        let v = funNew({
+            userId: 'id-for-admin',
+            order: k,
+            name,
+            email: `${name}@example.com`,
+            from,
+            cgrups,
+            isAdmin,
+        })
         v.id = `id-for-${name}`
-        v.order = k
-        v.email = `${name}@example.com`
+        if (name === 'john') {
+            v.email = `${v.email};john@test.com`
+        }
+        v.isAdmin = isAdmin
         v = dtpick(v, keys(settings))
         return v
     })
-    rs[0].ruleGroupsIds = `id-for-權限群組1;id-for-權限群組2`
-    rs[1].ruleGroupsIds = `id-for-權限群組1`
-    rs[0].from = 'teamA'
-    rs[1].from = 'teamA'
-    rs[2].from = 'teamA'
-    rs[3].from = 'teamB'
-    rs[4].from = 'teamB'
-    rs[4].isActive = 'n'
-    rs[5].ruleGroupsIds = `id-for-權限群組1`
-    rs[5].description = '測試系統管理員描述說明'
-    rs[5].isAdmin = 'y' //admin
     console.log(`已產生: ${keyTable} 測試資料`, rs)
     return rs
 }

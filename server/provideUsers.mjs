@@ -12,19 +12,19 @@ async function provideUsers(url, from, users) {
 
     //ks
     let ks = [
-        'id',
-        'order',
+        // 'id',
+        'order', //order大部分由外部給予, 得要開啟
         'name',
         'email',
         'description',
         'from',
-        'ruleGroupsIds',
+        'cgrups',
         'isAdmin',
-        'userId',
-        'timeCreate',
-        'userIdUpdate',
-        'timeUpdate',
         'isActive',
+        // 'userId',
+        // 'timeCreate',
+        // 'userIdUpdate',
+        // 'timeUpdate',
     ]
 
     //ltdtpick
@@ -47,7 +47,7 @@ async function provideUsers(url, from, users) {
         .then((res) => {
             // console.log(res)
             let r = {
-                msg: '成功傳輸Users清單',
+                msg: '成功傳輸user清單',
                 res,
             }
             pm.resolve(r)
@@ -55,7 +55,7 @@ async function provideUsers(url, from, users) {
         .catch((err) => {
             // console.log(err)
             let r = {
-                msg: '無法傳輸Users清單',
+                msg: '無法傳輸user清單',
                 res: err,
             }
             pm.reject(r)

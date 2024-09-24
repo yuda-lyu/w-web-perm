@@ -1,4 +1,4 @@
-import map from 'lodash-es/map'
+import map from 'lodash-es/map.js'
 import ds from './src/schema/index.mjs'
 import provideUsers from './server/provideUsers.mjs'
 
@@ -10,23 +10,55 @@ async function provide() {
     let from = `pd`
 
     let rs = [
-        ['pd-viewer', 'pd-普通瀏覽者', 'id-for-pd-權限群組1'],
-        ['pd-basic', 'pd-一般使用者', 'id-for-pd-權限群組2'],
-        ['pd-admin', 'pd-系統管理者', 'id-for-pd-權限群組3'],
+
+        ['pd-peter', 'teamA', `
+            { 
+                'pd-權限群組M1': {
+                    'mode': 'OR',
+                    'isActive': 'y',
+                }
+            }
+        `, 'n'],
+        ['pd-mary', 'teamA', `
+            { 
+                'pd-權限群組M2': {
+                    'mode': 'OR',
+                    'isActive': 'y',
+                }
+            }
+        `, 'n'],
+        ['pd-john', 'teamA', `
+            { 
+                'pd-權限群組M3': {
+                    'mode': 'OR',
+                    'isActive': 'y',
+                }
+            }
+        `, 'n'],
+        ['pd-admin', '', `
+            { 
+                'pd-權限群組M4': {
+                    'mode': 'OR',
+                    'isActive': 'y',
+                }
+            }
+        `, 'y'],
+
     ]
-    rs = map(rs, ([key, name, ruleGroupsIds], k) => {
+    rs = map(rs, ([name, from, cgrups, isAdmin], k) => {
         let v = ds.users.funNew({
-            order: 1000 + k,
+            order: k + 1000, //使能排序至最後, 不穿插至原測試
             name,
-            email: `${key}@example.com`,
-            ruleGroupsIds,
-            userId: 'id-for-admin',
+            email: `${name}@example.com`,
             from,
+            cgrups,
+            isAdmin,
         })
-        v.id = `id-for-${key}`
-        if (key === 'pd-admin') {
-            v.isAdmin = 'y'
+        v.id = `id-for-${name}`
+        if (name === 'john') {
+            v.email = `${v.email};john@test.com`
         }
+        v.isAdmin = isAdmin
         return v
     })
     console.log('rs', rs)
@@ -42,4 +74,4 @@ provide()
     })
 
 
-//node --experimental-modules --es-module-specifier-resolution=node g.provideUsers.mjs
+//node --experimental-modules g.provideUsers.mjs

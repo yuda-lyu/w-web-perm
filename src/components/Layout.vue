@@ -106,11 +106,15 @@ export default {
     computed: {
 
         viewState: function() {
-            return get(this, `$store.state.viewState`)
+            return get(this, `$store.state.viewState`, '')
         },
 
         heightToolbar: function() {
-            return get(this, `$store.state.heightToolbar`)
+            //console.log('computed heightToolbar')
+
+            let vo = this
+
+            return get(vo, `$store.state.heightToolbar`, 0)
         },
 
         webName: {
@@ -131,7 +135,11 @@ export default {
         },
 
         webLogo: function() {
-            return get(this, `$store.state.webInfor.webLogo`)
+            //console.log('computed webLogo')
+
+            let vo = this
+
+            return get(vo, `$store.state.webInfor.webLogo`, '')
         },
 
     },

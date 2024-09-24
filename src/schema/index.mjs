@@ -1,11 +1,13 @@
-import ruleGroups from './tables/ruleGroups.mjs'
+import grups from './tables/grups.mjs'
+import pemis from './tables/pemis.mjs'
 import targets from './tables/targets.mjs'
 import users from './tables/users.mjs'
 import build from 'w-data-collector/src/build.mjs'
 
 
 let cs = {
-    ruleGroups,
+    grups,
+    pemis,
     targets,
     users,
 }

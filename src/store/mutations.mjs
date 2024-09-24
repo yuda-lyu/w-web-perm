@@ -34,6 +34,11 @@ let state = {
     lang: 'cht',
     keyLangs: {
 
+        aggridLanguage: {
+            eng: 'en',
+            cht: 'zh-tw',
+        },
+
         systemMessage: {
             eng: 'System message',
             cht: '系統確認訊息',
@@ -68,6 +73,10 @@ let state = {
             eng: `Save changes`,
             cht: `儲存變更`,
         },
+        id: {
+            eng: `Id`,
+            cht: `主鍵`,
+        },
         from: {
             eng: `From`,
             cht: `來源`,
@@ -80,10 +89,35 @@ let state = {
             eng: `Close`,
             cht: `關閉`,
         },
+        delete: {
+            eng: `Delete`,
+            cht: `刪除`,
+        },
         cancel: {
             eng: `Cancel`,
             cht: `取消`,
         },
+        screenFull: {
+            eng: `Max size`,
+            cht: `最大化尺寸`,
+        },
+        screenNormal: {
+            eng: `Normal size`,
+            cht: `預設尺寸`,
+        },
+        checkAllYes: {
+            eng: `Check all`,
+            cht: `全選`,
+        },
+        checkAllNo: {
+            eng: `Uncheck all`,
+            cht: `全不選`,
+        },
+        checkAllInv: {
+            eng: `Reverse all`,
+            cht: `全反選`,
+        },
+
         processing: {
             eng: `Processing...`,
             cht: `處理中請稍後...`,
@@ -117,214 +151,388 @@ let state = {
             eng: `No description`,
             cht: `無說明`,
         },
+        isAdmin: {
+            eng: `Administrator`,
+            cht: `是否為系統管理員`,
+        },
+        isActive: {
+            eng: `Active`,
+            cht: `是否使用`,
+        },
+
+        errInNames: {
+            eng: `Name errors`,
+            cht: `名稱出現錯誤待修復`,
+        },
+        errInEmails: {
+            eng: `Email errors`,
+            cht: `Email出現錯誤待修復`,
+        },
 
         managementTargets: {
             eng: `Targets`,
-            cht: `管理區塊`,
+            cht: `管理對象`,
         },
-        permissionGroups: {
-            eng: `Groups`,
-            cht: `權限群組`,
+        targetId: {
+            eng: `Target`,
+            cht: `管理名稱`,
         },
-        userPermissions: {
-            eng: 'Users',
-            cht: '使用者權限',
+        targetIdEmpty: {
+            eng: `No valid name`,
+            cht: `尚未給予有效管理名稱`,
         },
-
-        userMsg1: {
-            eng: `Please give the appropriate permission group according to the user's identity.`,
-            cht: '請依照使用者身份給予適合之權限群組。',
+        targetIdDuplicate: {
+            eng: `Duplicate target`,
+            cht: `管理名稱出現重複`,
         },
-        userMsg2: {
-            eng: `Please confirm that the new user is an approved user.`,
-            cht: `請確認新增使用者為核可之使用者。`,
+        targetAddEmpty: {
+            eng: `No target`,
+            cht: `尚未新增管理資料`,
         },
-        userList: {
-            eng: `User list`,
-            cht: `使用者分類清單`,
+        targetAdd: {
+            eng: `Add target`,
+            cht: `新增對象`,
         },
-        addUser: {
-            eng: `Add user`,
-            cht: `新增使用者`,
-        },
-
-        targetMsg1: {
-            eng: `Please click the button on the right side of each target to perform operations, such as changing the name, inserting or deleting targets.`,
-            cht: `請於各區塊右側點擊按鈕即可進行操作，例如變更名稱、插入或刪除區塊。`,
-        },
-        targetMsg2: {
-            eng: `Disable the sub-target function when editing a target.`,
-            cht: `編輯區塊時禁止顯隱子區塊功能。`,
-        },
-        edit: {
-            eng: `Edit`,
-            cht: `編輯`,
-        },
-        changeName: {
-            eng: `Change name`,
-            cht: `變更名稱`,
-        },
-        insertBefore: {
-            eng: `Insert before`,
-            cht: `插入前區塊`,
-        },
-        insertChild: {
-            eng: `Insert child`,
-            cht: `插入子區塊`,
-        },
-        insertAfter: {
-            eng: `Insert after`,
-            cht: `插入後區塊`,
-        },
-        deleteTarget: {
-            eng: `Delete target`,
-            cht: `刪除區塊`,
-        },
-        newTarget: {
+        targetAddNameNew: {
             eng: `New target`,
-            cht: `新區塊`,
+            cht: `新對象`,
         },
-        failedToChangePermissionGroups: {
-            eng: `Failed to change permission groups`,
-            cht: `連動變更權限群組失敗`,
+        targetAddIdNew: {
+            eng: `Waiting generation`,
+            cht: `待自動給予`,
         },
-        failedToClearTargets: {
+        targetCopy: {
+            eng: `Copy target`,
+            cht: `複製對象`,
+        },
+        targetCopyNameNew: {
+            eng: `copy`,
+            cht: `複製`,
+        },
+        targetDeleteChecks: {
+            eng: `Delete user(s)`,
+            cht: `刪除勾選對象`,
+        },
+        targetEnable: {
+            eng: `Enable`,
+            cht: `是否使用`,
+        },
+        targetClearTargetsFail: {
             eng: `Failed to clear existing targets`,
-            cht: `清除既有區塊數據失敗`,
+            cht: `清除既有對象數據失敗`,
         },
-        failedToSaveTargets: {
+        targetSaveTargetsFail: {
             eng: `Failed to save targets`,
-            cht: `儲存區塊數據失敗`,
+            cht: `儲存對象數據失敗`,
         },
-        successfulToSaveTargets: {
+        targetSaveTargetsSuccess: {
             eng: `Save targets successfully`,
-            cht: `儲存區塊數據成功`,
+            cht: `儲存對象數據成功`,
         },
 
-        groupMsg1: {
-            eng: `Please create appropriate permission groups for various users according to system management requirements.`,
-            cht: `請依照系統管理需求創建適合各類使用者適合的權限群組。`,
+        managementPemis: {
+            eng: `Permissions`,
+            cht: `管理權限`,
         },
-        groupMsg2: {
-            eng: `When using edit mode, you can drag permission groups to change their relative order.`,
-            cht: `開啟編輯時可拖曳權限群組變更其相對順序。`,
+        pemiName: {
+            eng: `Name of permission`,
+            cht: `權限名稱`,
         },
-        addGroup: {
-            eng: `Add group`,
-            cht: `新增群組`,
+        pemiNameEmpty: {
+            eng: `No valid name of permission`,
+            cht: `尚未給予有效權限名稱`,
         },
-        addPermissionGroup: {
+        pemiNameDuplicate: {
+            eng: `Duplicate name of permission`,
+            cht: `權限名稱出現重複`,
+        },
+        pemiAddEmpty: {
+            eng: `No permission`,
+            cht: `尚未新增權限資料`,
+        },
+        pemiAdd: {
+            eng: `Add permission`,
+            cht: `新增權限`,
+        },
+        pemiAddNameNew: {
+            eng: `New permission`,
+            cht: `新權限`,
+        },
+        pemiAddIdNew: {
+            eng: `Waiting generation`,
+            cht: `待自動給予`,
+        },
+        pemiCopy: {
+            eng: `Copy permission`,
+            cht: `複製權限`,
+        },
+        pemiCopyNameNew: {
+            eng: `copy`,
+            cht: `複製`,
+        },
+        pemiDeleteChecks: {
+            eng: `Delete user(s)`,
+            cht: `刪除勾選權限`,
+        },
+        pemiEnable: {
+            eng: `Enable`,
+            cht: `是否使用`,
+        },
+        pemiMode: {
+            eng: `Operator`,
+            cht: `合併權限模式`,
+        },
+        pemiCrules: {
+            eng: `Rules of permission`,
+            cht: `管控對象規則`,
+        },
+        pemiEditCrules: {
+            eng: `Edit rules of permission`,
+            cht: `編輯對象規則清單`,
+        },
+        pemiEditCrulesSimple: {
+            eng: `Edit rules`,
+            cht: `編輯對象規則`,
+        },
+        pemiEditCrulesNoId: {
+            eng: `Can not find the id of permission`,
+            cht: `無法找到權限Id`,
+        },
+        pemiEditCrulesNoPemi: {
+            eng: `Can not find the data of permission`,
+            cht: `無法找到權限資料`,
+        },
+        pemiClearPemisFail: {
+            eng: `Failed to clear existing permissions`,
+            cht: `清除既有權限數據失敗`,
+        },
+        pemiSavePemisFail: {
+            eng: `Failed to save permissions`,
+            cht: `儲存權限數據失敗`,
+        },
+        pemiSavePemisSuccess: {
+            eng: `Save permissions successfully`,
+            cht: `儲存權限數據成功`,
+        },
+
+        cruleEditNoId: {
+            eng: `Can not find the id of rule`,
+            cht: `無法找到規則Id`,
+        },
+        cruleEditNoRule: {
+            eng: `Can not find the data of rule`,
+            cht: `無法找到規則資料`,
+        },
+        cruleCheckAllYes: {
+            eng: `Check all`,
+            cht: `全選使用`,
+        },
+        cruleCheckAllNo: {
+            eng: `Uncheck all`,
+            cht: `全不選使用`,
+        },
+        cruleCheckAllInv: {
+            eng: `Reverse all`,
+            cht: `全反選使用`,
+        },
+        cruleDeleteCheckTargets: {
+            eng: `Delete item(s)`,
+            cht: `刪除勾選對象`,
+        },
+
+        managementGrups: {
+            eng: `Permission groups`,
+            cht: `管理權限群組`,
+        },
+        grupName: {
+            eng: `Name of permission group`,
+            cht: `權限群組名稱`,
+        },
+        grupNameEmpty: {
+            eng: `No valid name of permission group`,
+            cht: `尚未給予有效權限群組名稱`,
+        },
+        grupNameDuplicate: {
+            eng: `Duplicate name of permission group`,
+            cht: `權限群組名稱出現重複`,
+        },
+        grupAddEmpty: {
+            eng: `No permission group`,
+            cht: `尚未新增權限群組資料`,
+        },
+        grupAdd: {
             eng: `Add permission group`,
             cht: `新增權限群組`,
         },
-        groupMsgNoPick: {
-            eng: `No permission group is selected.`,
-            cht: `未選擇權限群組，請點擇上方任一權限群組以顯示管理範圍。`,
-        },
-        newGroup: {
-            eng: `New group`,
+        grupAddNameNew: {
+            eng: `New permission group`,
             cht: `新權限群組`,
         },
-        failedToAddPermissionGroup: {
-            eng: `Failed to add the permission group`,
-            cht: `新增權限群組失敗`,
+        grupAddIdNew: {
+            eng: `Waiting generation`,
+            cht: `待自動給予`,
         },
-        successfulToAddPermissionGroup: {
-            eng: `Add permission group successfully`,
-            cht: `新增權限群組成功`,
+        grupCopy: {
+            eng: `Copy permission group`,
+            cht: `複製權限群組`,
         },
-        confirmToDeletePermissionGroup: {
-            eng: `Do you want to delete the permission group[{name}]?`,
-            cht: `確認是否刪除權限群組`,
+        grupCopyNameNew: {
+            eng: `copy`,
+            cht: `複製`,
         },
-        failedToDeletePermissionGroup: {
-            eng: `Failed to delete the permission group`,
-            cht: `刪除權限群組失敗`,
+        grupDeleteChecks: {
+            eng: `Delete user(s)`,
+            cht: `刪除勾選權限群組`,
         },
-        successfulToDeletePermissionGroup: {
-            eng: `Delete the permission group successfully`,
-            cht: `刪除權限群組成功`,
+        grupCpemis: {
+            eng: `Permissions`,
+            cht: `管控使用權限`,
         },
-        failedToChangeOrderPermissionGroup: {
-            eng: `Failed to change the order of permission group`,
-            cht: `變更權限群組順序失敗`,
+        grupEditCpemis: {
+            eng: `Edit list of permission group`,
+            cht: `編輯使用權限清單`,
         },
-        successfulToChangeOrderPermissionGroup: {
-            eng: `Change the order of permission groups successfully`,
-            cht: `變更權限群組順序成功`,
+        grupEditCpemisSimple: {
+            eng: `Edit permissions`,
+            cht: `編輯權限`,
         },
-        rememberToGivePermissionGroupName: {
-            eng: `You need to give the permission group name`,
-            cht: `權限群組名稱請記得給予`,
+        grupEditCpemisNoId: {
+            eng: `Can not find the id of permission group`,
+            cht: `無法找到權限群組Id`,
         },
-        isPermissionGroupNameEmpty: {
-            eng: `The {n}th permission group name is empty`,
-            cht: `第 {n} 個權限群組名稱為空`,
+        grupEditCpemisNoGrup: {
+            eng: `Can not find the data of permission group`,
+            cht: `無法找到權限群組資料`,
         },
-        failedToSavePermissionGroup: {
-            eng: `Failed to save the permission group`,
-            cht: `儲存權限群組失敗`,
+        grupClearGrupsFail: {
+            eng: `Failed to clear existing permission groups`,
+            cht: `清除既有權限群組數據失敗`,
         },
-        successfulToSavePermissionGroup: {
-            eng: `Save the permission group successfully`,
-            cht: `儲存權限群組成功`,
+        grupSaveGrupsFail: {
+            eng: `Failed to save permission groups`,
+            cht: `儲存權限群組數據失敗`,
+        },
+        grupSaveGrupsSuccess: {
+            eng: `Save permission groups successfully`,
+            cht: `儲存權限群組數據成功`,
         },
 
-        editUser: {
-            eng: `Edit user`,
-            cht: `編修使用者`,
+        cpemiEditNoName: {
+            eng: `Can not find the name of permission`,
+            cht: `無法找到權限名稱`,
         },
-        belongToPermissionGroup: {
-            eng: `Permission group`,
-            cht: `隸屬權限群組`,
+        cpemiEditNoPemi: {
+            eng: `Can not find the data of permission`,
+            cht: `無法找到權限資料`,
         },
-        availableTarget: {
-            eng: `Available targets`,
-            cht: `使用者可用區塊`,
+        cpemiCheckAllYes: {
+            eng: `Check all`,
+            cht: `全選使用`,
         },
-        isAManager: {
-            eng: `Is a manager`,
-            cht: `是否為管理者`,
+        cpemiCheckAllNo: {
+            eng: `Uncheck all`,
+            cht: `全不選使用`,
         },
-        isActive: {
-            eng: 'Is active',
-            cht: '是否有效',
+        cpemiCheckAllInv: {
+            eng: `Reverse all`,
+            cht: `全反選使用`,
         },
-        remark: {
-            eng: `Remark`,
-            cht: `備註`,
+        cpemiDeleteCheckTargets: {
+            eng: `Delete item(s)`,
+            cht: `刪除勾選權限`,
         },
-        dayCreate: {
-            eng: 'Create day',
-            cht: '創建日期',
+
+        managementUsers: {
+            eng: `Users`,
+            cht: `管理使用者`,
         },
-        newUser: {
+        userName: {
+            eng: `Name of user`,
+            cht: `使用者名稱`,
+        },
+        userNameEmpty: {
+            eng: `No valid name of user`,
+            cht: `尚未給予有效使用者名稱`,
+        },
+        userNameDuplicate: {
+            eng: `Duplicate name of user`,
+            cht: `使用者名稱出現重複`,
+        },
+        userEmailEmpty: {
+            eng: `No valid email of user`,
+            cht: `尚未給予有效使用者Email`,
+        },
+        userEmailDuplicate: {
+            eng: `Duplicate email of user`,
+            cht: `使用者Email出現重複`,
+        },
+        userAddEmpty: {
+            eng: `No user`,
+            cht: `尚未新增使用者資料`,
+        },
+        userAdd: {
+            eng: `Add user`,
+            cht: `新增使用者`,
+        },
+        userAddNameNew: {
             eng: `New user`,
             cht: `新使用者`,
         },
-        failedToAddUser: {
-            eng: `Failed to add the user`,
-            cht: `新增使用者失敗`,
+        userAddIdNew: {
+            eng: `Waiting generation`,
+            cht: `待自動給予`,
         },
-        successfulToAddUser: {
-            eng: `Add the user successfully`,
-            cht: `新增使用者成功`,
+        userCopy: {
+            eng: `Copy user`,
+            cht: `複製使用者`,
         },
-        confirmToDeleteUser: {
-            eng: `Do you want to delete the user[{name}]?`,
-            cht: `確認是否刪除使用者`,
+        userCopyNameNew: {
+            eng: `copy`,
+            cht: `複製`,
         },
-        failedToDeleteUser: {
-            eng: `Failed to delete the user`,
-            cht: `刪除使用者失敗`,
+        userDeleteChecks: {
+            eng: `Delete user(s)`,
+            cht: `刪除勾選使用者`,
         },
-        successfulToDeleteUser: {
-            eng: `Delete the user successfully`,
-            cht: `刪除使用者成功`,
+        userCgrups: {
+            eng: `Permission groups`,
+            cht: `管控使用權限群組`,
         },
-        cannotShowUserDetailsInViewMode: {
-            eng: `Can not show the user details in the view mode`,
-            cht: `非編輯模式無法查閱使用者詳細資訊`,
+        userEditCgrups: {
+            eng: `Edit list of user`,
+            cht: `編輯使用權限群組清單`,
+        },
+        userEditCgrupsSimple: {
+            eng: `Edit permission group`,
+            cht: `編輯權限群組`,
+        },
+        userEditCgrupsNoId: {
+            eng: `Can not find the id of user`,
+            cht: `無法找到使用者Id`,
+        },
+        userEditCgrupsNoUser: {
+            eng: `Can not find the data of user`,
+            cht: `無法找到使用者資料`,
+        },
+        userClearUsersFail: {
+            eng: `Failed to clear existing users`,
+            cht: `清除既有使用者數據失敗`,
+        },
+        userSaveUsersFail: {
+            eng: `Failed to save users`,
+            cht: `儲存使用者數據失敗`,
+        },
+        userSaveUsersSuccess: {
+            eng: `Save users successfully`,
+            cht: `儲存使用者數據成功`,
+        },
+        userEditNoId: {
+            eng: `Can not find the id of user`,
+            cht: `無法找到使用者Id`,
+        },
+        userEditNoUser: {
+            eng: `Can not find the data of user`,
+            cht: `無法找到使用者數據`,
         },
 
         allDefaults: {
@@ -366,6 +574,23 @@ let state = {
         successfulToSaveUser: {
             eng: `Save the user successfully`,
             cht: `變更使用者成功`,
+        },
+
+        userId: {
+            eng: `ID of the created user`,
+            cht: '創建使用者主鍵',
+        },
+        timeCreate: {
+            eng: `Created time`,
+            cht: '創建時間',
+        },
+        userIdUpdate: {
+            eng: `ID of the updated user`,
+            cht: '最新變更使用者主鍵',
+        },
+        timeUpdate: {
+            eng: `Updated time`,
+            cht: '更新時間',
         },
 
     },

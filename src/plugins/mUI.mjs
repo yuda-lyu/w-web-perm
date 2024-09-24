@@ -149,7 +149,11 @@ function getKpLang() {
 function getKpText(key) {
     // console.log('call getKpText')
     let kpText = get(vo, '$store.state.kpText')
-    return get(kpText, key, '')
+    let t = get(kpText, key, '')
+    if (!isestr(t)) {
+        t = key
+    }
+    return t
 }
 
 
@@ -203,6 +207,18 @@ async function waitData(t = 0) {
 }
 
 
+let kpIcon = {
+    warning: `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACQAAAAhCAYAAACxzQkrAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAOwwAADsMBx2+oZAAAABZ0RVh0Q3JlYXRpb24gVGltZQAwOS8xOS8yNP52YhIAAAAcdEVYdFNvZnR3YXJlAEFkb2JlIEZpcmV3b3JrcyBDUzbovLKMAAADMklEQVRYha2WTWgTQRiGn0k2SU2KNQjmoiL+gGAVD/5gEelAkSKOiILei+hBRAQv/tBDsQiK1CJFDz331tNePAjRm60eBL0pXsSDF+dimmzbZDzsRJNmm+xPXliyOzP7zrNfvpn5hDGGJNJSHQJmAQHcLpbdL0n8RBIgLdVhYBHYb5u+AZeLZfdzXM9UbBpfC8AB/OgIe7+QxDA2kJZqAhgO6Bq2fbEU6y/TUuWB70BpkyG/gL3FsrsS1TtuhO53gcH23Y9jHDlCWqqd+Mmb6zHUA/YVy+7PKP5xIvQkBAx2zNOo5pEipKU6Bnzo6Kg3/N904PcdL5bdj2HniBqh2bYnITDVGmQcyDj+vRDd3+kXkJbqEjDS2mYqK2THTjO0MMfQwhzZsdOYSsfCGrHv9g9IS+UAz9oajUFkHPITV0mVSqRKJfITVxAZBzrT4Jn16A8QcBvY0w4EZDL+/mw8/xIpv60zLfdYj+RAWqrtwGRgpzHQaJm90QiKTlOT1isZEPAI2BpiXC9ttV5d1RVIS3UQuN4HmKZuWM94QMBMiDFRJKznptp0Mi3VGDDeR5imxq13eCB95iz0+JKEmtFj58IDkc5dI7jWaZcQ7cdFOhW0UwdpmHr6WiggLVUBmO4NA6bmYSpVEIMgBjGVKqbm+ZnSW9N2ru5AwANgR28gf9bKzDxry+9ZW35PZWa+ra+Hdti52m1bT3st1S7gK+HKi/+Ha73uP6fTiC0D3TbHjfKAA8Wy+6PZsDFCT0PDAGAQ2Qys12G97t8HnBtd1FEz/YuQluoEsBTFjXoDnDQ5u4o9940PF1wXddPJYtldBmg9gZ9HdTG1GoMPb5G9cBEAZ+9u/ky/QBTyUa2eY0ubFICWSgGnotEYxEAO59gRoAJUcI4fQQzkouRQU6csAykt1TZgKqqDn9Aeq6/fAQWgwOrrt5iqF3aVbdSUlmpI/B49vwiErujaZAxmbZ3syaMArC598gu0eEAAi+L36PkakVZWANRKFQCR35IEBqCaAl4mcUAIRCHvJ3IyGIBXjhHcEYYGcJMkkUomD5gziLut+9Bj4DKQJeLulkACWAUWi2X3HsBfLU4ARuGaUEMAAAAASUVORK5CYII=`,
+}
+function getIcon(icon) {
+    let c = get(kpIcon, icon, '')
+    if (!isestr(c)) {
+        console.log(`invalid icon[${icon}]`)
+    }
+    return c
+}
+
+
 let mUI = {
 
     setVo,
@@ -222,6 +238,8 @@ let mUI = {
     syncHeight,
 
     waitData,
+
+    getIcon,
 
 }
 

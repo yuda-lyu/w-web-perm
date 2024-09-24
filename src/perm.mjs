@@ -84,16 +84,16 @@ function perm() {
             return u
         },
         getRules: () => {
-            return get(pmd, `rules`, {})
+            return get(pmd, `pemis`, {})
         },
         rule: (key) => {
-            return get(pmd, `rules.${key}`, {})
+            return get(pmd, `pemis.${key}`, {})
         },
         show: (key) => {
-            return get(pmd, `rules.${key}.show`, 'n')
+            return get(pmd, `pemis.${key}.show`, 'n')
         },
         active: (key) => {
-            return get(pmd, `rules.${key}.active`, 'n')
+            return get(pmd, `pemis.${key}.active`, 'n')
         },
     }
 

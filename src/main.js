@@ -1,5 +1,5 @@
 import Vue from 'vue'
-import get from 'lodash-es/get'
+import get from 'lodash-es/get.js'
 import WServHapiClient from 'w-serv-hapi/src/WServHapiClient.mjs'
 import WAlert from 'w-component-vue/src/components/WAlert.mjs'
 import domMutation from 'w-component-vue/src/js/domMutation.mjs'
@@ -39,7 +39,7 @@ Vue.prototype.$t = ui.getKpText
 Vue.prototype.$s = s
 Vue.prototype.$dssm = dssm
 // Vue.prototype.$dspt = dspt
-// Vue.prototype.$ds = ds
+Vue.prototype.$ds = ds
 Vue.prototype.$dg = {}
 
 //directive

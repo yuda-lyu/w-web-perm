@@ -43,7 +43,7 @@ let getUserByToken = async (token) => {
     if (token === 'sys') { //開發階段w-ui-loginout自動給予browser使用者(且位於localhost)的token為sys
         return {
             id: 'id-for-admin',
-            name: 'tester',
+            name: 'admin',
             email: 'admin@example.com', //mappingBy為email, 開發階段時會使用email找到所建置之使用者資料
             isAdmin: 'y',
         }
@@ -75,4 +75,4 @@ instWWebPerm.on('error', (err) => {
 })
 
 
-//node --experimental-modules --es-module-specifier-resolution=node srv.mjs
+//node --experimental-modules srv.mjs

@@ -1,19 +1,19 @@
 {
   "name": "w-web-perm",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "main": "dist/w-web-perm.umd.js",
   "dependencies": {
     "@mdi/js": "^7.4.47",
-    "axios": "^1.6.8",
+    "axios": "^1.7.7",
     "json5": "^2.2.3",
     "lodash": "^4.17.21",
     "showdown": "^2.1.0",
-    "w-component-vue": "^2.3.80",
+    "w-component-vue": "^2.4.2",
     "w-data-collector": "^1.0.22",
     "w-serv-hapi": "^1.0.13",
-    "w-serv-orm": "^1.0.9",
+    "w-serv-orm": "^1.0.11",
     "w-ui-loginout": "^1.0.8",
-    "wsemi": "^1.7.49"
+    "wsemi": "^1.7.60"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^5.0.8",
@@ -29,13 +29,13 @@
     "eslint-plugin-vue": "^9.10.0",
     "vue": "^2.6.14",
     "vuex": "^3.6.2",
-    "w-orm-mongodb": "^1.1.31",
-    "w-package-tools": "^1.0.75"
+    "w-orm-mongodb": "^1.1.32",
+    "w-package-tools": "^1.0.76"
   },
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
-    "test": "mocha --parallel --timeout 60000 --experimental-modules --es-module-specifier-resolution=node",
+    "test": "mocha --parallel --timeout 60000 --experimental-modules",
     "lint": "vue-cli-service lint",
     "deploy": "gh-pages -d docs"
   },

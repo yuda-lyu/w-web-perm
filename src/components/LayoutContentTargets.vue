@@ -13,108 +13,124 @@
         >
 
             <!-- 標題區 -->
-            <div style="display:inline-block; vertical-align:top; padding:10px 0px 5px 20px;">
-                <div style="display:flex; align-items:center; padding:5px 15px 5px 5px; border-bottom:3px solid #FF9100;">
+            <div style="padding:10px 10px 10px 20px;">
+                <div :style="`display:flex; align-items:center; padding:${drawer?'5px':'5px 5px 5px 20px'};`">
 
                     <WIcon
                         :icon="mdiGamepadCircle"
-                        :color="'#FF9800'"
+                        :color="'#000'"
+                        :size="26"
                     ></WIcon>
 
-                    <div style="padding-left:10px; font-size:1.3rem; color:#d3912c;">
+                    <div style="padding-left:10px; font-size:1.4rem; color:#000;">
                         {{$t('managementTargets')}}
                     </div>
 
                 </div>
             </div>
 
-            <!-- 編輯設定區 -->
-            <div style="display:inline-block; vertical-align:top;">
+            <!-- 功能區 -->
+            <div style="padding:5px; border-top:1px solid #ddd; display:flex; align-items:center;">
 
-                <div style="padding:15px 20px 15px 20px; background:#fff;">
+                <template>
 
-                    <div style="display:flex;">
-                        <WSwitch
-                            :text="$t('isEditabled')"
-                            :checkedSwitchCircleColor="'#D81B60'"
-                            :checkedSwitchCircleColorHover="'#f26'"
-                            :checkedSwitchBarColor="'#F8BBD0'"
-                            :checkedSwitchBarColorHover="'#F8BBD0'"
-                            _v-model="isOperatable"
-                            :value="isOperatable"
-                            @input="updateIsOperatable"
-                        ></WSwitch>
-                    </div>
+                    <WButtonCircle
+                        :paddingStyle="{v:6,h:6}"
+                        :tooltip="$t('targetAdd')"
+                        :icon="mdiPlus"
+                        :backgroundColor="'#fff'"
+                        :backgroundColorHover="'#f2f2f2'"
+                        _textColor="'#eee'"
+                        _textColorHover="'#fff'"
+                        :iconColor="'#444'"
+                        :iconColorHover="'#222'"
+                        :shadow="false"
+                        @click="addItem"
+                    ></WButtonCircle>
 
-                    <div style="padding-top:5px; font-size:0.8rem; _color:#f26;" v-if="isOperatable">
-                        <div style="padding:3px 0px;">
-                            1. {{$t('targetMsg1')}}
-                        </div>
-                        <div style="padding:3px 0px;">
-                            2. {{$t('targetMsg2')}}
-                        </div>
-                    </div>
+                    <div style="padding-left:6px;"></div>
 
-                </div>
+                </template>
 
-            </div>
+                <template v-if="hasItemCheckOne">
 
-            <!-- 儲存變更提示區 -->
-            <div
-                style="padding:10px 10px 12px 10px; border-top:1px solid #F48FB1; border-bottom:1px solid #F48FB1; background:#FCE4EC; display:flex; align-items:center; justify-content:flex-end;"
-                v-if="isModified"
-            >
+                    <WButtonCircle
+                        :paddingStyle="{v:6,h:6}"
+                        :tooltip="$t('targetCopy')"
+                        :icon="mdiContentCopy"
+                        :backgroundColor="'#fff'"
+                        :backgroundColorHover="'#f2f2f2'"
+                        _textColor="'#eee'"
+                        _textColorHover="'#fff'"
+                        :iconColor="'#444'"
+                        :iconColorHover="'#222'"
+                        :shadow="false"
+                        @click="copyItem"
+                    ></WButtonCircle>
 
-                <WButtonChip
-                    :paddingStyle="{v:0,h:11}"
-                    :text="$t('saveChanges')"
-                    :icon="mdiCloudUploadOutline"
-                    :backgroundColor="'rgba(255,0,50,0.7)'"
-                    :backgroundColorHover="'rgba(255,0,50,0.8)'"
-                    :textColor="'#eee'"
-                    :textColorHover="'#fff'"
-                    :iconColor="'#eee'"
-                    :iconColorHover="'#fff'"
-                    @click="saveRuleGroupsAndTargets"
-                ></WButtonChip>
+                    <div style="padding-left:6px;"></div>
+
+                </template>
+
+                <template v-if="hasItemsCheck">
+
+                    <WButtonCircle
+                        :paddingStyle="{v:6,h:6}"
+                        :tooltip="$t('targetDeleteChecks')"
+                        :icon="mdiTrashCanOutline"
+                        :backgroundColor="'#fff'"
+                        :backgroundColorHover="'#f2f2f2'"
+                        _textColor="'#eee'"
+                        _textColorHover="'#fff'"
+                        :iconColor="'#444'"
+                        :iconColorHover="'#222'"
+                        :shadow="false"
+                        @click="deleteItemsCheck"
+                    ></WButtonCircle>
+
+                    <div style="padding-left:6px;"></div>
+
+                </template>
+
+                <template v-if="isModified">
+
+                    <WButtonCircle
+                        :paddingStyle="{v:6,h:6}"
+                        :tooltip="$t('saveChanges')"
+                        :icon="mdiCloudUploadOutline"
+                        :backgroundColor="'rgba(255,0,50,0.7)'"
+                        :backgroundColorHover="'rgba(255,0,50,0.8)'"
+                        :textColor="'#eee'"
+                        :textColorHover="'#fff'"
+                        :iconColor="'#eee'"
+                        :iconColorHover="'#fff'"
+                        :shadow="false"
+                        @click="saveTargets"
+                    ></WButtonCircle>
+
+                    <div style="padding-left:6px;"></div>
+
+                </template>
 
             </div>
 
         </div>
 
-        <div
-            :style="`padding:${spacePading}px;`"
+        <template
             v-if="!firstLoading"
         >
 
-            <div style="background:#fff; box-shadow:0 3px 1px -2px rgba(0,0,0,.2), 0 2px 2px 0 rgba(0,0,0,.14), 0 1px 5px 0 rgba(0,0,0,.12);">
-                <WTree
-                    ref="wt"
-                    :viewHeightMax="treeHeight"
-                    :separatorColor="'rgba(0,0,0,0.1)'"
-                    :data.sync="treeBlocks"
-                    :indent="0.5"
-                    :iconToggleColor="'#666'"
-                    :iconToggleBackgroundColor="'transparent'"
-                    :iconToggleBackgroundColorHover="'transparent'"
-                    :operatable="isOperatable"
-                    :operateBtnTooltip="$t('edit')"
-                    :operateItemTextForRename="$t('changeName')"
-                    :operateItemTextForInsertBefore="$t('insertBefore')"
-                    :operateItemTextForInsertChild="$t('insertChild')"
-                    :operateItemTextForInsertAfter="$t('insertAfter')"
-                    :operateItemTextForDelete="$t('deleteTarget')"
-                    :editorRenameSaveBtnText="$t('save')"
-                    :editorRenameSaveBtnTextColor="'#444'"
-                    :editorRenameSaveBtnTextColorHover="'#222'"
-                    :editorRenameCancelBtnText="$t('cancel')"
-                    :editorRenameCancelBtnTextColor="'#444'"
-                    :editorRenameCancelBtnTextColorHover="'#222'"
-                    @click-operate-item="clickOperateItem"
-                ></WTree>
-            </div>
+            <template v-if="items">
+                <WAggridVueDyn
+                    ref="rftable"
+                    :style="`width:100%;`"
+                    :height="contentHeight"
+                    :opt="opt"
+                >
+                </WAggridVueDyn>
+            </template>
 
-        </div>
+        </template>
 
         <div style="padding:10px 15px; font-size:0.8rem;" v-else>
             {{$t('waitingData')}}
@@ -124,38 +140,33 @@
 </template>
 
 <script>
-import { mdiGamepadCircle, mdiStackOverflow, mdiAccountGroupOutline, mdiBallotRecountOutline, mdiCloudUploadOutline } from '@mdi/js/mdi.js'
-import JSON5 from 'json5'
+import { mdiGamepadCircle, mdiStackOverflow, mdiAccountGroupOutline, mdiBallotRecountOutline, mdiCloudUploadOutline, mdiTrashCanOutline, mdiPlus, mdiPencilOutline, mdiContentCopy } from '@mdi/js/mdi.js'
 import get from 'lodash-es/get.js'
-import set from 'lodash-es/set.js'
 import each from 'lodash-es/each.js'
-import map from 'lodash-es/map.js'
 import size from 'lodash-es/size.js'
-import dropRight from 'lodash-es/dropRight.js'
+import filter from 'lodash-es/filter.js'
+import sortBy from 'lodash-es/sortBy.js'
 import cloneDeep from 'lodash-es/cloneDeep.js'
 import haskey from 'wsemi/src/haskey.mjs'
-import genID from 'wsemi/src/genID.mjs'
-import delay from 'wsemi/src/delay.mjs'
-import flattenTree from 'wsemi/src/flattenTree.mjs'
+import isestr from 'wsemi/src/isestr.mjs'
+import iseobj from 'wsemi/src/iseobj.mjs'
+import cstr from 'wsemi/src/cstr.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
-import WButtonChip from 'w-component-vue/src/components/WButtonChip.vue'
-import WSwitch from 'w-component-vue/src/components/WSwitch.vue'
-import WTree from 'w-component-vue/src/components/WTree.vue'
-import { getTreeBlocks } from '../plugins/mShare.mjs'
-
-
-//dlm
-let dlm = '.'
+import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
+import WAggridVueDyn from 'w-component-vue/src/components/WAggridVueDyn.vue'
 
 
 export default {
     components: {
         WIcon,
-        WButtonChip,
-        WSwitch,
-        WTree,
+        WButtonCircle,
+        WAggridVueDyn,
     },
     props: {
+        drawer: {
+            type: Boolean,
+            default: false,
+        },
     },
     data: function() {
         return {
@@ -164,37 +175,54 @@ export default {
             mdiAccountGroupOutline,
             mdiBallotRecountOutline,
             mdiCloudUploadOutline,
+            mdiTrashCanOutline,
+            mdiPlus,
+            mdiPencilOutline,
+            mdiContentCopy,
 
             panelWidth: 100,
             panelHeight: 100,
             headHeight: 100,
 
             firstLoading: true,
-            isOperatable: true,
             isModified: false,
 
-            treeBlocks: null,
-            listRename: [],
+            items: [],
+            itemsCheck: [],
+            opt: null,
 
         }
     },
     mounted: function() {
         // console.log('mounted')
 
-        let vo = this
-
-        //clear
-        vo.listRename = []
+        // let vo = this
 
     },
     computed: {
 
         targets: function() {
-            return get(this, `$store.state.targets`)
+            let rs = get(this, `$store.state.targets`)
+            rs = sortBy(rs, 'order')
+            return rs
         },
 
-        ruleGroups: function() {
-            return get(this, `$store.state.ruleGroups`)
+        pemis: function() {
+            let rs = get(this, `$store.state.pemis`)
+            rs = sortBy(rs, 'order')
+            return rs
+        },
+
+        grups: function() {
+            let rs = get(this, `$store.state.grups`)
+            rs = sortBy(rs, 'order')
+            return rs
+        },
+
+        users: function() {
+            let rs = get(this, `$store.state.users`)
+            rs = sortBy(rs, 'order')
+            return rs
         },
 
         changeTargets: function() {
@@ -207,13 +235,14 @@ export default {
                 return ''
             }
 
-            //getTreeBlocks
-            let treeBlocks = getTreeBlocks(vo.targets)
-            // console.log('targets', vo.targets)
-            // console.log('treeBlocks', treeBlocks)
+            //cloneDeep
+            let items = cloneDeep(vo.targets)
 
             //save
-            vo.treeBlocks = treeBlocks
+            vo.items = items
+
+            //genOpt
+            vo.genOpt()
 
             //firstLoading
             vo.firstLoading = false
@@ -221,25 +250,85 @@ export default {
             return ''
         },
 
-        spacePading: function() {
-            let vo = this
-            if (vo.panelWidth < 400) {
-                return 0
-            }
-            else if (vo.panelWidth < 800) {
-                return 10
-            }
-            return 20
-        },
-
-        treeHeight: function() {
+        contentHeight: function() {
             let vo = this
 
             //h
-            let h = vo.panelHeight - vo.headHeight - 2 * vo.spacePading
+            let h = vo.panelHeight - vo.headHeight
             h = Math.max(h, 0)
 
             return h
+        },
+
+        hasItemsCheck: function() {
+            let vo = this
+
+            //h
+            let b = vo.itemsCheck.length > 0
+
+            return b
+        },
+
+        hasItemCheckOne: function() {
+            let vo = this
+
+            //h
+            let b = size(vo.itemsCheck) === 1
+
+            return b
+        },
+
+        errItemsById: function() {
+            let vo = this
+
+            //rows
+            let rows = get(vo, 'opt.rows', [])
+
+            //kpErr
+            let kpErr = {}
+            let kpId = {}
+            each(rows, (v, k) => {
+
+                //id
+                let id = get(v, 'id', '')
+
+                //check
+                if (!isestr(id)) {
+
+                    //kpErr
+                    kpErr[id] = vo.$t(`targetIdEmpty`)
+
+                    return true //跳出換下一個
+                }
+
+                //check
+                if (haskey(kpId, id)) {
+
+                    //kpErr
+                    kpErr[id] = vo.$t(`targetIdDuplicate`)
+
+                    return true //跳出換下一個
+                }
+
+                //kpId
+                kpId[id] = true
+
+            })
+
+            return kpErr
+        },
+
+        isError: function() {
+            let vo = this
+
+            let c = ''
+            let b = false
+            b = iseobj(vo.errItemsByName)
+            if (b) {
+                c = vo.$t('errInNames')
+            }
+
+            return c
         },
 
     },
@@ -266,171 +355,304 @@ export default {
 
         },
 
-        updateIsOperatable: function(isOperatable) {
-            // console.log('methods updateIsOperatable', isOperatable)
+        genOpt: function() {
+            // console.log('methods genOpt')
 
             let vo = this
 
-            async function core() {
-                // let errTemp = null
+            //default
+            vo.itemsCheck = []
 
-                //show loading
-                vo.$ui.updateLoading(true)
+            //opt
+            let opt = null
+            if (size(vo.items) > 0) {
 
-                //isOperatable
-                if (isOperatable) {
-                    //切換至編輯模式時
-                    try {
+                //ks
+                let ks = [
+                    'id',
+                    'description',
+                    'from',
+                    'userId',
+                    'timeCreate',
+                    'userIdUpdate',
+                    'timeUpdate',
+                ]
+                // console.log('ks', ks)
 
-                        //先顯示全部節點
-                        let toUnfolding = true
-                        let toLevel = null
-                        vo.$refs.wt.toggleItemsAll(toUnfolding, toLevel)
-
-                        //若節點多顯示全部節點須一些時間, 故延遲變更
-                        await delay(300)
-
-                        //update
-                        vo.isOperatable = isOperatable
-
-
-                    }
-                    catch (err) {}
+                //kpHead
+                let kpHead = {
+                    'id': vo.$t('targetId'),
+                    'description': vo.$t('description'),
+                    'from': vo.$t('from'),
+                    'userId': vo.$t('userId'),
+                    'timeCreate': vo.$t('timeCreate'),
+                    'userIdUpdate': vo.$t('userIdUpdate'),
+                    'timeUpdate': vo.$t('timeUpdate'),
                 }
-                else {
-                    //切換至顯示模式時
 
-                    //update
-                    vo.isOperatable = isOperatable
+                //opt
+                opt = {
+                    language: vo.$t('aggridLanguage'),
+                    rows: vo.items,
+                    keys: ks,
+                    kpHead,
+                    // autoFitColumn: true,
+                    defHeadFilter: true,
+                    defCellAlignH: 'left',
+                    // kpHeadHide: {
+                    //     'id': true,
+                    // },
+                    kpHeadFixLeft: {
+                        'id': true,
+                    },
+                    defHeadMinWidth: 150,
+                    kpHeadWidth: {
+                        'id': 300,
+                        'timeCreate': 220,
+                        'timeUpdate': 220,
+                    },
+                    kpHeadFilterType: {
+                        'id': 'text',
+                        'description': 'text',
+                        'from': 'text',
+                        'userId': 'text',
+                        'timeCreate': 'text',
+                        'userIdUpdate': 'text',
+                        'timeUpdate': 'text',
+                    },
+                    kpCellEditable: {
+                        'id': true,
+                        'description': true,
+                        'from': true,
+                    },
+                    kpRowDrag: {
+                        'id': true,
+                    },
+                    kpHeadCheckBox: {
+                        'id': true,
+                    },
+                    kpCellRender: {
+                        'id': (v) => {
+                            // console.log('kpCellRender', v)
 
+                            //err
+                            let err = get(vo.errItemsById, v, '')
+                            // console.log(v, err)
+
+                            //check
+                            if (isestr(err)) {
+                                v = `
+                                    <span title="${err}">
+                                        <span style="color:#F57C00;">${cstr(v)}</span>
+                                        <img style="vertical-align:sub; width:16px; height:16px;" src="${vo.$ui.getIcon('warning')}" />
+                                    </span>
+                                `
+                            }
+
+                            return v
+                        },
+                    },
+                    // kpCellTooltip: {
+                    //     'id': (v) => {
+                    //         // console.log('kpCellTooltip', v)
+
+                    //         //err
+                    //         let err = get(vo.errItemsById, v, '')
+                    //         // console.log(v, err)
+
+                    //         //check
+                    //         let t = ''
+                    //         if (isestr(err)) {
+                    //             t = err
+                    //         }
+
+                    //         return t
+                    //     },
+                    // },
+                    rowsChange: (rs) => {
+                        // console.log('rowsChange', rs)
+                        // console.log('rowsChange cloneDeep(vo.opt.rows)', cloneDeep(vo.opt.rows))
+
+                        //isModified
+                        vo.isModified = true
+
+                    },
+                    rowChecked: (rs) => {
+                        // console.log('rowChecked', rs)
+                        // console.log('rowChecked cloneDeep(vo.opt.rows)', cloneDeep(vo.opt.rows))
+
+                        //save itemsCheck
+                        vo.itemsCheck = cloneDeep(rs)
+
+                    },
                 }
+                // console.log('opt', opt)
 
             }
-
-            //core
-            core()
-                // .then((res) => {
-                //     console.log('then', res)
-                // })
-                .catch((err) => {
-                    console.log('catch', err)
-                    vo.$alert(vo.$t('anUnexpectedErrorOccurred'), { type: 'error' })
-                })
-                .finally(() => {
-
-                    //hide loading
-                    vo.$ui.updateLoading(false)
-
-                })
-
-        },
-
-        clickOperateItem: function(msg) {
-            // console.log('methods clickOperateItem', msg)
-
-            let vo = this
-
-            async function core() {
-
-                //fun, 僅處理並回傳新項目, 不處理其他項目
-                let fun = async function() {
-                    let id = genID()
-                    let text = vo.$t('newTarget')
-                    let dataNew = {
-                        id,
-                        text,
-                    }
-                    return dataNew
-                }
-
-                //targetInd
-                let targetInd = msg.rowItem.index
-
-                //operateItem
-                await msg.operateItem(targetInd, msg.opItem.key, fun)
-
-                //modifyTreeBlocks
-                vo.modifyTreeBlocks()
-
-            }
-
-            //core
-            core()
-                // .then((res) => {
-                //     console.log('then', res)
-                // })
-                .catch((err) => {
-                    console.log('catch', err)
-                    vo.$alert(vo.$t('anUnexpectedErrorOccurred'), { type: 'error' })
-                })
-
-        },
-
-        modifyTreeBlocks: function() {
-            // console.log('methods modifyTreeBlocks')
-
-            let vo = this
-
-            //treeBlocksTemp
-            let treeBlocksTemp = cloneDeep(vo.treeBlocks)
-
-            //flattenTree
-            let blocksNew = flattenTree(treeBlocksTemp)
-            // console.log('blocksNew', cloneDeep(blocksNew))
-
-            //calc id, parentId, order
-            each(blocksNew, (v, k) => {
-                if (size(v.nk) === 1) {
-                    v.parentId = ''
-                    v.id = v.text
-                }
-                else { //size(v.nk)>=3
-                    let nkParent = dropRight(v.nk, 2)
-                    let p = get(treeBlocksTemp, nkParent)
-                    v.parentId = p.id
-                    v.id = `${v.parentId}${dlm}${v.text}` //[tag:dlm]
-                }
-                v.order = k //需重新給予order
-                set(treeBlocksTemp, v.nk, v)
-            })
 
             //save
-            vo.treeBlocks = treeBlocksTemp
-            // console.log('treeBlocks', cloneDeep(treeBlocksTemp))
+            vo.opt = opt
+
+        },
+
+        refresh: function() {
+            let vo = this
+
+            //cmp
+            let cmp = get(vo, '$refs.rftable.$refs.$self')
+            // console.log('cmp', cmp)
+
+            //refresh, 因set不會觸發kpCellRender, 故須另外調用組件函數refresh, 進而觸發kpCellRender, 使能更新數據
+            cmp.refresh()
+
+        },
+
+        addItem: function() {
+            // console.log('method addItem')
+
+            let vo = this
+
+            //cloneDeep
+            let rows = get(vo, 'opt.rows', [])
+
+            //cloneDeep
+            rows = cloneDeep(rows)
+
+            //r
+            let r = vo.$ds.targets.funNew()
+            r.id = vo.$s.getNameNew(rows, 'id', '', vo.$t('targetAddNameNew'))
+            r.userId = `{${vo.$t('targetAddIdNew')}}`
+            r.timeCreate = `{${vo.$t('targetAddIdNew')}}`
+            r.userIdUpdate = `{${vo.$t('targetAddIdNew')}}`
+            r.timeUpdate = `{${vo.$t('targetAddIdNew')}}`
+            // console.log('r', r)
+
+            //添加至最首
+            rows = [
+                r,
+                ...rows,
+            ]
+
+            //save
+            vo.opt.rows = rows
+            // console.log('cloneDeep(vo.opt.rows)', cloneDeep(vo.opt.rows))
 
             //isModified
             vo.isModified = true
 
         },
 
-        saveRuleGroupsAndTargets: function() {
-            // console.log('method saveRuleGroupsAndTargets')
+        copyItem: function() {
+            // console.log('method copyItem')
 
             let vo = this
 
-            //replaceObjKeys
-            let replaceObjKeys = (obj, kpKeys) => {
-            // console.log('methods replaceObjKeys', obj, kpKeys)
-
-                //r
-                let b = false
-                let r = {}
-                each(obj, (v, k) => {
-                    if (haskey(kpKeys, k)) {
-                        b = true
-                        let kk = kpKeys[k]
-                        r[kk] = v
-                    }
-                    else {
-                        r[k] = v
-                    }
-                })
-
-                return {
-                    obj: r,
-                    isChanged: b,
-                }
+            //check
+            if (size(vo.itemsCheck) !== 1) {
+                console.log(`size(vo.itemsCheck) !== 1`, vo.itemsCheck)
+                vo.$alert(`${vo.$t('anUnexpectedErrorOccurred')}`, { type: 'error' })
+                return
             }
+
+            //cloneDeep
+            let rows = get(vo, 'opt.rows', [])
+
+            //cloneDeep
+            rows = cloneDeep(rows)
+
+            //find
+            let tar = vo.itemsCheck[0]
+            let tarId = get(tar, 'data.id', '')
+            let row = null
+            each(rows, (v) => {
+                let id = get(v, 'id', '')
+                if (id === tarId) {
+                    row = v
+                    return false //跳出
+                }
+            })
+            // console.log('tar', tar)
+            // console.log('row', row)
+
+            //check
+            if (!iseobj(row)) {
+                console.log(`!iseobj(row)`, row)
+                vo.$alert(`${vo.$t('anUnexpectedErrorOccurred')}`, { type: 'error' })
+                return
+            }
+
+            //r
+            let r = cloneDeep(row)
+            let nameOld = r.id
+            let _r = vo.$ds.targets.funNew()
+            r.id = _r.id //使用新建方式預先產生id避免重複
+            r.id = vo.$s.getNameNew(rows, 'id', nameOld, vo.$t('targetCopyNameNew'))
+            r.userId = `{${vo.$t('targetAddIdNew')}}`
+            r.timeCreate = `{${vo.$t('targetAddIdNew')}}`
+            r.userIdUpdate = `{${vo.$t('targetAddIdNew')}}`
+            r.timeUpdate = `{${vo.$t('targetAddIdNew')}}`
+            // console.log('r', r)
+
+            //添加至最首
+            rows = [
+                r,
+                ...rows,
+            ]
+
+            //save
+            vo.opt.rows = rows
+            // console.log('cloneDeep(vo.opt.rows)', cloneDeep(vo.opt.rows))
+
+            //isModified
+            vo.isModified = true
+
+        },
+
+        deleteItemsCheck: function() {
+            // console.log('method deleteItemsCheck')
+
+            let vo = this
+
+            //check
+            if (size(vo.itemsCheck) === 0) {
+                return
+            }
+
+            //cloneDeep
+            let rows = get(vo, 'opt.rows', [])
+
+            //cloneDeep
+            rows = cloneDeep(rows)
+
+            //filter
+            each(vo.itemsCheck, (v) => {
+                // console.log('v', v)
+                let id = get(v, 'data.id', '')
+                if (!isestr(id)) {
+                    console.log(`invalid id`)
+                    return true //跳出換下一個
+                }
+                rows = filter(rows, (vv) => {
+                    return vv.id !== id
+                })
+            })
+
+            //clear
+            vo.itemsCheck = []
+
+            //save
+            vo.opt.rows = rows
+            // console.log('deleteItemsCheck cloneDeep(vo.opt.rows)', cloneDeep(vo.opt.rows))
+
+            //isModified
+            vo.isModified = true
+
+        },
+
+        saveTargets: function() {
+            // console.log('method saveTargets')
+
+            let vo = this
 
             async function core() {
                 let errTemp = null
@@ -438,78 +660,30 @@ export default {
                 //show loading
                 vo.$ui.updateLoading(true)
 
-                //treeBlocksTemp
-                let treeBlocksTemp = cloneDeep(vo.treeBlocks)
-
-                //flattenTree
-                let blocksNew = flattenTree(treeBlocksTemp)
-                // console.log('blocksNew1', cloneDeep(blocksNew))
-
-                //kpDiffs
-                let kpDiffs = {}
-                map(blocksNew, (v, k) => {
-                    if (v.id !== v.idTemp) {
-                        kpDiffs[v.idTemp] = v.id
-                    }
-                })
-                // console.log('kpDiffs', kpDiffs)
-
-                //gs
-                let gs = []
-                each(vo.ruleGroups, (v) => {
-                    let rules = JSON5.parse(v.crules)
-                    let r = replaceObjKeys(rules, kpDiffs)
-                    if (r.isChanged) {
-                        gs.push({
-                            id: v.id,
-                            crules: JSON.stringify(r.obj),
-                        })
-                    }
-                })
-                // console.log('ruleGroups', vo.ruleGroups, gs)
-
-                //save
-                await vo.$fapi.ruleGroups.save(gs)
-                    .catch((err) => {
-                        errTemp = err
-                    })
-
                 //check
-                if (errTemp !== null) {
-                    vo.$alert(`${vo.$t('failedToChangePermissionGroups')}: ${errTemp}`, { type: 'error' })
+                if (isestr(vo.isError)) {
+                    vo.$alert(`${vo.isError}`, { type: 'error' })
                     return
                 }
 
-                //rs
-                let rs = map(blocksNew, (v, k) => {
-                    return {
-                        id: v.id,
-                        order: v.order,
-                    }
-                })
-                // console.log('targets rs', rs)
-
-                //delAll
-                await vo.$fapi.targets.delAll()
-                    .catch((err) => {
-                        errTemp = err
-                    })
+                //rows
+                let rows = get(vo, 'opt.rows', [])
 
                 //check
-                if (errTemp !== null) {
-                    vo.$alert(`${vo.$t('failedToClearTargets')}: ${errTemp}`, { type: 'error' })
+                if (size(rows) === 0) {
+                    vo.$alert(`${vo.$t('targetAddEmpty')}`, { type: 'error' })
                     return
                 }
 
-                //save
-                await vo.$fapi.targets.save(rs)
+                //updateTargets
+                await vo.$fapi.updateTargets(rows)
                     .catch((err) => {
                         errTemp = err
                     })
 
                 //check
                 if (errTemp !== null) {
-                    vo.$alert(`${vo.$t('failedToSaveTargets')}: ${errTemp}`, { type: 'error' })
+                    vo.$alert(`${vo.$t('targetSaveTargetsFail')}: ${errTemp}`, { type: 'error' })
                     return
                 }
 
@@ -517,7 +691,7 @@ export default {
                 vo.isModified = false
 
                 //alert
-                vo.$alert(vo.$t('successfulToSaveTargets'))
+                vo.$alert(vo.$t('targetSaveTargetsSuccess'))
 
             }
 

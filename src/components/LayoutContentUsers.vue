@@ -13,170 +13,124 @@
         >
 
             <!-- 標題區 -->
-            <div style="display:inline-block; vertical-align:top; padding:10px 0px 5px 20px;">
-                <div style="display:flex; align-items:center; padding:5px 15px 5px 5px; border-bottom:3px solid #FF9100;">
+            <div style="padding:10px 10px 10px 20px;">
+                <div :style="`display:flex; align-items:center; padding:${drawer?'5px':'5px 5px 5px 20px'};`">
 
                     <WIcon
                         :icon="mdiAccountGroupOutline"
-                        :color="'#FF9800'"
+                        :color="'#000'"
+                        :size="26"
                     ></WIcon>
 
-                    <div style="padding-left:10px; font-size:1.3rem; color:#d3912c;">
-                        {{$t('userPermissions')}}
+                    <div style="padding-left:10px; font-size:1.4rem; color:#000;">
+                        {{$t('managementUsers')}}
                     </div>
 
                 </div>
             </div>
 
-            <!-- 編輯設定區 -->
-            <div style="display:inline-block; vertical-align:top;">
+            <!-- 功能區 -->
+            <div style="padding:5px; border-top:1px solid #ddd; display:flex; align-items:center;">
 
-                <div style="padding:15px 20px 15px 20px; background:#fff;">
+                <template>
 
-                    <div style="display:flex;">
-                        <WSwitch
-                            :text="$t('isEditabled')"
-                            :checkedSwitchCircleColor="'#D81B60'"
-                            :checkedSwitchCircleColorHover="'#f26'"
-                            :checkedSwitchBarColor="'#F8BBD0'"
-                            :checkedSwitchBarColorHover="'#F8BBD0'"
-                            v-model="isOperatable"
-                        ></WSwitch>
-                    </div>
+                    <WButtonCircle
+                        :paddingStyle="{v:6,h:6}"
+                        :tooltip="$t('userAdd')"
+                        :icon="mdiPlus"
+                        :backgroundColor="'#fff'"
+                        :backgroundColorHover="'#f2f2f2'"
+                        _textColor="'#eee'"
+                        _textColorHover="'#fff'"
+                        :iconColor="'#444'"
+                        :iconColorHover="'#222'"
+                        :shadow="false"
+                        @click="addItem"
+                    ></WButtonCircle>
 
-                    <div style="padding-top:5px; font-size:0.8rem; _color:#f26;" v-if="isOperatable">
-                        <div style="padding:3px 0px;">
-                            1. {{$t('userMsg1')}}
-                        </div>
-                        <div style="padding:3px 0px;">
-                            2. {{$t('userMsg2')}}
-                        </div>
-                    </div>
+                    <div style="padding-left:6px;"></div>
 
-                </div>
+                </template>
 
-            </div>
+                <template v-if="hasItemCheckOne">
 
-            <!-- 儲存變更提示區 -->
-            <div
-                style="padding:10px 10px 12px 10px; border-top:1px solid #F48FB1; border-bottom:1px solid #F48FB1; background:#FCE4EC; display:flex; align-items:center; justify-content:flex-end;"
-                v-if="isModified"
-            >
+                    <WButtonCircle
+                        :paddingStyle="{v:6,h:6}"
+                        :tooltip="$t('userCopy')"
+                        :icon="mdiContentCopy"
+                        :backgroundColor="'#fff'"
+                        :backgroundColorHover="'#f2f2f2'"
+                        _textColor="'#eee'"
+                        _textColorHover="'#fff'"
+                        :iconColor="'#444'"
+                        :iconColorHover="'#222'"
+                        :shadow="false"
+                        @click="copyItem"
+                    ></WButtonCircle>
 
-                <WButtonChip
-                    :paddingStyle="{v:0,h:11}"
-                    :text="$t('saveChanges')"
-                    :icon="mdiCloudUploadOutline"
-                    :backgroundColor="'rgba(255,0,50,0.7)'"
-                    :backgroundColorHover="'rgba(255,0,50,0.8)'"
-                    :textColor="'#eee'"
-                    :textColorHover="'#fff'"
-                    :iconColor="'#eee'"
-                    :iconColorHover="'#fff'"
-                    @click="saveGroups"
-                ></WButtonChip>
+                    <div style="padding-left:6px;"></div>
+
+                </template>
+
+                <template v-if="hasItemsCheck">
+
+                    <WButtonCircle
+                        :paddingStyle="{v:6,h:6}"
+                        :tooltip="$t('userDeleteChecks')"
+                        :icon="mdiTrashCanOutline"
+                        :backgroundColor="'#fff'"
+                        :backgroundColorHover="'#f2f2f2'"
+                        _textColor="'#eee'"
+                        _textColorHover="'#fff'"
+                        :iconColor="'#444'"
+                        :iconColorHover="'#222'"
+                        :shadow="false"
+                        @click="deleteItemsCheck"
+                    ></WButtonCircle>
+
+                    <div style="padding-left:6px;"></div>
+
+                </template>
+
+                <template v-if="isModified">
+
+                    <WButtonCircle
+                        :paddingStyle="{v:6,h:6}"
+                        :tooltip="$t('saveChanges')"
+                        :icon="mdiCloudUploadOutline"
+                        :backgroundColor="'rgba(255,0,50,0.7)'"
+                        :backgroundColorHover="'rgba(255,0,50,0.8)'"
+                        :textColor="'#eee'"
+                        :textColorHover="'#fff'"
+                        :iconColor="'#eee'"
+                        :iconColorHover="'#fff'"
+                        :shadow="false"
+                        @click="saveUsers"
+                    ></WButtonCircle>
+
+                    <div style="padding-left:6px;"></div>
+
+                </template>
 
             </div>
 
         </div>
 
-        <div
-            :style="`padding:${spacePading}px;`"
+        <template
             v-if="!firstLoading"
         >
 
-            <div style="background:#fff; box-shadow:0 3px 1px -2px rgba(0,0,0,.2), 0 2px 2px 0 rgba(0,0,0,.14), 0 1px 5px 0 rgba(0,0,0,.12);">
-
-                <div
-                    style="padding:20px 10px 10px 20px; border-bottom:3px solid #ddd;"
-                    v-domresize
-                    @domresize="resizeGroupInfor"
+            <template v-if="items">
+                <WAggridVueDyn
+                    ref="rftable"
+                    :style="`width:100%;`"
+                    :height="contentHeight"
+                    :opt="opt"
                 >
+                </WAggridVueDyn>
+            </template>
 
-                    <div style="padding:0px 10px 10px 0px; display:inline-block; vertical-align:middle; color:#666; font-size:1.1rem;">
-                        {{$t('userList')}}
-                    </div>
-
-                    <div
-                        style="padding:0px 10px 10px 0px; display:inline-block; vertical-align:middle;"
-                        v-if="isOperatable"
-                    >
-
-                        <WButtonChip
-                            :paddingStyle="{v:0,h:11}"
-                            :text="$t('addUser')"
-                            :icon="mdiAccountPlusOutline"
-                            :backgroundColor="'rgba(255,0,50,0.7)'"
-                            :backgroundColorHover="'rgba(255,0,50,0.8)'"
-                            :textColor="'#eee'"
-                            :textColorHover="'#fff'"
-                            :iconColor="'#eee'"
-                            :iconColorHover="'#fff'"
-                            @click="clickAddUser"
-                        ></WButtonChip>
-
-                    </div>
-
-                </div>
-
-                <WPanelScrolly
-                    :style="`height:${usersGroupsHeight}px; _overflow-y:auto;`"
-                >
-                    <div style="padding:10px;">
-
-                        <div
-                            style="padding:10px;"
-                            :key="'kus:'+kus"
-                            v-for="(us,kus) in usersGroups"
-                        >
-
-                            <div style="padding-bottom:5px; display:flex; align-items:center; border-bottom:1px dashed #ddd;">
-                                <div style="padding-right:5px; color:#888; font-size:0.8rem;">
-                                    {{$t('from')}}:
-                                </div>
-                                <div style="color:#000; font-size:0.8rem;">
-                                    {{getFrom(kus)}}
-                                </div>
-                            </div>
-
-                            <div style="padding-top:10px;">
-
-                                <div
-                                    style="display:inline-block; margin:0px 10px 10px 0px;"
-                                    :key="'ku:'+ku"
-                                    v-for="(u,ku) in us"
-                                >
-
-                                    <WButtonChip
-                                        :text="u.name"
-                                        :paddingStyle="{
-                                            v: 2,
-                                            h: 12,
-                                        }"
-                                        :icon="getIsAdmin(u)?mdiChessRook:''"
-                                        :backgroundColor="getIsNotActive(u)?'rgba(130,130,130,0.8)':getIsAdmin(u)?'rgba(216, 27, 96, 0.8)':'rgba(50,110,230,0.8)'"
-                                        :backgroundColorHover="getIsNotActive(u)?'rgba(130,130,130,0.9)':getIsAdmin(u)?'rgba(216, 27, 96, 0.9)':'rgba(50,110,230,0.9)'"
-                                        :textColor="'#eee'"
-                                        :textColorHover="'#fff'"
-                                        :iconColor="'#eee'"
-                                        :iconColorHover="'#fff'"
-                                        :close="isOperatable"
-                                        @click="clickEditUser(u)"
-                                        @click-close="clickRemoveUser(u)"
-                                    ></WButtonChip>
-
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-                </WPanelScrolly>
-
-            </div>
-
-        </div>
+        </template>
 
         <div style="padding:10px 15px; font-size:0.8rem;" v-else>
             {{$t('waitingData')}}
@@ -186,69 +140,94 @@
 </template>
 
 <script>
-import { mdiAccountGroupOutline, mdiAccountPlusOutline, mdiCheckboxMarkedCircle, mdiChessRook } from '@mdi/js/mdi.js'
+import { mdiAccountGroupOutline, mdiVectorPolylinePlus, mdiCheckboxMarkedCircle, mdiCloudUploadOutline, mdiTrashCanOutline, mdiPlus, mdiPencilOutline, mdiContentCopy } from '@mdi/js/mdi.js'
 import get from 'lodash-es/get.js'
+import set from 'lodash-es/set.js'
 import each from 'lodash-es/each.js'
-import keys from 'lodash-es/keys.js'
-import sortBy from 'lodash-es/sortBy.js'
-import find from 'lodash-es/find.js'
 import size from 'lodash-es/size.js'
-import groupBy from 'lodash-es/groupBy.js'
-import genID from 'wsemi/src/genID.mjs'
+import filter from 'lodash-es/filter.js'
+import sortBy from 'lodash-es/sortBy.js'
+import cloneDeep from 'lodash-es/cloneDeep.js'
+import haskey from 'wsemi/src/haskey.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
-import waitFun from 'wsemi/src/waitFun.mjs'
+import cstr from 'wsemi/src/cstr.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
-import WButtonChip from 'w-component-vue/src/components/WButtonChip.vue'
-import WSwitch from 'w-component-vue/src/components/WSwitch.vue'
-import WPanelScrolly from 'w-component-vue/src/components/WPanelScrolly.vue'
+import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
+import WAggridVueDyn from 'w-component-vue/src/components/WAggridVueDyn.vue'
 
 
 export default {
     components: {
         WIcon,
-        WButtonChip,
-        WSwitch,
-        WPanelScrolly,
+        WButtonCircle,
+        WAggridVueDyn,
     },
     props: {
+        drawer: {
+            type: Boolean,
+            default: false,
+        },
     },
     data: function() {
         return {
             mdiAccountGroupOutline,
-            mdiAccountPlusOutline,
+            mdiVectorPolylinePlus,
             mdiCheckboxMarkedCircle,
-            mdiChessRook,
+            mdiCloudUploadOutline,
+            mdiTrashCanOutline,
+            mdiPlus,
+            mdiPencilOutline,
+            mdiContentCopy,
 
             panelWidth: 100,
             panelHeight: 100,
             headHeight: 100,
-            groupInforHeight: 100,
 
             firstLoading: true,
-            isOperatable: true,
             isModified: false,
 
-            pickGroupId: '',
+            items: [],
+            itemsCheck: [],
+            opt: null,
 
         }
     },
+    mounted: function() {
+        // console.log('mounted')
+
+        let vo = this
+
+        //註冊至$dg供使用
+        vo.$dg.showVeCgrupsById = vo.showVeCgrupsById
+        vo.$dg.toggleItemIsAdminById = vo.toggleItemIsAdminById
+        vo.$dg.toggleItemIsActiveById = vo.toggleItemIsActiveById
+
+    },
     computed: {
 
-        users: function() {
-            return get(this, `$store.state.users`)
+        targets: function() {
+            let rs = get(this, `$store.state.targets`)
+            rs = sortBy(rs, 'order')
+            return rs
         },
 
-        usersGroups: function() {
-            let gs = groupBy(this.users, 'from')
-            let ks = keys(gs)
-            ks = sortBy(ks)
-            let gsTemp = {}
-            each(ks, (k) => {
-                gsTemp[k] = gs[k]
-            })
-            gs = gsTemp
-            return gs
+        pemis: function() {
+            let rs = get(this, `$store.state.pemis`)
+            rs = sortBy(rs, 'order')
+            return rs
+        },
+
+        grups: function() {
+            let rs = get(this, `$store.state.grups`)
+            rs = sortBy(rs, 'order')
+            return rs
+        },
+
+        users: function() {
+            let rs = get(this, `$store.state.users`)
+            rs = sortBy(rs, 'order')
+            return rs
         },
 
         changeUsers: function() {
@@ -261,31 +240,146 @@ export default {
                 return ''
             }
 
+            //cloneDeep
+            let items = cloneDeep(vo.users)
+
+            //save
+            vo.items = items
+
+            //genOpt
+            vo.genOpt()
+
             //firstLoading
             vo.firstLoading = false
 
             return ''
         },
 
-        spacePading: function() {
-            let vo = this
-            if (vo.panelWidth < 400) {
-                return 0
-            }
-            else if (vo.panelWidth < 800) {
-                return 10
-            }
-            return 20
-        },
-
-        usersGroupsHeight: function() {
+        contentHeight: function() {
             let vo = this
 
             //h
-            let h = vo.panelHeight - vo.headHeight - 2 * vo.spacePading - vo.groupInforHeight
+            let h = vo.panelHeight - vo.headHeight
             h = Math.max(h, 0)
 
             return h
+        },
+
+        hasItemsCheck: function() {
+            let vo = this
+
+            //h
+            let b = size(vo.itemsCheck) > 0
+
+            return b
+        },
+
+        hasItemCheckOne: function() {
+            let vo = this
+
+            //h
+            let b = size(vo.itemsCheck) === 1
+
+            return b
+        },
+
+        errItemsByName: function() {
+            let vo = this
+
+            //rows
+            let rows = get(vo, 'opt.rows', [])
+
+            //kpErr
+            let kpErr = {}
+            let kpName = {}
+            each(rows, (v, k) => {
+
+                //name
+                let name = get(v, 'name', '')
+
+                //check
+                if (!isestr(name)) {
+
+                    //kpErr
+                    kpErr[name] = vo.$t(`userNameEmpty`)
+
+                    return true //跳出換下一個
+                }
+
+                //check
+                if (haskey(kpName, name)) {
+
+                    //kpErr
+                    kpErr[name] = vo.$t(`userNameDuplicate`)
+
+                    return true //跳出換下一個
+                }
+
+                //kpName
+                kpName[name] = true
+
+            })
+
+            return kpErr
+        },
+
+        errItemsByEmail: function() {
+            let vo = this
+
+            //rows
+            let rows = get(vo, 'opt.rows', [])
+
+            //kpErr
+            let kpErr = {}
+            let kpEmail = {}
+            each(rows, (v, k) => {
+
+                //email
+                let email = get(v, 'email', '')
+
+                //check
+                if (!isestr(email)) {
+
+                    //kpErr
+                    kpErr[email] = vo.$t(`userEmailEmpty`)
+
+                    return true //跳出換下一個
+                }
+
+                //check
+                if (haskey(kpEmail, email)) {
+
+                    //kpErr
+                    kpErr[email] = vo.$t(`userEmailDuplicate`)
+
+                    return true //跳出換下一個
+                }
+
+                //kpEmail
+                kpEmail[email] = true
+
+            })
+
+            return kpErr
+        },
+
+        isError: function() {
+            let vo = this
+
+            let c = ''
+            let b = false
+            b = iseobj(vo.errItemsByName)
+            if (b) {
+                c = vo.$t('errInNames')
+                return c
+            }
+            b = iseobj(vo.errItemsByEmail)
+            if (b) {
+                c = vo.$t('errInEmails')
+                return c
+            }
+
+            return ''
         },
 
     },
@@ -312,181 +406,592 @@ export default {
 
         },
 
-        resizeGroupInfor: function(msg) {
-            // console.log('methods resizeGroupInfor', msg)
+        genOpt: function() {
+            // console.log('methods genOpt')
 
             let vo = this
 
-            //groupInforHeight
-            vo.groupInforHeight = msg.snew.offsetHeight
+            //default
+            vo.itemsCheck = []
 
-        },
+            //opt
+            let opt = null
+            if (size(vo.items) > 0) {
 
-        getFrom: function(kus) {
-            // console.log('methods getFrom', kus)
-            let vo = this
-            if (!isestr(kus)) {
-                kus = vo.$t('empty')
+                //ks
+                let ks = [
+                    'id',
+                    'name',
+                    'email',
+                    'description',
+                    'from',
+                    'cgrups',
+                    'isAdmin',
+                    'isActive',
+                    'userId',
+                    'timeCreate',
+                    'userIdUpdate',
+                    'timeUpdate',
+                ]
+                // console.log('ks', ks)
+
+                //kpHead
+                let kpHead = {
+                    'id': vo.$t('id'),
+                    'name': vo.$t('name'),
+                    'email': vo.$t('email'),
+                    'description': vo.$t('description'),
+                    'from': vo.$t('from'),
+                    'cgrups': vo.$t('userCgrups'),
+                    'isAdmin': vo.$t('isAdmin'),
+                    'isActive': vo.$t('isActive'),
+                    'userId': vo.$t('userId'),
+                    'timeCreate': vo.$t('timeCreate'),
+                    'userIdUpdate': vo.$t('userIdUpdate'),
+                    'timeUpdate': vo.$t('timeUpdate'),
+                }
+
+                //opt
+                opt = {
+                    language: vo.$t('aggridLanguage'),
+                    rows: vo.items,
+                    keys: ks,
+                    kpHead,
+                    // autoFitColumn: true,
+                    defHeadFilter: true,
+                    defCellAlignH: 'left',
+                    kpHeadHide: {
+                        'id': true,
+                    },
+                    kpHeadFixLeft: {
+                        'name': true,
+                    },
+                    defHeadMinWidth: 150,
+                    kpHeadWidth: {
+                        'cgrups': 100,
+                        'isAdmin': 100,
+                        'isActive': 100,
+                        'timeCreate': 220,
+                        'timeUpdate': 220,
+                    },
+                    kpHeadFilterType: {
+                        'id': 'text',
+                        'name': 'text',
+                        'email': 'text',
+                        'description': 'text',
+                        'from': 'text',
+                        'cgrups': 'text',
+                        'isAdmin': 'text',
+                        'isActive': 'text',
+                        'userId': 'text',
+                        'timeCreate': 'text',
+                        'userIdUpdate': 'text',
+                        'timeUpdate': 'text',
+                    },
+                    kpCellEditable: {
+                        'name': true,
+                        'email': true,
+                        'description': true,
+                        'from': true,
+                    },
+                    kpRowDrag: {
+                        'name': true,
+                    },
+                    kpHeadCheckBox: {
+                        'name': true,
+                    },
+                    kpHeadFilter: {
+                        'cgrups': false,
+                    },
+                    kpHeadSort: {
+                        'cgrups': false,
+                    },
+                    kpHeadFocusHighlight: { //雖然效果不完全, 但因按鈕與cell有padding可被點擊, 故還是需要開啟
+                        'cgrups': false,
+                    },
+                    kpCellRender: {
+                        'name': (v) => {
+                            // console.log('kpCellRender name', v)
+
+                            //err
+                            let err = get(vo.errItemsByName, v, '')
+                            // console.log(v, err)
+
+                            //check
+                            if (isestr(err)) {
+                                v = `
+                                    <span title="${err}">
+                                        <span style="color:#F57C00;">${cstr(v)}</span>
+                                        <img style="vertical-align:sub; width:16px; height:16px;" src="${vo.$ui.getIcon('warning')}" />
+                                    </span>
+                                `
+                            }
+
+                            return v
+                        },
+                        'email': (v) => {
+                            // console.log('kpCellRender email', v)
+
+                            //err
+                            let err = get(vo.errItemsByEmail, v, '')
+                            // console.log(v, err)
+
+                            //check
+                            if (isestr(err)) {
+                                v = `
+                                    <span title="${err}">
+                                        <span style="color:#F57C00;">${cstr(v)}</span>
+                                        <img style="vertical-align:sub; width:16px; height:16px;" src="${vo.$ui.getIcon('warning')}" />
+                                    </span>
+                                `
+                            }
+
+                            return v
+                        },
+                        'cgrups': (v, k, r) => {
+                            // console.log('kpCellRender cgrups', v, k, r)
+
+                            //id
+                            let id = get(r, 'id', '')
+                            // console.log('id', id, k, r)
+
+                            //因kpHeadFocusHighlight設定false時, 仍會於點擊其他可focus的cell, 再點回時依然出現highlight的focus邊框, 故改使用stopPropagation強制吃掉點擊訊息
+                            //因stopPropagation只吃掉訊息, 原本focus會處於原本可focus的cell, 再重複點時會於前個focus的cell出現highlight邊框, 故再多使用preventDefault阻止瀏覽器預設行為, 此等同於return false
+                            let t = `
+                                <div onclick="event.stopPropagation();event.preventDefault();" onmousedown="event.stopPropagation();event.preventDefault();">
+                                    <button style="width:100%;" onclick="$vo.$dg.showVeCgrupsById('${id}')">${vo.$t('userEditCgrupsSimple')}</button>
+                                </div>
+                            `
+
+                            return t
+                        },
+                        'isAdmin': (v, k, r) => {
+                            // console.log('kpCellRender isAdmin', v, k, r)
+
+                            //id
+                            let id = get(r, 'id', '')
+                            // console.log('id', id, k, r)
+
+                            let t = `
+                                <input type="checkbox" ${v === 'y' ? 'checked' : ''} onclick="$vo.$dg.toggleItemIsAdminById('${id}')" />
+                            `
+
+                            return t
+                        },
+                        'isActive': (v, k, r) => {
+                            // console.log('kpCellRender isActive', v, k, r)
+
+                            //id
+                            let id = get(r, 'id', '')
+                            // console.log('id', id, k, r)
+
+                            let t = `
+                                <input type="checkbox" ${v === 'y' ? 'checked' : ''} onclick="$vo.$dg.toggleItemIsActiveById('${id}')" />
+                            `
+
+                            return t
+                        },
+                    },
+                    rowsChange: (rs) => {
+                        // console.log('rowsChange', rs)
+                        // console.log('rowsChange cloneDeep(vo.opt.rows)', cloneDeep(vo.opt.rows))
+
+                        //isModified
+                        vo.isModified = true
+
+                    },
+                    rowChecked: (rs) => {
+                        // console.log('rowChecked', rs)
+                        // console.log('rowChecked cloneDeep(vo.opt.rows)', cloneDeep(vo.opt.rows))
+
+                        //save itemsCheck
+                        vo.itemsCheck = cloneDeep(rs)
+
+                    },
+                }
+                // console.log('opt', opt)
+
             }
-            return kus
+
+            //save
+            vo.opt = opt
+
         },
 
-        getIsAdmin: function(u) {
-            return get(u, 'isAdmin') === 'y'
+        refresh: function() {
+            let vo = this
+
+            //cmp
+            let cmp = get(vo, '$refs.rftable.$refs.$self')
+            // console.log('cmp', cmp)
+
+            //refresh, 因set不會觸發kpCellRender, 故須另外調用組件函數refresh, 進而觸發kpCellRender, 使能更新數據
+            cmp.refresh()
+
         },
 
-        getIsNotActive: function(u) {
-            return get(u, 'isActive') === 'n'
-        },
-
-        clickAddUser: function() {
-            // console.log('methods clickAddUser')
+        toggleItemIsAdminById: function(id) {
+            // console.log('toggleItemIsAdminById', id)
 
             let vo = this
 
-            async function core() {
-                let errTemp = null
+            //k
+            let k = 'isAdmin'
 
-                //show loading
-                vo.$ui.updateLoading(true)
-
-                //u
-                let u = {
-                    id: genID(),
-                    name: vo.$t('newUser'),
-                    from: '',
-                    isAdmin: 'n',
-                    isActive: 'y',
-                }
-
-                //save
-                await vo.$fapi.users.insert(u)
-                    .catch((err) => {
-                        errTemp = err
-                    })
-
-                //check
-                if (errTemp !== null) {
-                    vo.$alert(`${vo.$t('failedToAddUser')}: ${errTemp}`, { type: 'error' })
-                }
-
-                //un
-                let un = null
-                await waitFun(() => {
-                    un = find(vo.users, { id: u.id })
-                    return iseobj(un) //確認g.id已存在
-                })
-                // console.log('un', un)
-
-                //showVeUser
-                vo.$dg.showVeUser(un)
-                    .catch(() => {})
-
-                //alert
-                vo.$alert(vo.$t('successfulToAddUser'))
-
+            //check
+            if (!isestr(id)) {
+                vo.$alert(`${vo.$t('userEditNoId')}`, { type: 'error' })
+                return
             }
 
-            //core
-            core()
-                // .then((res) => {
-                //     console.log('then', res)
-                // })
-                .catch((err) => {
-                    console.log('catch', err)
-                    vo.$alert(vo.$t('anUnexpectedErrorOccurred'), { type: 'error' })
-                })
-                .finally(() => {
+            //rows
+            let rows = get(vo, 'opt.rows', [])
 
-                    //hide loading
-                    vo.$ui.updateLoading(false)
+            //find
+            let r = null
+            let kr = null
+            each(rows, (v, k) => {
+                if (get(v, 'id', '') === id) {
+                    r = v
+                    kr = k
+                    return false //跳出
+                }
+            })
 
-                })
+            //check
+            if (!iseobj(r)) {
+                vo.$alert(`${vo.$t('userEditNoUser')}`, { type: 'error' })
+                return
+            }
+
+            //v
+            let _v = get(r, k, 'n')
+            let v = _v === 'y' ? 'n' : 'y'
+            // console.log(k, v)
+
+            //set
+            set(vo, `opt.rows[${kr}].${k}`, v)
+            // console.log('vo.opt.rows[kr]', cloneDeep(vo.opt.rows[kr]))
+
+            //refresh
+            vo.refresh()
+
+            //isModified
+            vo.isModified = true
 
         },
 
-        clickRemoveUser: function(u) {
-            // console.log('methods clickRemoveUser', u)
+        toggleItemIsActiveById: function(id) {
+            // console.log('toggleItemIsActiveById', id)
 
             let vo = this
 
-            async function core() {
-                let errTemp = null
+            //k
+            let k = 'isActive'
 
-                //showCheckYesNo
-                let bExit = false
-                let t_confirmToDeleteUser = vo.$t('confirmToDeleteUser')
-                t_confirmToDeleteUser = t_confirmToDeleteUser.replace('{name}', u.name)
-                await vo.$dg.showCheckYesNo(t_confirmToDeleteUser)
-                    .catch(() => {
-                        bExit = true
-                    })
-                if (bExit) {
-                    return
-                }
-
-                //show loading
-                vo.$ui.updateLoading(true)
-
-                //save
-                await vo.$fapi.users.del(u)
-                    .catch((err) => {
-                        errTemp = err
-                    })
-
-                //check
-                if (errTemp !== null) {
-                    vo.$alert(`${vo.$t('failedToDeleteUser')}: ${errTemp}`, { type: 'error' })
-                    return
-                }
-
-                //un
-                let un = null
-                await waitFun(() => {
-                    un = find(vo.users, (v) => {
-                        return v.id === u.id
-                    })
-                    return !iseobj(un) //確認g.id已不存在
-                })
-                // console.log('un', un)
-
-                //alert
-                vo.$alert(vo.$t('successfulToDeleteUser'))
-
+            //check
+            if (!isestr(id)) {
+                vo.$alert(`${vo.$t('userEditNoId')}`, { type: 'error' })
+                return
             }
 
-            //core
-            core()
-                // .then((res) => {
-                //     console.log('then', res)
-                // })
-                .catch((err) => {
-                    console.log('catch', err)
-                    vo.$alert(vo.$t('anUnexpectedErrorOccurred'), { type: 'error' })
-                })
-                .finally(() => {
+            //rows
+            let rows = get(vo, 'opt.rows', [])
 
-                    //hide loading
-                    vo.$ui.updateLoading(false)
+            //find
+            let r = null
+            let kr = null
+            each(rows, (v, k) => {
+                if (get(v, 'id', '') === id) {
+                    r = v
+                    kr = k
+                    return false //跳出
+                }
+            })
 
-                })
+            //check
+            if (!iseobj(r)) {
+                vo.$alert(`${vo.$t('userEditNoUser')}`, { type: 'error' })
+                return
+            }
+
+            //v
+            let _v = get(r, k, 'n')
+            let v = _v === 'y' ? 'n' : 'y'
+            // console.log(k, v)
+
+            //set
+            set(vo, `opt.rows[${kr}].${k}`, v)
+            // console.log('vo.opt.rows[kr]', cloneDeep(vo.opt.rows[kr]))
+
+            //refresh
+            vo.refresh()
+
+            //isModified
+            vo.isModified = true
 
         },
 
-        clickEditUser: function(u) {
-            // console.log('clickEditGroup', u)
+        addItem: function() {
+            // console.log('method addItem')
+
+            let vo = this
+
+            //cloneDeep
+            let rows = get(vo, 'opt.rows', [])
+
+            //cloneDeep
+            rows = cloneDeep(rows)
+
+            //r
+            let r = vo.$ds.users.funNew()
+            r.name = vo.$s.getNameNew(rows, 'name', '', vo.$t('userAddNameNew'))
+            r.userId = `{${vo.$t('userAddIdNew')}}`
+            r.timeCreate = `{${vo.$t('userAddIdNew')}}`
+            r.userIdUpdate = `{${vo.$t('userAddIdNew')}}`
+            r.timeUpdate = `{${vo.$t('userAddIdNew')}}`
+            // console.log('r', r)
+
+            //添加至最首
+            rows = [
+                r,
+                ...rows,
+            ]
+
+            //save
+            vo.opt.rows = rows
+            // console.log('cloneDeep(vo.opt.rows)', cloneDeep(vo.opt.rows))
+
+            //isModified
+            vo.isModified = true
+
+        },
+
+        copyItem: function() {
+            // console.log('method copyItem')
 
             let vo = this
 
             //check
-            if (!vo.isOperatable) {
-                vo.$alert(vo.$t('cannotShowUserDetailsInViewMode'), { type: 'error' })
+            if (size(vo.itemsCheck) !== 1) {
+                console.log(`size(vo.itemsCheck) !== 1`, vo.itemsCheck)
+                vo.$alert(`${vo.$t('anUnexpectedErrorOccurred')}`, { type: 'error' })
                 return
             }
 
-            //showVeUser
-            vo.$dg.showVeUser(u)
+            //cloneDeep
+            let rows = get(vo, 'opt.rows', [])
+
+            //cloneDeep
+            rows = cloneDeep(rows)
+
+            //find
+            let tar = vo.itemsCheck[0]
+            let tarId = get(tar, 'data.id', '')
+            let row = null
+            each(rows, (v) => {
+                let id = get(v, 'id', '')
+                if (id === tarId) {
+                    row = v
+                    return false //跳出
+                }
+            })
+            // console.log('tar', tar)
+            // console.log('row', row)
+
+            //check
+            if (!iseobj(row)) {
+                console.log(`!iseobj(row)`, row)
+                vo.$alert(`${vo.$t('anUnexpectedErrorOccurred')}`, { type: 'error' })
+                return
+            }
+
+            //r
+            let r = cloneDeep(row)
+            let nameOld = r.name
+            let _r = vo.$ds.users.funNew()
+            r.id = _r.id //使用新建方式預先產生id避免重複
+            r.name = vo.$s.getNameNew(rows, 'name', nameOld, vo.$t('userCopyNameNew'))
+            r.userId = `{${vo.$t('userAddIdNew')}}`
+            r.timeCreate = `{${vo.$t('userAddIdNew')}}`
+            r.userIdUpdate = `{${vo.$t('userAddIdNew')}}`
+            r.timeUpdate = `{${vo.$t('userAddIdNew')}}`
+            // console.log('r', r)
+
+            //添加至最首
+            rows = [
+                r,
+                ...rows,
+            ]
+
+            //save
+            vo.opt.rows = rows
+            // console.log('cloneDeep(vo.opt.rows)', cloneDeep(vo.opt.rows))
+
+            //isModified
+            vo.isModified = true
+
+        },
+
+        deleteItemsCheck: function() {
+            // console.log('method deleteItemsCheck')
+
+            let vo = this
+
+            //check
+            if (size(vo.itemsCheck) === 0) {
+                console.log(`size(vo.itemsCheck) === 0`, vo.itemsCheck)
+                vo.$alert(`${vo.$t('anUnexpectedErrorOccurred')}`, { type: 'error' })
+                return
+            }
+
+            //cloneDeep
+            let rows = get(vo, 'opt.rows', [])
+
+            //cloneDeep
+            rows = cloneDeep(rows)
+
+            //filter
+            each(vo.itemsCheck, (v) => {
+                // console.log('v', v)
+                let id = get(v, 'data.id', '')
+                if (!isestr(id)) {
+                    console.log(`invalid id`)
+                    return true //跳出換下一個
+                }
+                rows = filter(rows, (vv) => {
+                    return vv.id !== id
+                })
+            })
+
+            //clear
+            vo.itemsCheck = []
+
+            //save
+            vo.opt.rows = rows
+            // console.log('deleteItemsCheck cloneDeep(vo.opt.rows)', cloneDeep(vo.opt.rows))
+
+            //isModified
+            vo.isModified = true
+
+        },
+
+        showVeCgrupsById: function(id) {
+            // console.log('method showVeCgrupsById', id)
+
+            let vo = this
+
+            //check
+            if (!isestr(id)) {
+                vo.$alert(`${vo.$t('userEditCgrupsNoId')}`, { type: 'error' })
+                return
+            }
+
+            //rows
+            let rows = get(vo, 'opt.rows', [])
+
+            //find
+            let r = null
+            let kr = null
+            each(rows, (v, k) => {
+                if (get(v, 'id', '') === id) {
+                    r = v
+                    kr = k
+                    return false //跳出
+                }
+            })
+
+            //check
+            if (!iseobj(r)) {
+                vo.$alert(`${vo.$t('userEditCgrupsNoUser')}`, { type: 'error' })
+                return
+            }
+
+            // //getUserRules
+            // let ur = vo.$s.getUserRules(r, vo.grups, vo.pemis, vo.targets)
+            // console.log('getUserRules ur', ur)
+
+            //showVeCgrups
+            vo.$dg.showVeCgrups(r)
+                .then((cgrups) => {
+                    // console.log('cgrups', cgrups)
+
+                    //set
+                    set(vo, `opt.rows[${kr}].cgrups`, cgrups)
+                    // console.log('vo.opt.rows[kr]', cloneDeep(vo.opt.rows[kr]))
+
+                    //refresh
+                    vo.refresh()
+
+                    //isModified
+                    vo.isModified = true
+
+                })
                 .catch(() => {})
+
+        },
+
+        saveUsers: function() {
+            // console.log('method saveUsers')
+
+            let vo = this
+
+            async function core() {
+                let errTemp = null
+
+                //show loading
+                vo.$ui.updateLoading(true)
+
+                //check
+                if (isestr(vo.isError)) {
+                    vo.$alert(`${vo.isError}`, { type: 'error' })
+                    return
+                }
+
+                //rows
+                let rows = get(vo, 'opt.rows', [])
+
+                //check
+                if (size(rows) === 0) {
+                    vo.$alert(`${vo.$t('userAddEmpty')}`, { type: 'error' })
+                    return
+                }
+
+                //updateUsers
+                await vo.$fapi.updateUsers(rows)
+                    .catch((err) => {
+                        errTemp = err
+                    })
+
+                //check
+                if (errTemp !== null) {
+                    vo.$alert(`${vo.$t('userSaveUsersFail')}: ${errTemp}`, { type: 'error' })
+                    return
+                }
+
+                //isModified
+                vo.isModified = false
+
+                //alert
+                vo.$alert(vo.$t('userSaveUsersSuccess'))
+
+            }
+
+            //core
+            core()
+                // .then((res) => {
+                //     console.log('then', res)
+                // })
+                .catch((err) => {
+                    console.log('catch', err)
+                    vo.$alert(vo.$t('anUnexpectedErrorOccurred'), { type: 'error' })
+                })
+                .finally(() => {
+
+                    //hide loading
+                    vo.$ui.updateLoading(false)
+
+                })
 
         },
 

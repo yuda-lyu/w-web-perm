@@ -1,4 +1,4 @@
-import map from 'lodash-es/map'
+import map from 'lodash-es/map.js'
 import ds from './src/schema/index.mjs'
 import provideTargets from './server/provideTargets.mjs'
 
@@ -10,33 +10,40 @@ async function provide() {
     let from = `pd`
 
     let rs = [
-        'pd-專案A',
-        'pd-專案A/頁A',
+
         'pd-專案A/頁A/區塊A',
         'pd-專案A/頁A/區塊A/執行按鈕',
         'pd-專案A/頁A/區塊A/分析按鈕',
-        'pd-專案A/頁B',
+
         'pd-專案A/頁B/區塊A',
         'pd-專案A/頁B/區塊A/執行按鈕',
         'pd-專案A/頁B/區塊A/分析按鈕',
-        'pd-專案A/頁B/區塊B',
+
         'pd-專案A/頁B/區塊B/展開按鈕',
         'pd-專案A/頁B/區塊B/下載按鈕',
-        'pd-專案B',
-        'pd-專案B/頁A',
+
+        'pd-專案A/頁C',
+
         'pd-專案B/頁A/區塊A',
-        'pd-專案B/頁A/區塊A/下載報表按鈕',
-        'pd-專案B/頁A/區塊A/下載數據按鈕',
+        'pd-專案B/頁A/區塊A/顯示綜合報表',
+        'pd-專案B/頁A/區塊A/顯示當前數據',
+        'pd-專案B/頁A/區塊B',
+        'pd-專案B/頁A/區塊B/下載報表按鈕',
+        'pd-專案B/頁A/區塊B/下載數據按鈕',
+        'pd-專案B/頁A/區塊C',
+
         'pd-專案B/頁B/區塊A',
+        'pd-專案B/頁B/區塊A/待辦事項清單',
+        'pd-專案B/頁B/區塊A/相關資源清單',
         'pd-專案B/頁B/區塊B',
         'pd-專案B/頁B/區塊B/顯示後台按鈕',
         'pd-專案B/頁B/區塊B/轉跳主站按鈕',
+
     ]
     rs = map(rs, (key, k) => {
         let v = ds.targets.funNew({
-            order: 1000 + k,
-            description: key,
-            from,
+            order: k + 1000, //使能排序至最後, 不穿插至原測試數據
+            description: `${key}的說明`,
         })
         v.id = key
         return v
@@ -54,4 +61,4 @@ provide()
     })
 
 
-//node --experimental-modules --es-module-specifier-resolution=node g.provideTargets.mjs
+//node --experimental-modules g.provideTargets.mjs

@@ -28,13 +28,13 @@
                             :itemActive="menuActive"
                             :item-text-color="'#222'"
                             :item-text-color-hover="'#444'"
-                            :item-text-color-active="'#EF6C00'"
+                            :item-text-color-active="'#fff'"
                             :item-icon-color="'#222'"
                             :item-icon-color-hover="'#444'"
-                            :item-icon-color-active="'#EF6C00'"
+                            :item-icon-color-active="'#eee'"
                             :item-background-color="'#fff'"
                             :item-background-color-hover="'#f2f2f2'"
-                            :item-background-color-active="'#FFF3E0'"
+                            :item-background-color-active="'#666'"
                             :paddingStyle="{v:15,h:15}"
                             @click="(menu)=>{menuKey=menu.key}"
                         ></WListVertical>
@@ -68,14 +68,22 @@
                         <template>
 
                             <LayoutContentTargets
+                                :drawer="drawer"
                                 v-if="menuKey==='targets'"
                             ></LayoutContentTargets>
 
-                            <LayoutContentGroups
-                                v-if="menuKey==='groups'"
-                            ></LayoutContentGroups>
+                            <LayoutContentPemis
+                                :drawer="drawer"
+                                v-if="menuKey==='pemis'"
+                            ></LayoutContentPemis>
+
+                            <LayoutContentGrups
+                                :drawer="drawer"
+                                v-if="menuKey==='grups'"
+                            ></LayoutContentGrups>
 
                             <LayoutContentUsers
+                                :drawer="drawer"
                                 v-if="menuKey==='users'"
                             ></LayoutContentUsers>
 
@@ -120,24 +128,26 @@
 </template>
 
 <script>
-import { mdiGamepadCircle, mdiStackOverflow, mdiAccountGroupOutline } from '@mdi/js/mdi.js'
+import { mdiGamepadCircle, mdiStackOverflow, mdiSelectGroup, mdiAccountGroupOutline } from '@mdi/js/mdi.js'
 import get from 'lodash-es/get.js'
 import find from 'lodash-es/find.js'
 import WDrawer from 'w-component-vue/src/components/WDrawer.vue'
-import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
 import WListVertical from 'w-component-vue/src/components/WListVertical.vue'
+import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
 import LayoutContentTargets from './LayoutContentTargets.vue'
-import LayoutContentGroups from './LayoutContentGroups.vue'
+import LayoutContentPemis from './LayoutContentPemis.vue'
+import LayoutContentGrups from './LayoutContentGrups.vue'
 import LayoutContentUsers from './LayoutContentUsers.vue'
 
 
 export default {
     components: {
         WDrawer,
-        WButtonCircle,
         WListVertical,
+        WButtonCircle,
         LayoutContentTargets,
-        LayoutContentGroups,
+        LayoutContentPemis,
+        LayoutContentGrups,
         LayoutContentUsers,
     },
     props: {
@@ -172,13 +182,18 @@ export default {
                     icon: mdiGamepadCircle,
                 },
                 {
-                    key: 'groups',
-                    text: vo.$t('permissionGroups'),
+                    key: 'pemis',
+                    text: vo.$t('managementPemis'),
                     icon: mdiStackOverflow,
                 },
                 {
+                    key: 'grups',
+                    text: vo.$t('managementGrups'),
+                    icon: mdiSelectGroup,
+                },
+                {
                     key: 'users',
-                    text: vo.$t('userPermissions'),
+                    text: vo.$t('managementUsers'),
                     icon: mdiAccountGroupOutline,
                 },
             ]

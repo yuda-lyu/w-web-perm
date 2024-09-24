@@ -5,7 +5,7 @@ import genPm from 'wsemi/src/genPm.mjs'
 
 async function provideTargets(url, from, targets) {
     //url: 指權限伺服器提供的調整targets網址, 例如 http://localhost:11006/syncAndReplaceTargets
-    //from: 指target來源
+    //from: 指targets來源
 
     //pm
     let pm = genPm()
@@ -13,9 +13,12 @@ async function provideTargets(url, from, targets) {
     //ks
     let ks = [
         'id',
-        'order',
+        'order', //order大部分由外部給予, 得要開啟
         'description',
-        'from',
+        // 'userId',
+        // 'timeCreate',
+        // 'userIdUpdate',
+        // 'timeUpdate',
     ]
 
     //ltdtpick
@@ -38,7 +41,7 @@ async function provideTargets(url, from, targets) {
         .then((res) => {
             // console.log(res)
             let r = {
-                msg: '成功傳輸Targets清單',
+                msg: '成功傳輸targets清單',
                 res,
             }
             pm.resolve(r)
@@ -46,7 +49,7 @@ async function provideTargets(url, from, targets) {
         .catch((err) => {
             // console.log(err)
             let r = {
-                msg: '無法傳輸Targets清單',
+                msg: '無法傳輸targets清單',
                 res: err,
             }
             pm.reject(r)

@@ -14,7 +14,9 @@
         <CheckYesNo></CheckYesNo>
         <CheckYes></CheckYes>
 
-        <VeUser></VeUser>
+        <VeCrules></VeCrules>
+        <VeCpemis></VeCpemis>
+        <VeCgrups></VeCgrups>
 
     </div>
 </template>
@@ -30,7 +32,9 @@ import CheckYesNo from './components/Common/CheckYesNo.vue'
 import CheckYes from './components/Common/CheckYes.vue'
 import LayoutState from './components/LayoutState.vue'
 import Layout from './components/Layout.vue'
-import VeUser from './components/VeUser.vue'
+import VeCrules from './components/VeCrules.vue'
+import VeCpemis from './components/VeCpemis.vue'
+import VeCgrups from './components/VeCgrups.vue'
 
 
 export default {
@@ -40,7 +44,9 @@ export default {
         CheckYes,
         LayoutState,
         Layout,
-        VeUser,
+        VeCrules,
+        VeCpemis,
+        VeCgrups,
     },
     data: function() {
         return {
@@ -95,6 +101,13 @@ export default {
             loginError,
         })
         vo.ll = ll
+
+    },
+    mounted: function() {
+        let vo = this
+
+        //set, 把目前vo儲存至window供外部非vue環境使用
+        window.$vo = vo
 
     },
     computed: {
