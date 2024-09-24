@@ -175,15 +175,15 @@ let state = {
         },
         targetId: {
             eng: `Target`,
-            cht: `管理名稱`,
+            cht: `對象名稱`,
         },
         targetIdEmpty: {
             eng: `No valid name`,
-            cht: `尚未給予有效管理名稱`,
+            cht: `尚未給予有效對象名稱`,
         },
         targetIdDuplicate: {
             eng: `Duplicate target`,
-            cht: `管理名稱出現重複`,
+            cht: `對象名稱出現重複`,
         },
         targetAddEmpty: {
             eng: `No target`,
