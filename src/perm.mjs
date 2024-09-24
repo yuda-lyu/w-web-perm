@@ -12,6 +12,9 @@ function perm() {
 
     //pmd
     let pmd = null
+    let _user = {}
+    let _rules = []
+    let _kpRule = {}
 
     //conn
     let conn = (url, opt = {}) => {
@@ -43,6 +46,9 @@ function perm() {
             .then((res) => {
                 // console.log('perm.getPerm then', res)
                 pmd = res
+                genUser()
+                genRules()
+                genKpRule()
                 if (isfun(permSuccess)) {
                     permSuccess(pmd)
                 }
@@ -59,48 +65,52 @@ function perm() {
         return pm
     }
 
-    //user
-    let user = get(pmd, `user`, {})
+    let genUser = () => {
+        _user = get(pmd, `user`, {})
+    }
 
-    //rules
-    let rules = get(pmd, `rules`, [])
+    let genRules = () => {
+        _rules = get(pmd, `rules`, [])
+    }
 
-    //kpRule
-    let kpRule = {}
-    each(rules, (v) => {
+    let genKpRule = () => {
+        let kpRule = {}
+        each(_rules, (v) => {
 
-        //name
-        let name = get(v, 'name', '')
-        if (!isestr(name)) {
-            return true //跳出換下一個
-        }
+            //name
+            let name = get(v, 'name', '')
+            if (!isestr(name)) {
+                return true //跳出換下一個
+            }
 
-        //isActive
-        let _isActive = get(v, 'isActive', '')
-        let isActive = _isActive === 'y' ? 'y' : 'n'
+            //isActive
+            let _isActive = get(v, 'isActive', '')
+            let isActive = _isActive === 'y' ? 'y' : 'n'
 
-        //save
-        kpRule[name] = isActive
+            //save
+            kpRule[name] = isActive
 
-    })
+        })
+        _kpRule = kpRule
+    }
 
     //kp
     let kp = {
         conn,
         getUser: () => {
-            return user
+            return _user
         },
         getRules: () => {
-            return rules
+            return _rules
         },
         getKpRule: () => {
-            return kpRule
+            return _kpRule
         },
         // rule: (key) => {
-        //     return get(kpRule, key, '')
+        //     return get(_kpRule, key, '')
         // },
         active: (key) => {
-            let _isActive = get(kpRule, key, '')
+            let _isActive = get(_kpRule, key, '')
             let isActive = _isActive === 'y' ? 'y' : 'n'
             return isActive
         },
