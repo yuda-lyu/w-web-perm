@@ -32,7 +32,7 @@
 
                             <WButtonCircle
                                 :paddingStyle="{v:6,h:6}"
-                                :tooltip="$t('cruleCheckAllYes')"
+                                :tooltip="$t('checkAllYes')"
                                 :icon="mdiCheckboxMultipleMarked"
                                 :backgroundColor="'#fff'"
                                 :backgroundColorHover="'#f2f2f2'"
@@ -52,7 +52,7 @@
 
                             <WButtonCircle
                                 :paddingStyle="{v:6,h:6}"
-                                :tooltip="$t('cruleCheckAllNo')"
+                                :tooltip="$t('checkAllNo')"
                                 :icon="mdiCheckboxMultipleBlankOutline"
                                 :backgroundColor="'#fff'"
                                 :backgroundColorHover="'#f2f2f2'"
@@ -72,7 +72,7 @@
 
                             <WButtonCircle
                                 :paddingStyle="{v:6,h:6}"
-                                :tooltip="$t('cruleCheckAllInv')"
+                                :tooltip="$t('checkAllInv')"
                                 :icon="mdiCodeTagsCheck"
                                 :backgroundColor="'#fff'"
                                 :backgroundColorHover="'#f2f2f2'"
@@ -501,7 +501,7 @@ export default {
 
             //check
             if (!isestr(id)) {
-                vo.$alert(`${vo.$t('cruleEditNoId')}`, { type: 'error' })
+                vo.$alert(`${vo.$t('cruleEditNoTargetId')}`, { type: 'error' })
                 return
             }
 
@@ -521,7 +521,7 @@ export default {
 
             //check
             if (!iseobj(r)) {
-                vo.$alert(`${vo.$t('cruleEditNoRule')}`, { type: 'error' })
+                vo.$alert(`${vo.$t('cruleEditNoTargetData')}`, { type: 'error' })
                 return
             }
 

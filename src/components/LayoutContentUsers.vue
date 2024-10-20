@@ -76,7 +76,7 @@
 
                     <WButtonCircle
                         :paddingStyle="{v:6,h:6}"
-                        :tooltip="$t('userDeleteChecks')"
+                        :tooltip="$t('userDeleteCheckUsers')"
                         :icon="mdiTrashCanOutline"
                         :backgroundColor="'#fff'"
                         :backgroundColorHover="'#f2f2f2'"
@@ -141,6 +141,7 @@
 
 <script>
 import { mdiAccountGroupOutline, mdiVectorPolylinePlus, mdiCheckboxMarkedCircle, mdiCloudUploadOutline, mdiTrashCanOutline, mdiPlus, mdiPencilOutline, mdiContentCopy } from '@mdi/js/mdi.js'
+import JSON5 from 'json5'
 import get from 'lodash-es/get.js'
 import set from 'lodash-es/set.js'
 import each from 'lodash-es/each.js'
@@ -468,7 +469,7 @@ export default {
                     },
                     defHeadMinWidth: 150,
                     kpHeadWidth: {
-                        'cgrups': 100,
+                        'cgrups': 300,
                         'isAdmin': 100,
                         'isActive': 100,
                         'timeCreate': 220,
@@ -559,7 +560,7 @@ export default {
                             //因stopPropagation只吃掉訊息, 原本focus會處於原本可focus的cell, 再重複點時會於前個focus的cell出現highlight邊框, 故再多使用preventDefault阻止瀏覽器預設行為, 此等同於return false
                             let t = `
                                 <div onclick="event.stopPropagation();event.preventDefault();" onmousedown="event.stopPropagation();event.preventDefault();">
-                                    <button style="width:100%;" onclick="$vo.$dg.showVeCgrupsById('${id}')">${vo.$t('userEditCgrupsSimple')}</button>
+                                    <button style="width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" onclick="$vo.$dg.showVeCgrupsById('${id}')">${vo.getCgrupsText(v)}</button>
                                 </div>
                             `
 
@@ -640,7 +641,7 @@ export default {
 
             //check
             if (!isestr(id)) {
-                vo.$alert(`${vo.$t('userEditNoId')}`, { type: 'error' })
+                vo.$alert(`${vo.$t('userEditNoUserId')}`, { type: 'error' })
                 return
             }
 
@@ -660,7 +661,7 @@ export default {
 
             //check
             if (!iseobj(r)) {
-                vo.$alert(`${vo.$t('userEditNoUser')}`, { type: 'error' })
+                vo.$alert(`${vo.$t('userEditNoUserData')}`, { type: 'error' })
                 return
             }
 
@@ -691,7 +692,7 @@ export default {
 
             //check
             if (!isestr(id)) {
-                vo.$alert(`${vo.$t('userEditNoId')}`, { type: 'error' })
+                vo.$alert(`${vo.$t('userEditNoUserId')}`, { type: 'error' })
                 return
             }
 
@@ -711,7 +712,7 @@ export default {
 
             //check
             if (!iseobj(r)) {
-                vo.$alert(`${vo.$t('userEditNoUser')}`, { type: 'error' })
+                vo.$alert(`${vo.$t('userEditNoUserData')}`, { type: 'error' })
                 return
             }
 
@@ -876,6 +877,48 @@ export default {
 
         },
 
+        getCgrupsText: function(cgrups) {
+            // console.log('method getCgrupsText', cgrups)
+
+            let vo = this
+
+            //kpGrup
+            let kpGrup = JSON5.parse(cgrups)
+
+            let vs = []
+            each(kpGrup, (v, k) => {
+                // console.log(k, 'v', v)
+
+                //isActive
+                let isActive = get(v, 'isActive', '')
+                if (isActive !== 'y') {
+                    return true //跳出換下一個
+                }
+                // console.log(k, '_isActive', _isActive)
+
+                //push
+                vs.push(k)
+
+            })
+
+            //cgrupsText
+            let cgrupsText = vo.$t('userRnderCgrupsNoGroup')
+            let t = vo.$t('userRnderCgrupsHasNGroups')
+            let n = size(vs)
+            if (n > 0) {
+                t = t.replace('{n}', n)
+                if (n === 1) {
+                    t = t.replace('{nms}', `(${vs[0]})`)
+                }
+                else {
+                    t = t.replace('{nms}', '')
+                }
+                cgrupsText = t
+            }
+
+            return cgrupsText
+        },
+
         showVeCgrupsById: function(id) {
             // console.log('method showVeCgrupsById', id)
 
@@ -883,7 +926,7 @@ export default {
 
             //check
             if (!isestr(id)) {
-                vo.$alert(`${vo.$t('userEditCgrupsNoId')}`, { type: 'error' })
+                vo.$alert(`${vo.$t('userEditCgrupsNoUserId')}`, { type: 'error' })
                 return
             }
 
@@ -903,13 +946,13 @@ export default {
 
             //check
             if (!iseobj(r)) {
-                vo.$alert(`${vo.$t('userEditCgrupsNoUser')}`, { type: 'error' })
+                vo.$alert(`${vo.$t('userEditCgrupsNoUserData')}`, { type: 'error' })
                 return
             }
 
-            //getUserRules
-            let kur = vo.$s.getUserRules(r, vo.grups, vo.pemis, vo.targets)
-            console.log('getUserRules kur', kur)
+            // //getUserRules
+            // let kur = vo.$s.getUserRules(r, vo.grups, vo.pemis, vo.targets)
+            // // console.log('getUserRules kur', kur)
 
             //showVeCgrups
             vo.$dg.showVeCgrups(r)

@@ -9,7 +9,7 @@ import now2strp from 'wsemi/src/now2strp.mjs'
 
 let keyTable = 'grups'
 let tableNameCht = '權限群組設定'
-let tableNameEng = 'Permissions groups'
+let tableNameEng = 'Permission groups'
 
 
 let settings = {

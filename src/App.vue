@@ -18,6 +18,9 @@
         <VeCpemis></VeCpemis>
         <VeCgrups></VeCgrups>
 
+        <VeGrupBlngUsers></VeGrupBlngUsers>
+        <VePemiBlngGrups></VePemiBlngGrups>
+
     </div>
 </template>
 
@@ -35,6 +38,8 @@ import Layout from './components/Layout.vue'
 import VeCrules from './components/VeCrules.vue'
 import VeCpemis from './components/VeCpemis.vue'
 import VeCgrups from './components/VeCgrups.vue'
+import VeGrupBlngUsers from './components/VeGrupBlngUsers.vue'
+import VePemiBlngGrups from './components/VePemiBlngGrups.vue'
 
 
 export default {
@@ -47,6 +52,8 @@ export default {
         VeCrules,
         VeCpemis,
         VeCgrups,
+        VeGrupBlngUsers,
+        VePemiBlngGrups,
     },
     data: function() {
         return {

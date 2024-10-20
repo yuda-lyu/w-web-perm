@@ -107,15 +107,23 @@ let state = {
         },
         checkAllYes: {
             eng: `Check all`,
-            cht: `全選`,
+            cht: `全選使用`,
         },
         checkAllNo: {
             eng: `Uncheck all`,
-            cht: `全不選`,
+            cht: `全不選使用`,
         },
         checkAllInv: {
             eng: `Reverse all`,
-            cht: `全反選`,
+            cht: `全反選使用`,
+        },
+        operMode: {
+            eng: `Enable`,
+            cht: `是否使用`,
+        },
+        operEnable: {
+            eng: `Operator`,
+            cht: `合併權限模式`,
         },
 
         processing: {
@@ -147,9 +155,29 @@ let state = {
             eng: `Description`,
             cht: `說明`,
         },
-        noDescription: {
-            eng: `No description`,
-            cht: `無說明`,
+        // noDescription: {
+        //     eng: `No description`,
+        //     cht: `無說明`,
+        // },
+        belongUsers: {
+            eng: `Use users`,
+            cht: `管控所屬使用者`,
+        },
+        belongGrups: {
+            eng: `Use groups`,
+            cht: `所屬權限群組`,
+        },
+        belongPemis: {
+            eng: `Use permissions`,
+            cht: `所屬權限`,
+        },
+        belongGrupsNames: {
+            eng: `Use permission groups`,
+            cht: `所屬權限群組名稱`,
+        },
+        belongPemisNames: {
+            eng: `Use permissions`,
+            cht: `所屬權限名稱`,
         },
         isAdmin: {
             eng: `Administrator`,
@@ -209,8 +237,8 @@ let state = {
             eng: `copy`,
             cht: `複製`,
         },
-        targetDeleteChecks: {
-            eng: `Delete user(s)`,
+        targetDeleteCheckTargets: {
+            eng: `Delete target(s)`,
             cht: `刪除勾選對象`,
         },
         targetEnable: {
@@ -270,21 +298,21 @@ let state = {
             eng: `copy`,
             cht: `複製`,
         },
-        pemiDeleteChecks: {
-            eng: `Delete user(s)`,
+        pemiDeleteCheckPemis: {
+            eng: `Delete permission(s)`,
             cht: `刪除勾選權限`,
-        },
-        pemiEnable: {
-            eng: `Enable`,
-            cht: `是否使用`,
-        },
-        pemiMode: {
-            eng: `Operator`,
-            cht: `合併權限模式`,
         },
         pemiCrules: {
             eng: `Rules of permission`,
             cht: `管控對象規則`,
+        },
+        pemiEditBlngGrupsNoPemiId: {
+            eng: `Can not find the id of permission`,
+            cht: `無法找到權限Id`,
+        },
+        pemiEditBlngGrupsNoPemiData: {
+            eng: `Can not find the data of permission`,
+            cht: `無法找到權限資料`,
         },
         pemiEditCrules: {
             eng: `Edit rules of permission`,
@@ -294,11 +322,11 @@ let state = {
             eng: `Edit rules`,
             cht: `編輯對象規則`,
         },
-        pemiEditCrulesNoId: {
+        pemiEditCrulesNoPemiId: {
             eng: `Can not find the id of permission`,
             cht: `無法找到權限Id`,
         },
-        pemiEditCrulesNoPemi: {
+        pemiEditCrulesNoPemiData: {
             eng: `Can not find the data of permission`,
             cht: `無法找到權限資料`,
         },
@@ -315,28 +343,45 @@ let state = {
             cht: `儲存權限數據成功`,
         },
 
-        cruleEditNoId: {
-            eng: `Can not find the id of rule`,
-            cht: `無法找到規則Id`,
+        pemiBlngEditGrups: {
+            eng: `Edit permission groups`,
+            cht: `編輯所屬權限群組`,
         },
-        cruleEditNoRule: {
-            eng: `Can not find the data of rule`,
-            cht: `無法找到規則資料`,
+        pemiBlngRnderNoGrup: {
+            eng: `No users`,
+            cht: `無所屬權限群組`,
         },
-        cruleCheckAllYes: {
-            eng: `Check all`,
-            cht: `全選使用`,
+        pemiBlngRnderGrups: {
+            eng: `Has {n} permission group(s){nms}`,
+            cht: `共被 {n} 個權限群組{nms}使用`,
         },
-        cruleCheckAllNo: {
-            eng: `Uncheck all`,
-            cht: `全不選使用`,
+        pemiBlngPemiNow: {
+            eng: `Now permission`,
+            cht: `目前權限`,
         },
-        cruleCheckAllInv: {
-            eng: `Reverse all`,
-            cht: `全反選使用`,
+        pemiBlngEditNoName: {
+            eng: `Can not find the name of permission`,
+            cht: `無法找到權限名稱`,
+        },
+        pemiBlngEditNoPemi: {
+            eng: `Can not find the data of permission`,
+            cht: `無法找到權限資料`,
+        },
+        pemiBlngDeleteCheckPemis: {
+            eng: `Delete permission(s)`,
+            cht: `刪除勾選權限`,
+        },
+
+        cruleEditNoTargetId: {
+            eng: `Can not find the id of target`,
+            cht: `無法找到對象Id`,
+        },
+        cruleEditNoTargetData: {
+            eng: `Can not find the data of target`,
+            cht: `無法找到對象資料`,
         },
         cruleDeleteCheckTargets: {
-            eng: `Delete item(s)`,
+            eng: `Delete target(s)`,
             cht: `刪除勾選對象`,
         },
 
@@ -380,33 +425,41 @@ let state = {
             eng: `copy`,
             cht: `複製`,
         },
-        grupDeleteChecks: {
-            eng: `Delete user(s)`,
+        grupDeleteCheckGrups: {
+            eng: `Delete permission group(s)`,
             cht: `刪除勾選權限群組`,
         },
         grupCpemis: {
             eng: `Permissions`,
             cht: `管控使用權限`,
         },
+        grupEditBlngNoGrupId: {
+            eng: `Can not find the id of permission group`,
+            cht: `無法找到權限群組Id`,
+        },
+        grupEditBlngNoGrupData: {
+            eng: `Can not find the data of permission group`,
+            cht: `無法找到權限群組資料`,
+        },
         grupEditCpemis: {
             eng: `Edit list of permission group`,
             cht: `編輯使用權限清單`,
         },
-        grupEditCpemisSimple: {
-            eng: `Edit permissions`,
-            cht: `編輯權限`,
+        grupRnderCpemisNoPermission: {
+            eng: `No permission`,
+            cht: `無使用任何權限`,
         },
-        grupEditCpemisNoId: {
-            eng: `Can not find the id of permission group`,
-            cht: `無法找到權限群組Id`,
-        },
-        grupEditCpemisNoGrup: {
-            eng: `Can not find the data of permission group`,
-            cht: `無法找到權限群組資料`,
+        grupRnderCpemisHasNPermissions: {
+            eng: `Has {n} permission(s){nms}`,
+            cht: `編輯使用 {n} 項權限{nms}`,
         },
         grupClearGrupsFail: {
             eng: `Failed to clear existing permission groups`,
             cht: `清除既有權限群組數據失敗`,
+        },
+        grupSaveGrupsEmpty: {
+            eng: `No user`,
+            cht: `未有變更權限群組資料`,
         },
         grupSaveGrupsFail: {
             eng: `Failed to save permission groups`,
@@ -417,29 +470,46 @@ let state = {
             cht: `儲存權限群組數據成功`,
         },
 
+        grupBlngEditUsers: {
+            eng: `Edit permission group of users`,
+            cht: `編輯所屬使用者`,
+        },
+        grupBlngRnderNoUser: {
+            eng: `No users`,
+            cht: `無所屬使用者`,
+        },
+        grupBlngRnderUsers: {
+            eng: `Has {n} user(s){nms}`,
+            cht: `共被 {n} 位使用者{nms}使用`,
+        },
+        grupBlngGrupNow: {
+            eng: `Now permission group`,
+            cht: `目前權限群組`,
+        },
+        grupBlngEditNoGrupName: {
+            eng: `Can not find the name of permission group`,
+            cht: `無法找到權限群組名稱`,
+        },
+        grupBlngEditNoGrupData: {
+            eng: `Can not find the data of permission group`,
+            cht: `無法找到權限群組資料`,
+        },
+        grupBlngDeleteCheckGrups: {
+            eng: `Delete permission group(s)`,
+            cht: `刪除勾選權限群組`,
+        },
+
         cpemiEditNoName: {
-            eng: `Can not find the name of permission`,
-            cht: `無法找到權限名稱`,
+            eng: `Can not find the name of target`,
+            cht: `無法找到對象名稱`,
         },
-        cpemiEditNoPemi: {
-            eng: `Can not find the data of permission`,
-            cht: `無法找到權限資料`,
-        },
-        cpemiCheckAllYes: {
-            eng: `Check all`,
-            cht: `全選使用`,
-        },
-        cpemiCheckAllNo: {
-            eng: `Uncheck all`,
-            cht: `全不選使用`,
-        },
-        cpemiCheckAllInv: {
-            eng: `Reverse all`,
-            cht: `全反選使用`,
+        cpemiEditNoTarget: {
+            eng: `Can not find the data of target`,
+            cht: `無法找到對象資料`,
         },
         cpemiDeleteCheckTargets: {
-            eng: `Delete item(s)`,
-            cht: `刪除勾選權限`,
+            eng: `Delete targets(s)`,
+            cht: `刪除勾選對象`,
         },
 
         managementUsers: {
@@ -490,7 +560,7 @@ let state = {
             eng: `copy`,
             cht: `複製`,
         },
-        userDeleteChecks: {
+        userDeleteCheckUsers: {
             eng: `Delete user(s)`,
             cht: `刪除勾選使用者`,
         },
@@ -502,21 +572,21 @@ let state = {
             eng: `Edit list of user`,
             cht: `編輯使用權限群組清單`,
         },
-        userEditCgrupsSimple: {
-            eng: `Edit permission group`,
-            cht: `編輯權限群組`,
-        },
-        userEditCgrupsNoId: {
+        userEditCgrupsNoUserId: {
             eng: `Can not find the id of user`,
             cht: `無法找到使用者Id`,
         },
-        userEditCgrupsNoUser: {
+        userEditCgrupsNoUserData: {
             eng: `Can not find the data of user`,
             cht: `無法找到使用者資料`,
         },
-        userClearUsersFail: {
-            eng: `Failed to clear existing users`,
-            cht: `清除既有使用者數據失敗`,
+        // userClearUsersFail: {
+        //     eng: `Failed to clear existing users`,
+        //     cht: `清除既有使用者數據失敗`,
+        // },
+        userSaveUsersEmpty: {
+            eng: `No user`,
+            cht: `未有變更使用者資料`,
         },
         userSaveUsersFail: {
             eng: `Failed to save users`,
@@ -526,13 +596,34 @@ let state = {
             eng: `Save users successfully`,
             cht: `儲存使用者數據成功`,
         },
-        userEditNoId: {
+        userEditNoUserId: {
             eng: `Can not find the id of user`,
             cht: `無法找到使用者Id`,
         },
-        userEditNoUser: {
+        userEditNoUserData: {
             eng: `Can not find the data of user`,
             cht: `無法找到使用者數據`,
+        },
+        userRnderCgrupsNoGroup: {
+            eng: `No permission group`,
+            cht: `無使用任何權限群組`,
+        },
+        userRnderCgrupsHasNGroups: {
+            eng: `Has {n} permission group(s){nms}`,
+            cht: `編輯使用 {n} 項權限群組{nms}`,
+        },
+
+        cgrupEditNoName: {
+            eng: `Can not find the name of permission`,
+            cht: `無法找到權限名稱`,
+        },
+        cgrupEditNoPemi: {
+            eng: `Can not find the data of permission`,
+            cht: `無法找到權限資料`,
+        },
+        cgrupDeleteCheckPemis: {
+            eng: `Delete permission(s)`,
+            cht: `刪除勾選權限`,
         },
 
         allDefaults: {

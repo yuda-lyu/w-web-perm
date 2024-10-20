@@ -1,7 +1,7 @@
 <template>
     <WDialog
         :show.sync="bShow"
-        :title="$t('userEditCgrups')"
+        :title="$t('pemiBlngEditGrups')"
         :icon="mdiFormatListCheckbox"
         :minWidth="800"
         :maxWidth="800"
@@ -25,6 +25,19 @@
                     @domresize="resizeHead"
                 >
 
+                    <!-- 當前權限群組名稱 -->
+                    <div style="padding:18px 12px;  background:#fff; border-bottom:1px solid #ddd;">
+
+                        <div style="font-size:0.75rem; color:#999; padding-bottom:2px;">
+                            {{$t('pemiBlngPemiNow')}}
+                        </div>
+
+                        <div style="font-size:1.3rem;">
+                            {{pemiName}}
+                        </div>
+
+                    </div>
+
                     <!-- 功能區 -->
                     <div style="padding:5px; background:#fff; display:flex; align-items:center;">
 
@@ -41,7 +54,7 @@
                                 :iconColor="'#444'"
                                 :iconColorHover="'#222'"
                                 :shadow="false"
-                                @click="showVeCgrupsToggleItemsEnableAllYes"
+                                @click="showVePemiBlngGrupsToggleItemsEnableAllYes"
                             ></WButtonCircle>
 
                             <div style="padding-left:6px;"></div>
@@ -61,7 +74,7 @@
                                 :iconColor="'#444'"
                                 :iconColorHover="'#222'"
                                 :shadow="false"
-                                @click="showVeCgrupsToggleItemsEnableAllNo"
+                                @click="showVePemiBlngGrupsToggleItemsEnableAllNo"
                             ></WButtonCircle>
 
                             <div style="padding-left:6px;"></div>
@@ -81,7 +94,7 @@
                                 :iconColor="'#444'"
                                 :iconColorHover="'#222'"
                                 :shadow="false"
-                                @click="showVeCgrupsToggleItemsEnableAllInv"
+                                @click="showVePemiBlngGrupsToggleItemsEnableAllInv"
                             ></WButtonCircle>
 
                             <div style="padding-left:6px;"></div>
@@ -92,7 +105,7 @@
 
                             <WButtonCircle
                                 :paddingStyle="{v:6,h:6}"
-                                :tooltip="$t('cgrupDeleteCheckPemis')"
+                                :tooltip="$t('pemiBlngDeleteCheckPemis')"
                                 :icon="mdiTrashCanOutline"
                                 :backgroundColor="'#fff'"
                                 :backgroundColorHover="'#f2f2f2'"
@@ -146,9 +159,11 @@ import size from 'lodash-es/size.js'
 import filter from 'lodash-es/filter.js'
 import join from 'lodash-es/join.js'
 import sortBy from 'lodash-es/sortBy.js'
+import isEqual from 'lodash-es/isEqual.js'
 import cloneDeep from 'lodash-es/cloneDeep.js'
 import genPm from 'wsemi/src/genPm.mjs'
 import sep from 'wsemi/src/sep.mjs'
+import haskey from 'wsemi/src/haskey.mjs'
 import delay from 'wsemi/src/delay.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
@@ -200,7 +215,7 @@ export default {
 
             isModified: false,
 
-            user: null,
+            pemi: null,
 
             items: [],
             itemsCheck: [],
@@ -214,9 +229,9 @@ export default {
         let vo = this
 
         //set
-        Vue.prototype.$dg.showVeCgrups = vo.show
-        Vue.prototype.$dg.showVeCgrupsToggleItemModeByName = vo.showVeCgrupsToggleItemModeByName
-        Vue.prototype.$dg.showVeCgrupsToggleItemEnableByName = vo.showVeCgrupsToggleItemEnableByName
+        Vue.prototype.$dg.showVePemiBlngGrups = vo.show
+        Vue.prototype.$dg.showVePemiBlngGrupsToggleItemModeByName = vo.showVePemiBlngGrupsToggleItemModeByName
+        Vue.prototype.$dg.showVePemiBlngGrupsToggleItemEnableByName = vo.showVePemiBlngGrupsToggleItemEnableByName
 
     },
     computed: {
@@ -306,6 +321,14 @@ export default {
             return b
         },
 
+        pemiName: function() {
+            let vo = this
+
+            let c = get(vo, 'pemi.name', '')
+
+            return c
+        },
+
     },
     methods: {
 
@@ -345,6 +368,7 @@ export default {
                 //ks
                 let ks = [
                     'name',
+                    'pemisNames',
                     'mode',
                     'enable',
                 ]
@@ -352,7 +376,8 @@ export default {
 
                 //kpHead
                 let kpHead = {
-                    'name': vo.$t('pemiName'),
+                    'name': vo.$t('grupName'),
+                    'pemisNames': vo.$t('belongPemisNames'),
                     'mode': vo.$t('operEnable'),
                     'enable': vo.$t('operMode'),
                 }
@@ -383,17 +408,47 @@ export default {
                     // },
                     kpHeadFilterType: {
                         'name': 'text',
+                        'pemisNames': 'text',
                         'mode': 'text',
                         'enable': 'text',
                     },
                     // kpHeadCheckBox: {
                     //     'name': true,
                     // },
+                    kpHeadFocusHighlight: { //雖然效果不完全, 但因按鈕與cell有padding可被點擊, 故還是需要開啟
+                        'pemisNames': false,
+                    },
                     kpCellRender: {
-                        'name': (v, k, r) => {
-                            // console.log('kpCellRender name', v)
+                        'pemisNames': (v, k, r) => {
+                            // console.log('kpCellRender pemisNames', v, k, r)
 
-                            return v
+                            let csp = `border-top-left-radius:4px; border-bottom-left-radius:4px;`
+                            let csnp = `border-left:1px solid #aaaaaa; border-right:1px solid #aaaaaa; border-top:1px solid #aaaaaa; border-bottom:1px solid #aaaaaa; background:#ffffff; color:#555;`
+                            let csep = `border-left:1px solid #ac2451; border-right:1px solid #9e2149; border-top:1px solid #ac2451; border-bottom:1px solid #ac2451; background:#be295a; color:#fff;`
+
+                            let csa = `border-top-right-radius:4px; border-bottom-right-radius:4px;`
+                            let csna = `_border-left:1px solid #aaaaaa; border-right:1px solid #aaaaaa; border-top:1px solid #aaaaaa; border-bottom:1px solid #aaaaaa; background:#eeeeee; color:#555;`
+                            let csea = `_border-left:1px solid #ac2451; border-right:1px solid #ac2451; border-top:1px solid #ac2451; border-bottom:1px solid #ac2451; background:#d22f64; color:#fff;`
+
+                            let vs = r.pemis
+
+                            let t = ''
+                            each(vs, (v) => {
+                                t += `
+                                    <span style="display:inline-block; line-height:20px; height:20px;">
+                                        <div style="display:flex;">
+                                            <div style="padding:0px 5px; ${csp} ${v.enable === 'y' ? csep : csnp}">
+                                                ${v.mode}
+                                            </div>
+                                            <div style="padding:0px 5px; ${csa} ${v.enable === 'y' ? csea : csna}">
+                                                ${v.name}
+                                            </div>
+                                        </div>
+                                    </span>
+                                `
+                            })
+
+                            return t
                         },
                         'mode': (v, k, r) => {
                             // console.log('kpCellRender mode', v)
@@ -407,7 +462,7 @@ export default {
                             // console.log('mode', mode, k, r)
 
                             let t = `
-                                <select onchange="$vo.$dg.showVeCgrupsToggleItemModeByName('${name}',this.value)">
+                                <select onchange="$vo.$dg.showVePemiBlngGrupsToggleItemModeByName('${name}',this.value)">
                                     <option value="OR" ${mode === 'OR' ? 'selected' : ''}>OR</option>
                                     <option value="AND" ${mode === 'AND' ? 'selected' : ''}>AND</option>
                                 </select>
@@ -423,7 +478,7 @@ export default {
                             // console.log('name', name, k, r)
 
                             let t = `
-                                <input type="checkbox" ${v === 'y' ? 'checked' : ''} onclick="$vo.$dg.showVeCgrupsToggleItemEnableByName('${name}')" />
+                                <input type="checkbox" ${v === 'y' ? 'checked' : ''} onclick="$vo.$dg.showVePemiBlngGrupsToggleItemEnableByName('${name}')" />
                             `
 
                             return t
@@ -521,14 +576,170 @@ export default {
             return rows
         },
 
-        showVeCgrupsToggleItemModeByName: function(name, mode) {
-            // console.log('showVeCgrupsToggleItemModeByName', name, mode)
+        genItems: function(pemi, grups) {
+            // console.log('genItems', pemi, grups)
+
+            // let vo = this
+
+            //items
+            let items = map(grups, (g) => {
+
+                //kpPemi
+                let kpPemi = JSON5.parse(g.cpemis)
+                // console.log(g.name, 'kpPemi', kpPemi)
+
+                //mode, enable, pemis
+                let mode = 'OR'
+                let enable = 'n'
+                let pemis = []
+                each(kpPemi, (v, k) => {
+                    // console.log(k, 'v', v)
+
+                    //_isActive, 此為使用者cpemis內設定, 可為y或n, 僅提取y, 再判斷此使用者是否有使用此pemi
+                    let _isActive = get(v, 'isActive', '')
+                    if (_isActive !== 'y') {
+                        return true //跳出換下一個
+                    }
+                    // console.log(k, '_isActive', _isActive)
+
+                    //_mode
+                    let _mode = get(v, 'mode', '')
+                    // console.log(k, '_mode', _mode)
+
+                    //b, 使用者是否擁有指定權限群組
+                    let b = k === pemi.name
+                    // console.log(k, 'b', b)
+
+                    //mode, isActive
+                    if (b) {
+                        enable = 'y'
+                        mode = _mode //使用使用者給予cpemis內指定權限群組之合併權限模式
+                        // console.log('使用使用者給予cpemis內指定權限群組之合併權限模式 pemi', pemi)
+                    }
+
+                    //push
+                    pemis.push({
+                        name: k,
+                        ...v,
+                        enable: b ? 'y' : 'n', //給render使用
+                    })
+
+                })
+                // console.log(g.name, 'pemis', pemis)
+
+                //pemisNames
+                let pemisNames = map(pemis, 'name')
+                pemisNames = join(pemisNames, ' ')
+                // console.log(g.name, 'pemisNames', pemisNames)
+
+                return {
+                    name: g.name,
+                    pemisNames,
+                    mode,
+                    enable,
+                    // kpPemi,
+                    pemis,
+                }
+            })
+            // console.log(g.name, 'items', items)
+
+            return items
+        },
+
+        revRows: function() {
+            // console.log('revRows')
+
+            let vo = this
+
+            //pemi
+            let pemi = cloneDeep(vo.pemi)
+            // console.log('pemi', pemi)
+
+            //grups
+            let grups = cloneDeep(vo.grups)
+            // console.log('grups', grups)
+
+            //rows
+            let rows = get(vo, 'opt.rows', [])
+            // console.log('rows', rows)
+
+            //grups
+            grups = map(grups, (g, kg) => {
+
+                //kpPemi
+                let kpPemi = JSON5.parse(g.cpemis)
+                // console.log(g.name, 'kpPemi', kpPemi)
+
+                //mode
+                let mode = get(rows, `${kg}.mode`, '')
+                if (mode !== 'OR' && mode !== 'AND') {
+                    console.log(`非預期: mode應該皆已指定不應觸發`, mode)
+                    mode = 'OR'
+                }
+                // console.log(g.name, 'mode', mode)
+
+                //enable
+                let enable = get(rows, `${kg}.enable`, '')
+                if (enable !== 'y' && enable !== 'n') {
+                    console.log(`非預期: enable應該皆已指定不應觸發`, enable)
+                    enable = 'n'
+                }
+                // console.log(g.name, 'enable', enable)
+
+                //kpPemi
+                if (enable === 'y') {
+                    kpPemi[pemi.name] = {
+                        mode,
+                        isActive: 'y',
+                    }
+                }
+                else {
+                    if (haskey(kpPemi, pemi.name)) {
+                        delete kpPemi[pemi.name]
+                    }
+                }
+                // console.log(g.name, 'kpPemi', kpPemi)
+
+                //update cpemis
+                let cpemis = JSON.stringify(kpPemi)
+                g.cpemis = cpemis
+                // console.log(g.name, 'cpemis', cpemis)
+
+                return g
+            })
+
+            //items
+            let items = vo.genItems(pemi, grups)
+            // console.log('items', items)
+
+            //update pemisNames, pemis
+            each(items, (r, kr) => {
+                // name: g.name,
+                // pemisNames,
+                // mode,
+                // enable,
+                // pemis,
+
+                //set
+                set(vo, `opt.rows[${kr}].pemisNames`, r.pemisNames)
+                set(vo, `opt.rows[${kr}].pemis`, r.pemis)
+                // console.log('vo.opt.rows[kr]', cloneDeep(vo.opt.rows[kr]))
+
+            })
+
+            //refresh
+            vo.refresh()
+
+        },
+
+        showVePemiBlngGrupsToggleItemModeByName: function(name, mode) {
+            // console.log('showVePemiBlngGrupsToggleItemModeByName', name, mode)
 
             let vo = this
 
             //check
             if (!isestr(name)) {
-                vo.$alert(`${vo.$t('cgrupEditNoName')}`, { type: 'error' })
+                vo.$alert(`${vo.$t('pemiBlngEditNoName')}`, { type: 'error' })
                 return
             }
 
@@ -548,7 +759,7 @@ export default {
 
             //check
             if (!iseobj(r)) {
-                vo.$alert(`${vo.$t('cgrupEditNoPemi')}`, { type: 'error' })
+                vo.$alert(`${vo.$t('pemiBlngEditNoPemi')}`, { type: 'error' })
                 return
             }
 
@@ -560,22 +771,22 @@ export default {
             set(vo, `opt.rows[${kr}].mode`, mode)
             // console.log('vo.opt.rows[kr]', cloneDeep(vo.opt.rows[kr]))
 
-            //refresh
-            vo.refresh()
+            //revRows, 已含refresh
+            vo.revRows()
 
             //isModified
             vo.isModified = true
 
         },
 
-        showVeCgrupsToggleItemEnableByName: function(name) {
-            // console.log('showVeCgrupsToggleItemEnableByName', name)
+        showVePemiBlngGrupsToggleItemEnableByName: function(name) {
+            // console.log('showVePemiBlngGrupsToggleItemEnableByName', name)
 
             let vo = this
 
             //check
             if (!isestr(name)) {
-                vo.$alert(`${vo.$t('cgrupEditNoName')}`, { type: 'error' })
+                vo.$alert(`${vo.$t('pemiBlngEditNoName')}`, { type: 'error' })
                 return
             }
 
@@ -595,7 +806,7 @@ export default {
 
             //check
             if (!iseobj(r)) {
-                vo.$alert(`${vo.$t('cgrupEditNoPemi')}`, { type: 'error' })
+                vo.$alert(`${vo.$t('pemiBlngEditNoPemi')}`, { type: 'error' })
                 return
             }
 
@@ -608,16 +819,16 @@ export default {
             set(vo, `opt.rows[${kr}].enable`, enable)
             // console.log('vo.opt.rows[kr]', cloneDeep(vo.opt.rows[kr]))
 
-            //refresh
-            vo.refresh()
+            //revRows, 已含refresh
+            vo.revRows()
 
             //isModified
             vo.isModified = true
 
         },
 
-        showVeCgrupsToggleItemsEnableAllYes: function() {
-            // console.log('showVeCgrupsToggleItemsEnableAllYes')
+        showVePemiBlngGrupsToggleItemsEnableAllYes: function() {
+            // console.log('showVePemiBlngGrupsToggleItemsEnableAllYes')
 
             let vo = this
 
@@ -647,16 +858,16 @@ export default {
 
             })
 
-            //refresh
-            vo.refresh()
+            //revRows, 已含refresh
+            vo.revRows()
 
             //isModified
             vo.isModified = true
 
         },
 
-        showVeCgrupsToggleItemsEnableAllNo: function() {
-            // console.log('showVeCgrupsToggleItemsEnableAllNo')
+        showVePemiBlngGrupsToggleItemsEnableAllNo: function() {
+            // console.log('showVePemiBlngGrupsToggleItemsEnableAllNo')
 
             let vo = this
 
@@ -686,16 +897,16 @@ export default {
 
             })
 
-            //refresh
-            vo.refresh()
+            //revRows, 已含refresh
+            vo.revRows()
 
             //isModified
             vo.isModified = true
 
         },
 
-        showVeCgrupsToggleItemsEnableAllInv: function() {
-            // console.log('showVeCgrupsToggleItemsEnableAllInv')
+        showVePemiBlngGrupsToggleItemsEnableAllInv: function() {
+            // console.log('showVePemiBlngGrupsToggleItemsEnableAllInv')
 
             let vo = this
 
@@ -729,11 +940,42 @@ export default {
 
             })
 
-            //refresh
-            vo.refresh()
+            //revRows, 已含refresh
+            vo.revRows()
 
             //isModified
             vo.isModified = true
+
+        },
+
+        saveGrups: async function(rows) {
+            // console.log('method saveGrups', rows)
+
+            let vo = this
+
+            //errTemp
+            let errTemp = null
+
+            //check
+            if (size(rows) === 0) {
+                vo.$alert(`${vo.$t('grupSaveGrupsEmpty')}`, { type: 'error' })
+                return
+            }
+
+            //updateGrups
+            await vo.$fapi.updateGrups(rows)
+                .catch((err) => {
+                    errTemp = err
+                })
+
+            //check
+            if (errTemp !== null) {
+                vo.$alert(`${vo.$t('grupSaveGrupsFail')}: ${errTemp}`, { type: 'error' })
+                return
+            }
+
+            //alert
+            vo.$alert(vo.$t('grupSaveGrupsSuccess'))
 
         },
 
@@ -769,36 +1011,59 @@ export default {
                 let rows = get(vo, 'opt.rows', [])
                 // console.log('rows', rows)
 
-                //kpGrup
-                let kpGrup = {}
-                each(rows, (r) => {
-                    let name = get(r, 'name', '')
-                    let mode = get(r, 'mode', '')
-                    let enable = get(r, 'enable', '')
-                    if (!isestr(name)) {
-                        console.log(`invalid name`)
-                        return true //跳出換下一個
+                //grups
+                let grups = cloneDeep(vo.grups)
+                // console.log('grups', grups)
+
+                //grupsNew
+                let grupsNew = map(rows, (r, kr) => {
+
+                    //g
+                    let g = get(grups, kr, {})
+
+                    //cpemis
+                    let cpemis = get(g, 'cpemis', '')
+
+                    //kpPemi
+                    let kpPemi = JSON5.parse(cpemis)
+                    // console.log('kpGrup', kpGrup)
+
+                    //pemis
+                    let pemis = get(r, 'pemis', [])
+
+                    //kpPemiNew
+                    let kpPemiNew = {}
+                    if (true) {
+                        each(pemis, (p) => {
+                            if (p.isActive === 'y') {
+                                kpPemiNew[p.name] = {
+                                    mode: p.mode,
+                                    isActive: p.isActive,
+                                }
+                            }
+                        })
                     }
-                    if (mode !== 'OR' && mode !== 'AND') {
-                        console.log(`invalid mode[${mode}]`)
-                        return true //跳出換下一個
+
+                    //check
+                    if (!isEqual(kpPemi, kpPemiNew)) {
+
+                        //cpemis
+                        g.cpemis = JSON.stringify(kpPemiNew)
+
                     }
-                    if (!isestr(enable)) {
-                        console.log(`invalid enable`)
-                        return true //跳出換下一個
-                    }
-                    kpGrup[name] = {
-                        mode,
-                        isActive: enable,
-                    }
+
+                    return g
                 })
-                // console.log('kpGrup', kpGrup)
+                console.log('grupsNew', grupsNew)
 
-                //cgrups
-                let cgrups = JSON.stringify(kpGrup)
-                // console.log('cgrups', cgrups)
+                // //check
+                // if (size(grupsNew) === 0) {
+                //     return
+                // }
 
-                return cgrups
+                //saveGrups
+                await vo.saveGrups(grupsNew)
+
             }
 
             //core
@@ -838,8 +1103,8 @@ export default {
 
         },
 
-        show: function (user) {
-            // console.log('methods show', user)
+        show: function (pemi) {
+            // console.log('methods show', pemi)
 
             let vo = this
 
@@ -849,64 +1114,15 @@ export default {
             //default
             vo.isModified = false
 
-            //cloneDeep
-            user = cloneDeep(user)
+            //grup
+            pemi = cloneDeep(pemi)
+            vo.pemi = pemi
 
-            //cgrups
-            let cgrups = get(user, 'cgrups', '')
-            // console.log('cgrups', cgrups)
-
-            //kpGrup
-            let kpGrup = {}
-            if (isestr(cgrups)) {
-                try {
-                    kpGrup = JSON5.parse(cgrups)
-                }
-                catch (err) {
-                    console.log('cgrups', cgrups)
-                    console.log('err', err)
-                }
-            }
-            // console.log('kpGrup', kpGrup)
+            //grups
+            let grups = cloneDeep(vo.grups)
 
             //items
-            let items = map(vo.grups, (v) => {
-                // console.log('grups v', v)
-
-                //p
-                let p = get(kpGrup, v.name, null)
-                // console.log('p', p)
-
-                //name
-                let name = v.name
-                // console.log('name', name)
-
-                //mode
-                let mode = get(p, 'mode', '')
-                if (mode !== 'OR' && mode !== 'AND') {
-                    mode = 'OR'
-                }
-                // console.log('mode', mode)
-
-                //enable
-                let _enable = get(p, 'isActive', '')
-                let enable = _enable === 'y' ? 'y' : 'n'
-                // console.log('isActive', enable)
-
-                //r
-                let r = {
-                    name,
-                    mode,
-                    enable,
-                }
-                // console.log('r', r)
-
-                return r
-            })
-            // console.log('items', items)
-
-            //save
-            vo.user = user
+            let items = vo.genItems(pemi, grups)
             vo.items = items
 
             //genOpt

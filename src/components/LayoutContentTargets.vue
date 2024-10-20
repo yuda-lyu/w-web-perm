@@ -76,7 +76,7 @@
 
                     <WButtonCircle
                         :paddingStyle="{v:6,h:6}"
-                        :tooltip="$t('targetDeleteChecks')"
+                        :tooltip="$t('targetDeleteCheckTargets')"
                         :icon="mdiTrashCanOutline"
                         :backgroundColor="'#fff'"
                         :backgroundColorHover="'#f2f2f2'"

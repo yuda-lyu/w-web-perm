@@ -1,6 +1,7 @@
 import path from 'path'
 import fs from 'fs'
 import get from 'lodash-es/get.js'
+import each from 'lodash-es/each.js'
 import map from 'lodash-es/map.js'
 import keys from 'lodash-es/keys.js'
 import size from 'lodash-es/size.js'
@@ -20,6 +21,8 @@ import pm2resolve from 'wsemi/src/pm2resolve.mjs'
 import fsIsFolder from 'wsemi/src/fsIsFolder.mjs'
 import fsIsFile from 'wsemi/src/fsIsFile.mjs'
 import replace from 'wsemi/src/replace.mjs'
+import haskey from 'wsemi/src/haskey.mjs'
+import arrHas from 'wsemi/src/arrHas.mjs'
 import ltdtDiffByKey from 'wsemi/src/ltdtDiffByKey.mjs'
 import ltdtmapping from 'wsemi/src/ltdtmapping.mjs'
 import WServHapiServer from 'w-serv-hapi/src/WServHapiServer.mjs'
@@ -221,6 +224,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
 
     //urlRedirect
     let urlRedirect = get(opt, 'urlRedirect', '')
+    console.log('urlRedirect', urlRedirect)
 
 
     //mappingBy
@@ -291,6 +295,60 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
             r.order = k + 1
             return r
         })
+
+        //ckKey
+        let ckKey = (rows, key) => {
+            let err = null
+
+            //check
+            let kp = {}
+            each(rows, (v, k) => {
+
+                //value
+                let value = get(v, key, '')
+
+                //check
+                if (!isestr(value)) {
+                    err = `rows[${k}].${key} is not an effective string`
+                    return false //跳出
+                }
+
+                //check
+                if (haskey(kp, value)) {
+                    err = `rows[${k}].${key}[${value}] is duplicate`
+                    return false //跳出
+                }
+
+                //kp
+                kp[value] = true
+
+            })
+
+            return err
+        }
+
+        //偵測id,name,email重複
+        let err = null
+        if (true) {
+            if (arrHas(woName, ['targets'])) {
+                err = ckKey(rows, 'id')
+                if (err !== null) {
+                    return Promise.reject(err)
+                }
+            }
+            else if (arrHas(woName, ['targets', 'pemis', 'grups'])) { //users可重複name故不列入
+                err = ckKey(rows, 'name')
+                if (err !== null) {
+                    return Promise.reject(err)
+                }
+            }
+            else if (arrHas(woName, ['users'])) { //users不能重複email
+                err = ckKey(rows, 'email')
+                if (err !== null) {
+                    return Promise.reject(err)
+                }
+            }
+        }
 
         //ltdtDiffByKey
         let ltdtOld = await woItems[woName].select()

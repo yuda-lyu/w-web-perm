@@ -76,7 +76,7 @@
 
                     <WButtonCircle
                         :paddingStyle="{v:6,h:6}"
-                        :tooltip="$t('grupDeleteChecks')"
+                        :tooltip="$t('grupDeleteCheckGrups')"
                         :icon="mdiTrashCanOutline"
                         :backgroundColor="'#fff'"
                         :backgroundColorHover="'#f2f2f2'"
@@ -141,9 +141,11 @@
 
 <script>
 import { mdiSelectGroup, mdiVectorPolylinePlus, mdiCheckboxMarkedCircle, mdiCloudUploadOutline, mdiTrashCanOutline, mdiPlus, mdiPencilOutline, mdiContentCopy } from '@mdi/js/mdi.js'
+import JSON5 from 'json5'
 import get from 'lodash-es/get.js'
 import set from 'lodash-es/set.js'
 import each from 'lodash-es/each.js'
+import map from 'lodash-es/map.js'
 import size from 'lodash-es/size.js'
 import filter from 'lodash-es/filter.js'
 import sortBy from 'lodash-es/sortBy.js'
@@ -199,6 +201,7 @@ export default {
         let vo = this
 
         //註冊至$dg供使用
+        vo.$dg.showVeGrupBlngUsersById = vo.showVeGrupBlngUsersById
         vo.$dg.showVeCpemisById = vo.showVeCpemisById
 
     },
@@ -238,8 +241,12 @@ export default {
                 return ''
             }
 
-            //cloneDeep
-            let items = cloneDeep(vo.grups)
+            //grups, users
+            let grups = cloneDeep(vo.grups)
+            let users = cloneDeep(vo.users)
+
+            //addUsers
+            let items = vo.addUsers(grups, users)
 
             //save
             vo.items = items
@@ -374,6 +381,7 @@ export default {
                 let ks = [
                     'id',
                     'name',
+                    'belongUsers',
                     'description',
                     'from',
                     'cpemis',
@@ -388,6 +396,7 @@ export default {
                 let kpHead = {
                     'id': vo.$t('id'),
                     'name': vo.$t('name'),
+                    'belongUsers': vo.$t('belongUsers'),
                     'description': vo.$t('description'),
                     'from': vo.$t('from'),
                     'cpemis': vo.$t('grupCpemis'),
@@ -415,13 +424,15 @@ export default {
                     defHeadMinWidth: 150,
                     kpHeadWidth: {
                         'name': 300,
-                        'cpemis': 100,
+                        'belongUsers': 300,
+                        'cpemis': 300,
                         'timeCreate': 220,
                         'timeUpdate': 220,
                     },
                     kpHeadFilterType: {
                         'id': 'text',
                         'name': 'text',
+                        'belongUsers': 'text',
                         'description': 'text',
                         'from': 'text',
                         'cpemis': 'text',
@@ -442,12 +453,15 @@ export default {
                         'name': true,
                     },
                     kpHeadFilter: {
+                        'belongUsers': false,
                         'cpemis': false,
                     },
                     kpHeadSort: {
+                        'belongUsers': false,
                         'cpemis': false,
                     },
                     kpHeadFocusHighlight: { //雖然效果不完全, 但因按鈕與cell有padding可被點擊, 故還是需要開啟
+                        'belongUsers': false,
                         'cpemis': false,
                     },
                     kpCellRender: {
@@ -470,6 +484,23 @@ export default {
 
                             return v
                         },
+                        'belongUsers': (v, k, r) => {
+                            // console.log('kpCellRender belongUsers', v, k, r)
+
+                            //id
+                            let id = get(r, 'id', '')
+                            // console.log('id', id, k, r)
+
+                            //因kpHeadFocusHighlight設定false時, 仍會於點擊其他可focus的cell, 再點回時依然出現highlight的focus邊框, 故改使用stopPropagation強制吃掉點擊訊息
+                            //因stopPropagation只吃掉訊息, 原本focus會處於原本可focus的cell, 再重複點時會於前個focus的cell出現highlight邊框, 故再多使用preventDefault阻止瀏覽器預設行為, 此等同於return false
+                            let t = `
+                                <div onclick="event.stopPropagation();event.preventDefault();" onmousedown="event.stopPropagation();event.preventDefault();">
+                                    <button style="width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" onclick="$vo.$dg.showVeGrupBlngUsersById('${id}')">${v}</button>
+                                </div>
+                            `
+
+                            return t
+                        },
                         'cpemis': (v, k, r) => {
                             // console.log('kpCellRender cpemis', v, k, r)
 
@@ -481,7 +512,7 @@ export default {
                             //因stopPropagation只吃掉訊息, 原本focus會處於原本可focus的cell, 再重複點時會於前個focus的cell出現highlight邊框, 故再多使用preventDefault阻止瀏覽器預設行為, 此等同於return false
                             let t = `
                                 <div onclick="event.stopPropagation();event.preventDefault();" onmousedown="event.stopPropagation();event.preventDefault();">
-                                    <button style="width:100%;" onclick="$vo.$dg.showVeCpemisById('${id}')">${vo.$t('grupEditCpemisSimple')}</button>
+                                    <button style="width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" onclick="$vo.$dg.showVeCpemisById('${id}')">${vo.getCpemisText(v)}</button>
                                 </div>
                             `
 
@@ -524,6 +555,74 @@ export default {
             //refresh, 因set不會觸發kpCellRender, 故須另外調用組件函數refresh, 進而觸發kpCellRender, 使能更新數據
             cmp.refresh()
 
+        },
+
+        addUsers: function(grups, users) {
+            // console.log('method addUsers', grups, users)
+
+            let vo = this
+
+            //parse cgrups
+            users = map(users, (u) => {
+                let kpGrup = JSON5.parse(u.cgrups)
+                u.kpGrup = kpGrup
+                return u
+            })
+            // console.log('users', users)
+
+            //kp
+            let kp = {}
+            each(users, (u) => {
+                each(u.kpGrup, (v, k) => {
+                    let isActive = get(v, 'isActive', '')
+                    if (isActive !== 'y') {
+                        return true //跳出換下一個
+                    }
+                    if (!haskey(kp, k)) {
+                        kp[k] = []
+                    }
+                    kp[k].push({
+                        user: u,
+                        grup: v,
+                    })
+                })
+            })
+            // console.log('kp', kp)
+
+            //items
+            let items = map(grups, (g) => {
+
+                //us
+                let us = []
+                if (haskey(kp, g.name)) {
+                    us = kp[g.name]
+                }
+                // console.log('us', us)
+
+                //belongUsers
+                let belongUsers = vo.$t('grupBlngRnderNoUser')
+                let t = vo.$t('grupBlngRnderUsers')
+                let n = size(us)
+                if (n > 0) {
+                    t = t.replace('{n}', n)
+                    if (n === 1) {
+                        t = t.replace('{nms}', `(${us[0].user.name})`)
+                    }
+                    else {
+                        t = t.replace('{nms}', '')
+                    }
+                    belongUsers = t
+                }
+
+                //save belongUsers, us
+                g.belongUsers = belongUsers
+                g.us = us
+
+                return g
+            })
+            // console.log('items', items)
+
+            return items
         },
 
         addItem: function() {
@@ -670,6 +769,86 @@ export default {
 
         },
 
+        getCpemisText: function(cpemis) {
+            // console.log('method getCpemisText', cpemis)
+
+            let vo = this
+
+            //kpPemi
+            let kpPemi = JSON5.parse(cpemis)
+
+            let vs = []
+            each(kpPemi, (v, k) => {
+                // console.log(k, 'v', v)
+
+                //isActive
+                let isActive = get(v, 'isActive', '')
+                if (isActive !== 'y') {
+                    return true //跳出換下一個
+                }
+                // console.log(k, '_isActive', _isActive)
+
+                //push
+                vs.push(k)
+
+            })
+
+            //cpemisText
+            let cpemisText = vo.$t('grupRnderCpemisNoPermission')
+            let t = vo.$t('grupRnderCpemisHasNPermissions')
+            let n = size(vs)
+            if (n > 0) {
+                t = t.replace('{n}', n)
+                if (n === 1) {
+                    t = t.replace('{nms}', `(${vs[0]})`)
+                }
+                else {
+                    t = t.replace('{nms}', '')
+                }
+                cpemisText = t
+            }
+
+            return cpemisText
+        },
+
+        showVeGrupBlngUsersById: function(id) {
+            // console.log('method showVeGrupBlngUsersById', id)
+
+            let vo = this
+
+            //check
+            if (!isestr(id)) {
+                vo.$alert(`${vo.$t('grupEditBlngNoGrupId')}`, { type: 'error' })
+                return
+            }
+
+            //rows
+            let rows = get(vo, 'opt.rows', [])
+
+            //find
+            let r = null
+            // let kr = null
+            each(rows, (v, k) => {
+                if (get(v, 'id', '') === id) {
+                    r = v
+                    // kr = k
+                    return false //跳出
+                }
+            })
+
+            //check
+            if (!iseobj(r)) {
+                vo.$alert(`${vo.$t('grupEditBlngNoGrupData')}`, { type: 'error' })
+                return
+            }
+
+            //showVeGrupBlngUsers
+            vo.$dg.showVeGrupBlngUsers(r)
+                .then(() => {})
+                .catch(() => {})
+
+        },
+
         showVeCpemisById: function(id) {
             // console.log('method showVeCpemisById', id)
 
@@ -677,7 +856,7 @@ export default {
 
             //check
             if (!isestr(id)) {
-                vo.$alert(`${vo.$t('grupEditCpemisNoId')}`, { type: 'error' })
+                vo.$alert(`${vo.$t('grupEditBlngNoGrupId')}`, { type: 'error' })
                 return
             }
 
@@ -697,7 +876,7 @@ export default {
 
             //check
             if (!iseobj(r)) {
-                vo.$alert(`${vo.$t('grupEditCpemisNoGrup')}`, { type: 'error' })
+                vo.$alert(`${vo.$t('grupEditBlngNoGrupData')}`, { type: 'error' })
                 return
             }
 

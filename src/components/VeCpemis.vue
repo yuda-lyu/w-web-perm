@@ -32,7 +32,7 @@
 
                             <WButtonCircle
                                 :paddingStyle="{v:6,h:6}"
-                                :tooltip="$t('cpemiCheckAllYes')"
+                                :tooltip="$t('checkAllYes')"
                                 :icon="mdiCheckboxMultipleMarked"
                                 :backgroundColor="'#fff'"
                                 :backgroundColorHover="'#f2f2f2'"
@@ -41,7 +41,7 @@
                                 :iconColor="'#444'"
                                 :iconColorHover="'#222'"
                                 :shadow="false"
-                                @click="toggleItemsEnableAllYes"
+                                @click="showVeCpemisToggleItemsEnableAllYes"
                             ></WButtonCircle>
 
                             <div style="padding-left:6px;"></div>
@@ -52,7 +52,7 @@
 
                             <WButtonCircle
                                 :paddingStyle="{v:6,h:6}"
-                                :tooltip="$t('cpemiCheckAllNo')"
+                                :tooltip="$t('checkAllNo')"
                                 :icon="mdiCheckboxMultipleBlankOutline"
                                 :backgroundColor="'#fff'"
                                 :backgroundColorHover="'#f2f2f2'"
@@ -61,7 +61,7 @@
                                 :iconColor="'#444'"
                                 :iconColorHover="'#222'"
                                 :shadow="false"
-                                @click="toggleItemsEnableAllNo"
+                                @click="showVeCpemisToggleItemsEnableAllNo"
                             ></WButtonCircle>
 
                             <div style="padding-left:6px;"></div>
@@ -72,7 +72,7 @@
 
                             <WButtonCircle
                                 :paddingStyle="{v:6,h:6}"
-                                :tooltip="$t('cpemiCheckAllInv')"
+                                :tooltip="$t('checkAllInv')"
                                 :icon="mdiCodeTagsCheck"
                                 :backgroundColor="'#fff'"
                                 :backgroundColorHover="'#f2f2f2'"
@@ -81,7 +81,7 @@
                                 :iconColor="'#444'"
                                 :iconColorHover="'#222'"
                                 :shadow="false"
-                                @click="toggleItemsEnableAllInv"
+                                @click="showVeCpemisToggleItemsEnableAllInv"
                             ></WButtonCircle>
 
                             <div style="padding-left:6px;"></div>
@@ -215,8 +215,8 @@ export default {
 
         //set
         Vue.prototype.$dg.showVeCpemis = vo.show
-        Vue.prototype.$dg.toggleItemModeByName = vo.toggleItemModeByName
-        Vue.prototype.$dg.toggleItemEnableByName = vo.toggleItemEnableByName
+        Vue.prototype.$dg.showVeCpemisToggleItemModeByName = vo.showVeCpemisToggleItemModeByName
+        Vue.prototype.$dg.showVeCpemisToggleItemEnableByName = vo.showVeCpemisToggleItemEnableByName
 
     },
     computed: {
@@ -353,8 +353,8 @@ export default {
                 //kpHead
                 let kpHead = {
                     'name': vo.$t('pemiName'),
-                    'mode': vo.$t('pemiMode'),
-                    'enable': vo.$t('pemiEnable'),
+                    'mode': vo.$t('operEnable'),
+                    'enable': vo.$t('operMode'),
                 }
 
                 //opt
@@ -372,8 +372,8 @@ export default {
                     //     'enable': true,
                     // },
                     kpHeadWidth: {
-                        'mode': 50,
-                        'enable': 50,
+                        'mode': 100,
+                        'enable': 100,
                     },
                     // kpRowDrag: {
                     //     'name': true,
@@ -407,7 +407,7 @@ export default {
                             // console.log('mode', mode, k, r)
 
                             let t = `
-                                <select onchange="$vo.$dg.toggleItemModeByName('${name}',this.value)">
+                                <select onchange="$vo.$dg.showVeCpemisToggleItemModeByName('${name}',this.value)">
                                     <option value="OR" ${mode === 'OR' ? 'selected' : ''}>OR</option>
                                     <option value="AND" ${mode === 'AND' ? 'selected' : ''}>AND</option>
                                 </select>
@@ -423,7 +423,7 @@ export default {
                             // console.log('name', name, k, r)
 
                             let t = `
-                                <input type="checkbox" ${v === 'y' ? 'checked' : ''} onclick="$vo.$dg.toggleItemEnableByName('${name}')" />
+                                <input type="checkbox" ${v === 'y' ? 'checked' : ''} onclick="$vo.$dg.showVeCpemisToggleItemEnableByName('${name}')" />
                             `
 
                             return t
@@ -521,8 +521,8 @@ export default {
             return rows
         },
 
-        toggleItemModeByName: function(name, mode) {
-            // console.log('toggleItemModeByName', name, mode)
+        showVeCpemisToggleItemModeByName: function(name, mode) {
+            // console.log('showVeCpemisToggleItemModeByName', name, mode)
 
             let vo = this
 
@@ -548,13 +548,13 @@ export default {
 
             //check
             if (!iseobj(r)) {
-                vo.$alert(`${vo.$t('cpemiEditNoPemi')}`, { type: 'error' })
+                vo.$alert(`${vo.$t('cpemiEditNoTarget')}`, { type: 'error' })
                 return
             }
 
             //mode
             // let mode = th.value
-            console.log('mode', mode)
+            // console.log('mode', mode)
 
             //set
             set(vo, `opt.rows[${kr}].mode`, mode)
@@ -568,8 +568,8 @@ export default {
 
         },
 
-        toggleItemEnableByName: function(name) {
-            // console.log('toggleItemEnableByName', name)
+        showVeCpemisToggleItemEnableByName: function(name) {
+            // console.log('showVeCpemisToggleItemEnableByName', name)
 
             let vo = this
 
@@ -595,7 +595,7 @@ export default {
 
             //check
             if (!iseobj(r)) {
-                vo.$alert(`${vo.$t('cpemiEditNoPemi')}`, { type: 'error' })
+                vo.$alert(`${vo.$t('cpemiEditNoTarget')}`, { type: 'error' })
                 return
             }
 
@@ -616,8 +616,8 @@ export default {
 
         },
 
-        toggleItemsEnableAllYes: function() {
-            // console.log('toggleItemsEnableAllYes')
+        showVeCpemisToggleItemsEnableAllYes: function() {
+            // console.log('showVeCpemisToggleItemsEnableAllYes')
 
             let vo = this
 
@@ -655,8 +655,8 @@ export default {
 
         },
 
-        toggleItemsEnableAllNo: function() {
-            // console.log('toggleItemsEnableAllNo')
+        showVeCpemisToggleItemsEnableAllNo: function() {
+            // console.log('showVeCpemisToggleItemsEnableAllNo')
 
             let vo = this
 
@@ -694,8 +694,8 @@ export default {
 
         },
 
-        toggleItemsEnableAllInv: function() {
-            // console.log('toggleItemsEnableAllInv')
+        showVeCpemisToggleItemsEnableAllInv: function() {
+            // console.log('showVeCpemisToggleItemsEnableAllInv')
 
             let vo = this
 
