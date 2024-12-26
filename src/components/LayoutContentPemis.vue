@@ -231,6 +231,80 @@ export default {
             return rs
         },
 
+        useGrups: function() {
+            let vo = this
+
+            //parse cpemis
+            let grups = map(vo.grups, (g) => {
+
+                //cloneDeep
+                g = cloneDeep(g)
+
+                //kpPemi
+                let kpPemi = {}
+                try {
+                    // console.log('g.cpemis', g.cpemis)
+                    kpPemi = JSON5.parse(g.cpemis)
+                }
+                catch (err) {}
+
+                //save kpPemi
+                g.kpPemi = kpPemi
+
+                return g
+            })
+            // console.log('grups', grups)
+
+            return grups
+        },
+
+        kpPemiGrup: function() {
+            let vo = this
+
+            //kp
+            let kp = {}
+            each(vo.useGrups, (g) => {
+                each(g.kpPemi, (v, k) => {
+                    let isActive = get(v, 'isActive', '')
+                    if (isActive !== 'y') {
+                        return true //跳出換下一個
+                    }
+                    if (!haskey(kp, k)) {
+                        kp[k] = []
+                    }
+                    kp[k].push({
+                        grup: g,
+                        pemi: v,
+                    })
+                })
+            })
+            // console.log('kp', kp)
+
+            return kp
+        },
+
+        kpUsePemiGrup: function() {
+            let vo = this
+
+            //_kp
+            let _kp = {}
+            each(vo.pemis, (v, k) => {
+                _kp[v.name] = true
+            })
+            // console.log('_kp', _kp)
+
+            //kp
+            let kp = {}
+            each(vo.kpPemiGrup, (v, k) => {
+                if (haskey(_kp, k)) {
+                    kp[k] = v
+                }
+            })
+            // console.log('kp', kp)
+
+            return kp
+        },
+
         changePemis: function() {
             // console.log('computed changePemis')
 
@@ -241,12 +315,12 @@ export default {
                 return ''
             }
 
-            //pemis, grups
+            //pemis, kpUsePemiGrup
             let pemis = cloneDeep(vo.pemis)
-            let grups = cloneDeep(vo.grups)
+            let kpUsePemiGrup = cloneDeep(vo.kpUsePemiGrup)
 
-            //addGrups
-            let items = vo.addGrups(pemis, grups)
+            //genItems
+            let items = vo.genItems(pemis, kpUsePemiGrup)
 
             // //cloneDeep
             // let items = cloneDeep(vo.pemis)
@@ -515,7 +589,7 @@ export default {
                             //因stopPropagation只吃掉訊息, 原本focus會處於原本可focus的cell, 再重複點時會於前個focus的cell出現highlight邊框, 故再多使用preventDefault阻止瀏覽器預設行為, 此等同於return false
                             let t = `
                                 <div onclick="event.stopPropagation();event.preventDefault();" onmousedown="event.stopPropagation();event.preventDefault();">
-                                    <button style="width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" onclick="$vo.$dg.showVeCrulesById('${id}')">${vo.$t('pemiEditCrulesSimple')}</button>
+                                    <button style="width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" onclick="$vo.$dg.showVeCrulesById('${id}')">${vo.getCrulesText(v)}</button>
                                 </div>
                             `
 
@@ -560,45 +634,18 @@ export default {
 
         },
 
-        addGrups: function(pemis, grups) {
-            // console.log('method addGrups', pemis, grups)
+        genItems: function(pemis, kpUsePemiGrup) {
+            // console.log('method genItems', pemis, kpUsePemiGrup)
 
             let vo = this
-
-            //parse cpemis
-            grups = map(grups, (g) => {
-                let kpPemi = JSON5.parse(g.cpemis)
-                g.kpPemi = kpPemi
-                return g
-            })
-            // console.log('users', users)
-
-            //kp
-            let kp = {}
-            each(grups, (g) => {
-                each(g.kpPemi, (v, k) => {
-                    let isActive = get(v, 'isActive', '')
-                    if (isActive !== 'y') {
-                        return true //跳出換下一個
-                    }
-                    if (!haskey(kp, k)) {
-                        kp[k] = []
-                    }
-                    kp[k].push({
-                        grup: g,
-                        pemi: v,
-                    })
-                })
-            })
-            // console.log('kp', kp)
 
             //items
             let items = map(pemis, (p) => {
 
                 //gs
                 let gs = []
-                if (haskey(kp, p.name)) {
-                    gs = kp[p.name]
+                if (haskey(kpUsePemiGrup, p.name)) {
+                    gs = kpUsePemiGrup[p.name]
                 }
                 // console.log('gs', gs)
 
@@ -620,6 +667,7 @@ export default {
                 //save belongGrups, gs
                 p.belongGrups = belongGrups
                 p.gs = gs
+                // console.log('p', p)
 
                 return p
             })
@@ -642,10 +690,20 @@ export default {
             //r
             let r = vo.$ds.pemis.funNew()
             r.name = vo.$s.getNameNew(rows, 'name', '', vo.$t('pemiAddNameNew'))
+            // r.crules = ''
             r.userId = `{${vo.$t('pemiAddIdNew')}}`
             r.timeCreate = `{${vo.$t('pemiAddIdNew')}}`
             r.userIdUpdate = `{${vo.$t('pemiAddIdNew')}}`
             r.timeUpdate = `{${vo.$t('pemiAddIdNew')}}`
+            // console.log('r', r)
+
+            //belongGrups, gs
+            let gs = []
+            let belongGrups = vo.$t('pemiBlngRnderNoGrup')
+
+            //save belongGrups, gs
+            r.belongGrups = belongGrups
+            r.gs = gs
             // console.log('r', r)
 
             //添加至最首
@@ -714,6 +772,15 @@ export default {
             r.timeUpdate = `{${vo.$t('pemiAddIdNew')}}`
             // console.log('r', r)
 
+            //belongGrups, gs
+            let gs = []
+            let belongGrups = vo.$t('pemiBlngRnderNoGrup')
+
+            //save belongGrups, gs
+            r.belongGrups = belongGrups
+            r.gs = gs
+            // console.log('r', r)
+
             //添加至最首
             rows = [
                 r,
@@ -772,6 +839,83 @@ export default {
 
         },
 
+        fltKpRule: function(kp) {
+            // console.log('fltKpRule', kp)
+
+            let vo = this
+
+            //_kp
+            let _kp = {}
+            each(vo.targets, (v, k) => {
+                _kp[v.id] = true //管控對象須使用id
+            })
+            // console.log('_kp', _kp)
+
+            //kpt
+            let kpt = {}
+            each(kp, (v, k) => {
+                if (haskey(_kp, k)) {
+                    kpt[k] = v
+                }
+            })
+
+            return kpt
+        },
+
+        getCrulesText: function(crules) {
+            // console.log('method getCrulesText', crules)
+
+            let vo = this
+
+            //kpRule
+            let kpRule = {}
+            try {
+                // console.log('crules', crules)
+                kpRule = JSON5.parse(crules)
+            }
+            catch (err) {}
+            // console.log('kpRule', kpRule)
+
+            //fltKpRule
+            kpRule = vo.fltKpRule(kpRule)
+            // console.log('kpRule(fltKpRule)', kpRule)
+
+            //vs
+            let vs = []
+            each(kpRule, (v, k) => {
+                // console.log(k, 'v', v)
+
+                //isActive
+                let isActive = v //crules各值為直接儲存y或n
+                if (isActive !== 'y') {
+                    return true //跳出換下一個
+                }
+                // console.log(k, '_isActive', _isActive)
+
+                //push
+                vs.push(k)
+
+            })
+
+            //crulesText
+            let crulesText = vo.$t('pemiRnderCrulesNoRule')
+            let t = vo.$t('pemiRnderCrulesHasNRule')
+            let n = size(vs)
+            if (n > 0) {
+                t = t.replace('{n}', n)
+                // if (n === 1) {
+                //     t = t.replace('{nms}', `(${vs[0]})`)
+                // }
+                // else {
+                //     t = t.replace('{nms}', '')
+                // }
+                t = t.replace('{nms}', '') //管控對象id太長, 顯示按鈕預設寬度小, 故皆僅顯示數量
+                crulesText = t
+            }
+
+            return crulesText
+        },
+
         showVePemiBlngGrupsById: function(id) {
             // console.log('method showVePemiBlngGrupsById', id)
 
@@ -796,6 +940,7 @@ export default {
                     return false //跳出
                 }
             })
+            // console.log('r', r)
 
             //check
             if (!iseobj(r)) {

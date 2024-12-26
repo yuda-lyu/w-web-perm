@@ -152,9 +152,6 @@ import get from 'lodash-es/get.js'
 import set from 'lodash-es/set.js'
 import each from 'lodash-es/each.js'
 import map from 'lodash-es/map.js'
-import trim from 'lodash-es/trim.js'
-import uniq from 'lodash-es/uniq.js'
-import find from 'lodash-es/find.js'
 import size from 'lodash-es/size.js'
 import filter from 'lodash-es/filter.js'
 import join from 'lodash-es/join.js'
@@ -162,18 +159,11 @@ import sortBy from 'lodash-es/sortBy.js'
 import isEqual from 'lodash-es/isEqual.js'
 import cloneDeep from 'lodash-es/cloneDeep.js'
 import genPm from 'wsemi/src/genPm.mjs'
-import sep from 'wsemi/src/sep.mjs'
 import haskey from 'wsemi/src/haskey.mjs'
 import delay from 'wsemi/src/delay.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import WDialog from 'w-component-vue/src/components/WDialog.vue'
-import WText from 'w-component-vue/src/components/WText.vue'
-import WTextSuggest from 'w-component-vue/src/components/WTextSuggest.vue'
-import WSwitch from 'w-component-vue/src/components/WSwitch.vue'
-import WCheckbox from 'w-component-vue/src/components/WCheckbox.vue'
-import WIcon from 'w-component-vue/src/components/WIcon.vue'
-import WButtonChip from 'w-component-vue/src/components/WButtonChip.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
 import WAggridVueDyn from 'w-component-vue/src/components/WAggridVueDyn.vue'
 
@@ -181,12 +171,6 @@ import WAggridVueDyn from 'w-component-vue/src/components/WAggridVueDyn.vue'
 export default {
     components: {
         WDialog,
-        WText,
-        WTextSuggest,
-        WSwitch,
-        WCheckbox,
-        WIcon,
-        WButtonChip,
         WButtonCircle,
         WAggridVueDyn,
     },
@@ -378,7 +362,7 @@ export default {
                 let kpHead = {
                     'name': vo.$t('grupName'),
                     'pemisNames': vo.$t('belongPemisNames'),
-                    'mode': vo.$t('operEnable'),
+                    'mode': vo.$t('operPemiEnable'),
                     'enable': vo.$t('operMode'),
                 }
 
@@ -576,10 +560,33 @@ export default {
             return rows
         },
 
+        fltKpPemi: function(kp) {
+            // console.log('fltKpPemi', kp)
+
+            let vo = this
+
+            //_kp
+            let _kp = {}
+            each(vo.pemis, (v, k) => {
+                _kp[v.name] = true
+            })
+            // console.log('_kp', _kp)
+
+            //kpt
+            let kpt = {}
+            each(kp, (v, k) => {
+                if (haskey(_kp, k)) {
+                    kpt[k] = v
+                }
+            })
+
+            return kpt
+        },
+
         genItems: function(pemi, grups) {
             // console.log('genItems', pemi, grups)
 
-            // let vo = this
+            let vo = this
 
             //items
             let items = map(grups, (g) => {
@@ -587,6 +594,10 @@ export default {
                 //kpPemi
                 let kpPemi = JSON5.parse(g.cpemis)
                 // console.log(g.name, 'kpPemi', kpPemi)
+
+                //fltKpPemi
+                kpPemi = vo.fltKpPemi(kpPemi)
+                // console.log(g.name, 'kpPemi(fltKpPemi)', kpPemi)
 
                 //mode, enable, pemis
                 let mode = 'OR'
@@ -669,6 +680,10 @@ export default {
                 //kpPemi
                 let kpPemi = JSON5.parse(g.cpemis)
                 // console.log(g.name, 'kpPemi', kpPemi)
+
+                //fltKpPemi
+                kpPemi = vo.fltKpPemi(kpPemi)
+                // console.log(g.name, 'kpPemi(fltKpPemi)', kpPemi)
 
                 //mode
                 let mode = get(rows, `${kg}.mode`, '')

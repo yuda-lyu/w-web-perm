@@ -231,6 +231,80 @@ export default {
             return rs
         },
 
+        useUsers: function() {
+            let vo = this
+
+            //parse cgrups
+            let users = map(vo.users, (u) => {
+
+                //cloneDeep
+                u = cloneDeep(u)
+
+                //kpGrup
+                let kpGrup = {}
+                try {
+                    // console.log('u.cgrups', u.cgrups)
+                    kpGrup = JSON5.parse(u.cgrups)
+                }
+                catch (err) {}
+
+                //save kpGrup
+                u.kpGrup = kpGrup
+
+                return u
+            })
+            // console.log('users', users)
+
+            return users
+        },
+
+        kpGrupUser: function() {
+            let vo = this
+
+            //kp
+            let kp = {}
+            each(vo.useUsers, (u) => {
+                each(u.kpGrup, (v, k) => {
+                    let isActive = get(v, 'isActive', '')
+                    if (isActive !== 'y') {
+                        return true //跳出換下一個
+                    }
+                    if (!haskey(kp, k)) {
+                        kp[k] = []
+                    }
+                    kp[k].push({
+                        user: u,
+                        grup: v,
+                    })
+                })
+            })
+            // console.log('kp', kp)
+
+            return kp
+        },
+
+        kpUseGrupUser: function() {
+            let vo = this
+
+            //_kp
+            let _kp = {}
+            each(vo.grups, (v, k) => {
+                _kp[v.name] = true
+            })
+            // console.log('_kp', _kp)
+
+            //kp
+            let kp = {}
+            each(vo.kpGrupUser, (v, k) => {
+                if (haskey(_kp, k)) {
+                    kp[k] = v
+                }
+            })
+            // console.log('kp', kp)
+
+            return kp
+        },
+
         changeGrups: function() {
             // console.log('computed changeGrups')
 
@@ -241,12 +315,12 @@ export default {
                 return ''
             }
 
-            //grups, users
+            //grups, kpUseGrupUser
             let grups = cloneDeep(vo.grups)
-            let users = cloneDeep(vo.users)
+            let kpUseGrupUser = cloneDeep(vo.kpUseGrupUser)
 
-            //addUsers
-            let items = vo.addUsers(grups, users)
+            //genItems
+            let items = vo.genItems(grups, kpUseGrupUser)
 
             //save
             vo.items = items
@@ -557,45 +631,18 @@ export default {
 
         },
 
-        addUsers: function(grups, users) {
-            // console.log('method addUsers', grups, users)
+        genItems: function(grups, kpUseGrupUser) {
+            // console.log('method genItems', grups, kpUseGrupUser)
 
             let vo = this
-
-            //parse cgrups
-            users = map(users, (u) => {
-                let kpGrup = JSON5.parse(u.cgrups)
-                u.kpGrup = kpGrup
-                return u
-            })
-            // console.log('users', users)
-
-            //kp
-            let kp = {}
-            each(users, (u) => {
-                each(u.kpGrup, (v, k) => {
-                    let isActive = get(v, 'isActive', '')
-                    if (isActive !== 'y') {
-                        return true //跳出換下一個
-                    }
-                    if (!haskey(kp, k)) {
-                        kp[k] = []
-                    }
-                    kp[k].push({
-                        user: u,
-                        grup: v,
-                    })
-                })
-            })
-            // console.log('kp', kp)
 
             //items
             let items = map(grups, (g) => {
 
                 //us
                 let us = []
-                if (haskey(kp, g.name)) {
-                    us = kp[g.name]
+                if (haskey(kpUseGrupUser, g.name)) {
+                    us = kpUseGrupUser[g.name]
                 }
                 // console.log('us', us)
 
@@ -617,6 +664,7 @@ export default {
                 //save belongUsers, us
                 g.belongUsers = belongUsers
                 g.us = us
+                // console.log('g', g)
 
                 return g
             })
@@ -643,6 +691,15 @@ export default {
             r.timeCreate = `{${vo.$t('grupAddIdNew')}}`
             r.userIdUpdate = `{${vo.$t('grupAddIdNew')}}`
             r.timeUpdate = `{${vo.$t('grupAddIdNew')}}`
+            // console.log('r', r)
+
+            //belongUsers, us
+            let us = []
+            let belongUsers = vo.$t('grupBlngRnderNoUser')
+
+            //save belongUsers, us
+            r.belongUsers = belongUsers
+            r.us = us
             // console.log('r', r)
 
             //添加至最首
@@ -711,6 +768,15 @@ export default {
             r.timeUpdate = `{${vo.$t('grupAddIdNew')}}`
             // console.log('r', r)
 
+            //belongUsers, us
+            let us = []
+            let belongUsers = vo.$t('grupBlngRnderNoUser')
+
+            //save belongUsers, us
+            r.belongUsers = belongUsers
+            r.us = us
+            // console.log('r', r)
+
             //添加至最首
             rows = [
                 r,
@@ -769,14 +835,48 @@ export default {
 
         },
 
+        fltKpPemi: function(kp) {
+            // console.log('fltKpPemi', kp)
+
+            let vo = this
+
+            //_kp
+            let _kp = {}
+            each(vo.pemis, (v, k) => {
+                _kp[v.name] = true
+            })
+            // console.log('_kp', _kp)
+
+            //kpt
+            let kpt = {}
+            each(kp, (v, k) => {
+                if (haskey(_kp, k)) {
+                    kpt[k] = v
+                }
+            })
+
+            return kpt
+        },
+
         getCpemisText: function(cpemis) {
             // console.log('method getCpemisText', cpemis)
 
             let vo = this
 
             //kpPemi
-            let kpPemi = JSON5.parse(cpemis)
+            let kpPemi = {}
+            try {
+                // console.log('cpemis', cpemis)
+                kpPemi = JSON5.parse(cpemis)
+            }
+            catch (err) {}
+            // console.log('kpPemi', kpPemi)
 
+            //fltKpPemi
+            kpPemi = vo.fltKpPemi(kpPemi)
+            // console.log('kpPemi(fltKpPemi)', kpPemi)
+
+            //vs
             let vs = []
             each(kpPemi, (v, k) => {
                 // console.log(k, 'v', v)
@@ -835,6 +935,7 @@ export default {
                     return false //跳出
                 }
             })
+            // console.log('r', r)
 
             //check
             if (!iseobj(r)) {

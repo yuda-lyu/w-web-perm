@@ -883,7 +883,12 @@ export default {
             let vo = this
 
             //kpGrup
-            let kpGrup = JSON5.parse(cgrups)
+            let kpGrup = {}
+            try {
+                // console.log('cgrups', cgrups)
+                kpGrup = JSON5.parse(cgrups)
+            }
+            catch (err) {}
 
             let vs = []
             each(kpGrup, (v, k) => {

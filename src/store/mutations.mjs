@@ -121,9 +121,13 @@ let state = {
             eng: `Enable`,
             cht: `是否使用`,
         },
-        operEnable: {
+        operPemiEnable: {
             eng: `Operator`,
             cht: `合併權限模式`,
+        },
+        operGrupEnable: {
+            eng: `Operator`,
+            cht: `合併權限群組模式`,
         },
 
         processing: {
@@ -318,10 +322,10 @@ let state = {
             eng: `Edit rules of permission`,
             cht: `編輯對象規則清單`,
         },
-        pemiEditCrulesSimple: {
-            eng: `Edit rules`,
-            cht: `編輯對象規則`,
-        },
+        // pemiEditCrulesSimple: {
+        //     eng: `Edit rules`,
+        //     cht: `編輯對象規則`,
+        // },
         pemiEditCrulesNoPemiId: {
             eng: `Can not find the id of permission`,
             cht: `無法找到權限Id`,
@@ -329,6 +333,14 @@ let state = {
         pemiEditCrulesNoPemiData: {
             eng: `Can not find the data of permission`,
             cht: `無法找到權限資料`,
+        },
+        pemiRnderCrulesNoRule: {
+            eng: `No rule`,
+            cht: `無使用任何對象規則`,
+        },
+        pemiRnderCrulesHasNRule: {
+            eng: `Has {n} rule(s){nms}`,
+            cht: `編輯使用 {n} 項對象規則{nms}`,
         },
         pemiClearPemisFail: {
             eng: `Failed to clear existing permissions`,
