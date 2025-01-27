@@ -4,14 +4,6 @@
         <!-- menu top, 因窄版導致名稱換行故須使用overflow-y:hidden -->
         <div :style="`height:${heightToolbar}px; overflow-y:hidden; padding:0px 10px; background:#fff; border-bottom:1px solid #ccc; display:flex; align-items:center;`">
 
-            <WButtonCircle
-                :icon="'mdi-menu'"
-                :tooltip="'左側選單'"
-                :shadow="false"
-                @click="drawer=!drawer"
-                v-if="false"
-            ></WButtonCircle>
-
             <div style="padding-left:5px; white-space:nowrap">
                 <div style="display:flex; align-items:center;">
 
@@ -71,11 +63,8 @@ export default {
         return {
 
             mdiMenu,
-            // drawer: null, //null false
             // menuKey: 'blocks',
             userName: 'tester',
-
-            drawer: true, //null,
 
             tgLangs: [
                 {

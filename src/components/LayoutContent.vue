@@ -40,21 +40,21 @@
                         ></WListVertical>
 
                         <div
-                            :style="`position:absolute; top:1px; right:4px;`"
+                            :style="`position:absolute; top:2px; right:4px;`"
                             v-if="drawer"
                         >
                             <WButtonCircle
-                                :paddingStyle="{v:3,h:3}"
-                                :icon="'mdi-arrow-left'"
-                                :iconSize="16"
-                                :backgroundColor="'#fff'"
-                                :backgroundColorHover="'#eee'"
-                                :backgroundColorFocus="'#fff'"
+                                :paddingStyle="{h:2,v:2}"
+                                :icon="'mdi-arrow-left-bold-hexagon-outline'"
+                                :iconSize="20"
+                                :backgroundColor="'rgba(255,255,255,0.9)'"
+                                :backgroundColorHover="'rgba(255,255,255,0.7)'"
+                                :backgroundColorFocus="'rgba(255,255,255,0.5)'"
                                 :borderColor="'transparent'"
-                                :borderColorHover="'#eee'"
-                                :borderColorFocus="'#eee'"
-                                :tooltip="$t('menuTreeHide')"
-                                :shadow="true"
+                                :borderColorHover="'transparent'"
+                                :borderColorFocus="'transparent'"
+                                _tooltip="$t('menuTreeHide')"
+                                :shadow="false"
                                 @click="drawer=false"
                             ></WButtonCircle>
                         </div>
@@ -90,21 +90,21 @@
                         </template>
 
                         <div
-                            :style="`position:absolute; top:1px; left:4px;`"
+                            :style="`position:absolute; top:3px; left:5px;`"
                             v-if="!drawer"
                         >
                             <WButtonCircle
-                                :paddingStyle="{v:3,h:3}"
-                                :icon="'mdi-arrow-right'"
-                                :iconSize="16"
-                                :backgroundColor="'#fff'"
-                                :backgroundColorHover="'#eee'"
-                                :backgroundColorFocus="'#fff'"
+                                :paddingStyle="{h:2,v:2}"
+                                :icon="'mdi-arrow-right-bold-hexagon-outline'"
+                                :iconSize="20"
+                                :backgroundColor="'rgba(255,255,255,0.9)'"
+                                :backgroundColorHover="'rgba(255,255,255,0.7)'"
+                                :backgroundColorFocus="'rgba(255,255,255,0.5)'"
                                 :borderColor="'transparent'"
-                                :borderColorHover="'#eee'"
-                                :borderColorFocus="'#eee'"
-                                :tooltip="$t('menuTreeShow')"
-                                :shadow="true"
+                                :borderColorHover="'transparent'"
+                                :borderColorFocus="'transparent'"
+                                _tooltip="$t('menuTreeShow')"
+                                :shadow="false"
                                 @click="drawer=true"
                             ></WButtonCircle>
                         </div>

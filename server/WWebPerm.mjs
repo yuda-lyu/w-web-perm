@@ -224,7 +224,18 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
 
     //urlRedirect
     let urlRedirect = get(opt, 'urlRedirect', '')
-    console.log('urlRedirect', urlRedirect)
+    // console.log('urlRedirect', urlRedirect)
+
+
+    //params
+    let showModeEditTargets = get(opt, 'showModeEditTargets', 'n')
+    let showModeEditPemis = get(opt, 'showModeEditPemis', 'n')
+    let showModeEditGrups = get(opt, 'showModeEditGrups', 'n')
+    let showModeEditUsers = get(opt, 'showModeEditUsers', 'n')
+    let modeEditTargets = get(opt, 'modeEditTargets', 'n')
+    let modeEditPemis = get(opt, 'modeEditPemis', 'n')
+    let modeEditGrups = get(opt, 'modeEditGrups', 'n')
+    let modeEditUsers = get(opt, 'modeEditUsers', 'n')
 
 
     //mappingBy
@@ -257,6 +268,15 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
             webName,
             webDescription,
             webLogo,
+            // urlRedirect, //登入失敗就需要轉址, 故須通過html模板取代提供, 無法用api提供
+            showModeEditTargets,
+            showModeEditPemis,
+            showModeEditGrups,
+            showModeEditUsers,
+            modeEditTargets,
+            modeEditPemis,
+            modeEditGrups,
+            modeEditUsers,
         }
     }
 
@@ -771,6 +791,14 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
         c = replace(c, '/mperm/', '{sfd}/') //方法同genEntry
         c = replace(c, '{sfd}', subfolder)
         c = replace(c, '{urlRedirect}', urlRedirect)
+        c = replace(c, '{showModeEditTargets}', showModeEditTargets)
+        c = replace(c, '{showModeEditPemis}', showModeEditPemis)
+        c = replace(c, '{showModeEditGrups}', showModeEditGrups)
+        c = replace(c, '{showModeEditUsers}', showModeEditUsers)
+        c = replace(c, '{modeEditTargets}', modeEditTargets)
+        c = replace(c, '{modeEditPemis}', modeEditPemis)
+        c = replace(c, '{modeEditGrups}', modeEditGrups)
+        c = replace(c, '{modeEditUsers}', modeEditUsers)
         fs.writeFileSync(fpEntryOut, c, 'utf8')
     }
     catch (err) {

@@ -3,11 +3,11 @@
         style="height:100%;"
         v-domresize
         @domresize="resizePanel"
-        :changeUsers="changeUsers"
+        :changeParams="changeParams"
     >
 
         <div
-            style="border-bottom:1px solid #ddd; background:#fff;"
+            style="_border-bottom:1px solid #ddd; background:#fff;"
             v-domresize
             @domresize="resizeHead"
         >
@@ -19,20 +19,96 @@
                     <WIcon
                         :icon="mdiAccountGroupOutline"
                         :color="'#000'"
-                        :size="26"
+                        :size="32"
                     ></WIcon>
 
-                    <div style="padding-left:10px; font-size:1.4rem; color:#000;">
-                        {{$t('managementUsers')}}
+                    <div style="padding-left:12px;">
+
+                        <div style="font-size:1.4rem; color:#000;">
+                            {{$t('managementUsers')}}
+                        </div>
+
+                        <div style="padding-top:2px; font-size:0.8rem; color:#666;">
+                            {{$t('managementUsersMsg')}}
+                        </div>
+
                     </div>
 
                 </div>
             </div>
 
             <!-- 功能區 -->
-            <div style="padding:5px; border-top:1px solid #ddd; display:flex; align-items:center;">
+            <div
+                style="padding:5px; border-top:1px solid #ddd; display:flex; align-items:center;"
+                _v-if="showIsEditable || isEditable"
+            >
 
-                <template>
+                <template v-if="showIsEditable">
+
+                    <div style="padding:6px 0px 4px 4px;">
+                        <WSwitch
+                            v-model="isEditable"
+                            :text="$t('modeEdit')"
+                        ></WSwitch>
+                    </div>
+
+                    <div style="padding-left:10px;"></div>
+
+                </template>
+
+                <template v-if="true">
+
+                    <WPopup
+                        :isolated="true"
+                        _show=""
+                        _hide=""
+                    >
+                        <template v-slot:trigger>
+                            <WButtonCircle
+                                :paddingStyle="{v:6,h:6}"
+                                :tooltip="$t('showTabCols')"
+                                :icon="mdiTableHeadersEye"
+                                :backgroundColor="'#fff'"
+                                :backgroundColorHover="'#f2f2f2'"
+                                _textColor="'#eee'"
+                                _textColorHover="'#fff'"
+                                :iconColor="'#444'"
+                                :iconColorHover="'#222'"
+                                :shadow="false"
+                                _click=""
+                            ></WButtonCircle>
+                        </template>
+
+                        <template v-slot:content>
+                            <div style="padding:10px 0px 10px 0px;">
+
+                                <div style="padding:7px 10px; font-size:0.85rem; color:#222; background:#f2f2f2;">
+                                    {{$t('showTabCols')}}
+                                </div>
+
+                                <div style="padding:7px 9px 0px 7px;">
+                                    <WInputCheckbox
+                                        :items="tabKeysPick"
+                                        v-model="tabKeysShow"
+                                        @input="toggleTabKeys"
+                                    >
+                                        <template v-slot="props">
+                                            <div style="padding-left:3px; display:flex; align-items:center; font-size:0.85rem; height:24px; cursor:pointer;">
+                                                {{getHead(props.item.data)}}
+                                            </div>
+                                        </template>
+                                    </WInputCheckbox>
+                                </div>
+
+                            </div>
+                        </template>
+                    </WPopup>
+
+                    <div style="padding-left:4px;"></div>
+
+                </template>
+
+                <template v-if="isEditable">
 
                     <WButtonCircle
                         :paddingStyle="{v:6,h:6}"
@@ -48,11 +124,11 @@
                         @click="addItem"
                     ></WButtonCircle>
 
-                    <div style="padding-left:6px;"></div>
+                    <div style="padding-left:4px;"></div>
 
                 </template>
 
-                <template v-if="hasItemCheckOne">
+                <template v-if="isEditable && hasItemCheckOne">
 
                     <WButtonCircle
                         :paddingStyle="{v:6,h:6}"
@@ -68,11 +144,11 @@
                         @click="copyItem"
                     ></WButtonCircle>
 
-                    <div style="padding-left:6px;"></div>
+                    <div style="padding-left:4px;"></div>
 
                 </template>
 
-                <template v-if="hasItemsCheck">
+                <template v-if="isEditable && hasItemsCheck">
 
                     <WButtonCircle
                         :paddingStyle="{v:6,h:6}"
@@ -88,11 +164,11 @@
                         @click="deleteItemsCheck"
                     ></WButtonCircle>
 
-                    <div style="padding-left:6px;"></div>
+                    <div style="padding-left:4px;"></div>
 
                 </template>
 
-                <template v-if="isModified">
+                <template v-if="isEditable && isModified">
 
                     <WButtonCircle
                         :paddingStyle="{v:6,h:6}"
@@ -108,7 +184,7 @@
                         @click="saveUsers"
                     ></WButtonCircle>
 
-                    <div style="padding-left:6px;"></div>
+                    <div style="padding-left:4px;"></div>
 
                 </template>
 
@@ -140,7 +216,7 @@
 </template>
 
 <script>
-import { mdiAccountGroupOutline, mdiVectorPolylinePlus, mdiCheckboxMarkedCircle, mdiCloudUploadOutline, mdiTrashCanOutline, mdiPlus, mdiPencilOutline, mdiContentCopy } from '@mdi/js/mdi.js'
+import { mdiAccountGroupOutline, mdiVectorPolylinePlus, mdiCheckboxMarkedCircle, mdiCloudUploadOutline, mdiTrashCanOutline, mdiTableHeadersEye, mdiPlus, mdiPencilOutline, mdiContentCopy } from '@mdi/js/mdi.js'
 import JSON5 from 'json5'
 import get from 'lodash-es/get.js'
 import set from 'lodash-es/set.js'
@@ -153,15 +229,22 @@ import haskey from 'wsemi/src/haskey.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import cstr from 'wsemi/src/cstr.mjs'
+import arrPull from 'wsemi/src/arrPull.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
+import WSwitch from 'w-component-vue/src/components/WSwitch.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
+import WPopup from 'w-component-vue/src/components/WPopup.vue'
+import WInputCheckbox from 'w-component-vue/src/components/WInputCheckbox.vue'
 import WAggridVueDyn from 'w-component-vue/src/components/WAggridVueDyn.vue'
 
 
 export default {
     components: {
         WIcon,
+        WSwitch,
         WButtonCircle,
+        WPopup,
+        WInputCheckbox,
         WAggridVueDyn,
     },
     props: {
@@ -177,6 +260,7 @@ export default {
             mdiCheckboxMarkedCircle,
             mdiCloudUploadOutline,
             mdiTrashCanOutline,
+            mdiTableHeadersEye,
             mdiPlus,
             mdiPencilOutline,
             mdiContentCopy,
@@ -186,7 +270,51 @@ export default {
             headHeight: 100,
 
             firstLoading: true,
+            firstSetting: true,
+            showIsEditable: false,
+            isEditable: false,
             isModified: false,
+
+            tabKeys: [
+                'id',
+                'name',
+                'email',
+                'description',
+                'from',
+                'cgrups',
+                'isAdmin',
+                'isActive',
+                'userId',
+                'timeCreate',
+                'userIdUpdate',
+                'timeUpdate',
+            ],
+            tabKeysPick: [
+                'name',
+                'email',
+                'description',
+                'from',
+                'cgrups',
+                'isAdmin',
+                'isActive',
+                'userId',
+                'timeCreate',
+                'userIdUpdate',
+                'timeUpdate',
+            ],
+            tabKeysShow: [
+                'name',
+                'email',
+                'description',
+                // 'from',
+                'cgrups',
+                'isAdmin',
+                'isActive',
+                // 'userId',
+                // 'timeCreate',
+                // 'userIdUpdate',
+                // 'timeUpdate',
+            ],
 
             items: [],
             itemsCheck: [],
@@ -204,8 +332,23 @@ export default {
         vo.$dg.toggleItemIsAdminById = vo.toggleItemIsAdminById
         vo.$dg.toggleItemIsActiveById = vo.toggleItemIsActiveById
 
+        //firstSetting
+        if (vo.firstSetting) {
+            // console.log('webInfor', vo.webInfor)
+            let showModeEditUsers = get(vo, 'webInfor.showModeEditUsers', '')
+            vo.showIsEditable = showModeEditUsers === 'y'
+            let modeEditUsers = get(vo, 'webInfor.modeEditUsers', '')
+            vo.isEditable = modeEditUsers === 'y'
+            vo.firstSetting = false
+        }
+
     },
     computed: {
+
+        webInfor: function() {
+            let wi = get(this, `$store.state.webInfor`)
+            return wi
+        },
 
         targets: function() {
             let rs = get(this, `$store.state.targets`)
@@ -231,24 +374,22 @@ export default {
             return rs
         },
 
-        changeUsers: function() {
-            // console.log('computed changeUsers')
+        changeParams: function() {
+            // console.log('computed changeParams')
 
             let vo = this
 
-            //check
-            if (size(vo.users) === 0) {
-                return ''
-            }
+            //trigger
+            let isEditable = vo.isEditable
 
-            //cloneDeep
+            //items
             let items = cloneDeep(vo.users)
 
             //save
             vo.items = items
 
             //genOpt
-            vo.genOpt()
+            vo.genOpt({ isEditable })
 
             //firstLoading
             vo.firstLoading = false
@@ -383,6 +524,27 @@ export default {
             return ''
         },
 
+        kpHead: function() {
+            let vo = this
+
+            let kp = {
+                'id': vo.$t('id'),
+                'name': vo.$t('name'),
+                'email': vo.$t('email'),
+                'description': vo.$t('description'),
+                'from': vo.$t('from'),
+                'cgrups': vo.$t('userCgrups'),
+                'isAdmin': vo.$t('isAdmin'),
+                'isActive': vo.$t('isActive'),
+                'userId': vo.$t('userId'),
+                'timeCreate': vo.$t('timeCreate'),
+                'userIdUpdate': vo.$t('userIdUpdate'),
+                'timeUpdate': vo.$t('timeUpdate'),
+            }
+
+            return kp
+        },
+
     },
     methods: {
 
@@ -407,6 +569,16 @@ export default {
 
         },
 
+        getHead: function(key) {
+            // console.log('methods getHead', key)
+
+            let vo = this
+
+            let head = get(vo, `kpHead.${key}`, '')
+
+            return head
+        },
+
         genOpt: function() {
             // console.log('methods genOpt')
 
@@ -420,36 +592,40 @@ export default {
             if (size(vo.items) > 0) {
 
                 //ks
-                let ks = [
-                    'id',
-                    'name',
-                    'email',
-                    'description',
-                    'from',
-                    'cgrups',
-                    'isAdmin',
-                    'isActive',
-                    'userId',
-                    'timeCreate',
-                    'userIdUpdate',
-                    'timeUpdate',
-                ]
+                let ks = vo.tabKeys
                 // console.log('ks', ks)
 
                 //kpHead
-                let kpHead = {
-                    'id': vo.$t('id'),
-                    'name': vo.$t('name'),
-                    'email': vo.$t('email'),
-                    'description': vo.$t('description'),
-                    'from': vo.$t('from'),
-                    'cgrups': vo.$t('userCgrups'),
-                    'isAdmin': vo.$t('isAdmin'),
-                    'isActive': vo.$t('isActive'),
-                    'userId': vo.$t('userId'),
-                    'timeCreate': vo.$t('timeCreate'),
-                    'userIdUpdate': vo.$t('userIdUpdate'),
-                    'timeUpdate': vo.$t('timeUpdate'),
+                let kpHead = vo.kpHead
+
+                //kpCellEditable, kpRowDrag, kpHeadCheckBox
+                let kpCellEditable = {}
+                let kpRowDrag = {}
+                let kpHeadCheckBox = {}
+                if (vo.isEditable) {
+                    kpCellEditable = {
+                        'name': true,
+                        'email': true,
+                        'description': true,
+                        'from': true,
+                    }
+                    kpRowDrag = {
+                        'name': true,
+                    }
+                    kpHeadCheckBox = {
+                        'name': true,
+                    }
+                }
+
+                //kpHeadHide
+                let kpHeadHide = {
+                    'id': true,
+                }
+                if (true) {
+                    let tabKeysHide = arrPull(vo.tabKeysPick, vo.tabKeysShow)
+                    each(tabKeysHide, (k) => {
+                        kpHeadHide[k] = true
+                    })
                 }
 
                 //opt
@@ -459,11 +635,10 @@ export default {
                     keys: ks,
                     kpHead,
                     // autoFitColumn: true,
+                    defCellEditable: vo.isEditable,
                     defHeadFilter: true,
                     defCellAlignH: 'left',
-                    kpHeadHide: {
-                        'id': true,
-                    },
+                    kpHeadHide,
                     kpHeadFixLeft: {
                         'name': true,
                     },
@@ -489,18 +664,9 @@ export default {
                         'userIdUpdate': 'text',
                         'timeUpdate': 'text',
                     },
-                    kpCellEditable: {
-                        'name': true,
-                        'email': true,
-                        'description': true,
-                        'from': true,
-                    },
-                    kpRowDrag: {
-                        'name': true,
-                    },
-                    kpHeadCheckBox: {
-                        'name': true,
-                    },
+                    kpCellEditable,
+                    kpRowDrag,
+                    kpHeadCheckBox,
                     kpHeadFilter: {
                         'cgrups': false,
                     },
@@ -574,7 +740,7 @@ export default {
                             // console.log('id', id, k, r)
 
                             let t = `
-                                <input type="checkbox" ${v === 'y' ? 'checked' : ''} onclick="$vo.$dg.toggleItemIsAdminById('${id}')" />
+                                <input type="checkbox" ${v === 'y' ? 'checked' : ''} onclick="$vo.$dg.toggleItemIsAdminById('${id}')" ${vo.isEditable ? '' : 'disabled'} />
                             `
 
                             return t
@@ -587,7 +753,7 @@ export default {
                             // console.log('id', id, k, r)
 
                             let t = `
-                                <input type="checkbox" ${v === 'y' ? 'checked' : ''} onclick="$vo.$dg.toggleItemIsActiveById('${id}')" />
+                                <input type="checkbox" ${v === 'y' ? 'checked' : ''} onclick="$vo.$dg.toggleItemIsActiveById('${id}')" ${vo.isEditable ? '' : 'disabled'} />
                             `
 
                             return t
@@ -628,6 +794,19 @@ export default {
 
             //refresh, 因set不會觸發kpCellRender, 故須另外調用組件函數refresh, 進而觸發kpCellRender, 使能更新數據
             cmp.refresh()
+
+        },
+
+        toggleTabKeys: function() {
+            let vo = this
+
+            //cmp
+            let cmp = get(vo, '$refs.rftable.$refs.$self')
+            // console.log('cmp', cmp)
+
+            //showKeys
+            cmp.showKeys(vo.tabKeysShow)
+            // console.log('tabKeysShow', vo.tabKeysShow)
 
         },
 
@@ -960,7 +1139,10 @@ export default {
             // // console.log('getUserRules kur', kur)
 
             //showVeCgrups
-            vo.$dg.showVeCgrups(r)
+            vo.$dg.showVeCgrups({
+                isEditable: vo.isEditable,
+                user: r,
+            })
                 .then((cgrups) => {
                     // console.log('cgrups', cgrups)
 

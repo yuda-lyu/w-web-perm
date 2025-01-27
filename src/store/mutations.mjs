@@ -163,6 +163,15 @@ let state = {
         //     eng: `No description`,
         //     cht: `無說明`,
         // },
+        modeEdit: {
+            eng: `Edit mode`,
+            cht: `編輯模式`,
+        },
+        showTabCols: {
+            eng: `Show columns`,
+            cht: `顯示欄位`,
+        },
+
         belongUsers: {
             eng: `Use users`,
             cht: `管控所屬使用者`,
@@ -183,6 +192,7 @@ let state = {
             eng: `Use permissions`,
             cht: `所屬權限名稱`,
         },
+
         isAdmin: {
             eng: `Administrator`,
             cht: `是否為系統管理員`,
@@ -201,9 +211,22 @@ let state = {
             cht: `Email出現錯誤待修復`,
         },
 
+        menuTreeShow: {
+            eng: `Show menu`,
+            cht: `顯示選單`,
+        },
+        menuTreeHide: {
+            eng: `Hide menu`,
+            cht: `隱藏選單`,
+        },
+
         managementTargets: {
             eng: `Targets`,
             cht: `管理對象`,
+        },
+        managementTargetsMsg: {
+            eng: `Targets generally refer to entities such as pages, data, etc., and can also include features or services.`,
+            cht: `對象泛指實體的頁面、數據等，亦可為的功能或服務。`,
         },
         targetId: {
             eng: `Target`,
@@ -266,6 +289,10 @@ let state = {
             eng: `Permissions`,
             cht: `管理權限`,
         },
+        managementPemisMsg: {
+            eng: `Permissions are primarily used to set rules for enabling or disabling various objects.`,
+            cht: `權限主要為用來設定各種對象之使用或禁用規則。`,
+        },
         pemiName: {
             eng: `Name of permission`,
             cht: `權限名稱`,
@@ -308,7 +335,7 @@ let state = {
         },
         pemiCrules: {
             eng: `Rules of permission`,
-            cht: `管控對象規則`,
+            cht: `管控對象`,
         },
         pemiEditBlngGrupsNoPemiId: {
             eng: `Can not find the id of permission`,
@@ -320,11 +347,15 @@ let state = {
         },
         pemiEditCrules: {
             eng: `Edit rules of permission`,
-            cht: `編輯對象規則清單`,
+            cht: `編輯使用對象`,
+        },
+        pemiEditCrulesForDisplay: {
+            eng: `Rules of permission`,
+            cht: `展示使用對象`,
         },
         // pemiEditCrulesSimple: {
         //     eng: `Edit rules`,
-        //     cht: `編輯對象規則`,
+        //     cht: `編輯對象`,
         // },
         pemiEditCrulesNoPemiId: {
             eng: `Can not find the id of permission`,
@@ -336,11 +367,11 @@ let state = {
         },
         pemiRnderCrulesNoRule: {
             eng: `No rule`,
-            cht: `無使用任何對象規則`,
+            cht: `無使用任何對象`,
         },
         pemiRnderCrulesHasNRule: {
             eng: `Has {n} rule(s){nms}`,
-            cht: `編輯使用 {n} 項對象規則{nms}`,
+            cht: `使用共 {n} 項對象{nms}`,
         },
         pemiClearPemisFail: {
             eng: `Failed to clear existing permissions`,
@@ -358,6 +389,10 @@ let state = {
         pemiBlngEditGrups: {
             eng: `Edit permission groups`,
             cht: `編輯所屬權限群組`,
+        },
+        pemiBlngEditGrupsForDisplay: {
+            eng: `Permission groups`,
+            cht: `展示所屬權限群組`,
         },
         pemiBlngRnderNoGrup: {
             eng: `No users`,
@@ -400,6 +435,10 @@ let state = {
         managementGrups: {
             eng: `Permission groups`,
             cht: `管理權限群組`,
+        },
+        managementGrupsMsg: {
+            eng: `Permission groups are primarily used to configure combinations of different permissions.`,
+            cht: `權限群組主要為用來設定組合各種權限。`,
         },
         grupName: {
             eng: `Name of permission group`,
@@ -455,7 +494,11 @@ let state = {
         },
         grupEditCpemis: {
             eng: `Edit list of permission group`,
-            cht: `編輯使用權限清單`,
+            cht: `編輯使用權限`,
+        },
+        grupEditCpemisForDisplay: {
+            eng: `List of permission group`,
+            cht: `展示使用權限`,
         },
         grupRnderCpemisNoPermission: {
             eng: `No permission`,
@@ -463,7 +506,7 @@ let state = {
         },
         grupRnderCpemisHasNPermissions: {
             eng: `Has {n} permission(s){nms}`,
-            cht: `編輯使用 {n} 項權限{nms}`,
+            cht: `使用 {n} 項權限{nms}`,
         },
         grupClearGrupsFail: {
             eng: `Failed to clear existing permission groups`,
@@ -485,6 +528,10 @@ let state = {
         grupBlngEditUsers: {
             eng: `Edit permission group of users`,
             cht: `編輯所屬使用者`,
+        },
+        grupBlngEditUsersForDisplay: {
+            eng: `Permission group of users`,
+            cht: `展示所屬使用者`,
         },
         grupBlngRnderNoUser: {
             eng: `No users`,
@@ -527,6 +574,10 @@ let state = {
         managementUsers: {
             eng: `Users`,
             cht: `管理使用者`,
+        },
+        managementUsersMsg: {
+            eng: `Users are primarily for providing or extending user information and can be configured with combinations of various permission groups.`,
+            cht: `使用者主要為提供或擴充使用者資訊，並可設定組合各種權限群組。`,
         },
         userName: {
             eng: `Name of user`,
@@ -582,7 +633,11 @@ let state = {
         },
         userEditCgrups: {
             eng: `Edit list of user`,
-            cht: `編輯使用權限群組清單`,
+            cht: `編輯使用權限群組`,
+        },
+        userEditCgrupsForDisplay: {
+            eng: `Edit list of user`,
+            cht: `展示使用權限群組`,
         },
         userEditCgrupsNoUserId: {
             eng: `Can not find the id of user`,
@@ -622,7 +677,7 @@ let state = {
         },
         userRnderCgrupsHasNGroups: {
             eng: `Has {n} permission group(s){nms}`,
-            cht: `編輯使用 {n} 項權限群組{nms}`,
+            cht: `使用 {n} 項權限群組{nms}`,
         },
 
         cgrupEditNoName: {

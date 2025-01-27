@@ -35,7 +35,7 @@ let settings = {
         type: 'STRING',
     },
     crules: {
-        name: '管控對象規則清單', //為json字串
+        name: '管控對象清單', //為json字串
         type: 'TEXT',
     },
     userId: {

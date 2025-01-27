@@ -1,14 +1,14 @@
 <template>
     <WDialog
         :show.sync="bShow"
-        :title="$t('pemiBlngEditGrups')"
+        :title="isEditable?$t('pemiBlngEditGrups'):$t('pemiBlngEditGrupsForDisplay')"
         :icon="mdiFormatListCheckbox"
         :minWidth="800"
         :maxWidth="800"
         :fullscreen="fullscreen"
         :contentBackgroundColor="'#fff'"
         :headerBtns="useHeaderBtns"
-        :hasSaveBtn="isModified"
+        :hasSaveBtn="isEditable && isModified"
         :save-btn-tooltip="$t('save')"
         :close-btn-tooltip="$t('close')"
         @click-btns="clickBtns"
@@ -20,7 +20,7 @@
             <div>
 
                 <div
-                    style="border-bottom:1px solid #ddd; background:#fff;"
+                    style="_border-bottom:1px solid #ddd; background:#fff;"
                     v-domresize
                     @domresize="resizeHead"
                 >
@@ -39,7 +39,10 @@
                     </div>
 
                     <!-- 功能區 -->
-                    <div style="padding:5px; background:#fff; display:flex; align-items:center;">
+                    <div
+                        style="padding:5px; background:#fff; display:flex; align-items:center;"
+                        v-if="isEditable"
+                    >
 
                         <template>
 
@@ -57,7 +60,7 @@
                                 @click="showVePemiBlngGrupsToggleItemsEnableAllYes"
                             ></WButtonCircle>
 
-                            <div style="padding-left:6px;"></div>
+                            <div style="padding-left:4px;"></div>
 
                         </template>
 
@@ -77,7 +80,7 @@
                                 @click="showVePemiBlngGrupsToggleItemsEnableAllNo"
                             ></WButtonCircle>
 
-                            <div style="padding-left:6px;"></div>
+                            <div style="padding-left:4px;"></div>
 
                         </template>
 
@@ -97,7 +100,7 @@
                                 @click="showVePemiBlngGrupsToggleItemsEnableAllInv"
                             ></WButtonCircle>
 
-                            <div style="padding-left:6px;"></div>
+                            <div style="padding-left:4px;"></div>
 
                         </template>
 
@@ -117,7 +120,7 @@
                                 @click="deleteItemsCheck"
                             ></WButtonCircle>
 
-                            <div style="padding-left:6px;"></div>
+                            <div style="padding-left:4px;"></div>
 
                         </template>
 
@@ -197,6 +200,7 @@ export default {
             panelHeight: 100,
             headHeight: 100,
 
+            isEditable: false,
             isModified: false,
 
             pemi: null,
@@ -373,13 +377,14 @@ export default {
                     keys: ks,
                     kpHead,
                     autoFitColumn: true,
+                    defCellEditable: false, //vo.isEditable,
                     defHeadFilter: true,
                     defCellAlignH: 'left',
-                    // kpCellEditable: {
-                    //     'name': true,
-                    //     'mode': true,
-                    //     'enable': true,
-                    // },
+                    kpCellEditable: {
+                        'name': vo.isEditable,
+                        'mode': false,
+                        'enable': false,
+                    },
                     kpHeadWidth: {
                         'mode': 100,
                         'enable': 100,
@@ -446,7 +451,7 @@ export default {
                             // console.log('mode', mode, k, r)
 
                             let t = `
-                                <select onchange="$vo.$dg.showVePemiBlngGrupsToggleItemModeByName('${name}',this.value)">
+                                <select onchange="$vo.$dg.showVePemiBlngGrupsToggleItemModeByName('${name}',this.value)" ${vo.isEditable ? '' : 'disabled'}>
                                     <option value="OR" ${mode === 'OR' ? 'selected' : ''}>OR</option>
                                     <option value="AND" ${mode === 'AND' ? 'selected' : ''}>AND</option>
                                 </select>
@@ -462,7 +467,7 @@ export default {
                             // console.log('name', name, k, r)
 
                             let t = `
-                                <input type="checkbox" ${v === 'y' ? 'checked' : ''} onclick="$vo.$dg.showVePemiBlngGrupsToggleItemEnableByName('${name}')" />
+                                <input type="checkbox" ${v === 'y' ? 'checked' : ''} onclick="$vo.$dg.showVePemiBlngGrupsToggleItemEnableByName('${name}')" ${vo.isEditable ? '' : 'disabled'} />
                             `
 
                             return t
@@ -1118,8 +1123,8 @@ export default {
 
         },
 
-        show: function (pemi) {
-            // console.log('methods show', pemi)
+        show: function (msg) {
+            // console.log('methods show', msg)
 
             let vo = this
 
@@ -1129,15 +1134,22 @@ export default {
             //default
             vo.isModified = false
 
+            //isEditable, pemi
+            let isEditable = get(msg, 'isEditable', false)
+            let pemi = get(msg, 'pemi', {})
+
             //grup
             pemi = cloneDeep(pemi)
-            vo.pemi = pemi
 
             //grups
             let grups = cloneDeep(vo.grups)
 
             //items
             let items = vo.genItems(pemi, grups)
+
+            //save
+            vo.isEditable = isEditable
+            vo.pemi = pemi
             vo.items = items
 
             //genOpt

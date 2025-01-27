@@ -28,6 +28,7 @@
 import get from 'lodash-es/get.js'
 import cloneDeep from 'lodash-es/cloneDeep.js'
 import isestr from 'wsemi/src/isestr.mjs'
+import iseobj from 'wsemi/src/iseobj.mjs'
 import isDev from 'wsemi/src/isDev.mjs'
 import wui from 'w-ui-loginout/src/WUiLoginout.mjs'
 import LoadingWinBar from './components/Common/LoadingWinBar.vue'
@@ -121,7 +122,11 @@ export default {
 
         ready: function() {
             let connState = get(this, `$store.state.connState`)
-            return connState === '已連線'
+            let webInfor = get(this, `$store.state.webInfor`)
+            let b1 = connState === '已連線'
+            let b2 = iseobj(webInfor)
+            let b = b1 && b2
+            return b
         },
 
     },

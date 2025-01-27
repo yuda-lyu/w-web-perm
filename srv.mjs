@@ -17,6 +17,14 @@ let opt = {
     serverPort: 11006,
     subfolder: '', //mperm
     urlRedirect: 'https://www.google.com/', //本機測試時得先編譯, 再瀏覽: http://localhost:11006/
+    showModeEditTargets: 'y', //'n',
+    showModeEditPemis: 'y',
+    showModeEditGrups: 'y',
+    showModeEditUsers: 'y',
+    modeEditTargets: 'y', //'n',
+    modeEditPemis: 'y',
+    modeEditGrups: 'y',
+    modeEditUsers: 'y',
 
     webName: {
         'eng': 'Permission Service',
@@ -24,7 +32,7 @@ let opt = {
     },
     webDescription: {
         'eng': 'A web service package for user permissions and management targets.',
-        'cht': 'A web service package for user permissions and management targets.',
+        'cht': '基於簡易分層架構來給予與設定使用者所需之權限及群組管理功能',
     },
     webLogo: 'data:image/svg+xml;base64,PHN2ZyBmaWxsPSJub25lIiBoZWlnaHQ9IjQ4IiB3aWR0aD0iNDgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTQ4IDBIMHY0OGg0OFYwWiIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuMDEiLz48cGF0aCBkPSJNMzcuODU2IDIwdjhNMjcuNDY0IDM4bDMuNDY0LTIgMy40NjQtMk0yMC41MzYgMzhsLTMuNDY1LTItMy40NjQtMk0xMC4xNDQgMjB2OE0xMy42MDcgMTRsMy40NjUtMiAzLjQ2NC0yTTI3LjQ2NCAxMGwzLjQ2NCAyIDMuNDY0IDIiIHN0cm9rZT0iI0ZGOTgwMCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBzdHJva2Utd2lkdGg9IjIiLz48cGF0aCBkPSJNMjQgNDRhNCA0IDAgMSAwIDAtOCA0IDQgMCAwIDAgMCA4Wk0yNCAxMmE0IDQgMCAxIDAgMC04IDQgNCAwIDAgMCAwIDhaTTI0IDI4YTQgNCAwIDEgMCAwLTggNCA0IDAgMCAwIDAgOFpNMzggMjBhNCA0IDAgMSAwIDAtOCA0IDQgMCAwIDAgMCA4Wk0zOCAzNmE0IDQgMCAxIDAgMC04IDQgNCAwIDAgMCAwIDhaTTEwIDIwYTQgNCAwIDEgMCAwLTggNCA0IDAgMCAwIDAgOFpNMTAgMzZhNCA0IDAgMSAwIDAtOCA0IDQgMCAwIDAgMCA4WiIgZmlsbD0iI0ZGRTBCMiIgc3Ryb2tlPSIjRkY5ODAwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIHN0cm9rZS13aWR0aD0iMiIvPjwvc3ZnPg==',
 
