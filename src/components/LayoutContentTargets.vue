@@ -226,6 +226,8 @@ import cloneDeep from 'lodash-es/cloneDeep.js'
 import haskey from 'wsemi/src/haskey.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
+import isnum from 'wsemi/src/isnum.mjs'
+import cdbl from 'wsemi/src/cdbl.mjs'
 import cstr from 'wsemi/src/cstr.mjs'
 import arrPull from 'wsemi/src/arrPull.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
@@ -302,6 +304,9 @@ export default {
                 // 'timeUpdate',
             ],
 
+            widthTargetId: null,
+            widthTargetDescription: null,
+
             items: [],
             itemsCheck: [],
             opt: null,
@@ -316,10 +321,15 @@ export default {
         //firstSetting
         if (vo.firstSetting) {
             // console.log('webInfor', vo.webInfor)
+
             let showModeEditTargets = get(vo, 'webInfor.showModeEditTargets', '')
             vo.showIsEditable = showModeEditTargets === 'y'
             let modeEditTargets = get(vo, 'webInfor.modeEditTargets', '')
             vo.isEditable = modeEditTargets === 'y'
+
+            vo.widthTargetId = get(vo, 'webInfor.widthTargetId', '')
+            vo.widthTargetDescription = get(vo, 'webInfor.widthTargetDescription', '')
+
             vo.firstSetting = false
         }
 
@@ -571,8 +581,8 @@ export default {
                     },
                     defHeadMinWidth: 150,
                     kpHeadWidth: {
-                        'id': 300,
-                        'description': 300,
+                        'id': isnum(vo.widthTargetId) ? cdbl(vo.widthTargetId) : 600,
+                        'description': isnum(vo.widthTargetId) ? cdbl(vo.widthTargetId) : 600,
                         'timeCreate': 220,
                         'timeUpdate': 220,
                     },

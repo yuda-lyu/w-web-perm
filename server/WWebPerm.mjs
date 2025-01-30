@@ -228,6 +228,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
 
 
     //params
+    let showLanguage = get(opt, 'showLanguage', 'n')
+    let language = get(opt, 'language', 'eng')
     let showModeEditTargets = get(opt, 'showModeEditTargets', 'n')
     let showModeEditPemis = get(opt, 'showModeEditPemis', 'n')
     let showModeEditGrups = get(opt, 'showModeEditGrups', 'n')
@@ -236,6 +238,15 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
     let modeEditPemis = get(opt, 'modeEditPemis', 'n')
     let modeEditGrups = get(opt, 'modeEditGrups', 'n')
     let modeEditUsers = get(opt, 'modeEditUsers', 'n')
+    let widthTargetId = get(opt, 'widthTargetId', '')
+    let widthTargetDescription = get(opt, 'widthTargetDescription', '')
+    let widthPemisName = get(opt, 'widthPemisName', '')
+    let widthPemisDescription = get(opt, 'widthPemisDescription', '')
+    let widthGrupsName = get(opt, 'widthGrupsName', '')
+    let widthGrupsDescription = get(opt, 'widthGrupsDescription', '')
+    let widthUsersName = get(opt, 'widthUsersName', '')
+    let widthUsersEmail = get(opt, 'widthUsersEmail', '')
+    let widthUsersDescription = get(opt, 'widthUsersDescription', '')
 
 
     //mappingBy
@@ -265,10 +276,15 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
     //getWebInfor
     let getWebInfor = (userId) => {
         return {
+
             webName,
             webDescription,
             webLogo,
             // urlRedirect, //登入失敗就需要轉址, 故須通過html模板取代提供, 無法用api提供
+
+            showLanguage,
+            language,
+
             showModeEditTargets,
             showModeEditPemis,
             showModeEditGrups,
@@ -277,6 +293,17 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
             modeEditPemis,
             modeEditGrups,
             modeEditUsers,
+
+            widthTargetId,
+            widthTargetDescription,
+            widthPemisName,
+            widthPemisDescription,
+            widthGrupsName,
+            widthGrupsDescription,
+            widthUsersName,
+            widthUsersEmail,
+            widthUsersDescription,
+
         }
     }
 
@@ -791,14 +818,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
         c = replace(c, '/mperm/', '{sfd}/') //方法同genEntry
         c = replace(c, '{sfd}', subfolder)
         c = replace(c, '{urlRedirect}', urlRedirect)
-        c = replace(c, '{showModeEditTargets}', showModeEditTargets)
-        c = replace(c, '{showModeEditPemis}', showModeEditPemis)
-        c = replace(c, '{showModeEditGrups}', showModeEditGrups)
-        c = replace(c, '{showModeEditUsers}', showModeEditUsers)
-        c = replace(c, '{modeEditTargets}', modeEditTargets)
-        c = replace(c, '{modeEditPemis}', modeEditPemis)
-        c = replace(c, '{modeEditGrups}', modeEditGrups)
-        c = replace(c, '{modeEditUsers}', modeEditUsers)
+        c = replace(c, '{language}', language)
         fs.writeFileSync(fpEntryOut, c, 'utf8')
     }
     catch (err) {

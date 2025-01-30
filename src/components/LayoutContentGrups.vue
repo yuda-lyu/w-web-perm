@@ -229,6 +229,8 @@ import cloneDeep from 'lodash-es/cloneDeep.js'
 import haskey from 'wsemi/src/haskey.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
+import isnum from 'wsemi/src/isnum.mjs'
+import cdbl from 'wsemi/src/cdbl.mjs'
 import cstr from 'wsemi/src/cstr.mjs'
 import arrPull from 'wsemi/src/arrPull.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
@@ -311,6 +313,9 @@ export default {
                 // 'timeUpdate',
             ],
 
+            widthGrupsName: null,
+            widthGrupsDescription: null,
+
             items: [],
             itemsCheck: [],
             opt: null,
@@ -329,10 +334,15 @@ export default {
         //firstSetting
         if (vo.firstSetting) {
             // console.log('webInfor', vo.webInfor)
+
             let showModeEditGrups = get(vo, 'webInfor.showModeEditGrups', '')
             vo.showIsEditable = showModeEditGrups === 'y'
             let modeEditGrups = get(vo, 'webInfor.modeEditGrups', '')
             vo.isEditable = modeEditGrups === 'y'
+
+            vo.widthGrupsName = get(vo, 'webInfor.widthGrupsName', '')
+            vo.widthGrupsDescription = get(vo, 'webInfor.widthGrupsDescription', '')
+
             vo.firstSetting = false
         }
 
@@ -665,8 +675,8 @@ export default {
                     },
                     defHeadMinWidth: 150,
                     kpHeadWidth: {
-                        'name': 300,
-                        'description': 300,
+                        'name': isnum(vo.widthGrupsName) ? cdbl(vo.widthGrupsName) : 300,
+                        'description': isnum(vo.widthGrupsDescription) ? cdbl(vo.widthGrupsDescription) : 300,
                         'belongUsers': 300,
                         'cpemis': 300,
                         'timeCreate': 220,

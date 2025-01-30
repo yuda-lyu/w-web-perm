@@ -17,6 +17,10 @@ let opt = {
     serverPort: 11006,
     subfolder: '', //mperm
     urlRedirect: 'https://www.google.com/', //本機測試時得先編譯, 再瀏覽: http://localhost:11006/
+
+    showLanguage: 'y', //'n',
+    language: 'eng', //'eng', 'cht'
+
     showModeEditTargets: 'y', //'n',
     showModeEditPemis: 'y',
     showModeEditGrups: 'y',

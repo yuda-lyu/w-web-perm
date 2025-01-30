@@ -229,6 +229,8 @@ import cloneDeep from 'lodash-es/cloneDeep.js'
 import haskey from 'wsemi/src/haskey.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
+import isnum from 'wsemi/src/isnum.mjs'
+import cdbl from 'wsemi/src/cdbl.mjs'
 import cstr from 'wsemi/src/cstr.mjs'
 import arrPull from 'wsemi/src/arrPull.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
@@ -311,6 +313,9 @@ export default {
                 // 'timeUpdate',
             ],
 
+            widthPemisName: null,
+            widthPemisDescription: null,
+
             items: [],
             itemsCheck: [],
             opt: null,
@@ -329,10 +334,15 @@ export default {
         //firstSetting
         if (vo.firstSetting) {
             // console.log('webInfor', vo.webInfor)
+
             let showModeEditPemis = get(vo, 'webInfor.showModeEditPemis', '')
             vo.showIsEditable = showModeEditPemis === 'y'
             let modeEditPemis = get(vo, 'webInfor.modeEditPemis', '')
             vo.isEditable = modeEditPemis === 'y'
+
+            vo.widthPemisName = get(vo, 'webInfor.widthPemisName', '')
+            vo.widthPemisDescription = get(vo, 'webInfor.widthPemisDescription', '')
+
             vo.firstSetting = false
         }
 
@@ -665,8 +675,8 @@ export default {
                     },
                     defHeadMinWidth: 150,
                     kpHeadWidth: {
-                        'name': 300,
-                        'description': 300,
+                        'name': isnum(vo.widthPemisName) ? cdbl(vo.widthPemisName) : 300,
+                        'description': isnum(vo.widthPemisDescription) ? cdbl(vo.widthPemisDescription) : 300,
                         'belongGrups': 300,
                         'crules': 300,
                         'timeCreate': 220,

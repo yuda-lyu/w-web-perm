@@ -228,6 +228,8 @@ import cloneDeep from 'lodash-es/cloneDeep.js'
 import haskey from 'wsemi/src/haskey.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
+import isnum from 'wsemi/src/isnum.mjs'
+import cdbl from 'wsemi/src/cdbl.mjs'
 import cstr from 'wsemi/src/cstr.mjs'
 import arrPull from 'wsemi/src/arrPull.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
@@ -316,6 +318,10 @@ export default {
                 // 'timeUpdate',
             ],
 
+            widthUsersName: null,
+            widthUsersEmail: null,
+            widthUsersDescription: null,
+
             items: [],
             itemsCheck: [],
             opt: null,
@@ -335,10 +341,16 @@ export default {
         //firstSetting
         if (vo.firstSetting) {
             // console.log('webInfor', vo.webInfor)
+
             let showModeEditUsers = get(vo, 'webInfor.showModeEditUsers', '')
             vo.showIsEditable = showModeEditUsers === 'y'
             let modeEditUsers = get(vo, 'webInfor.modeEditUsers', '')
             vo.isEditable = modeEditUsers === 'y'
+
+            vo.widthUsersName = get(vo, 'webInfor.widthUsersName', '')
+            vo.widthUsersEmail = get(vo, 'webInfor.widthUsersEmail', '')
+            vo.widthUsersDescription = get(vo, 'webInfor.widthUsersDescription', '')
+
             vo.firstSetting = false
         }
 
@@ -644,6 +656,9 @@ export default {
                     },
                     defHeadMinWidth: 150,
                     kpHeadWidth: {
+                        'name': isnum(vo.widthUsersName) ? cdbl(vo.widthUsersName) : 200,
+                        'email': isnum(vo.widthUsersEmail) ? cdbl(vo.widthUsersEmail) : 300,
+                        'description': isnum(vo.widthUsersDescription) ? cdbl(vo.widthUsersDescription) : 300,
                         'cgrups': 300,
                         'isAdmin': 100,
                         'isActive': 100,

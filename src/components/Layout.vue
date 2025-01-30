@@ -21,13 +21,23 @@
 
             <div style="width:100%;"></div>
 
-            <div style="padding-right:10px; white-space:nowrap">
+            <div
+                style="padding-right:10px; white-space:nowrap"
+                v-if="showLangSelect"
+            >
                 <WTextSelect
                     style="width:100px;"
-                    :items="tgLangs"
-                    v-model="tgLangSelect"
-                    @input="changeLang"
-                ></WTextSelect>
+                    :items="langKeys"
+                    :value="lang"
+                    @input="toggleLang"
+                >
+                    <template v-slot:select="props">
+                        {{getLangText(props.item)}}
+                    </template>
+                    <template v-slot:item="props">
+                        {{getLangText(props.item)}}
+                    </template>
+                </WTextSelect>
             </div>
 
         </div>
@@ -61,41 +71,49 @@ export default {
     },
     data: function() {
         return {
-
             mdiMenu,
-            // menuKey: 'blocks',
-            userName: 'tester',
 
-            tgLangs: [
-                {
-                    id: 'cht',
-                    text: '中文',
-                },
-                {
-                    id: 'eng',
-                    text: 'English',
-                },
+            firstSetting: true,
+
+            showLangSelect: false,
+
+            langKeys: [
+                'eng',
+                'cht',
             ],
-            tgLangSelect: {
-                id: 'cht',
-                text: '中文',
+            kpLang: {
+                'eng': 'English',
+                'cht': '中文',
             },
 
         }
     },
-    beforeMount: function() {
-        // console.log('beforeMount')
+    mounted: function() {
+        // console.log('mounted')
 
         let vo = this
 
-        //setLang
-        vo.$ui.setLang(vo.tgLangSelect.id)
+        //firstSetting
+        if (vo.firstSetting) {
+            // console.log('webInfor', vo.webInfor)
+            let showLanguage = get(vo, 'webInfor.showLanguage', '')
+            // console.log('showLanguage', showLanguage)
+            vo.showLangSelect = showLanguage === 'y'
+            let language = get(vo, 'webInfor.language', '')
+            // console.log('language', language)
+            vo.$ui.setLang(language, 'layout mounted')
+            vo.firstSetting = false
+        }
 
     },
     computed: {
 
         viewState: function() {
-            return get(this, `$store.state.viewState`, '')
+            //console.log('computed viewState')
+
+            let vo = this
+
+            return get(vo, `$store.state.viewState`, '')
         },
 
         heightToolbar: function() {
@@ -106,6 +124,11 @@ export default {
             return get(vo, `$store.state.heightToolbar`, 0)
         },
 
+        webInfor: function() {
+            let wi = get(this, `$store.state.webInfor`)
+            return wi
+        },
+
         webName: {
             get() {
                 let vo = this
@@ -113,8 +136,8 @@ export default {
                 // console.log('get webName1', c)
                 if (!isestr(c)) {
                     c = vo.$t('waitingData')
+                    // console.log('get webName2', c)
                 }
-                // console.log('get webName2', c)
                 document.title = c //更換網頁title
                 return c
             },
@@ -128,17 +151,38 @@ export default {
 
             let vo = this
 
-            return get(vo, `$store.state.webInfor.webLogo`, '')
+            return get(vo, `webInfor.webLogo`, '')
+        },
+
+        lang: function() {
+            //console.log('computed webLogo')
+
+            let vo = this
+
+            return get(vo, `$store.state.lang`, '')
         },
 
     },
     methods: {
 
-        changeLang: function(msg) {
-            // console.log('methods changeLang', msg)
+        getLangText: function(lang) {
+            // console.log('methods getLangText', lang)
+
             let vo = this
-            let lang = msg.id
-            vo.$ui.setLang(lang)
+
+            let t = get(vo, `kpLang.${lang}`, '')
+
+            return t
+        },
+
+        toggleLang: function(lang) {
+            // console.log('methods toggleLang', lang)
+
+            let vo = this
+
+            //setLang
+            vo.$ui.setLang(lang, 'toggle')
+
         },
 
     }
