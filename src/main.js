@@ -56,11 +56,11 @@ WServHapiClient({
         return token
     },
     getServerMethods: (_fapi) => {
-        console.log('$fapi', _fapi)
+        // console.log('$fapi', _fapi)
         Vue.prototype.$fapi = _fapi
         _fapi.getWebInfor() //已有fapi時優先取得web資訊
             .then((wi) => {
-                console.log('$fapi getWebInfor', wi)
+                // console.log('$fapi getWebInfor', wi)
                 Vue.prototype.$store.commit(Vue.prototype.$store.types.UpdateWebInfor, wi)
                 ui.setLang(null, 'get webInfor') //因更新webInfor可取得webName與webDescription, 得要重刷語系才能依照語言取得顯示文字
             })
@@ -69,7 +69,7 @@ WServHapiClient({
             })
     },
     recvData: (r) => {
-        console.log('sync data', r.tableName, r.data)
+        // console.log('sync data', r.tableName, r.data)
         Vue.prototype.$store.commit(Vue.prototype.$store.types.UpdateTableData, r)
     },
     getAfterUpdateTableTags: (r) => {
@@ -78,7 +78,7 @@ WServHapiClient({
             return
         }
         bFirstSync = true
-        console.log('first-sync')
+        // console.log('first-sync')
         Vue.prototype.$store.commit(Vue.prototype.$store.types.UpdateSyncState, true)
     },
 })
