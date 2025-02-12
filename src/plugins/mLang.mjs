@@ -188,7 +188,7 @@ let keyLangs = {
     },
     isActive: {
         eng: `Active`,
-        cht: `是否使用`,
+        cht: `是否有效`,
     },
 
     errInNames: {

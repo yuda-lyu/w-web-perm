@@ -11,7 +11,7 @@ let state = {
     webInfor: {},
     connState: 'csIng', //'csIng', 'csLogin', 'csLogout', 'csErrConn', 'csErrLogin'
     syncState: false,
-    viewState: 'lists',
+    // viewState: 'lists',
     loading: false,
     settings: {
         leftDrawerWidth: 200,
@@ -24,12 +24,7 @@ let state = {
     menu: {}, //初始值需為物件, 否則LayoutContent會取menu.key出錯
 
     userToken: '',
-    user: {
-        id: '', //id-for-admin
-        name: '', //測試者
-        email: '', //admin@example.com
-        isAdmin: 'n',
-    },
+    userSelf: {},
 
     lang: 'cht', //'eng', 'cht'
     kpText: {}, //一定要放在vuex內, 否則無法用broadcast驅動變更語系文字
@@ -71,9 +66,9 @@ export let mutations = {
         state.loading = loading
     },
 
-    [types.UpdateViewState] (state, viewState) {
-        state.viewState = viewState
-    },
+    // [types.UpdateViewState] (state, viewState) {
+    //     state.viewState = viewState
+    // },
 
     [types.UpdateTableData] (state, msg) {
         state[msg.tableName] = msg.data

@@ -138,7 +138,10 @@
                     </WAggridVueDyn>
                 </template>
 
-                <div style="padding:10px 15px; font-size:0.8rem;" v-else>
+                <div
+                    style="padding:10px 15px; font-size:0.8rem;"
+                    v-else
+                >
                     {{$t('waitingData')}}
                 </div>
 

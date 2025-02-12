@@ -47,6 +47,10 @@
 
                     <div style="padding:6px 0px 4px 4px;">
                         <WSwitch
+                            :checkedSwitchCircleColor="'#F68200'"
+                            :checkedSwitchCircleColorHover="'#FB8C00'"
+                            :checkedSwitchBarColor="'#FFE0B2'"
+                            :checkedSwitchBarColorHover="'#FFE6B8'"
                             v-model="isEditable"
                             :text="$t('modeEdit')"
                         ></WSwitch>
@@ -208,7 +212,10 @@
 
         </template>
 
-        <div style="padding:10px 15px; font-size:0.8rem;" v-else>
+        <div
+            style="padding:10px 15px; font-size:0.8rem;"
+            v-else
+        >
             {{$t('waitingData')}}
         </div>
 
@@ -572,7 +579,7 @@ export default {
                     keys: ks,
                     kpHead,
                     // autoFitColumn: true,
-                    defCellEditable: vo.isEditable,
+                    defCellEditable: false, //vo.isEditable,
                     defHeadFilter: true,
                     defCellAlignH: 'left',
                     kpHeadHide,

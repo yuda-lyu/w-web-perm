@@ -1,5 +1,5 @@
 <template>
-    <div style="height:100vh; background:#f5f5f5;">
+    <div style="height:100svh; background:#f5f5f5;">
 
         <!-- menu top, 因窄版導致名稱換行故須使用overflow-y:hidden -->
         <div :style="`height:${heightToolbar}px; overflow-y:hidden; padding:0px 10px; background:#fff; border-bottom:1px solid #ccc; display:flex; align-items:center;`">
@@ -22,7 +22,7 @@
             <div style="width:100%;"></div>
 
             <div
-                style="padding-right:10px; white-space:nowrap"
+                style="padding-right:10px; white-space:nowrap;"
                 v-if="showLangSelect"
             >
                 <WTextSelect
@@ -108,19 +108,13 @@ export default {
     },
     computed: {
 
-        viewState: function() {
-            //console.log('computed viewState')
-
-            let vo = this
-
-            return get(vo, `$store.state.viewState`, '')
-        },
+        // viewState: function() {
+        //     let vo = this
+        //     return get(vo, '$store.state.viewState', '')
+        // },
 
         heightToolbar: function() {
-            //console.log('computed heightToolbar')
-
             let vo = this
-
             return get(vo, `$store.state.heightToolbar`, 0)
         },
 
@@ -132,12 +126,12 @@ export default {
         webName: {
             get() {
                 let vo = this
-                let c = vo.$t('webName')
+                let c = vo.$t('webName', '')
                 // console.log('get webName1', c)
                 if (!isestr(c)) {
-                    c = vo.$t('waitingData')
-                    // console.log('get webName2', c)
+                    c = vo.$t('waitingData', '')
                 }
+                // console.log('get webName2', c)
                 document.title = c //更換網頁title
                 return c
             },
@@ -147,19 +141,13 @@ export default {
         },
 
         webLogo: function() {
-            //console.log('computed webLogo')
-
             let vo = this
-
-            return get(vo, `webInfor.webLogo`, '')
+            return get(vo, 'webInfor.webLogo', '')
         },
 
         lang: function() {
-            //console.log('computed webLogo')
-
             let vo = this
-
-            return get(vo, `$store.state.lang`, '')
+            return get(vo, '$store.state.lang', '')
         },
 
     },

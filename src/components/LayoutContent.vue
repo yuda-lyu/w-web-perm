@@ -28,13 +28,13 @@
                             :itemActive="menuActive"
                             :item-text-color="'#222'"
                             :item-text-color-hover="'#444'"
-                            :item-text-color-active="'#fff'"
+                            :item-text-color-active="'#E65100'"
                             :item-icon-color="'#222'"
                             :item-icon-color-hover="'#444'"
-                            :item-icon-color-active="'#eee'"
+                            :item-icon-color-active="'#F57C00'"
                             :item-background-color="'#fff'"
-                            :item-background-color-hover="'#f2f2f2'"
-                            :item-background-color-active="'#666'"
+                            :item-background-color-hover="'#f6f6f6'"
+                            :item-background-color-active="'#fff3e0'"
                             :paddingStyle="{v:15,h:15}"
                             @click="(menu)=>{menuKey=menu.key}"
                         ></WListVertical>
@@ -45,11 +45,11 @@
                         >
                             <WButtonCircle
                                 :paddingStyle="{h:2,v:2}"
-                                :icon="'mdi-arrow-left-bold-hexagon-outline'"
+                                :icon="mdiArrowLeftBoldHexagonOutline"
                                 :iconSize="20"
-                                :backgroundColor="'rgba(255,255,255,0.9)'"
-                                :backgroundColorHover="'rgba(255,255,255,0.7)'"
-                                :backgroundColorFocus="'rgba(255,255,255,0.5)'"
+                                :backgroundColor="'rgba(255,255,255,0.1)'"
+                                :backgroundColorHover="'rgba(255,255,255,0.4)'"
+                                :backgroundColorFocus="'rgba(255,255,255,0.7)'"
                                 :borderColor="'transparent'"
                                 :borderColorHover="'transparent'"
                                 :borderColorFocus="'transparent'"
@@ -95,11 +95,11 @@
                         >
                             <WButtonCircle
                                 :paddingStyle="{h:2,v:2}"
-                                :icon="'mdi-arrow-right-bold-hexagon-outline'"
+                                :icon="mdiArrowRightBoldHexagonOutline"
                                 :iconSize="20"
-                                :backgroundColor="'rgba(255,255,255,0.9)'"
-                                :backgroundColorHover="'rgba(255,255,255,0.7)'"
-                                :backgroundColorFocus="'rgba(255,255,255,0.5)'"
+                                :backgroundColor="'rgba(255,255,255,0.1)'"
+                                :backgroundColorHover="'rgba(255,255,255,0.4)'"
+                                :backgroundColorFocus="'rgba(255,255,255,0.7)'"
                                 :borderColor="'transparent'"
                                 :borderColorHover="'transparent'"
                                 :borderColorFocus="'transparent'"
@@ -116,19 +116,18 @@
 
         </template>
 
-        <template v-else>
-            <div
-                style="padding:20px; font-size:0.9rem;"
-            >
-                {{$t('waitingData')}}
-            </div>
-        </template>
+        <div
+            style="padding:20px; font-size:0.9rem;"
+            v-else
+        >
+            {{$t('waitingData')}}
+        </div>
 
     </div>
 </template>
 
 <script>
-import { mdiGamepadCircle, mdiStackOverflow, mdiSelectGroup, mdiAccountGroupOutline } from '@mdi/js/mdi.js'
+import { mdiArrowLeftBoldHexagonOutline, mdiArrowRightBoldHexagonOutline, mdiGamepadCircle, mdiStackOverflow, mdiSelectGroup, mdiAccountGroupOutline } from '@mdi/js/mdi.js'
 import get from 'lodash-es/get.js'
 import find from 'lodash-es/find.js'
 import WDrawer from 'w-component-vue/src/components/WDrawer.vue'
@@ -154,6 +153,8 @@ export default {
     },
     data: function() {
         return {
+            mdiArrowLeftBoldHexagonOutline,
+            mdiArrowRightBoldHexagonOutline,
 
             menuKey: 'targets',
 
@@ -161,7 +162,7 @@ export default {
             panelHeight: 0,
 
             drawer: true,
-            drawerWidth: 180,
+            drawerWidth: 200,
             drawerWidthMin: 150,
             drawerWidthMax: 300,
 
@@ -170,7 +171,8 @@ export default {
     computed: {
 
         syncState: function() {
-            return get(this, '$store.state.syncState')
+            let vo = this
+            return get(vo, '$store.state.syncState')
         },
 
         menus: function() {

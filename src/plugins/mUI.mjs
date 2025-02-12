@@ -63,9 +63,9 @@ function updateLoading(loading) {
 }
 
 
-function updateViewState(viewState) {
-    vo.$store.commit(vo.$store.types.UpdateViewState, viewState)
-}
+// function updateViewState(viewState) {
+//     vo.$store.commit(vo.$store.types.UpdateViewState, viewState)
+// }
 
 
 function updateUserToken(userToken) {
@@ -241,24 +241,24 @@ function syncHeight() {
 }
 
 
-async function waitData(t = 0) {
+// async function waitData(t = 0) {
 
-    //delay
-    if (t > 0) {
-        await delay(t)
-    }
+//     //delay
+//     if (t > 0) {
+//         await delay(t)
+//     }
 
-    //waitFun, 等待dsrl模組掛載
-    await waitFun(() => {
-        return iseobj(get(vo, '$dsrl'))
-    })
+//     //waitFun, 等待dsrl模組掛載
+//     await waitFun(() => {
+//         return iseobj(get(vo, '$dsrl'))
+//     })
 
-    //等待前端第一次同步完畢數據
-    await waitFun(() => {
-        return get(vo, '$store.state.syncState')
-    })
+//     //等待前端第一次同步完畢數據
+//     await waitFun(() => {
+//         return get(vo, '$store.state.syncState')
+//     })
 
-}
+// }
 
 
 let kpIcon = {
@@ -279,7 +279,7 @@ let mUI = {
 
     updateConnState,
     updateLoading,
-    updateViewState,
+    // updateViewState,
     updateUserToken,
     updateUserSelf,
     forceUpdate,
@@ -290,7 +290,7 @@ let mUI = {
     gv,
     syncHeight,
 
-    waitData,
+    // waitData,
 
     getIcon,
 
