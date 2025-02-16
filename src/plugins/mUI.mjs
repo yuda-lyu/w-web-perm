@@ -42,7 +42,7 @@ import replace from 'wsemi/src/replace.mjs'
 import timemsTZ2past from 'wsemi/src/timemsTZ2past.mjs'
 import convertToTree from 'wsemi/src/convertToTree.mjs'
 // import WUiDwload from 'w-ui-dwload/src/WUiDwload.mjs'
-import keyLangs from './mLang.mjs'
+import kpLang from './mLang.mjs'
 
 
 let vo = Vue.prototype
@@ -168,24 +168,56 @@ function setLang(lang = null, from = '') {
 function genKpText(lang) {
     // console.log('genKpText', lang)
 
-    //merge keyLangs
-    let webName = get(vo, '$store.state.webInfor.webName', '')
-    let webDescription = get(vo, '$store.state.webInfor.webDescription', '')
-    let kls = {
-        ...keyLangs,
-        webName: {
-            ...webName,
-        },
-        webDescription: {
-            ...webDescription,
-        },
+    //kp
+    let kp = {}
+
+    //kpLang
+    kp = {
+        ...kp,
+        ...kpLang,
     }
 
-    //update
+    //kpLangExt
+    let kpLangExt = get(vo, '$store.state.webInfor.kpLangExt', {})
+    // console.log('kpLangExt', kpLangExt)
+    if (iseobj(kpLangExt)) {
+        kp = {
+            ...kp,
+            ...kpLangExt,
+        }
+    }
+
+    //webName
+    let webName = get(vo, '$store.state.webInfor.webName', {})
+    // console.log('webName', webName)
+    if (iseobj(webName)) {
+        kp = {
+            ...kp,
+            webName: {
+                ...webName,
+            },
+        }
+    }
+
+    //webDescription
+    let webDescription = get(vo, '$store.state.webInfor.webDescription', {})
+    // console.log('webDescription', webDescription)
+    if (iseobj(webDescription)) {
+        kp = {
+            ...kp,
+            webDescription: {
+                ...webDescription,
+            },
+        }
+    }
+
+    //kpText
     let kpText = {}
-    each(kls, (v, k) => {
+    each(kp, (v, k) => {
         kpText[k] = v[lang]
     })
+    // console.log('kp', kp)
+    // console.log('kpText', kpText)
 
     //commit
     vo.$store.commit(vo.$store.types.UpdateKpText, kpText)

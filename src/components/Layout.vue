@@ -27,7 +27,7 @@
             >
                 <WTextSelect
                     style="width:100px;"
-                    :items="langKeys"
+                    :items="keysLang"
                     :value="lang"
                     @input="toggleLang"
                 >
@@ -77,11 +77,11 @@ export default {
 
             showLangSelect: false,
 
-            langKeys: [
+            keysLang: [
                 'eng',
                 'cht',
             ],
-            kpLang: {
+            kpLangSelect: {
                 'eng': 'English',
                 'cht': '中文',
             },
@@ -158,7 +158,7 @@ export default {
 
             let vo = this
 
-            let t = get(vo, `kpLang.${lang}`, '')
+            let t = get(vo, `kpLangSelect.${lang}`, '')
 
             return t
         },

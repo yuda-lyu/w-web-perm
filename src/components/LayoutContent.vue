@@ -69,22 +69,22 @@
 
                             <LayoutContentTargets
                                 :drawer="drawer"
-                                v-if="menuKey==='targets'"
+                                v-if="menuKey==='mmTargets'"
                             ></LayoutContentTargets>
 
                             <LayoutContentPemis
                                 :drawer="drawer"
-                                v-if="menuKey==='pemis'"
+                                v-if="menuKey==='mmPemis'"
                             ></LayoutContentPemis>
 
                             <LayoutContentGrups
                                 :drawer="drawer"
-                                v-if="menuKey==='grups'"
+                                v-if="menuKey==='mmGrups'"
                             ></LayoutContentGrups>
 
                             <LayoutContentUsers
                                 :drawer="drawer"
-                                v-if="menuKey==='users'"
+                                v-if="menuKey==='mmUsers'"
                             ></LayoutContentUsers>
 
                         </template>
@@ -156,7 +156,7 @@ export default {
             mdiArrowLeftBoldHexagonOutline,
             mdiArrowRightBoldHexagonOutline,
 
-            menuKey: 'targets',
+            menuKey: 'mmTargets',
 
             panelWidth: 0,
             panelHeight: 0,
@@ -179,23 +179,23 @@ export default {
             let vo = this
             let ms = [
                 {
-                    key: 'targets',
-                    text: vo.$t('managementTargets'),
+                    key: 'mmTargets',
+                    text: vo.$t('mmTargets'),
                     icon: mdiGamepadCircle,
                 },
                 {
-                    key: 'pemis',
-                    text: vo.$t('managementPemis'),
+                    key: 'mmPemis',
+                    text: vo.$t('mmPemis'),
                     icon: mdiStackOverflow,
                 },
                 {
-                    key: 'grups',
-                    text: vo.$t('managementGrups'),
+                    key: 'mmGrups',
+                    text: vo.$t('mmGrups'),
                     icon: mdiSelectGroup,
                 },
                 {
-                    key: 'users',
-                    text: vo.$t('managementUsers'),
+                    key: 'mmUsers',
+                    text: vo.$t('mmUsers'),
                     icon: mdiAccountGroupOutline,
                 },
             ]

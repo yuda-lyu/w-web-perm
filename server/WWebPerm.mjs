@@ -257,6 +257,10 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
     // console.log('mappingBy', mappingBy)
 
 
+    //kpLangExt
+    let kpLangExt = get(opt, 'kpLangExt', null)
+
+
     //WServOrm
     let optWServOrm = {
         bCheckUser,
@@ -303,6 +307,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
             widthUsersName,
             widthUsersEmail,
             widthUsersDescription,
+
+            kpLangExt,
 
         }
     }
@@ -374,7 +380,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
             return err
         }
 
-        //偵測id,name,email重複
+        //偵測未給予或重複
         let err = null
         if (true) {
             if (arrHas(woName, ['targets'])) {
@@ -383,13 +389,13 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
                     return Promise.reject(err)
                 }
             }
-            else if (arrHas(woName, ['targets', 'pemis', 'grups'])) { //users可重複name故不列入
+            if (arrHas(woName, ['pemis', 'grups'])) { //users可重複name故不列入
                 err = ckKey(rows, 'name')
                 if (err !== null) {
                     return Promise.reject(err)
                 }
             }
-            else if (arrHas(woName, ['users'])) { //users不能重複email
+            if (arrHas(woName, ['users'])) {
                 err = ckKey(rows, 'email')
                 if (err !== null) {
                     return Promise.reject(err)

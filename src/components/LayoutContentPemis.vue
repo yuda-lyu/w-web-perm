@@ -25,11 +25,11 @@
                     <div style="padding-left:12px;">
 
                         <div style="font-size:1.4rem; color:#000;">
-                            {{$t('managementPemis')}}
+                            {{$t('mmPemis')}}
                         </div>
 
                         <div style="padding-top:2px; font-size:0.8rem; color:#666;">
-                            {{$t('managementPemisMsg')}}
+                            {{$t('mmPemisMsg')}}
                         </div>
 
                     </div>

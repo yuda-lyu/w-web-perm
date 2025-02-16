@@ -25,11 +25,11 @@
                     <div style="padding-left:12px;">
 
                         <div style="font-size:1.4rem; color:#000;">
-                            {{$t('managementUsers')}}
+                            {{$t('mmUsers')}}
                         </div>
 
                         <div style="padding-top:2px; font-size:0.8rem; color:#666;">
-                            {{$t('managementUsersMsg')}}
+                            {{$t('mmUsersMsg')}}
                         </div>
 
                     </div>
@@ -236,6 +236,7 @@ import haskey from 'wsemi/src/haskey.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import isnum from 'wsemi/src/isnum.mjs'
+import isEmail from 'wsemi/src/isEmail.mjs'
 import cdbl from 'wsemi/src/cdbl.mjs'
 import cstr from 'wsemi/src/cstr.mjs'
 import arrPull from 'wsemi/src/arrPull.mjs'
@@ -503,6 +504,15 @@ export default {
 
                     //kpErr
                     kpErr[email] = vo.$t(`userEmailEmpty`)
+
+                    return true //跳出換下一個
+                }
+
+                //check
+                if (!isEmail(email)) {
+
+                    //kpErr
+                    kpErr[email] = vo.$t(`userEmailError`)
 
                     return true //跳出換下一個
                 }

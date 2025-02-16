@@ -1,6 +1,6 @@
 
 
-let keyLangs = {
+let kpLang = {
 
     csIng: {
         eng: 'Connecting...',
@@ -209,20 +209,48 @@ let keyLangs = {
         cht: `隱藏選單`,
     },
 
-    managementTargets: {
+    mmTargets: {
         eng: `Targets`,
         cht: `管理對象`,
     },
-    managementTargetsMsg: {
+    mmTargetsMsg: {
         eng: `Targets generally refer to entities such as pages, data, etc., and can also include features or services.`,
         cht: `對象泛指實體的頁面、數據等，亦可為的功能或服務。`,
     },
+
+    mmPemis: {
+        eng: `Permissions`,
+        cht: `管理權限`,
+    },
+    mmPemisMsg: {
+        eng: `Permissions are primarily used to set rules for enabling or disabling various objects.`,
+        cht: `權限主要為用來設定各種對象之使用或禁用規則。`,
+    },
+
+    mmGrups: {
+        eng: `Permission groups`,
+        cht: `管理權限群組`,
+    },
+    mmGrupsMsg: {
+        eng: `Permission groups are primarily used to configure combinations of different permissions.`,
+        cht: `權限群組主要為用來設定組合各種權限。`,
+    },
+
+    mmUsers: {
+        eng: `Users`,
+        cht: `管理使用者`,
+    },
+    mmUsersMsg: {
+        eng: `Users are primarily for providing or extending user information and can be configured with combinations of various permission groups.`,
+        cht: `使用者主要為提供或擴充使用者資訊，並可設定組合各種權限群組。`,
+    },
+
     targetId: {
         eng: `Target`,
         cht: `對象名稱`,
     },
     targetIdEmpty: {
-        eng: `No valid name`,
+        eng: `Invalid name`,
         cht: `尚未給予有效對象名稱`,
     },
     targetIdDuplicate: {
@@ -274,20 +302,12 @@ let keyLangs = {
         cht: `儲存對象數據成功`,
     },
 
-    managementPemis: {
-        eng: `Permissions`,
-        cht: `管理權限`,
-    },
-    managementPemisMsg: {
-        eng: `Permissions are primarily used to set rules for enabling or disabling various objects.`,
-        cht: `權限主要為用來設定各種對象之使用或禁用規則。`,
-    },
     pemiName: {
         eng: `Name of permission`,
         cht: `權限名稱`,
     },
     pemiNameEmpty: {
-        eng: `No valid name of permission`,
+        eng: `Invalid name of permission`,
         cht: `尚未給予有效權限名稱`,
     },
     pemiNameDuplicate: {
@@ -421,20 +441,12 @@ let keyLangs = {
         cht: `刪除勾選對象`,
     },
 
-    managementGrups: {
-        eng: `Permission groups`,
-        cht: `管理權限群組`,
-    },
-    managementGrupsMsg: {
-        eng: `Permission groups are primarily used to configure combinations of different permissions.`,
-        cht: `權限群組主要為用來設定組合各種權限。`,
-    },
     grupName: {
         eng: `Name of permission group`,
         cht: `權限群組名稱`,
     },
     grupNameEmpty: {
-        eng: `No valid name of permission group`,
+        eng: `Invalid name of permission group`,
         cht: `尚未給予有效權限群組名稱`,
     },
     grupNameDuplicate: {
@@ -560,20 +572,12 @@ let keyLangs = {
         cht: `刪除勾選對象`,
     },
 
-    managementUsers: {
-        eng: `Users`,
-        cht: `管理使用者`,
-    },
-    managementUsersMsg: {
-        eng: `Users are primarily for providing or extending user information and can be configured with combinations of various permission groups.`,
-        cht: `使用者主要為提供或擴充使用者資訊，並可設定組合各種權限群組。`,
-    },
     userName: {
         eng: `Name of user`,
         cht: `使用者名稱`,
     },
     userNameEmpty: {
-        eng: `No valid name of user`,
+        eng: `Invalid name of user`,
         cht: `尚未給予有效使用者名稱`,
     },
     userNameDuplicate: {
@@ -581,8 +585,12 @@ let keyLangs = {
         cht: `使用者名稱出現重複`,
     },
     userEmailEmpty: {
-        eng: `No valid email of user`,
-        cht: `尚未給予有效使用者Email`,
+        eng: `Empty email of user`,
+        cht: `尚未給予使用者Email`,
+    },
+    userEmailError: {
+        eng: `Invalid email of user`,
+        cht: `使用者Email格式錯誤`,
     },
     userEmailDuplicate: {
         eng: `Duplicate email of user`,
@@ -743,4 +751,4 @@ let keyLangs = {
 }
 
 
-export default keyLangs
+export default kpLang
