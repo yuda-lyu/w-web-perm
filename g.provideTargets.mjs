@@ -61,4 +61,4 @@ provide()
     })
 
 
-//node --experimental-modules g.provideTargets.mjs
+//node g.provideTargets.mjs

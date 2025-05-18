@@ -40,4 +40,4 @@ provide()
     })
 
 
-//node --experimental-modules g.providePemis.mjs
+//node g.providePemis.mjs

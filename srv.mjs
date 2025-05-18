@@ -10,9 +10,9 @@ let url = `mongodb://${st.dbUsername}:${st.dbPassword}@${st.dbIP}:${st.dbPort}` 
 let db = st.dbName
 let opt = {
 
-    bCheckUser: false,
+    useCheckUser: false,
     getUserById: null,
-    bExcludeWhenNotAdmin: false,
+    useExcludeWhenNotAdmin: false,
 
     serverPort: 11006,
     subfolder: '', //mperm
@@ -40,16 +40,16 @@ let opt = {
     },
     webLogo: 'data:image/svg+xml;base64,PHN2ZyBmaWxsPSJub25lIiBoZWlnaHQ9IjQ4IiB3aWR0aD0iNDgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTQ4IDBIMHY0OGg0OFYwWiIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuMDEiLz48cGF0aCBkPSJNMzcuODU2IDIwdjhNMjcuNDY0IDM4bDMuNDY0LTIgMy40NjQtMk0yMC41MzYgMzhsLTMuNDY1LTItMy40NjQtMk0xMC4xNDQgMjB2OE0xMy42MDcgMTRsMy40NjUtMiAzLjQ2NC0yTTI3LjQ2NCAxMGwzLjQ2NCAyIDMuNDY0IDIiIHN0cm9rZT0iI0ZGOTgwMCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBzdHJva2Utd2lkdGg9IjIiLz48cGF0aCBkPSJNMjQgNDRhNCA0IDAgMSAwIDAtOCA0IDQgMCAwIDAgMCA4Wk0yNCAxMmE0IDQgMCAxIDAgMC04IDQgNCAwIDAgMCAwIDhaTTI0IDI4YTQgNCAwIDEgMCAwLTggNCA0IDAgMCAwIDAgOFpNMzggMjBhNCA0IDAgMSAwIDAtOCA0IDQgMCAwIDAgMCA4Wk0zOCAzNmE0IDQgMCAxIDAgMC04IDQgNCAwIDAgMCAwIDhaTTEwIDIwYTQgNCAwIDEgMCAwLTggNCA0IDAgMCAwIDAgOFpNMTAgMzZhNCA0IDAgMSAwIDAtOCA0IDQgMCAwIDAgMCA4WiIgZmlsbD0iI0ZGRTBCMiIgc3Ryb2tlPSIjRkY5ODAwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIHN0cm9rZS13aWR0aD0iMiIvPjwvc3ZnPg==',
 
-    kpLangExt: {
-        mmTargets: {
-            eng: `Current features list`,
-            cht: `現有功能清單`,
-        },
-        mmTargetsMsg: {
-            eng: `Features generally refer to entities such as pages, data, etc., and can also include features or services.`,
-            cht: `現有功能泛指實體的頁面、數據等，亦可為的功能或服務。`,
-        },
-    },
+    // kpLangExt: {
+    //     mmTargets: {
+    //         eng: `Current features list`,
+    //         cht: `現有功能清單`,
+    //     },
+    //     mmTargetsMsg: {
+    //         eng: `Features generally refer to entities such as pages, data, etc., and can also include features or services.`,
+    //         cht: `現有功能泛指實體的頁面、數據等，亦可為的功能或服務。`,
+    //     },
+    // },
 
 }
 
@@ -98,4 +98,4 @@ instWWebPerm.on('error', (err) => {
 })
 
 
-//node --experimental-modules srv.mjs
+//node srv.mjs

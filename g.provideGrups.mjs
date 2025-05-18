@@ -84,4 +84,4 @@ provide()
     })
 
 
-//node --experimental-modules g.provideGrups.mjs
+//node g.provideGrups.mjs
