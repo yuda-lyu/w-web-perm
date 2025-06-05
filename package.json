@@ -1,6 +1,6 @@
 {
   "name": "w-web-perm",
-  "version": "1.0.31",
+  "version": "1.0.32",
   "main": "dist/w-web-perm.umd.js",
   "dependencies": {
     "@mdi/js": "^7.4.47",
@@ -8,12 +8,12 @@
     "json5": "^2.2.3",
     "lodash": "^4.17.21",
     "showdown": "^2.1.0",
-    "w-component-vue": "^2.4.15",
+    "w-component-vue": "^2.4.20",
     "w-data-collector": "^1.0.22",
-    "w-serv-hapi": "^1.0.53",
-    "w-serv-orm": "^1.0.25",
+    "w-serv-hapi": "^1.0.55",
+    "w-serv-orm": "^1.0.26",
     "w-ui-loginout": "^1.0.9",
-    "wsemi": "^1.7.90"
+    "wsemi": "^1.7.92"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^5.0.8",
