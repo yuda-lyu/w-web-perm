@@ -846,13 +846,15 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
         //         return 'someAPI'
         //     },
         // },
-        {
-            method: 'GET',
-            path: '/getWebInfor',
-            handler: async function (req, res) {
-                return getWebInfor()
-            },
-        },
+
+        // {
+        //     method: 'GET',
+        //     path: '/getWebInfor',
+        //     handler: async function (req, res) {
+        //         return getWebInfor()
+        //     },
+        // },
+
         {
             method: 'GET',
             path: '/api/getUserByToken', //名稱getUserByToken為w-ui-loginout預設值, 若要更改兩邊須同時修改
@@ -1204,6 +1206,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
         methodsExec: ['select', 'insert', 'save', 'del', 'delAll'], //mix需於procOrm內註冊以提供
         tableNamesSync,
         kpFunExt: { //接收參數第1個為userId, 之後才是前端給予參數
+
             getWebInfor,
 
             getTargetsList,

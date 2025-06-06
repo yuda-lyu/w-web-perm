@@ -1,6 +1,6 @@
 {
   "name": "w-web-perm",
-  "version": "1.0.33",
+  "version": "1.0.34",
   "main": "dist/w-web-perm.umd.js",
   "dependencies": {
     "@mdi/js": "^7.4.47",
@@ -10,7 +10,7 @@
     "showdown": "^2.1.0",
     "w-component-vue": "^2.4.20",
     "w-data-collector": "^1.0.22",
-    "w-serv-hapi": "^1.0.56",
+    "w-serv-hapi": "^1.0.57",
     "w-serv-orm": "^1.0.26",
     "w-ui-loginout": "^1.0.9",
     "wsemi": "^1.7.92"
