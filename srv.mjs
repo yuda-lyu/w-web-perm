@@ -1,4 +1,4 @@
-import WOrm from 'w-orm-mongodb/src/WOrmMongodb.mjs' //自行選擇引用ORM, 使用Mongodb測試
+import WOrm from 'w-orm-lmdb/src/WOrmLmdb.mjs'
 import WWebPerm from './server/WWebPerm.mjs'
 import getSettings from './g.getSettings.mjs'
 
@@ -6,7 +6,7 @@ import getSettings from './g.getSettings.mjs'
 //st
 let st = getSettings()
 
-let url = `mongodb://${st.dbUsername}:${st.dbPassword}@${st.dbIP}:${st.dbPort}` //使用Mongodb測試
+let url = st.dbUrl
 let db = st.dbName
 let opt = {
 
@@ -76,8 +76,8 @@ let getUserByToken = async (token) => {
     return {}
 }
 
-let verifyBrowserUser = (user, caller) => {
-    console.log('verifyBrowserUser/user', user)
+let verifyClientUser = (user, caller) => {
+    console.log('verifyClientUser/user', user)
     // return false //測試無法登入
     console.log('於生產環境時得加入限制瀏覽器使用者身份機制')
     return user.isAdmin === 'y' //測試僅系統管理者使用
@@ -91,7 +91,7 @@ let verifyAppUser = (user, caller) => {
 }
 
 //WWebPerm
-let instWWebPerm = WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUser, opt)
+let instWWebPerm = WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser, opt)
 
 instWWebPerm.on('error', (err) => {
     console.log(err)

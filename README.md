@@ -20,7 +20,7 @@ npm i w-web-perm
 #### Example for server:
 > **Link:** [[dev source code](https://github.com/yuda-lyu/w-web-perm/blob/master/srv.mjs)]
 ```alias
-import WOrm from 'w-orm-mongodb/src/WOrmMongodb.mjs' //自行選擇引用ORM, 使用Mongodb測試
+import WOrm from 'w-orm-lmdb/src/WOrmLmdb.mjs'
 import WWebPerm from './server/WWebPerm.mjs'
 import getSettings from './g.getSettings.mjs'
 
@@ -28,7 +28,7 @@ import getSettings from './g.getSettings.mjs'
 //st
 let st = getSettings()
 
-let url = `mongodb://${st.dbUsername}:${st.dbPassword}@${st.dbIP}:${st.dbPort}` //使用Mongodb測試
+let url = st.dbUrl
 let db = st.dbName
 let opt = {
 

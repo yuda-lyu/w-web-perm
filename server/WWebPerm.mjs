@@ -39,7 +39,7 @@ import { getUserRules } from '../src/plugins/mShare.mjs'
  * @param {String} url 輸入資料庫連線字串，例如'mongodb://sername:password@$127.0.0.1:27017'
  * @param {String} db 輸入資料庫名稱字串
  * @param {Function} getUserByToken 輸入處理函數，函數會傳入使用者token，通過此函數處理後並回傳使用者資訊物件，並至少須提供'id'、'email'、'name'、'isAdmin'欄位，且'isAdmin'限輸入'y'或'n'，且輸入'y'時會複寫權限系統該使用者之'isAdmin'欄位值
- * @param {Function} verifyBrowserUser 輸入驗證瀏覽使用者身份之處理函數，函數會傳入使用者資訊物件，通過此函數識別後回傳布林值，允許使用者回傳true，反之回傳false
+ * @param {Function} verifyClientUser 輸入驗證瀏覽使用者身份之處理函數，函數會傳入使用者資訊物件，通過此函數識別後回傳布林值，允許使用者回傳true，反之回傳false
  * @param {Function} verifyAppUser 輸入驗證應用程序使用者身份之處理函數，函數會傳入使用者資訊物件，通過此函數識別後回傳布林值，允許使用者回傳true，反之回傳false
  * @param {Object} [opt={}] 輸入設定物件，預設{}
  * @param {Integer} [opt.serverPort=11006] 輸入伺服器通訊port，預設11006
@@ -55,7 +55,7 @@ import { getUserRules } from '../src/plugins/mShare.mjs'
  * @returns {Object} 回傳物件，其內server為hapi伺服器實體，wsrv為w-converhp的伺服器事件物件，wsds為w-serv-webdata的伺服器事件物件，可監聽error事件
  * @example
  *
- * import WOrm from 'w-orm-mongodb/src/WOrmMongodb.mjs' //自行選擇引用ORM, 使用Mongodb測試
+ * import WOrm from 'w-orm-lmdb/src/WOrmLmdb.mjs'
  * import WWebPerm from './server/WWebPerm.mjs'
  * import getSettings from './g.getSettings.mjs'
  *
@@ -63,7 +63,7 @@ import { getUserRules } from '../src/plugins/mShare.mjs'
  * //st
  * let st = getSettings()
  *
- * let url = `mongodb://${st.dbUsername}:${st.dbPassword}@${st.dbIP}:${st.dbPort}` //使用Mongodb測試
+ * let url = st.dbUrl
  * let db = st.dbName
  * let opt = {
  *
@@ -110,8 +110,8 @@ import { getUserRules } from '../src/plugins/mShare.mjs'
  *     return {}
  * }
  *
- * let verifyBrowserUser = (user, caller) => {
- *     console.log('verifyBrowserUser/user', user)
+ * let verifyClientUser = (user, caller) => {
+ *     console.log('verifyClientUser/user', user)
  *     // return false //測試無法登入
  *     console.log('於生產環境時得加入限制瀏覽器使用者身份機制')
  *     return user.isAdmin === 'y' //測試僅系統管理者使用
@@ -125,14 +125,14 @@ import { getUserRules } from '../src/plugins/mShare.mjs'
  * }
  *
  * //WWebPerm
- * let instWWebPerm = WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUser, opt)
+ * let instWWebPerm = WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser, opt)
  *
  * instWWebPerm.on('error', (err) => {
  *     console.log(err)
  * })
  *
  */
-function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUser, opt = {}) {
+function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser, opt = {}) {
     let instWServHapiServer = null
 
 
@@ -164,10 +164,10 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
     }
 
 
-    //check verifyBrowserUser
-    if (!isfun(verifyBrowserUser)) {
-        console.log('invalid verifyBrowserUser', verifyBrowserUser)
-        throw new Error('invalid verifyBrowserUser')
+    //check verifyClientUser
+    if (!isfun(verifyClientUser)) {
+        console.log('invalid verifyClientUser', verifyClientUser)
+        throw new Error('invalid verifyClientUser')
     }
 
 
@@ -563,14 +563,15 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
     }
 
 
-    //getAndVerifyBrowserTokenUser
-    let getAndVerifyBrowserTokenUser = async (token, caller = '') => {
+    //getAndVerifyClientUser
+    let getAndVerifyClientUser = async (token, caller = '') => {
+        //基於token查找client使用者, 會基於外部getUserByToken以及perm內部users進行查找並比對
 
         //getTokenUser
         let userSelf = await getTokenUser(token)
 
-        //verifyBrowserUser
-        let b = verifyBrowserUser(userSelf, caller)
+        //verifyClientUser
+        let b = verifyClientUser(userSelf, caller)
         if (ispm(b)) {
             b = await b
         }
@@ -586,9 +587,9 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
     }
 
 
-    //getAndVerifyAppTokenUser
-    let getAndVerifyAppTokenUser = async (token, caller = '') => {
-        //基於token查找使用者, 會基於外部getUserByToken進行查找, 故只要getUserByToken提供使用者即可, 可支援getUserByToken給予針對應用程式所產生之虛擬使用者
+    //getAndVerifyAppUser
+    let getAndVerifyAppUser = async (token, caller = '') => {
+        //基於token查找app使用者, 會基於外部getUserByToken進行查找, 故只要getUserByToken提供使用者即可, 可支援getUserByToken給予針對應用程式所產生之虛擬使用者
 
         //userSelf
         let userSelf = null
@@ -868,8 +869,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
                     let token = get(req, 'query.token', '')
                     // console.log('token', token)
 
-                    //getAndVerifyBrowserTokenUser
-                    let userSelf = await getAndVerifyBrowserTokenUser(token, 'getUserByToken')
+                    //getAndVerifyClientUser
+                    let userSelf = await getAndVerifyClientUser(token, 'getUserByToken')
                     // console.log('userSelf', userSelf)
 
                     //check
@@ -897,14 +898,14 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
                 // console.log('getPerm', req)
 
                 async function core() {
-                    //提供對象為node與browser使用者, node通常也為其他系統之browser使用者因須驗證而由node轉發, 皆須先檢測token是否有效, 再依照token取得使用者資訊物件, 再由其userId查詢回傳該使用者之權限資訊物件
+                    //提供對象為node與browser使用者, 提供對象有node是因為幫忙轉發其他系統browser使用者驗證需求, 皆須先檢測token是否有效, 再依照token取得使用者資訊物件, 再由其userId查詢回傳該使用者之權限資訊物件
 
                     //parseToken
                     let token = parseToken(req)
                     // console.log('token', token)
 
-                    //getAndVerifyBrowserTokenUser
-                    let userLogin = await getAndVerifyBrowserTokenUser(token, 'getPerm')
+                    //getAndVerifyClientUser
+                    let userLogin = await getAndVerifyClientUser(token, 'getPerm')
                     // console.log('userLogin', userLogin)
 
                     //check
@@ -962,8 +963,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
                     let token = get(req, 'query.token', '')
                     // console.log('token', token)
 
-                    //getAndVerifyAppTokenUser
-                    let userSelf = await getAndVerifyAppTokenUser(token, 'getPermById')
+                    //getAndVerifyAppUser
+                    let userSelf = await getAndVerifyAppUser(token, 'getPermById')
                     // console.log('userSelf', userSelf)
 
                     //check
@@ -1013,8 +1014,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
                     //token
                     let token = get(req, 'query.token', '')
 
-                    //getAndVerifyAppTokenUser
-                    let user = await getAndVerifyAppTokenUser(token, 'syncAndReplaceTargets')
+                    //getAndVerifyAppUser
+                    let user = await getAndVerifyAppUser(token, 'syncAndReplaceTargets')
 
                     //check
                     if (!iseobj(user)) {
@@ -1056,8 +1057,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
                     //token
                     let token = get(req, 'query.token', '')
 
-                    //getAndVerifyAppTokenUser
-                    let user = await getAndVerifyAppTokenUser(token, 'syncAndReplacePemis')
+                    //getAndVerifyAppUser
+                    let user = await getAndVerifyAppUser(token, 'syncAndReplacePemis')
 
                     //check
                     if (!iseobj(user)) {
@@ -1099,8 +1100,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
                     //token
                     let token = get(req, 'query.token', '')
 
-                    //getAndVerifyAppTokenUser
-                    let user = await getAndVerifyAppTokenUser(token, 'syncAndReplaceGrups')
+                    //getAndVerifyAppUser
+                    let user = await getAndVerifyAppUser(token, 'syncAndReplaceGrups')
 
                     //check
                     if (!iseobj(user)) {
@@ -1142,8 +1143,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
                     //token
                     let token = get(req, 'query.token', '')
 
-                    //getAndVerifyAppTokenUser
-                    let user = await getAndVerifyAppTokenUser(token, 'syncAndReplaceUsers')
+                    //getAndVerifyAppUser
+                    let user = await getAndVerifyAppUser(token, 'syncAndReplaceUsers')
 
                     //check
                     if (!iseobj(user)) {
@@ -1188,6 +1189,9 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
         port: opt.serverPort,
         pathStaticFiles,
         apis,
+        verifyConn: () => {
+            return true
+        },
         getUserIdByToken: async (token) => { //可使用async或sync函數
             // console.log('getUserIdByToken', token)
             let user = await getUserByToken(token)
@@ -1199,6 +1203,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyBrowserUser, verifyAppUse
             }
             return userId
         },
+        corsOrigins: ['*'],
         useDbOrm: true,
         kpOrm: woItems,
         operOrm: procOrm, //procOrm的輸入為: userId, tableName, methodName, input
