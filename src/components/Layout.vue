@@ -8,7 +8,7 @@
                 <div style="display:flex; align-items:center;">
 
                     <div style="padding-right:10px; display:flex; align-items:center;" v-if="webLogo">
-                        <img style="width:36px; height:36px;" :src="webLogo" />
+                        <img style="width:36px; _min-width:36px; height:36px;" :src="webLogo" />
                     </div>
 
                     <div>

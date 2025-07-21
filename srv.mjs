@@ -54,6 +54,8 @@ let opt = {
 }
 
 let getUserByToken = async (token) => {
+    // console.log('getUserByToken/token', token)
+    // console.log('於生產環境時得加入SSO等驗證token機制')
     // return {} //測試無法登入
     if (token === '{token-for-application}') { //提供外部應用系統作為存取使用者
         return {
@@ -72,21 +74,20 @@ let getUserByToken = async (token) => {
         }
     }
     console.log('invalid token', token)
-    console.log('於生產環境時得加入SSO等驗證token機制')
     return {}
 }
 
-let verifyClientUser = (user, caller) => {
-    console.log('verifyClientUser/user', user)
+let verifyClientUser = (user, from) => {
+    // console.log('verifyClientUser/user', user)
+    // console.log('於生產環境時得加入限制瀏覽器使用者身份機制')
     // return false //測試無法登入
-    console.log('於生產環境時得加入限制瀏覽器使用者身份機制')
     return user.isAdmin === 'y' //測試僅系統管理者使用
 }
 
-let verifyAppUser = (user, caller) => {
-    console.log('verifyAppUser/user', user)
+let verifyAppUser = (user, from) => {
+    // console.log('verifyAppUser/user', user)
+    // console.log('於生產環境時得加入限制應用程式使用者身份機制')
     // return false //測試無法登入
-    console.log('於生產環境時得加入限制應用程式使用者身份機制')
     return user.isAdmin === 'y' //測試僅系統管理者使用
 }
 
@@ -96,6 +97,5 @@ let instWWebPerm = WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, ver
 instWWebPerm.on('error', (err) => {
     console.log(err)
 })
-
 
 //node srv.mjs

@@ -1,13 +1,15 @@
 import map from 'lodash-es/map.js'
 import ds from './src/schema/index.mjs'
-import provideTargets from './server/provideTargets.mjs'
+import provideTabs from './server/provideTabs.mjs'
 
 
 async function provide() {
 
-    let url = `http://localhost:11006/syncAndReplaceTargets?token=sys`
+    let keyTable = 'targets'
 
     let from = `pd`
+
+    let url = `http://localhost:11006/syncAndReplaceTabs?keyTable=${keyTable}&token=sys`
 
     let rs = [
 
@@ -50,8 +52,8 @@ async function provide() {
     })
     console.log('rs', rs)
 
-    let r = await provideTargets(url, from, rs)
-    console.log('r.msg', r.msg)
+    let r = await provideTabs(url, keyTable, from, rs)
+    console.log('r', r)
 
 }
 
