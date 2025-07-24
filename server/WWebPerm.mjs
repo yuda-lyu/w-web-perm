@@ -316,25 +316,32 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     }
 
 
-    //getUsersList
-    let getUsersList = async (userId) => {
-        let rs = await woItems.users.select() //isActive為y或n都需要提供, 給前端編輯
-        return rs
-    }
+    // //getTargetsList
+    // let getTargetsList = async (userId) => {
+    //     let rs = await woItems.targets.select()
+    //     return rs
+    // }
 
 
-    //getRuleGroupsList
-    let getRuleGroupsList = async (userId) => {
-        let rs = await woItems.pemis.select()
-        return rs
-    }
+    // //getPemisList
+    // let getPemisList = async (userId) => {
+    //     let rs = await woItems.pemis.select()
+    //     return rs
+    // }
 
 
-    //getTargetsList
-    let getTargetsList = async (userId) => {
-        let rs = await woItems.targets.select()
-        return rs
-    }
+    // //getGrupsList
+    // let getGrupsList = async (userId) => {
+    //     let rs = await woItems.grups.select()
+    //     return rs
+    // }
+
+
+    // //getUsersList
+    // let getUsersList = async (userId) => {
+    //     let rs = await woItems.users.select()
+    //     return rs
+    // }
 
 
     //updateTabItems
@@ -520,34 +527,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         }
 
         //check userSelf
-        if (true) {
-            // let id = get(userSelf, 'id', '')
-            // if (!isestr(id)) {
-            //     console.log('userSelf', userSelf)
-            //     console.log('can not get the userId')
-            //     return Promise.reject(`can not get the userId`)
-            // }
-            // let email = get(userSelf, 'email', '')
-            // if (!isestr(email)) {
-            //     console.log('userSelf', userSelf)
-            //     console.log('can not get the email of user')
-            //     return Promise.reject(`can not get the email of user`)
-            // }
-            // let name = get(userSelf, 'name', '')
-            // if (!isestr(name)) {
-            //     console.log('userSelf', userSelf)
-            //     console.log('can not get userName')
-            //     return Promise.reject(`can not get userName`)
-            // }
-            // let isAdmin = get(userSelf, 'isAdmin', '')
-            // if (isAdmin !== 'y' && isAdmin !== 'n') {
-            //     console.log('userSelf', userSelf)
-            //     console.log('userSelf.isAdmin is not y or n', userSelf.isAdmin)
-            //     console.log('can not get the role of user')
-            //     return Promise.reject(`can not get the role of user`)
-            // }
-            await checkUser(userSelf)
-        }
+        await checkUser(userSelf)
 
         //須反查perm內users, 提供正規化屬性
         let vSelf = get(userSelf, mappingBy, '')
@@ -873,17 +853,6 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
     //apis
     let apis = [
-        // {
-        //     method: 'GET',
-        //     path: '/api/someAPI',
-        //     handler: async function (req, res) {
-
-        //         // //token
-        //         // let token = get(req, 'query.token', '')
-
-        //         return 'someAPI'
-        //     },
-        // },
 
         {
             method: 'GET',
@@ -939,7 +908,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                 // console.log('getPerm', req)
 
                 async function core() {
-                    //提供對象為node與browser使用者, 提供對象有node是因為幫忙轉發其他系統browser使用者驗證需求, 皆須先檢測token是否有效, 再依照token取得使用者資訊物件, 再由其userId查詢回傳該使用者之權限資訊物件
+                    //提供對象為node與browser端, 須為client使用者, 須先檢測token是否有效, 再依照token取得使用者資訊物件, 再由其userId查詢回傳該使用者之權限資訊物件
 
                     //token
                     let token = get(req, 'query.token', '')
@@ -954,7 +923,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                         return Promise.reject(`token does not have permission`)
                     }
 
-                    //getAndVerifyClientUser, 發起token的所屬使用者, 驗證須為client使用者
+                    //getAndVerifyClientUser, 發起token的所屬使用者, 驗證僅對client使用者, 不得使用app使用者
                     let userSelf = await getAndVerifyClientUser(token, 'getPerm')
                     // console.log('userSelf', userSelf)
 
@@ -1008,12 +977,12 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         },
         {
             method: 'GET',
-            path: '/api/getPermById',
+            path: '/api/getPermUserInfor',
             handler: async function (req, res) {
-                // console.log('getPermById', req)
+                // console.log('getPermUserInfor', req)
 
                 async function core() {
-                    //提供對象為node使用者, 須為系統管理者, 須先檢測token是否有效, 再由query取得欲查詢的使用者userId, 再由其userId查詢回傳該使用者權限資訊物件
+                    //提供對象為node端, 須為app使用者, 須先檢測token是否有效, 再由其userId查詢回傳該使用者權限資訊物件
 
                     //tokenSelf
                     let tokenSelf = get(req, 'query.token', '')
@@ -1022,8 +991,20 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                     //check
                     if (!isestr(tokenSelf)) {
                         console.log('req.query', get(req, 'query'))
+                        console.log('[API]getPermUserInfor/check tokenSelf: invalid tokenSelf')
+                        console.log(`token does not have permission`)
+                        return Promise.reject(`token does not have permission`)
+                    }
+
+                    //getAndVerifyAppUser, 發起token的所屬使用者, 驗證須為app使用者
+                    let userSelf = await getAndVerifyAppUser(tokenSelf, 'getPermUserInfor')
+                    // console.log('userSelf', userSelf)
+
+                    //check
+                    if (!iseobj(userSelf)) {
+                        console.log('req.query', get(req, 'query'))
                         console.log('tokenSelf', tokenSelf)
-                        console.log('[API]getPermById/check tokenSelf: invalid tokenSelf')
+                        console.log('[API]getPermUserInfor/check userSelf: invalid userSelf')
                         console.log(`token does not have permission`)
                         return Promise.reject(`token does not have permission`)
                     }
@@ -1035,20 +1016,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                     //check
                     if (!isestr(userIdFind)) {
                         console.log('req.query', get(req, 'query'))
-                        console.log('userIdFind', userIdFind)
-                        console.log('[API]getPermById/check userIdFind: invalid userIdFind')
-                        console.log(`token does not have permission`)
-                        return Promise.reject(`token does not have permission`)
-                    }
-
-                    //getAndVerifyAppUser, 發起token的所屬使用者, 驗證須為app使用者
-                    let userSelf = await getAndVerifyAppUser(tokenSelf, 'getPermById')
-                    // console.log('userSelf', userSelf)
-
-                    //check
-                    if (!iseobj(userSelf)) {
                         console.log('tokenSelf', tokenSelf)
-                        console.log('[API]getPermById/check userSelf: invalid userSelf')
+                        console.log('[API]getPermUserInfor/check userIdFind: invalid userIdFind')
                         console.log(`token does not have permission`)
                         return Promise.reject(`token does not have permission`)
                     }
@@ -1060,7 +1029,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                     //check
                     if (!iseobj(userWithRulesFind)) {
                         console.log('userIdFind', userIdFind)
-                        console.log('[API]getPermById/check userWithRulesFind: invalid userWithRulesFind')
+                        console.log('[API]getPermUserInfor/check userWithRulesFind: invalid userWithRulesFind')
                         console.log(`userId does not have permrules`)
                         return Promise.reject(`userId does not have permrules`)
                     }
@@ -1073,7 +1042,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                 if (isErr(r.msg)) {
                     r.msg = r.msg.message
                 }
-                // console.log('getPermById', r)
+                // console.log('getPermUserInfor', r)
 
                 return r
             },
@@ -1222,9 +1191,10 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
             getWebInfor,
 
-            getTargetsList,
-            getRuleGroupsList,
-            getUsersList,
+            // getTargetsList,
+            // getPemisList,
+            // getGrupsList,
+            // getUsersList,
 
             updateTargets,
             updatePemis,

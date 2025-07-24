@@ -1,6 +1,6 @@
 {
   "name": "w-web-perm",
-  "version": "1.0.36",
+  "version": "1.0.37",
   "main": "dist/w-web-perm.umd.js",
   "dependencies": {
     "@mdi/js": "^7.4.47",
@@ -12,8 +12,8 @@
     "w-data-collector": "^1.0.22",
     "w-serv-hapi": "^1.0.60",
     "w-serv-orm": "^1.0.29",
-    "w-ui-loginout": "^1.0.9",
-    "wsemi": "^1.8.15"
+    "w-ui-loginout": "^1.0.10",
+    "wsemi": "^1.8.16"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^5.0.8",
