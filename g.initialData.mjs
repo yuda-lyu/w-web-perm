@@ -188,9 +188,9 @@ async function initialData() {
             isAdmin,
         })
         v.id = `id-for-${name}`
-        if (name === 'john') {
-            v.email = `${v.email};john@test.com`
-        }
+        // if (name === 'john') {
+        //     v.email = `${v.email};john@test.com`
+        // }
         v.isAdmin = isAdmin //funNew會複寫isAdmin為n, 得另外重置
         return v
     })

@@ -57,9 +57,9 @@ async function provide() {
             isAdmin,
         })
         v.id = `id-for-${name}`
-        if (name === 'john') {
-            v.email = `${v.email};john@test.com`
-        }
+        // if (name === 'john') {
+        //     v.email = `${v.email};john@test.com`
+        // }
         v.isAdmin = isAdmin
         return v
     })

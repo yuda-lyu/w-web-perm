@@ -201,13 +201,33 @@
         >
 
             <template v-if="items">
-                <WAggridVueDyn
+                <WAggridVue
                     ref="rftable"
                     :style="`width:100%;`"
                     :height="contentHeight"
                     :opt="opt"
                 >
-                </WAggridVueDyn>
+                    <template v-slot:cell-render="props">
+                        <template v-if="props.key==='name'">
+                            <span v-if="errItemsByName[props.value]" :title="errItemsByName[props.value]">
+                                <span style="color:#F57C00;">{{ props.value }}</span>
+                                <img style="vertical-align:sub; width:16px; height:16px;" :src="$ui.getIcon('warning')" />
+                            </span>
+                            <span v-else>{{ props.value }}</span>
+                        </template>
+                        <template v-else-if="props.key==='belongGrups'">
+                            <div @click.stop.prevent @mousedown.stop.prevent>
+                                <button style="width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" @click="$dg.showVePemiBlngGrupsById(props.row.id)">{{ props.value }}</button>
+                            </div>
+                        </template>
+                        <template v-else-if="props.key==='crules'">
+                            <div @click.stop.prevent @mousedown.stop.prevent>
+                                <button style="width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" @click="$dg.showVeCrulesById(props.row.id)">{{ getCrulesText(props.value) }}</button>
+                            </div>
+                        </template>
+                        <span v-else>{{ props.value }}</span>
+                    </template>
+                </WAggridVue>
             </template>
 
         </template>
@@ -238,14 +258,13 @@ import isestr from 'wsemi/src/isestr.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import isnum from 'wsemi/src/isnum.mjs'
 import cdbl from 'wsemi/src/cdbl.mjs'
-import cstr from 'wsemi/src/cstr.mjs'
 import arrPull from 'wsemi/src/arrPull.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
 import WSwitch from 'w-component-vue/src/components/WSwitch.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
 import WPopup from 'w-component-vue/src/components/WPopup.vue'
 import WInputCheckbox from 'w-component-vue/src/components/WInputCheckbox.vue'
-import WAggridVueDyn from 'w-component-vue/src/components/WAggridVueDyn.vue'
+import WAggridVue from 'w-aggrid-vue/src/components/WAggridVue.vue'
 
 
 export default {
@@ -255,7 +274,7 @@ export default {
         WButtonCircle,
         WPopup,
         WInputCheckbox,
-        WAggridVueDyn,
+        WAggridVue,
     },
     props: {
         drawer: {
@@ -716,61 +735,6 @@ export default {
                         'belongGrups': false,
                         'crules': false,
                     },
-                    kpCellRender: {
-                        'name': (v) => {
-                            // console.log('kpCellRender name', v)
-
-                            //err
-                            let err = get(vo.errItemsByName, v, '')
-                            // console.log(v, err)
-
-                            //check
-                            if (isestr(err)) {
-                                v = `
-                                    <span title="${err}">
-                                        <span style="color:#F57C00;">${cstr(v)}</span>
-                                        <img style="vertical-align:sub; width:16px; height:16px;" src="${vo.$ui.getIcon('warning')}" />
-                                    </span>
-                                `
-                            }
-
-                            return v
-                        },
-                        'belongGrups': (v, k, r) => {
-                            // console.log('kpCellRender belongGrups', v, k, r)
-
-                            //id
-                            let id = get(r, 'id', '')
-                            // console.log('id', id, k, r)
-
-                            //因kpHeadFocusHighlight設定false時, 仍會於點擊其他可focus的cell, 再點回時依然出現highlight的focus邊框, 故改使用stopPropagation強制吃掉點擊訊息
-                            //因stopPropagation只吃掉訊息, 原本focus會處於原本可focus的cell, 再重複點時會於前個focus的cell出現highlight邊框, 故再多使用preventDefault阻止瀏覽器預設行為, 此等同於return false
-                            let t = `
-                                <div onclick="event.stopPropagation();event.preventDefault();" onmousedown="event.stopPropagation();event.preventDefault();">
-                                    <button style="width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" onclick="$vo.$dg.showVePemiBlngGrupsById('${id}')">${v}</button>
-                                </div>
-                            `
-
-                            return t
-                        },
-                        'crules': (v, k, r) => {
-                            // console.log('kpCellRender crules', v, k, r)
-
-                            //id
-                            let id = get(r, 'id', '')
-                            // console.log('id', id, k, r)
-
-                            //因kpHeadFocusHighlight設定false時, 仍會於點擊其他可focus的cell, 再點回時依然出現highlight的focus邊框, 故改使用stopPropagation強制吃掉點擊訊息
-                            //因stopPropagation只吃掉訊息, 原本focus會處於原本可focus的cell, 再重複點時會於前個focus的cell出現highlight邊框, 故再多使用preventDefault阻止瀏覽器預設行為, 此等同於return false
-                            let t = `
-                                <div onclick="event.stopPropagation();event.preventDefault();" onmousedown="event.stopPropagation();event.preventDefault();">
-                                    <button style="width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" onclick="$vo.$dg.showVeCrulesById('${id}')">${vo.getCrulesText(v)}</button>
-                                </div>
-                            `
-
-                            return t
-                        },
-                    },
                     rowsChange: (rs) => {
                         // console.log('rowsChange', rs)
                         // console.log('rowsChange cloneDeep(vo.opt.rows)', cloneDeep(vo.opt.rows))
@@ -801,7 +765,7 @@ export default {
             let vo = this
 
             //cmp
-            let cmp = get(vo, '$refs.rftable.$refs.$self')
+            let cmp = get(vo, '$refs.rftable')
             // console.log('cmp', cmp)
 
             //refresh, 因set不會觸發kpCellRender, 故須另外調用組件函數refresh, 進而觸發kpCellRender, 使能更新數據
@@ -813,7 +777,7 @@ export default {
             let vo = this
 
             //cmp
-            let cmp = get(vo, '$refs.rftable.$refs.$self')
+            let cmp = get(vo, '$refs.rftable')
             // console.log('cmp', cmp)
 
             //showKeys

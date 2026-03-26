@@ -201,13 +201,23 @@
         >
 
             <template v-if="items">
-                <WAggridVueDyn
+                <WAggridVue
                     ref="rftable"
                     :style="`width:100%;`"
                     :height="contentHeight"
                     :opt="opt"
                 >
-                </WAggridVueDyn>
+                    <template v-slot:cell-render="props">
+                        <template v-if="props.key==='id'">
+                            <span v-if="errItemsById[props.value]" :title="errItemsById[props.value]">
+                                <span style="color:#F57C00;">{{ props.value }}</span>
+                                <img style="vertical-align:sub; width:16px; height:16px;" :src="$ui.getIcon('warning')" />
+                            </span>
+                            <span v-else>{{ props.value }}</span>
+                        </template>
+                        <span v-else>{{ props.value }}</span>
+                    </template>
+                </WAggridVue>
             </template>
 
         </template>
@@ -235,14 +245,13 @@ import isestr from 'wsemi/src/isestr.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import isnum from 'wsemi/src/isnum.mjs'
 import cdbl from 'wsemi/src/cdbl.mjs'
-import cstr from 'wsemi/src/cstr.mjs'
 import arrPull from 'wsemi/src/arrPull.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
 import WSwitch from 'w-component-vue/src/components/WSwitch.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
 import WPopup from 'w-component-vue/src/components/WPopup.vue'
 import WInputCheckbox from 'w-component-vue/src/components/WInputCheckbox.vue'
-import WAggridVueDyn from 'w-component-vue/src/components/WAggridVueDyn.vue'
+import WAggridVue from 'w-aggrid-vue/src/components/WAggridVue.vue'
 
 
 export default {
@@ -252,7 +261,7 @@ export default {
         WButtonCircle,
         WPopup,
         WInputCheckbox,
-        WAggridVueDyn,
+        WAggridVue,
     },
     props: {
         drawer: {
@@ -605,44 +614,6 @@ export default {
                     kpCellEditable,
                     kpRowDrag,
                     kpHeadCheckBox,
-                    kpCellRender: {
-                        'id': (v) => {
-                            // console.log('kpCellRender', v)
-
-                            //err
-                            let err = get(vo.errItemsById, v, '')
-                            // console.log(v, err)
-
-                            //check
-                            if (isestr(err)) {
-                                v = `
-                                    <span title="${err}">
-                                        <span style="color:#F57C00;">${cstr(v)}</span>
-                                        <img style="vertical-align:sub; width:16px; height:16px;" src="${vo.$ui.getIcon('warning')}" />
-                                    </span>
-                                `
-                            }
-
-                            return v
-                        },
-                    },
-                    // kpCellTooltip: {
-                    //     'id': (v) => {
-                    //         // console.log('kpCellTooltip', v)
-
-                    //         //err
-                    //         let err = get(vo.errItemsById, v, '')
-                    //         // console.log(v, err)
-
-                    //         //check
-                    //         let t = ''
-                    //         if (isestr(err)) {
-                    //             t = err
-                    //         }
-
-                    //         return t
-                    //     },
-                    // },
                     rowsChange: (rs) => {
                         // console.log('rowsChange', rs)
                         // console.log('rowsChange cloneDeep(vo.opt.rows)', cloneDeep(vo.opt.rows))
@@ -673,7 +644,7 @@ export default {
             let vo = this
 
             //cmp
-            let cmp = get(vo, '$refs.rftable.$refs.$self')
+            let cmp = get(vo, '$refs.rftable')
             // console.log('cmp', cmp)
 
             //refresh, 因set不會觸發kpCellRender, 故須另外調用組件函數refresh, 進而觸發kpCellRender, 使能更新數據
@@ -685,7 +656,7 @@ export default {
             let vo = this
 
             //cmp
-            let cmp = get(vo, '$refs.rftable.$refs.$self')
+            let cmp = get(vo, '$refs.rftable')
             // console.log('cmp', cmp)
 
             //showKeys

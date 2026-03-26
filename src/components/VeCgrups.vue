@@ -116,13 +116,22 @@
                 </div>
 
                 <template v-if="items">
-                    <WAggridVueDyn
+                    <WAggridVue
                         ref="rftable"
                         :style="`width:100%;`"
                         :height="contentHeight"
                         :opt="opt"
                     >
-                    </WAggridVueDyn>
+                        <template v-slot:cell-render="props">
+                            <span v-if="props.key==='name'">{{ props.value }}</span>
+                            <select v-else-if="props.key==='mode'" @change="showVeCgrupsToggleItemModeByName(props.row.name, $event.target.value)" :disabled="!isEditable">
+                                <option value="OR" :selected="props.row.mode === 'OR'">OR</option>
+                                <option value="AND" :selected="props.row.mode === 'AND'">AND</option>
+                            </select>
+                            <input v-else-if="props.key==='enable'" type="checkbox" :checked="props.value === 'y'" @click="showVeCgrupsToggleItemEnableByName(props.row.name)" :disabled="!isEditable" />
+                            <span v-else>{{ props.value }}</span>
+                        </template>
+                    </WAggridVue>
                 </template>
 
                 <div
@@ -155,14 +164,14 @@ import iseobj from 'wsemi/src/iseobj.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import WDialog from 'w-component-vue/src/components/WDialog.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
-import WAggridVueDyn from 'w-component-vue/src/components/WAggridVueDyn.vue'
+import WAggridVue from 'w-aggrid-vue/src/components/WAggridVue.vue'
 
 
 export default {
     components: {
         WDialog,
         WButtonCircle,
-        WAggridVueDyn,
+        WAggridVue,
     },
     props: {
     },
@@ -380,46 +389,6 @@ export default {
                     // kpHeadCheckBox: {
                     //     'name': true,
                     // },
-                    kpCellRender: {
-                        'name': (v, k, r) => {
-                            // console.log('kpCellRender name', v)
-
-                            return v
-                        },
-                        'mode': (v, k, r) => {
-                            // console.log('kpCellRender mode', v)
-
-                            //name
-                            let name = get(r, 'name', '')
-                            // console.log('name', name, k, r)
-
-                            //mode
-                            let mode = get(r, 'mode', '')
-                            // console.log('mode', mode, k, r)
-
-                            let t = `
-                                <select onchange="$vo.$dg.showVeCgrupsToggleItemModeByName('${name}',this.value)" ${vo.isEditable ? '' : 'disabled'}>
-                                    <option value="OR" ${mode === 'OR' ? 'selected' : ''}>OR</option>
-                                    <option value="AND" ${mode === 'AND' ? 'selected' : ''}>AND</option>
-                                </select>
-                            `
-
-                            return t
-                        },
-                        'enable': (v, k, r) => {
-                            // console.log('kpCellRender enable', v, k, r)
-
-                            //name
-                            let name = get(r, 'name', '')
-                            // console.log('name', name, k, r)
-
-                            let t = `
-                                <input type="checkbox" ${v === 'y' ? 'checked' : ''} onclick="$vo.$dg.showVeCgrupsToggleItemEnableByName('${name}')" ${vo.isEditable ? '' : 'disabled'} />
-                            `
-
-                            return t
-                        },
-                    },
                     rowsChange: (rs) => {
                         // console.log('rowsChange', rs)
                         // console.log('rowsChange cloneDeep(vo.opt.rows)', cloneDeep(vo.opt.rows))
@@ -491,7 +460,7 @@ export default {
             let vo = this
 
             //cmp
-            let cmp = get(vo, '$refs.rftable.$refs.$self')
+            let cmp = get(vo, '$refs.rftable')
             // console.log('cmp', cmp)
 
             //refresh, 因set不會觸發kpCellRender, 故須另外調用組件函數refresh, 進而觸發kpCellRender, 使能更新數據
@@ -503,7 +472,7 @@ export default {
             let vo = this
 
             //cmp
-            let cmp = get(vo, '$refs.rftable.$refs.$self')
+            let cmp = get(vo, '$refs.rftable')
             // console.log('cmp', cmp)
 
             //getDisplayData

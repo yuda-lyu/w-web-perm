@@ -116,13 +116,18 @@
                 </div>
 
                 <template v-if="items">
-                    <WAggridVueDyn
+                    <WAggridVue
                         ref="rftable"
                         :style="`width:100%;`"
                         :height="contentHeight"
                         :opt="opt"
                     >
-                    </WAggridVueDyn>
+                        <template v-slot:cell-render="props">
+                            <span v-if="props.key==='id'">{{ props.value }}</span>
+                            <input v-else-if="props.key==='enable'" type="checkbox" :checked="props.value === 'y'" @click="toggleItemEnableById(props.row.id)" :disabled="!isEditable" />
+                            <span v-else>{{ props.value }}</span>
+                        </template>
+                    </WAggridVue>
                 </template>
 
                 <div
@@ -155,14 +160,14 @@ import iseobj from 'wsemi/src/iseobj.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import WDialog from 'w-component-vue/src/components/WDialog.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
-import WAggridVueDyn from 'w-component-vue/src/components/WAggridVueDyn.vue'
+import WAggridVue from 'w-aggrid-vue/src/components/WAggridVue.vue'
 
 
 export default {
     components: {
         WDialog,
         WButtonCircle,
-        WAggridVueDyn,
+        WAggridVue,
     },
     props: {
     },
@@ -374,26 +379,6 @@ export default {
                     // kpHeadCheckBox: {
                     //     'id': true,
                     // },
-                    kpCellRender: {
-                        'id': (v, k, r) => {
-                            // console.log('kpCellRender id', v)
-
-                            return v
-                        },
-                        'enable': (v, k, r) => {
-                            // console.log('kpCellRender enable', v, k, r)
-
-                            //id
-                            let id = get(r, 'id', '')
-                            // console.log('id', id, k, r)
-
-                            let t = `
-                                <input type="checkbox" ${v === 'y' ? 'checked' : ''} onclick="$vo.$dg.toggleItemEnableById('${id}')" ${vo.isEditable ? '' : 'disabled'} />
-                            `
-
-                            return t
-                        },
-                    },
                     rowsChange: (rs) => {
                         // console.log('rowsChange', rs)
                         // console.log('rowsChange cloneDeep(vo.opt.rows)', cloneDeep(vo.opt.rows))
@@ -465,7 +450,7 @@ export default {
             let vo = this
 
             //cmp
-            let cmp = get(vo, '$refs.rftable.$refs.$self')
+            let cmp = get(vo, '$refs.rftable')
             // console.log('cmp', cmp)
 
             //refresh, 因set不會觸發kpCellRender, 故須另外調用組件函數refresh, 進而觸發kpCellRender, 使能更新數據
@@ -477,7 +462,7 @@ export default {
             let vo = this
 
             //cmp
-            let cmp = get(vo, '$refs.rftable.$refs.$self')
+            let cmp = get(vo, '$refs.rftable')
             // console.log('cmp', cmp)
 
             //getDisplayData

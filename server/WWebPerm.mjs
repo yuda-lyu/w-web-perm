@@ -31,6 +31,7 @@ import WServHapiServer from 'w-serv-hapi/src/WServHapiServer.mjs'
 import WServOrm from 'w-serv-orm/src/WServOrm.mjs'
 import ds from '../src/schema/index.mjs'
 import { getUserRules } from '../src/plugins/mShare.mjs'
+import procLang from './procLang.mjs'
 
 
 /**
@@ -263,6 +264,10 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     let kpLangExt = get(opt, 'kpLangExt', null)
 
 
+    //kpLang
+    let kpLang = procLang({ kpLangExt, webName, webDescription })
+
+
     //WServOrm
     let optWServOrm = {
         useCheckUser,
@@ -283,13 +288,14 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     let getWebInfor = (userId) => {
         return {
 
-            webName,
-            webDescription,
+            // webName, //已併入kpLang
+            // webDescription, //已併入kpLang
             webLogo,
             // urlRedirect, //登入失敗就需要轉址, 故須通過html模板取代提供, 無法用api提供
 
             showLanguage,
             language,
+            kpLang,
 
             showModeEditTargets,
             showModeEditPemis,
@@ -309,8 +315,6 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             widthUsersName,
             widthUsersEmail,
             widthUsersDescription,
-
-            kpLangExt,
 
         }
     }
