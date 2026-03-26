@@ -46,6 +46,31 @@ import convertToTree from 'wsemi/src/convertToTree.mjs'
 let vo = Vue.prototype
 
 
+//連線建立前的 fallback 專用, 僅含連線狀態字串, 其餘語系皆由後端提供
+let kpFallback = {
+    csIng: {
+        eng: 'Connecting...',
+        cht: '連線中...',
+    },
+    csLogin: {
+        eng: 'Logged in',
+        cht: '已登入',
+    },
+    csLogout: {
+        eng: 'Logged out',
+        cht: '已登出',
+    },
+    csErrConn: {
+        eng: 'Unable to connect',
+        cht: '無法連線',
+    },
+    csErrLogin: {
+        eng: 'Login denied',
+        cht: '拒絕登入',
+    },
+}
+
+
 function setVo(vObj) {
     vo = vObj
 }
@@ -180,6 +205,11 @@ function getKpText(key) {
 
     //t
     let t = get(kpText, key, '')
+    if (!isestr(t)) {
+        // fallback: 後端語系尚未載入時使用預設值
+        let lang = getLang()
+        t = get(kpFallback, `${key}.${lang}`, '')
+    }
     if (!isestr(t)) {
         t = key
     }
