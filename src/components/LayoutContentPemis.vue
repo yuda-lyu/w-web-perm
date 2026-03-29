@@ -369,11 +369,21 @@ export default {
             vo.widthPemisName = get(vo, 'webInfor.widthPemisName', '')
             vo.widthPemisDescription = get(vo, 'webInfor.widthPemisDescription', '')
 
-            vo.firstSetting = false
+            //會觸發數據變更再導致opt變更導致觸發rowsChange等事件, 故得要延遲, 供組件偵測初始設定數據初始化之用
+            setTimeout(() => {
+                vo.firstSetting = false
+                // console.log('firstSetting', vo.firstSetting)
+            }, 1)
+
         }
 
     },
     computed: {
+
+        syncState: function() {
+            let vo = this
+            return get(vo, '$store.state.syncState')
+        },
 
         webInfor: function() {
             let wi = get(this, `$store.state.webInfor`)
@@ -738,6 +748,11 @@ export default {
                     rowsChange: (rs) => {
                         // console.log('rowsChange', rs)
                         // console.log('rowsChange cloneDeep(vo.opt.rows)', cloneDeep(vo.opt.rows))
+
+                        //check
+                        if (!vo.syncState || vo.firstLoading || vo.firstSetting) {
+                            return
+                        }
 
                         //isModified
                         vo.isModified = true

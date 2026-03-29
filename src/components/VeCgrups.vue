@@ -115,23 +115,29 @@
 
                 </div>
 
-                <template v-if="items">
-                    <WAggridVue
-                        ref="rftable"
-                        :style="`width:100%;`"
-                        :height="contentHeight"
-                        :opt="opt"
-                    >
-                        <template v-slot:cell-render="props">
-                            <span v-if="props.key==='name'">{{ props.value }}</span>
-                            <select v-else-if="props.key==='mode'" @change="showVeCgrupsToggleItemModeByName(props.row.name, $event.target.value)" :disabled="!isEditable">
-                                <option value="OR" :selected="props.row.mode === 'OR'">OR</option>
-                                <option value="AND" :selected="props.row.mode === 'AND'">AND</option>
-                            </select>
-                            <input v-else-if="props.key==='enable'" type="checkbox" :checked="props.value === 'y'" @click="showVeCgrupsToggleItemEnableByName(props.row.name)" :disabled="!isEditable" />
-                            <span v-else>{{ props.value }}</span>
-                        </template>
-                    </WAggridVue>
+                <template
+                    v-if="!firstLoading"
+                >
+
+                    <template v-if="items">
+                        <WAggridVue
+                            ref="rftable"
+                            :style="`width:100%;`"
+                            :height="contentHeight"
+                            :opt="opt"
+                        >
+                            <template v-slot:cell-render="props">
+                                <span v-if="props.key==='name'">{{ props.value }}</span>
+                                <select v-else-if="props.key==='mode'" @change="showVeCgrupsToggleItemModeByName(props.row.name, $event.target.value)" :disabled="!isEditable">
+                                    <option value="OR" :selected="props.row.mode === 'OR'">OR</option>
+                                    <option value="AND" :selected="props.row.mode === 'AND'">AND</option>
+                                </select>
+                                <input v-else-if="props.key==='enable'" type="checkbox" :checked="props.value === 'y'" @click="showVeCgrupsToggleItemEnableByName(props.row.name)" :disabled="!isEditable" />
+                                <span v-else>{{ props.value }}</span>
+                            </template>
+                        </WAggridVue>
+                    </template>
+
                 </template>
 
                 <div
@@ -196,6 +202,8 @@ export default {
             panelHeight: 100,
             headHeight: 100,
 
+            firstLoading: true,
+            firstSetting: true,
             isEditable: false,
             isModified: false,
 
@@ -217,8 +225,25 @@ export default {
         Vue.prototype.$dg.showVeCgrupsToggleItemModeByName = vo.showVeCgrupsToggleItemModeByName
         Vue.prototype.$dg.showVeCgrupsToggleItemEnableByName = vo.showVeCgrupsToggleItemEnableByName
 
+        //firstSetting
+        if (vo.firstSetting) {
+            // console.log('webInfor', vo.webInfor)
+
+            //會觸發數據變更再導致opt變更導致觸發rowsChange等事件, 故得要延遲, 供組件偵測初始設定數據初始化之用
+            setTimeout(() => {
+                vo.firstSetting = false
+                // console.log('firstSetting', vo.firstSetting)
+            }, 1)
+
+        }
+
     },
     computed: {
+
+        syncState: function() {
+            let vo = this
+            return get(vo, '$store.state.syncState')
+        },
 
         targets: function() {
             let rs = get(this, `$store.state.targets`)
@@ -392,6 +417,11 @@ export default {
                     rowsChange: (rs) => {
                         // console.log('rowsChange', rs)
                         // console.log('rowsChange cloneDeep(vo.opt.rows)', cloneDeep(vo.opt.rows))
+
+                        //check
+                        if (!vo.syncState || vo.firstLoading || vo.firstSetting) {
+                            return
+                        }
 
                         //isModified
                         vo.isModified = true
@@ -876,6 +906,9 @@ export default {
 
             //genOpt
             vo.genOpt()
+
+            //firstLoading
+            vo.firstLoading = false
 
             //bShow
             vo.bShow = true

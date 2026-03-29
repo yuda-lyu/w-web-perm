@@ -128,34 +128,40 @@
 
                 </div>
 
-                <template v-if="items">
-                    <WAggridVue
-                        ref="rftable"
-                        :style="`width:100%;`"
-                        :height="contentHeight"
-                        :opt="opt"
-                    >
-                        <template v-slot:cell-render="props">
-                            <template v-if="props.key==='pemisNames'">
-                                <span v-for="(item, idx) in props.row.pemis" :key="idx" style="display:inline-block; line-height:20px; height:20px;">
-                                    <div style="display:flex;">
-                                        <div :style="'padding:0px 5px; border-top-left-radius:4px; border-bottom-left-radius:4px; ' + (item.enable === 'y' ? 'border-left:1px solid #ac2451; border-right:1px solid #9e2149; border-top:1px solid #ac2451; border-bottom:1px solid #ac2451; background:#be295a; color:#fff;' : 'border-left:1px solid #aaaaaa; border-right:1px solid #aaaaaa; border-top:1px solid #aaaaaa; border-bottom:1px solid #aaaaaa; background:#ffffff; color:#555;')">
-                                            {{ item.mode }}
+                <template
+                    v-if="!firstLoading"
+                >
+
+                    <template v-if="items">
+                        <WAggridVue
+                            ref="rftable"
+                            :style="`width:100%;`"
+                            :height="contentHeight"
+                            :opt="opt"
+                        >
+                            <template v-slot:cell-render="props">
+                                <template v-if="props.key==='pemisNames'">
+                                    <span v-for="(item, idx) in props.row.pemis" :key="idx" style="display:inline-block; line-height:20px; height:20px;">
+                                        <div style="display:flex;">
+                                            <div :style="'padding:0px 5px; border-top-left-radius:4px; border-bottom-left-radius:4px; ' + (item.enable === 'y' ? 'border-left:1px solid #ac2451; border-right:1px solid #9e2149; border-top:1px solid #ac2451; border-bottom:1px solid #ac2451; background:#be295a; color:#fff;' : 'border-left:1px solid #aaaaaa; border-right:1px solid #aaaaaa; border-top:1px solid #aaaaaa; border-bottom:1px solid #aaaaaa; background:#ffffff; color:#555;')">
+                                                {{ item.mode }}
+                                            </div>
+                                            <div :style="'padding:0px 5px; border-top-right-radius:4px; border-bottom-right-radius:4px; ' + (item.enable === 'y' ? '_border-left:1px solid #ac2451; border-right:1px solid #ac2451; border-top:1px solid #ac2451; border-bottom:1px solid #ac2451; background:#d22f64; color:#fff;' : '_border-left:1px solid #aaaaaa; border-right:1px solid #aaaaaa; border-top:1px solid #aaaaaa; border-bottom:1px solid #aaaaaa; background:#eeeeee; color:#555;')">
+                                                {{ item.name }}
+                                            </div>
                                         </div>
-                                        <div :style="'padding:0px 5px; border-top-right-radius:4px; border-bottom-right-radius:4px; ' + (item.enable === 'y' ? '_border-left:1px solid #ac2451; border-right:1px solid #ac2451; border-top:1px solid #ac2451; border-bottom:1px solid #ac2451; background:#d22f64; color:#fff;' : '_border-left:1px solid #aaaaaa; border-right:1px solid #aaaaaa; border-top:1px solid #aaaaaa; border-bottom:1px solid #aaaaaa; background:#eeeeee; color:#555;')">
-                                            {{ item.name }}
-                                        </div>
-                                    </div>
-                                </span>
+                                    </span>
+                                </template>
+                                <select v-else-if="props.key==='mode'" @change="showVePemiBlngGrupsToggleItemModeByName(props.row.name, $event.target.value)" :disabled="!isEditable">
+                                    <option value="OR" :selected="props.row.mode === 'OR'">OR</option>
+                                    <option value="AND" :selected="props.row.mode === 'AND'">AND</option>
+                                </select>
+                                <input v-else-if="props.key==='enable'" type="checkbox" :checked="props.value === 'y'" @click="showVePemiBlngGrupsToggleItemEnableByName(props.row.name)" :disabled="!isEditable" />
+                                <span v-else>{{ props.value }}</span>
                             </template>
-                            <select v-else-if="props.key==='mode'" @change="showVePemiBlngGrupsToggleItemModeByName(props.row.name, $event.target.value)" :disabled="!isEditable">
-                                <option value="OR" :selected="props.row.mode === 'OR'">OR</option>
-                                <option value="AND" :selected="props.row.mode === 'AND'">AND</option>
-                            </select>
-                            <input v-else-if="props.key==='enable'" type="checkbox" :checked="props.value === 'y'" @click="showVePemiBlngGrupsToggleItemEnableByName(props.row.name)" :disabled="!isEditable" />
-                            <span v-else>{{ props.value }}</span>
-                        </template>
-                    </WAggridVue>
+                        </WAggridVue>
+                    </template>
+
                 </template>
 
                 <div
@@ -223,6 +229,8 @@ export default {
             panelHeight: 100,
             headHeight: 100,
 
+            firstLoading: true,
+            firstSetting: true,
             isEditable: false,
             isModified: false,
 
@@ -244,8 +252,25 @@ export default {
         Vue.prototype.$dg.showVePemiBlngGrupsToggleItemModeByName = vo.showVePemiBlngGrupsToggleItemModeByName
         Vue.prototype.$dg.showVePemiBlngGrupsToggleItemEnableByName = vo.showVePemiBlngGrupsToggleItemEnableByName
 
+        //firstSetting
+        if (vo.firstSetting) {
+            // console.log('webInfor', vo.webInfor)
+
+            //會觸發數據變更再導致opt變更導致觸發rowsChange等事件, 故得要延遲, 供組件偵測初始設定數據初始化之用
+            setTimeout(() => {
+                vo.firstSetting = false
+                // console.log('firstSetting', vo.firstSetting)
+            }, 1)
+
+        }
+
     },
     computed: {
+
+        syncState: function() {
+            let vo = this
+            return get(vo, '$store.state.syncState')
+        },
 
         targets: function() {
             let rs = get(this, `$store.state.targets`)
@@ -433,6 +458,11 @@ export default {
                     rowsChange: (rs) => {
                         // console.log('rowsChange', rs)
                         // console.log('rowsChange cloneDeep(vo.opt.rows)', cloneDeep(vo.opt.rows))
+
+                        //check
+                        if (!vo.syncState || vo.firstLoading || vo.firstSetting) {
+                            return
+                        }
 
                         //isModified
                         vo.isModified = true
@@ -1111,6 +1141,9 @@ export default {
 
             //genOpt
             vo.genOpt()
+
+            //firstLoading
+            vo.firstLoading = false
 
             //bShow
             vo.bShow = true

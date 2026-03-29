@@ -150,10 +150,9 @@ function getLang() {
         }
     }
 
-    //return
-    if (!isestr(lang)) {
-        return 'eng'
-    }
+    //validLang
+    lang = validLang(lang) //有可能給予非預期lang
+
     return lang
 }
 
@@ -165,9 +164,7 @@ function setLang(lang = null, from = '') {
     if (!isestr(lang)) {
         lang = getLang()
     }
-    else {
-        lang = validLang(lang)
-    }
+    lang = validLang(lang)
     // console.log('get lang', lang)
 
     //check, 若有變更才commit
