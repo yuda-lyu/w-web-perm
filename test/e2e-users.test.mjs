@@ -109,11 +109,23 @@ async function resetDb(browser, seed) {
 async function clickSave(page) {
     await iconBtn(page, MDI.upload).first().click()
 }
-//按 save → 等 isModified=false（save 按鈕[upload icon]消失）→ 等成功 toast 淡出（避免入鏡）
-async function saveAndSettle(page) {
+//按 save → 等 CheckYes 結果 modal 出現（System Message 標題 + OK 鈕）→ 停在 modal 顯示態供截圖。
+//系統已改用持久 CheckYes modal 呈現「操作主要結果」（取代舊 toast）：成功路徑 isModified=false 在 modal 前設、
+//失敗路徑 isModified 不重設，但兩者都會 showCheckYes，故統一以 systemMessage 標題偵測 modal 出現（成功/失敗皆適用）。
+async function saveAndWaitModal(page) {
     await clickSave(page)
-    await page.waitForFunction((p) => !document.querySelector(`div[role="button"] svg path[d="${p}"]`), MDI.upload, { timeout: 20000 })
-    await page.waitForTimeout(5000)
+    await waitUntilExist(page, 'CheckYes 結果 modal（systemMessage 標題）', () => {
+        const vo = window.$vo
+        return (document.body.innerText || '').includes(vo.$t('systemMessage'))
+    }, { timeout: 20000 })
+    await page.waitForTimeout(800) //modal 進場 settle（captureStable 再 retry-until-stable 收斂）
+}
+//語意斷言：CheckYes 結果 modal 顯示指定 i18n 訊息（lang-aware，eng/cht 皆適用）。
+//對 fail 類只斷言前綴鍵（userSaveUsersFail），不含動態 errTemp 字尾。
+async function assertModalMsg(page, i18nKey) {
+    const msg = await page.evaluate((k) => window.$vo.$t(k), i18nKey)
+    const txt = await page.evaluate(() => document.body.innerText)
+    assert.ok(txt.includes(msg), `結果 modal 應顯示 ${i18nKey}（${msg}）`)
 }
 
 //case 定義：run(page,lang) 走流程並回傳截圖 buffer；mocha 模式再加語意斷言
@@ -215,10 +227,11 @@ const CASES = [
             await clickAdd(page)
             await typeIntoCell(page, 0, 'name', 'NewUserE003')
             await typeIntoCell(page, 0, 'email', 'newuser-e003@test.com')
-            await saveAndSettle(page)
+            await saveAndWaitModal(page)
             return await captureStable(page)
         },
         semantic: async (page) => {
+            await assertModalMsg(page, 'userSaveUsersSuccess') //結果 modal 顯示儲存成功
             const has = await page.evaluate(() => (window.$vo.$store.state.users || []).some((u) => u.email === 'newuser-e003@test.com'))
             assert.ok(has, '新使用者應寫入 DB（store 同步）')
             const n = await page.evaluate(() => (window.$vo.$store.state.users || []).length)
@@ -232,10 +245,11 @@ const CASES = [
             await gotoUsers(page)
             await page.locator('.ag-row[row-index="0"] .ag-cell[col-id="isActive"] input[type="checkbox"]').first().click()
             await page.waitForTimeout(500)
-            await saveAndSettle(page)
+            await saveAndWaitModal(page)
             return await captureStable(page)
         },
         semantic: async (page) => {
+            await assertModalMsg(page, 'userSaveUsersSuccess') //結果 modal 顯示儲存成功
             //row 0 = peter（依 order 排序最前）；isActive 由 y 切為 n
             const peter = await page.evaluate(() => (window.$vo.$store.state.users || []).find((u) => u.email === 'peter@example.com'))
             assert.equal(peter && peter.isActive, 'n', 'peter isActive 應切為 n')
@@ -249,10 +263,11 @@ const CASES = [
             await checkRow(page, 0) //勾選 peter（row 0）
             await iconBtn(page, MDI.trash).first().click()
             await page.waitForTimeout(500)
-            await saveAndSettle(page)
+            await saveAndWaitModal(page)
             return await captureStable(page)
         },
         semantic: async (page) => {
+            await assertModalMsg(page, 'userSaveUsersSuccess') //結果 modal 顯示儲存成功
             const has = await page.evaluate(() => (window.$vo.$store.state.users || []).some((u) => u.email === 'peter@example.com'))
             assert.ok(!has, 'peter 應已刪除')
             const n = await page.evaluate(() => (window.$vo.$store.state.users || []).length)
@@ -268,10 +283,11 @@ const CASES = [
             await iconBtn(page, MDI.copy).first().click() //複製，複製列插入最首 row 0
             await page.waitForTimeout(700)
             await typeIntoCell(page, 0, 'email', 'peter-copy-e004@test.com') //改唯一 email（避免與來源重複）
-            await saveAndSettle(page)
+            await saveAndWaitModal(page)
             return await captureStable(page)
         },
         semantic: async (page) => {
+            await assertModalMsg(page, 'userSaveUsersSuccess') //結果 modal 顯示儲存成功
             const has = await page.evaluate(() => (window.$vo.$store.state.users || []).some((u) => u.email === 'peter-copy-e004@test.com'))
             assert.ok(has, '複製出的使用者應寫入 DB')
             const n = await page.evaluate(() => (window.$vo.$store.state.users || []).length)
@@ -287,11 +303,11 @@ const CASES = [
             await typeIntoCell(page, 0, 'name', 'TokenFailUser')
             await typeIntoCell(page, 0, 'email', 'tokenfail-e010@test.com')
             await page.evaluate(() => { window.$vo.$ui.updateUserToken('invalid-token-e010') }) //setup：模擬 token 失效
-            await clickSave(page)
-            await page.waitForTimeout(6000) //等失敗 toast 淡出（儲存失敗：isModified 不重設、DB 不變）
+            await saveAndWaitModal(page) //儲存失敗 → 顯示 CheckYes 失敗 modal（isModified 不重設、DB 不變）
             return await captureStable(page)
         },
         semantic: async (page) => {
+            await assertModalMsg(page, 'userSaveUsersFail') //結果 modal 顯示儲存失敗（前綴；字尾為後端 errTemp 確定字串）
             const has = await page.evaluate(() => (window.$vo.$store.state.users || []).some((u) => u.email === 'tokenfail-e010@test.com'))
             assert.ok(!has, 'token 失效，使用者不應寫入 DB')
             const n = await page.evaluate(() => (window.$vo.$store.state.users || []).length)
@@ -300,14 +316,26 @@ const CASES = [
     },
 ]
 
+//手術式重產（§6.3）：--names a,b,c 只產指定 case；--langs eng,cht 只產指定語系。截圖「前」就 gate（省截圖成本）。
+function argList(flag) {
+    const i = process.argv.indexOf(flag)
+    if (i >= 0 && process.argv[i + 1]) return process.argv[i + 1].split(',').map((s) => s.trim()).filter(Boolean)
+    return null
+}
+//前綴或完整匹配：傳 'E2E-003' 即可匹配 'E2E-003-add-save'（避免 §6.3 殷鑑「--names 只認字面」陷阱）
+function nameMatch(list, caseName) { return list.some((nm) => caseName === nm || caseName.startsWith(nm)) }
 async function generateBaseline() {
     console.log('=== 產製 users baseline 開始 ===')
+    const onlyNames = argList('--names')
+    const onlyLangs = argList('--langs')
     await startServersOnce()
     fs.mkdirSync(PICS_DIR, { recursive: true })
     //擷取 pristine base seed（DB 剛 fresh seed，4 筆）——用臨時 browser
     { const b = await launchBrowser(); const pp = await openApp(b); BASE_SEED = await captureBaseSeed(pp); await b.close() }
     for (const lang of LANGS) {
+        if (onlyLangs && !nameMatch(onlyLangs, lang)) continue //§6.3 手術式：跳過未指定語系
         for (const c of CASES) {
+            if (onlyNames && !nameMatch(onlyNames, c.name)) continue //§6.3 手術式：截圖前 gate，跳過未指定 case
             //per-case fresh browser（每 case 全新 browser 進程，消除 GPU/font/CSS cache 跨 case 累積造成
             //的 cold/warm 差異；對齊 sso e2e-adduser 之 per-case chromium.launch，確保 gen 與 mocha 收斂同態）
             const browser = await launchBrowser()

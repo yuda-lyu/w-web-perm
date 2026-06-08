@@ -1192,7 +1192,8 @@ export default {
 
                 //check
                 if (isestr(vo.isError)) {
-                    vo.$alert(`${vo.isError}`, { type: 'error' })
+                    vo.$ui.updateLoading(false)
+                    await vo.$dg.showCheckYes(`${vo.isError}`)
                     return
                 }
 
@@ -1201,7 +1202,8 @@ export default {
 
                 //check
                 if (size(rows) === 0) {
-                    vo.$alert(`${vo.$t('pemiAddEmpty')}`, { type: 'error' })
+                    vo.$ui.updateLoading(false)
+                    await vo.$dg.showCheckYes(`${vo.$t('pemiAddEmpty')}`)
                     return
                 }
 
@@ -1213,7 +1215,8 @@ export default {
 
                 //check
                 if (errTemp !== null) {
-                    vo.$alert(`${vo.$t('pemiSavePemisFail')}: ${errTemp}`, { type: 'error' })
+                    vo.$ui.updateLoading(false)
+                    await vo.$dg.showCheckYes(`${vo.$t('pemiSavePemisFail')}: ${errTemp}`)
                     return
                 }
 
@@ -1221,7 +1224,8 @@ export default {
                 vo.isModified = false
 
                 //alert
-                vo.$alert(vo.$t('pemiSavePemisSuccess'))
+                vo.$ui.updateLoading(false)
+                await vo.$dg.showCheckYes(vo.$t('pemiSavePemisSuccess'))
 
             }
 

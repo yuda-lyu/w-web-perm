@@ -1190,7 +1190,8 @@ export default {
 
                 //check
                 if (isestr(vo.isError)) {
-                    vo.$alert(`${vo.isError}`, { type: 'error' })
+                    vo.$ui.updateLoading(false)
+                    await vo.$dg.showCheckYes(`${vo.isError}`)
                     return
                 }
 
@@ -1199,7 +1200,8 @@ export default {
 
                 //check
                 if (size(rows) === 0) {
-                    vo.$alert(`${vo.$t('grupAddEmpty')}`, { type: 'error' })
+                    vo.$ui.updateLoading(false)
+                    await vo.$dg.showCheckYes(`${vo.$t('grupAddEmpty')}`)
                     return
                 }
 
@@ -1211,7 +1213,8 @@ export default {
 
                 //check
                 if (errTemp !== null) {
-                    vo.$alert(`${vo.$t('grupSaveGrupsFail')}: ${errTemp}`, { type: 'error' })
+                    vo.$ui.updateLoading(false)
+                    await vo.$dg.showCheckYes(`${vo.$t('grupSaveGrupsFail')}: ${errTemp}`)
                     return
                 }
 
@@ -1219,7 +1222,8 @@ export default {
                 vo.isModified = false
 
                 //alert
-                vo.$alert(vo.$t('grupSaveGrupsSuccess'))
+                vo.$ui.updateLoading(false)
+                await vo.$dg.showCheckYes(vo.$t('grupSaveGrupsSuccess'))
 
             }
 

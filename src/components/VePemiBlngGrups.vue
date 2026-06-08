@@ -965,7 +965,7 @@ export default {
 
             //check
             if (size(rows) === 0) {
-                vo.$alert(`${vo.$t('grupSaveGrupsEmpty')}`, { type: 'error' })
+                await vo.$dg.showCheckYes(`${vo.$t('grupSaveGrupsEmpty')}`)
                 return
             }
 
@@ -977,12 +977,12 @@ export default {
 
             //check
             if (errTemp !== null) {
-                vo.$alert(`${vo.$t('grupSaveGrupsFail')}: ${errTemp}`, { type: 'error' })
+                await vo.$dg.showCheckYes(`${vo.$t('grupSaveGrupsFail')}: ${errTemp}`)
                 return
             }
 
             //alert
-            vo.$alert(vo.$t('grupSaveGrupsSuccess'))
+            await vo.$dg.showCheckYes(vo.$t('grupSaveGrupsSuccess'))
 
         },
 

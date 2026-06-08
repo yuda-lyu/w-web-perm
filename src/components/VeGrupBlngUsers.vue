@@ -965,7 +965,7 @@ export default {
 
             //check
             if (size(rows) === 0) {
-                vo.$alert(`${vo.$t('userSaveUsersEmpty')}`, { type: 'error' })
+                await vo.$dg.showCheckYes(`${vo.$t('userSaveUsersEmpty')}`)
                 return
             }
 
@@ -977,12 +977,12 @@ export default {
 
             //check
             if (errTemp !== null) {
-                vo.$alert(`${vo.$t('userSaveUsersFail')}: ${errTemp}`, { type: 'error' })
+                await vo.$dg.showCheckYes(`${vo.$t('userSaveUsersFail')}: ${errTemp}`)
                 return
             }
 
             //alert
-            vo.$alert(vo.$t('userSaveUsersSuccess'))
+            await vo.$dg.showCheckYes(vo.$t('userSaveUsersSuccess'))
 
         },
 

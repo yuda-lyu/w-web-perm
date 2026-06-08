@@ -835,7 +835,8 @@ export default {
 
                 //check
                 if (isestr(vo.isError)) {
-                    vo.$alert(`${vo.isError}`, { type: 'error' })
+                    vo.$ui.updateLoading(false)
+                    await vo.$dg.showCheckYes(`${vo.isError}`)
                     return
                 }
 
@@ -844,7 +845,8 @@ export default {
 
                 //check
                 if (size(rows) === 0) {
-                    vo.$alert(`${vo.$t('targetAddEmpty')}`, { type: 'error' })
+                    vo.$ui.updateLoading(false)
+                    await vo.$dg.showCheckYes(`${vo.$t('targetAddEmpty')}`)
                     return
                 }
 
@@ -856,7 +858,8 @@ export default {
 
                 //check
                 if (errTemp !== null) {
-                    vo.$alert(`${vo.$t('targetSaveTargetsFail')}: ${errTemp}`, { type: 'error' })
+                    vo.$ui.updateLoading(false)
+                    await vo.$dg.showCheckYes(`${vo.$t('targetSaveTargetsFail')}: ${errTemp}`)
                     return
                 }
 
@@ -864,7 +867,8 @@ export default {
                 vo.isModified = false
 
                 //alert
-                vo.$alert(vo.$t('targetSaveTargetsSuccess'))
+                vo.$ui.updateLoading(false)
+                await vo.$dg.showCheckYes(vo.$t('targetSaveTargetsSuccess'))
 
             }
 

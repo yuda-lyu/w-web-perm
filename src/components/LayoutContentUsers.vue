@@ -1161,7 +1161,8 @@ export default {
 
                 //check
                 if (isestr(vo.isError)) {
-                    vo.$alert(`${vo.isError}`, { type: 'error' })
+                    vo.$ui.updateLoading(false)
+                    await vo.$dg.showCheckYes(`${vo.isError}`)
                     return
                 }
 
@@ -1170,7 +1171,8 @@ export default {
 
                 //check
                 if (size(rows) === 0) {
-                    vo.$alert(`${vo.$t('userAddEmpty')}`, { type: 'error' })
+                    vo.$ui.updateLoading(false)
+                    await vo.$dg.showCheckYes(`${vo.$t('userAddEmpty')}`)
                     return
                 }
 
@@ -1182,7 +1184,8 @@ export default {
 
                 //check
                 if (errTemp !== null) {
-                    vo.$alert(`${vo.$t('userSaveUsersFail')}: ${errTemp}`, { type: 'error' })
+                    vo.$ui.updateLoading(false)
+                    await vo.$dg.showCheckYes(`${vo.$t('userSaveUsersFail')}: ${errTemp}`)
                     return
                 }
 
@@ -1190,7 +1193,8 @@ export default {
                 vo.isModified = false
 
                 //alert
-                vo.$alert(vo.$t('userSaveUsersSuccess'))
+                vo.$ui.updateLoading(false)
+                await vo.$dg.showCheckYes(vo.$t('userSaveUsersSuccess'))
 
             }
 
