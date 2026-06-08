@@ -27,7 +27,12 @@
     - **Save/Close 鈕**：WDialog header WButtonCircle（mdiCheckCircle save **僅 isModified=true 才渲染**、mdiClose close）。
     - **loading 修正（modal 改動漏修的補修）**：VeGrupBlngUsers.saveUsers / VePemiBlngGrups.saveGrups 先前未在 showCheckYes 前關 loading（clickSave 包裝層有 loading），導致「Processing...」loading bar（JS 驅動進度，captureStable 凍不到）疊在 modal 後 → E2E-005 cht 微 flake（147px）。修＝showCheckYes 前 updateLoading(false)（比照 LayoutContent）。
   - [x] **群組權限關聯 完成**：test/e2e-rela-grup-pemi.test.mjs（5 cases × eng/cht = 10 baseline 全綠）。VeCpemis（grups 頁 cpemis 欄 resolve）+ VePemiBlngGrups（pemis 頁 belongGrups 欄 own-save）→ 皆改 grups.cpemis。E2E-002 對話框 resolve **後再點群組頁工具列存檔→DB+modal**；E2E-005 唯讀檢視（關編輯模式→對話框 disabled、無 Save 鈕）。title 鍵 grupEditCpemis/pemiBlngEditGrups。
-  - [ ] 流程_權限規則關聯（VeCrules → pemis.crules，最後一個 B flow，僅單一編輯器 VeCrules）
+  - [x] **權限規則關聯 完成**：test/e2e-rela-pemi-rule.test.mjs（5 cases × eng/cht = 10 baseline 全綠）。**單一編輯器 VeCrules**（resolve 型）；crules 結構 key=target id/value='y'|'n' 純字串（無 mode 欄，異於 cpemis 的 {mode,isActive}）；grid=targets 列+enable checkbox。E2E-004 對話框 Save resolve→權限頁工具列存檔→pemiSavePemisSuccess modal + DB P1.crules。title 鍵 pemiEditCrules。
+- **B 全部完成（3/3：使用者群組/群組權限/權限規則關聯）。**
+
+### 剩 C shell e2e + users spec 補
+- **C**：流程_應用啟動與登入（登入委派 w-ui-loginout，e2e-users openApp 已間接覆蓋登入；優先序最低，可能僅驗 app 啟動 + 登入著陸頁）。
+- **users spec 結果呈現待補 toast→modal**（modal 已實作 875a721，唯 users spec 未改；A/B 各 spec 已改）。
   - 對話框已在 A 的 relation-dialog case 驗證可開啟。
 - **C shell e2e**：流程_應用啟動與登入（登入委派 w-ui-loginout，pilot 已間接覆蓋；優先序最低）。
 - **users spec 結果呈現待補**（modal 已實作 875a721，但 users spec 未改 toast→modal）。
