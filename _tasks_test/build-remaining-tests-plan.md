@@ -30,9 +30,13 @@
   - [x] **權限規則關聯 完成**：test/e2e-rela-pemi-rule.test.mjs（5 cases × eng/cht = 10 baseline 全綠）。**單一編輯器 VeCrules**（resolve 型）；crules 結構 key=target id/value='y'|'n' 純字串（無 mode 欄，異於 cpemis 的 {mode,isActive}）；grid=targets 列+enable checkbox。E2E-004 對話框 Save resolve→權限頁工具列存檔→pemiSavePemisSuccess modal + DB P1.crules。title 鍵 pemiEditCrules。
 - **B 全部完成（3/3：使用者群組/群組權限/權限規則關聯）。**
 
-### 剩 C shell e2e + users spec 補
-- **C**：流程_應用啟動與登入（登入委派 w-ui-loginout，e2e-users openApp 已間接覆蓋登入；優先序最低，可能僅驗 app 啟動 + 登入著陸頁）。
-- **users spec 結果呈現待補 toast→modal**（modal 已實作 875a721，唯 users spec 未改；A/B 各 spec 已改）。
+### ✅ C shell e2e + users spec 補 完成
+- **C 完成**：test/e2e-startup.test.mjs（5 cases × eng/cht = 10 baseline 全綠）。測 LayoutState 連線狀態畫面 + 登入分流。openRaw helper（不等 csLogin）+ `$vo.$ui.updateConnState` 操控狀態。E2E-001 csIng / E2E-002 登入成功四頁籤 / E2E-003 csErrLogin（**改 forceConnState 避開 ?token=error 的重導 navigation**）/ E2E-004 csErrConn / E2E-005 語言切換。csIng 連線動畫圖由 captureStable 自動遮 animate-img。
+- **users spec 補完成**：流程_後台使用者清單.md 結果呈現 toast→modal（i18n 表 + trace + 規則摘要 + E2E 描述）。
+
+## 🎉 全部完成：12/12 flow 測試 + 演算法 unit
+測試覆蓋 12 份流程文件全部：A 後台 CRUD(targets/grups/pemis/users) + B 關聯編輯(使用者群組/群組權限/權限規則) + C shell(應用啟動與登入) + D 查詢 API(getPerm/getPermUserInfor/syncAndReplaceTabs) + getUserRules unit。
+**本 session 9 commits**（875a721 modal、f627df8 D API、cbfd4d5 targets、7c1a343 grups、6640cfb pemis、5287974 rela-user-grup+loading 修、e721b09 rela-grup-pemi、02810ee rela-pemi-rule、+startup 待 commit）。
   - 對話框已在 A 的 relation-dialog case 驗證可開啟。
 - **C shell e2e**：流程_應用啟動與登入（登入委派 w-ui-loginout，pilot 已間接覆蓋；優先序最低）。
 - **users spec 結果呈現待補**（modal 已實作 875a721，但 users spec 未改 toast→modal）。
