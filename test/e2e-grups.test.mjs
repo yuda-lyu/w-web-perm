@@ -9,7 +9,7 @@
 //save 結果（成功 / 失敗 / 空 / errInNames）皆走 $dg.showCheckYes 持久 modal。
 import fs from 'fs'
 import assert from 'assert'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, waitUntilExist } from './e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, waitUntilExist, getResolvedActiveTargets } from './e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/grups'
 const LANGS = ['eng', 'cht']
@@ -223,6 +223,11 @@ const CASES = [
             assert.ok(!has, `base seed 第一列（${delName}）應已刪除`)
             const n = await page.evaluate(() => (window.$vo.$store.state.grups || []).length)
             assert.equal(n, BASE_SEED.length - 1, `DB 應為 base-1（${BASE_SEED.length - 1}）筆`)
+            //【端到端不變式：刪 group → 受影響 user 權限樹】base seed row 0 = 權限群組M1，peter 屬之（唯一群組）；
+            //刪 M1 後 peter 失去唯一群組 → 解析後權限樹應為空 []（getUserRules 對 peter.cgrups 殘留的 M1 引用找不到群組而忽略）。
+            //驗 getPermUserInfor 回傳的 resolved 權限樹，守護「刪群組 → 受影響使用者權限正確縮減」。
+            const tree = await getResolvedActiveTargets(page, 'id-for-peter')
+            assert.deepEqual(tree, [], `刪除 peter 唯一群組 ${delName} 後，其解析後權限樹應為空（實得 ${JSON.stringify(tree)}）`)
         },
     },
     {
