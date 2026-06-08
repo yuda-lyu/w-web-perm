@@ -79,9 +79,11 @@ function spawnSrv(name, cmd, args, opts = {}) {
     return child
 }
 
-export async function startServersOnce() {
+export async function startServersOnce(opts = {}) {
     if (started) return
     started = true
+
+    const { backendOnly = false } = opts
 
     //後端：已起→reuse；沒人→先 seed 再 spawn（seed 須在後端開 lmdb 前）
     const backendUp = await httpOk(`${apiBaseUrl}/`)
@@ -90,6 +92,9 @@ export async function startServersOnce() {
         spawnSrv('backend', 'node', ['srv.mjs'])
         await waitPort(`${apiBaseUrl}/`, 'backend 11006', 60000)
     }
+
+    //API 契約測試（D 類）只需 backend，省去 frontend webpack 首編（~2 分）；e2e 不傳此旗標→照起前端
+    if (backendOnly) return
 
     //前端 dev server：已起→reuse；沒人→spawn（webpack 首編較久）
     const frontendUp = await httpOk(`${baseUrl}/`)

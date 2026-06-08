@@ -36,9 +36,6 @@ async function getPerm(url, tokenTar, opt = {}) {
 
     //check
     if (errTemp !== null) {
-        console.log('res', res)
-        console.log('errTemp', errTemp)
-        console.log(`can not get user by url[${url}]`)
         return Promise.reject(`can not get user by url[${url}]`) //由SSO取得使用者資訊錯誤
     }
 
@@ -53,11 +50,6 @@ async function getPerm(url, tokenTar, opt = {}) {
 
     //check
     if (state !== 'success') {
-        console.log('res', res)
-        console.log('data', data)
-        console.log('state', state)
-        console.log('errTemp', msg)
-        console.log(`can not get user data by url[${url}]`)
         return Promise.reject(`can not get user data by url[${url}]`) //取得使用者資訊失敗
     }
 
@@ -67,7 +59,6 @@ async function getPerm(url, tokenTar, opt = {}) {
 
     //check
     if (!iseobj(ur)) {
-        console.log(`no user data by url[${url}]`)
         return Promise.reject(`no user data by url[${url}]`)
     }
 
@@ -83,7 +74,6 @@ async function getPerm(url, tokenTar, opt = {}) {
 
         //check
         if (!iseobj(ur)) {
-            console.log(`no user data after funConvertPerm`)
             return Promise.reject(`no user data after funConvertPerm`)
         }
 
