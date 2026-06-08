@@ -26,8 +26,8 @@
     - **兩編輯器行為不同**：VeCgrups（users 頁 cgrups 欄，Cxxx-resolve 型）Save **resolve cgrups 字串回 parent 前端暫存、無 modal**（E2E-002 斷言前端 cgrups 文字 1→2，不期待 success modal）；E2E-003 Close 取消。VeGrupBlngUsers（grups 頁 belongUsers 欄，own-save 型）Save **自己 $fapi.updateUsers 寫 DB + showCheckYes modal**（E2E-005 斷言 modal + store users[mary].cgrups 含 M1）。
     - **Save/Close 鈕**：WDialog header WButtonCircle（mdiCheckCircle save **僅 isModified=true 才渲染**、mdiClose close）。
     - **loading 修正（modal 改動漏修的補修）**：VeGrupBlngUsers.saveUsers / VePemiBlngGrups.saveGrups 先前未在 showCheckYes 前關 loading（clickSave 包裝層有 loading），導致「Processing...」loading bar（JS 驅動進度，captureStable 凍不到）疊在 modal 後 → E2E-005 cht 微 flake（147px）。修＝showCheckYes 前 updateLoading(false)（比照 LayoutContent）。
-  - [ ] 流程_群組權限關聯（VeCpemis resolve + VePemiBlngGrups own-save → grups.cpemis）— **VePemiBlngGrups loading 已修**，比照此 flow。
-  - [ ] 流程_權限規則關聯（VeCrules → pemis.crules）
+  - [x] **群組權限關聯 完成**：test/e2e-rela-grup-pemi.test.mjs（5 cases × eng/cht = 10 baseline 全綠）。VeCpemis（grups 頁 cpemis 欄 resolve）+ VePemiBlngGrups（pemis 頁 belongGrups 欄 own-save）→ 皆改 grups.cpemis。E2E-002 對話框 resolve **後再點群組頁工具列存檔→DB+modal**；E2E-005 唯讀檢視（關編輯模式→對話框 disabled、無 Save 鈕）。title 鍵 grupEditCpemis/pemiBlngEditGrups。
+  - [ ] 流程_權限規則關聯（VeCrules → pemis.crules，最後一個 B flow，僅單一編輯器 VeCrules）
   - 對話框已在 A 的 relation-dialog case 驗證可開啟。
 - **C shell e2e**：流程_應用啟動與登入（登入委派 w-ui-loginout，pilot 已間接覆蓋；優先序最低）。
 - **users spec 結果呈現待補**（modal 已實作 875a721，但 users spec 未改 toast→modal）。
