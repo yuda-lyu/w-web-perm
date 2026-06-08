@@ -965,6 +965,7 @@ export default {
 
             //check
             if (size(rows) === 0) {
+                vo.$ui.updateLoading(false) //showCheckYes 前關 loading（modal 阻斷、避免 clickSave 包裝層 loading 疊在 modal 後）
                 await vo.$dg.showCheckYes(`${vo.$t('userSaveUsersEmpty')}`)
                 return
             }
@@ -977,11 +978,13 @@ export default {
 
             //check
             if (errTemp !== null) {
+                vo.$ui.updateLoading(false)
                 await vo.$dg.showCheckYes(`${vo.$t('userSaveUsersFail')}: ${errTemp}`)
                 return
             }
 
             //alert
+            vo.$ui.updateLoading(false)
             await vo.$dg.showCheckYes(vo.$t('userSaveUsersSuccess'))
 
         },
