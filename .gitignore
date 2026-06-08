@@ -1,3 +1,11 @@
 node_modules
 .opencode
 .claude
+CLAUDE.md
+.env
+tmp
+user_data
+
+_logs
+db
+uploadTemp
