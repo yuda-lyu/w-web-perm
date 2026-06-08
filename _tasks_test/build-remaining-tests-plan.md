@@ -16,8 +16,18 @@
   - [x] **grups 完成**：test/e2e-grups.test.mjs（10 cases × eng/cht = 20 baseline 全綠 byte-stable）+ spec 更新（toast→modal + trace 行號校正 + E2E-005 對齊）。
     - 特點：name 主鍵**前端**驗證（isError 引用 errItemsByName → 前端擋 errInNames modal，異於 targets 後端 ckKey）；E2E-006/007 斷言 cell 警告 + errInNames modal。**雙 relation-dialog**：E2E-008 belongUsers→VeGrupBlngUsers（grupBlngEditUsers）、E2E-009 cpemis→VeCpemis（grupEditCpemis），仿 users E2E-011。
     - WDrawer 防護（captureStable 內建）對 grups 也穩定，relation-dialog 對話框 byte-stable。
-  - [ ] **pemis 待建**（最後一個 A flow，比照 grups）：有 crules→VeCrules 關聯欄（relation-dialog case）。name 主鍵——**讀碼確認前端或後端驗證**。save 走 modal。captureStable 已含 WDrawer 防護。
-    - **注意**：pemis spec 結果呈現亦 stale（toast→modal）建時更新；users spec 結果呈現待補（modal 已實作未改 spec）。
+  - [x] **pemis 完成**：test/e2e-pemis.test.mjs（10 cases × eng/cht = 20 baseline 全綠）+ spec 更新（toast→modal + trace 校正 + E2E-001/002 方向 + E2E-004/005 對齊）。
+    - name **前端**驗證（errInNames，同 grups）；**雙 relation-dialog**：E2E-008 crules→VeCrules（pemiEditCrules）、E2E-009 belongGrups→VePemiBlngGrups（pemiBlngEditGrups）。
+- **A 全部完成（3/3：targets/grups/pemis，各 20 baseline 全綠）。**
+
+### 待續：B 關聯編輯 e2e + C shell
+- **B 關聯編輯 e2e**（3 flow，比 A 複雜：act 在對話框「內」操作關聯後存檔，非只開對話框）：
+  - 流程_使用者群組關聯（VeCgrups 選群組 + VeGrupBlngUsers 選成員 → 改 users.cgrups）
+  - 流程_群組權限關聯（VeCpemis 選權限 + VePemiBlngGrups 選群組 → 改 grups.cpemis）
+  - 流程_權限規則關聯（VeCrules 設規則 → 改 pemis.crules）
+  - 對話框已在 A 的 relation-dialog case 驗證可開啟（users E2E-011 / grups E2E-008/009 / pemis E2E-008/009）；B 要測對話框內的勾選/toggle/save 流程。
+- **C shell e2e**：流程_應用啟動與登入（登入委派 w-ui-loginout，pilot 已間接覆蓋；優先序最低）。
+- **users spec 結果呈現待補**（modal 已實作 875a721，但 users spec 未改 toast→modal）。
   - [ ] grups、pemis（待 targets 完成後比照）
 - **B 關聯編輯 e2e**：使用者群組 / 群組權限 / 權限規則 關聯（VeCgrups+VeGrupBlngUsers / VeCpemis+VePemiBlngGrups / VeCrules，關聯 save 含 modal）
 - **C Shell e2e**：應用啟動與登入
