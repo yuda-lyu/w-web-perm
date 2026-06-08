@@ -18,7 +18,7 @@
 import fs from 'fs'
 import assert from 'assert'
 import JSON5 from 'json5'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, waitUntilExist } from './e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, waitUntilExist, getResolvedActiveTargets } from './e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/rela-pemi-rule'
 const LANGS = ['eng', 'cht']
@@ -268,6 +268,11 @@ const CASES = [
             assert.ok(crules && typeof crules === 'object', 'P1.crules 應為物件')
             assert.equal(crules[TARGET_N_FOR_P1], 'y', `P1 對 ${TARGET_N_FOR_P1} 應為新啟用 y`)
             assert.equal(crules[TARGET_Y_FOR_P1], 'y', `P1 對 ${TARGET_Y_FOR_P1} 原 y 應維持`)
+            //【端到端核心不變式：權限變更 → 解析後權限樹】P1 新啟用 專案A/頁B/區塊A；peter 屬 M1、M1 用 P1，
+            //故 peter 樹應「新增」此 target（baseline 4 → 5，P1∪P2 聯集）。驗 getPermUserInfor 回傳的 resolved 權限樹。
+            const tree = await getResolvedActiveTargets(page, 'id-for-peter')
+            assert.deepEqual(tree, ['專案A/頁A/區塊A', '專案A/頁B/區塊A', '專案A/頁C', '專案B/頁A/區塊A', '專案B/頁A/區塊B'],
+                `peter 解析後權限樹應因 P1 新啟用 專案A/頁B/區塊A 而新增該 target（baseline 4→5；實得 ${JSON.stringify(tree)}）`)
         },
     },
 

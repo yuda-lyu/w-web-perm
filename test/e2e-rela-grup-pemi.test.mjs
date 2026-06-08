@@ -22,7 +22,7 @@
 import fs from 'fs'
 import assert from 'assert'
 import JSON5 from 'json5'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, waitUntilExist } from './e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, waitUntilExist, getResolvedActiveTargets } from './e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/rela-grup-pemi'
 const LANGS = ['eng', 'cht']
@@ -234,6 +234,13 @@ const CASES = [
             assert.ok(cpemis && typeof cpemis === 'object' && cpemis['權限P3'], 'M1.cpemis 應含 權限P3 鍵（新勾選）')
             assert.equal(cpemis['權限P3'].isActive, 'y', 'M1 對 權限P3 isActive 應為 y')
             assert.equal(cpemis['權限P3'].mode, 'AND', 'M1 對 權限P3 mode 應為所選 AND')
+            //【端到端核心不變式：權限變更 → 解析後權限樹】驗的是外部應用 getPermUserInfor 實際查到的 resolved 權限，
+            //非只驗 cpemis 設定存對。peter 屬 M1；M1 加 P3(AND) 後，peter 樹反映 AND 交集：baseline (P1∪P2)=4 個
+            //（A/頁A/區塊A,A/頁C,B/頁A/區塊A,B/頁A/區塊B）∩ P3 → B/頁A/區塊A 被交集掉，剩 3 個（A/頁A/區塊A 不在 P3 故保留）。
+            //預期值由 getUserRules 演算法算出（見 tmp/calc-trees 心得）；若 AND 交集邏輯或 UI→DB→解析任一環壞掉，此斷言會抓到。
+            const tree = await getResolvedActiveTargets(page, 'id-for-peter')
+            assert.deepEqual(tree, ['專案A/頁A/區塊A', '專案A/頁C', '專案B/頁A/區塊B'],
+                `peter 解析後權限樹應反映 M1+=P3(AND) 之交集效果（baseline 4→3；實得 ${JSON.stringify(tree)}）`)
         },
     },
 

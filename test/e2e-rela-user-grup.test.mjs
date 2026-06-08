@@ -20,7 +20,7 @@
 import fs from 'fs'
 import assert from 'assert'
 import JSON5 from 'json5'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, waitUntilExist } from './e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, waitUntilExist, getResolvedActiveTargets } from './e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/rela-user-grup'
 const LANGS = ['eng', 'cht']
@@ -293,6 +293,11 @@ const CASES = [
             assert.ok(cgrups && typeof cgrups === 'object' && cgrups['權限群組M1'], 'mary.cgrups 應含 權限群組M1 鍵（已歸屬本群組）')
             assert.equal(cgrups['權限群組M1'].isActive, 'y', 'mary 對 權限群組M1 isActive 應為 y')
             assert.equal(cgrups['權限群組M1'].mode, 'AND', 'mary 對 權限群組M1 mode 應為所選 AND')
+            //【端到端核心不變式：權限變更 → 解析後權限樹】mary 從 {M2(OR)} 變 {M2(OR), M1(AND)}，群組層 M2 聯集後與 M1 交集。
+            //預期 active 4 個（getUserRules 算出）；驗 getPermUserInfor 回傳的 resolved 權限樹符合此合併結果。
+            const tree = await getResolvedActiveTargets(page, 'id-for-mary')
+            assert.deepEqual(tree, ['專案A/頁C', '專案B/頁A/區塊A', '專案B/頁A/區塊B', '專案B/頁A/區塊C'],
+                `mary 解析後權限樹應反映 +=M1(AND) 之群組層合併（實得 ${JSON.stringify(tree)}）`)
         },
     },
     {

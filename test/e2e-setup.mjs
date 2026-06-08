@@ -273,6 +273,22 @@ export async function waitNavExpanded(page, opts = {}) {
     }
 }
 
+//端到端「解析後權限樹」查詢（權限系統核心不變式守護）：以 app token 經瀏覽器 fetch 打 getPermUserInfor 查指定
+//userId，回其 resolved rules（getUserRules 合併 OR 聯集 / AND 交集 / isActive 過濾後的結果）中 isActive='y'
+//的 target 名稱集合（排序）。這是**外部應用實際查到的權限樹**。用於斷言「UI 改權限 → 權限樹正確變化」，
+//不是只驗關聯設定資料（cgrups/cpemis/crules）存對、而是驗其「解析後」的最終權限是否符合預期。
+//token 'token-for-application' 由 srv.mjs getUserByToken 解為 app 使用者（過 verifyAppUser）；走前端 dev server
+//proxy /api→backend。須在 UI 編輯 + 存檔（DB 持久化）之後呼叫。
+export async function getResolvedActiveTargets(page, userId) {
+    return await page.evaluate(async (uid) => {
+        const url = `/api/getPermUserInfor?token=${encodeURIComponent('{token-for-application}')}&userId=${encodeURIComponent(uid)}`
+        const res = await fetch(url)
+        const data = await res.json()
+        if (!data || data.state !== 'success') throw new Error('getPermUserInfor 失敗: ' + JSON.stringify(data))
+        return (data.msg.rules || []).filter((r) => r.isActive === 'y').map((r) => r.name).sort()
+    }, userId)
+}
+
 //mocha root teardown hook（框架環境自動觸發 cleanup）
 if (typeof globalThis.after === 'function') {
     globalThis.after(function() {
