@@ -166,6 +166,11 @@ export async function captureStable(page, opts = {}) {
     //等 setTimeout-based delayed-reveal + hover-leave + chain animation settle
     await page.waitForTimeout(initialWaitMs)
 
+    //【WDrawer 雙穩態：先等 nav 收斂回「展開態」】reflow（複製/編輯產生較長 id、切編輯模式、開 modal）可能誘發
+    //autoSwitch 收合（cht 比 eng 易觸發，故僅部分 cht case 機率性 flake）；1440px viewport 的確定性穩定態為展開，
+    //故截圖前被動等 nav 標籤重新展開且穩定（非遮蔽、非 drawer-force）。gen 一直是展開、flake 僅在 verify 偶 capture 收合。
+    await waitNavExpanded(page)
+
     //【WDrawer nav 收斂偵測 — 非遮蔽】左側 nav 用 WDrawer（autoSwitchToHide/Show）。layout reflow（開
     //對話框 / 新增列 / 切編輯模式）後其 nav 文字 x 位置可能短暫擺盪；等 nav 區（x<205）文字葉節點的 x
     //位置指紋「連續 8×200ms=1.6s 完全不變」＝收斂到最終態才截圖（防收斂到 reflow 中途的偽穩定態）。
@@ -241,6 +246,30 @@ export async function waitUntilExist(page, label, fn, opts = {}) {
     }
     catch (err) {
         throw new Error(`waitUntilExist 超過 ${timeout}ms 仍找不到「${label}」`)
+    }
+}
+
+//等左側 WDrawer nav 收斂到「展開態」（防 layout reflow（如複製列產生較長 id 觸發欄寬重排）誘發 autoSwitch
+//收合的雙穩態）。被動等待 nav 區（x<205）文字葉節點數 ≥ minLabels 且連續 stableMs 穩定——非遮蔽、非 drawer-force，
+//僅在截圖前確保 nav 落在 1440px viewport 的確定性展開態。對齊 CLAUDE.md「WDrawer 雙穩態正解＝主動等收斂」。
+//用於易觸發 reflow 的 case（如 copy）於 captureStable 前呼叫。
+export async function waitNavExpanded(page, opts = {}) {
+    const { timeout = 12000, minLabels = 4, stableMs = 1200 } = opts
+    const navCount = () => page.evaluate(() => [...document.querySelectorAll('*')].filter((e) => {
+        if (e.children.length !== 0 || !(e.textContent || '').trim()) return false
+        const r = e.getBoundingClientRect()
+        return r.width > 0 && r.left < 205 && r.top > 60
+    }).length)
+    const t0 = Date.now()
+    let stableStart = null
+    while (Date.now() - t0 < timeout) {
+        const n = await navCount()
+        if (n >= minLabels) {
+            if (stableStart === null) stableStart = Date.now()
+            if (Date.now() - stableStart >= stableMs) return
+        }
+        else { stableStart = null }
+        await page.waitForTimeout(200)
     }
 }
 

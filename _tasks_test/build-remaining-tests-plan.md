@@ -8,6 +8,14 @@
   → 仿 sso api-*.test.mjs + api-setup.mjs，直接 woItems 斷言 DB
   → 可能含 E 基建：g.initialData.mjs refactor 成 export builders
 - **A 後台 CRUD e2e**：targets / grups / pemis 清單（仿 e2e-users pilot + modal 模式）
+  - [x] **targets 完成**：test/e2e-targets.test.mjs（10 cases × eng/cht = 20 baseline 全綠 byte-stable）+ spec 更新（E2E-001/002 方向、toast→modal）。
+    - runtime 待確認點全部實證通過：checkAll(E2E-009 空 grid+targetAddEmpty modal)、toggle、copy 避重、cellHasWarn(E2E-007 紅三角+fail modal)。
+    - **WDrawer 雙穩態徹底修復（重要，沿用至所有 e2e）**：複製/編輯產生較長 id（或切編輯模式/開 modal）觸發欄寬 reflow → autoSwitch 收合（cht 比 eng 易觸發，故部分 cht case 機率性 flake，不同 run 中不同 case）。**正解**：`waitNavExpanded` helper（e2e-setup.mjs，被動等 nav 標籤≥4 展開且穩定 1.2s，非遮蔽/非 drawer-force）已**加進 captureStable 起始**，對所有 e2e 自動生效。gen 一直是展開態（確定性），flake 僅在 verify 偶 capture 收合。
+    - **合併驗證 42 passing（targets 20 + users 22 無退化）**，captureStable 共用改動安全。
+    - 指令：產 `node test/e2e-targets.test.mjs --baseline`；驗 `npx mocha test/e2e-targets.test.mjs --reporter list --timeout 240000`；手術式 `--names E2E-004 --langs cht`。
+  - [ ] **grups、pemis 待建**（比照 targets）：有關聯欄（grups: cgrups? 不，grups 有 cpemis→VeCpemis；pemis 有 crules→VeCrules）+ **relation-dialog case**（仿 users E2E-011 cgrups-dialog）。name 主鍵後端去重。save 結果走 modal。captureStable 已含 WDrawer 防護，無需各別處理。
+    - **注意**：grups/pemis spec 結果呈現亦 stale（toast→modal），建時一併更新；users spec 結果呈現亦待補（modal 已實作但 spec 未改）。
+  - [ ] grups、pemis（待 targets 完成後比照）
 - **B 關聯編輯 e2e**：使用者群組 / 群組權限 / 權限規則 關聯（VeCgrups+VeGrupBlngUsers / VeCpemis+VePemiBlngGrups / VeCrules，關聯 save 含 modal）
 - **C Shell e2e**：應用啟動與登入
 
