@@ -479,25 +479,20 @@ function getUserRules(user, grups, pemis, targets) {
     }
     // console.log('merge _rules', cloneDeep(_rules))
 
-    //expand _rules
+    //expand _rules：以「當前 targets」為輸出主軸——逐 target 取其解析後 isActive（取自合併 crules 的 kp、預設 'n'）。
+    //如此只列現存管控對象；crules 仍引用但已從 targets 刪除的「孤兒 target」自然被濾掉，不再殘留於權限樹。
+    //（修正前：輸出 kp 全部 keys = crules keys ∪ targets，導致已刪 target 因 crules 殘留引用而仍出現在權限樹。）
     if (true) {
         let kp = {}
         each(_rules, (v) => {
             kp[v.name] = v.isActive
         })
-        each(targets, (t) => {
-            // console.log('t', t)
-            if (!haskey(kp, t.id)) {
-                kp[t.id] = 'n'
-            }
-        })
         let rs = []
-        each(kp, (v, k) => {
-            let r = {
-                name: k,
-                isActive: v,
-            }
-            rs.push(r)
+        each(targets, (t) => {
+            rs.push({
+                name: t.id,
+                isActive: get(kp, t.id, 'n'),
+            })
         })
         _rules = rs
     }

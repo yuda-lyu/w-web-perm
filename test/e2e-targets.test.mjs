@@ -7,7 +7,7 @@
 //checkbox 與警告 icon 皆在 col-id="id"；save 結果走 $dg.showCheckYes 持久 modal。
 import fs from 'fs'
 import assert from 'assert'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, waitUntilExist } from './e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, waitUntilExist, getResolvedActiveTargets } from './e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/targets'
 const LANGS = ['eng', 'cht']
@@ -226,6 +226,14 @@ const CASES = [
             assert.ok(!has, `base seed 第一列（${delId}）應已刪除`)
             const n = await page.evaluate(() => (window.$vo.$store.state.targets || []).length)
             assert.equal(n, BASE_SEED.length - 1, `DB 應為 base-1（${BASE_SEED.length - 1}）筆`)
+            //—— 權限樹核心不變式（孤兒 target 回歸守護；本專案為權限系統，此為不可省之核心驗證）——
+            //delId（BASE_SEED[0] = 專案A/頁A/區塊A）原經 P1.crules 'y' → M1 → peter 而在 peter 解析權限樹內。
+            //刪除該 target 後，即使 P1.crules 仍殘留對它的引用（未連動清除），getPermUserInfor 解析出的
+            //權限樹須只反映「現存 targets」、剔除此孤兒——守護 getUserRules expand 段「以當前 targets 為
+            //輸出主軸」之修正，防回歸到「已刪 target 仍授權於外部應用」的權限漏洞。
+            const peterTree = await getResolvedActiveTargets(page, 'id-for-peter')
+            assert.ok(!peterTree.includes(delId), `刪除的 target（${delId}）不應再殘留於 peter 解析權限樹（孤兒不變式）`)
+            assert.deepEqual(peterTree, ['專案A/頁C', '專案B/頁A/區塊A', '專案B/頁A/區塊B'], 'peter 樹應只剩刪除後現存的授權標的')
         },
     },
     {
