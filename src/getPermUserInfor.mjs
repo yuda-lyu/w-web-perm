@@ -12,13 +12,13 @@ async function getPermUserInfor(url, tokenSelf, userIdTar, opt = {}) {
 
     //check
     if (!isestr(url)) {
-        return Promise.reject('invalid url')
+        return Promise.reject('invalidUrl')
     }
     if (!isestr(tokenSelf)) {
-        return Promise.reject('invalid tokenSelf')
+        return Promise.reject('invalidTokenSelf')
     }
     if (!isestr(userIdTar)) {
-        return Promise.reject('invalid userIdTar')
+        return Promise.reject('invalidUserIdTar')
     }
 
     //funConvertPerm
@@ -26,7 +26,7 @@ async function getPermUserInfor(url, tokenSelf, userIdTar, opt = {}) {
 
     //url
     if (url.indexOf('token={sysToken}') < 0 && url.indexOf('userId={userId}') < 0) {
-        return Promise.reject(`no 'token={sysToken}', 'userId={userId}' in url`)
+        return Promise.reject('noTokenUserIdInUrl')
     }
     url = url.replaceAll('{sysToken}', tokenSelf) //系統介接用permToken
     url = url.replaceAll('{userId}', userIdTar)
@@ -40,7 +40,7 @@ async function getPermUserInfor(url, tokenSelf, userIdTar, opt = {}) {
 
     //check
     if (errTemp !== null) {
-        return Promise.reject(`can not get user by url[${url}]`) //由SSO取得使用者資訊錯誤
+        return Promise.reject('cannotGetUserByUrl') //由SSO取得使用者資訊錯誤
     }
 
     //data
@@ -54,7 +54,7 @@ async function getPermUserInfor(url, tokenSelf, userIdTar, opt = {}) {
 
     //check
     if (state !== 'success') {
-        return Promise.reject(`can not get user data by url[${url}]`) //取得使用者資訊失敗
+        return Promise.reject('cannotGetUserDataByUrl') //取得使用者資訊失敗
     }
 
     //ur
@@ -63,7 +63,7 @@ async function getPermUserInfor(url, tokenSelf, userIdTar, opt = {}) {
 
     //check
     if (!iseobj(ur)) {
-        return Promise.reject(`no user data by url[${url}]`)
+        return Promise.reject('noUserDataByUrl')
     }
 
     //check
@@ -78,7 +78,7 @@ async function getPermUserInfor(url, tokenSelf, userIdTar, opt = {}) {
 
         //check
         if (!iseobj(ur)) {
-            return Promise.reject(`no user data after funConvertPerm`)
+            return Promise.reject('noUserDataAfterConvert')
         }
 
     }

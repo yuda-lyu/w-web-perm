@@ -20,11 +20,15 @@
 //  - 開發環境 token==='error' 被拒後延遲 60 秒才重導（App.vue:93-98），於重導前截圖（截圖在 60 秒內完成）。
 import fs from 'fs'
 import assert from 'assert'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, waitUntilExist, baseUrl } from './e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, waitUntilExist, baseUrl, assertBaselineMatch } from './e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/startup'
 const LANGS = ['eng', 'cht']
 const isBaseline = process.argv.includes('--baseline')
+
+//紅框標注目標（captureStableWithBox）：本 case 主要觀看區
+const SEL_STATE = '[data-fmid="conn-state"]'   //LayoutState 內容包覆層（連線中/拒絕登入/無法連線之 spinner+訊息）
+const SEL_TOPBAR = '[data-fmid="app-topbar"]'  //Layout 頂部工具列（webName + 語言選單）
 
 function picPath(lang, name) { return `${PICS_DIR}/startup-${lang}-${name}.png` }
 
@@ -104,11 +108,12 @@ const CASES = [
     {
         //E2E-001：開啟後台先顯示連線中（csIng）過場畫面，尚未進入後台
         name: 'E2E-001-conn-ing',
+        langs: ['eng'], //連線中畫面語系為 server 注入（dev server 不注入→恆為預設 eng；雙語覆蓋見 e2e-initlang）
         run: async (browser, lang) => {
             const page = await openRaw(browser, { token: 'sys' })
             await setLang(page, lang)
             await forceConnState(page, 'csIng') //login 落定後覆寫回 csIng（過場初始態）
-            const buf = await captureStatus(page)
+            const buf = await captureStableWithBox(page, SEL_STATE) //觀看區：LayoutState 連線中狀態畫面
             return { buf, page }
         },
         semantic: async (page) => {
@@ -122,7 +127,7 @@ const CASES = [
         run: async (browser, lang) => {
             const page = await openApp(browser) //等 csLogin+webInfor+譯文（登入成功 golden）
             await setLang(page, lang)
-            const buf = await captureStable(page) //停在預設 mmTargets 殼層（含 nav 收斂偵測）
+            const buf = await captureStableWithBox(page, SEL_TOPBAR) //觀看區：頂部工具列（webName + 語言選單）
             return { buf, page }
         },
         semantic: async (page) => {
@@ -145,6 +150,7 @@ const CASES = [
         //E2E-003：登入被拒（開發環境 token==='error'）→ loginError 設 csErrLogin，顯示拒絕登入畫面
         //（開發環境拒絕後延遲 60 秒才重導，於重導前截圖；截圖在 60 秒內完成，無虞）
         name: 'E2E-003-err-login',
+        langs: ['eng'], //拒絕登入畫面語系為 server 注入（雙語覆蓋見 e2e-initlang）
         run: async (browser, lang) => {
             //以 token='sys' 正常登入後覆寫 connState='csErrLogin'，避開 token='error' 觸發 loginError 重導
             //（app 未被偵測為 dev 時 urlRedirect 即時導去 google.com → page navigation → context destroyed）。
@@ -152,7 +158,7 @@ const CASES = [
             const page = await openRaw(browser, { token: 'sys' })
             await setLang(page, lang)
             await forceConnState(page, 'csErrLogin')
-            const buf = await captureStatus(page)
+            const buf = await captureStableWithBox(page, SEL_STATE) //觀看區：LayoutState 拒絕登入狀態畫面
             return { buf, page }
         },
         semantic: async (page) => {
@@ -163,11 +169,12 @@ const CASES = [
     {
         //E2E-004：無法連線（csErrConn）→ LayoutState 顯示無法連線畫面（保留狀態值，須手動設）
         name: 'E2E-004-err-conn',
+        langs: ['eng'], //無法連線畫面語系為 server 注入（雙語覆蓋見 e2e-initlang）
         run: async (browser, lang) => {
             const page = await openRaw(browser, { token: 'sys' })
             await setLang(page, lang)
             await forceConnState(page, 'csErrConn') //login 落定後覆寫成 csErrConn（保留值，手動設）
-            const buf = await captureStatus(page)
+            const buf = await captureStableWithBox(page, SEL_STATE) //觀看區：LayoutState 無法連線狀態畫面
             return { buf, page }
         },
         semantic: async (page) => {
@@ -183,7 +190,7 @@ const CASES = [
             const page = await openApp(browser) //登入成功進入後台（預設 eng）
             //切到目標語系（語言選單 showLangSelect 為真，setLang 廣播 forceUpdate 全組件重渲染）
             await setLang(page, lang)
-            const buf = await captureStable(page)
+            const buf = await captureStableWithBox(page, SEL_TOPBAR) //觀看區：頂部工具列（切換語言後 webName + 語言選單文字）
             return { buf, page }
         },
         semantic: async (page, lang) => {
@@ -226,6 +233,7 @@ async function generateBaseline() {
         if (onlyLangs && !nameMatch(onlyLangs, lang)) continue //§6.3 手術式：跳過未指定語系
         for (const c of CASES) {
             if (onlyNames && !nameMatch(onlyNames, c.name)) continue //§6.3 手術式：截圖前 gate
+            if (c.langs && !c.langs.includes(lang)) continue //連線狀態畫面語系為 server 注入（雙語覆蓋見 e2e-initlang），此處僅產指定語系
             //per-case fresh browser（每 case 全新進程，消 GPU/font/CSS cache 跨 case 累積差異；對齊 sso）
             const browser = await launchBrowser()
             const { buf } = await c.run(browser, lang)
@@ -250,6 +258,7 @@ else {
                 await startServersOnce()
             })
             for (const c of CASES) {
+                if (c.langs && !c.langs.includes(lang)) continue //連線狀態畫面語系為 server 注入（雙語覆蓋見 e2e-initlang），僅跑指定語系
                 it(c.name, async () => {
                     //per-case fresh browser（每 case 全新進程，對齊 sso / 其他 perm e2e）
                     const browser = await launchBrowser()
@@ -257,12 +266,7 @@ else {
                         const { buf, page } = await c.run(browser, lang)
                         if (c.semantic) await c.semantic(page, lang)
                         const p = picPath(lang, c.name)
-                        assert.ok(fs.existsSync(p), `baseline 不存在: ${p}（先跑 --baseline 產製）`)
-                        if (!buf.equals(fs.readFileSync(p))) {
-                            fs.mkdirSync('./tmp', { recursive: true })
-                            fs.writeFileSync(`./tmp/${lang}-${c.name}-actual.png`, buf) //供 diff
-                            assert.fail(`pixel 不一致: ${p}（當次截圖存 ./tmp/${lang}-${c.name}-actual.png）`)
-                        }
+                        assertBaselineMatch(buf, p, `startup-${lang}-${c.name}`)
                     }
                     finally {
                         await browser.close()

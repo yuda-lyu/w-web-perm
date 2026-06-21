@@ -55,9 +55,9 @@ describe('api-getPerm', function() {
             assert.fail('應 reject（無效 token）')
         }
         catch (e) {
-            //src/getPerm.mjs:61，含動態 url 後綴故用 startsWith
+            //src/getPerm.mjs:61，reject 已改為 camelCase key
             assert.strict.equal(typeof e, 'string', 'reject 應為純字串')
-            assert.strict.ok(String(e).startsWith('can not get user data by url'), `reject 應以 'can not get user data by url' 起頭，實得: ${e}`)
+            assert.strict.equal(e, 'cannotGetUserDataByUrl', `reject 應為 'cannotGetUserDataByUrl'，實得: ${e}`)
         }
     })
 
@@ -69,7 +69,7 @@ describe('api-getPerm', function() {
         }
         catch (e) {
             //src/getPerm.mjs:26
-            assert.strict.equal(e, "no 'token={token}' in url", 'reject 字串應為佔位符缺失訊息')
+            assert.strict.equal(e, 'noTokenInUrl', 'reject 應為 err key noTokenInUrl')
         }
     })
 
@@ -81,7 +81,7 @@ describe('api-getPerm', function() {
         }
         catch (e) {
             //src/getPerm.mjs:15
-            assert.strict.equal(e, 'invalid url', 'reject 字串應為 invalid url')
+            assert.strict.equal(e, 'invalidUrl', 'reject 應為 err key invalidUrl')
         }
 
         try {
@@ -90,7 +90,7 @@ describe('api-getPerm', function() {
         }
         catch (e) {
             //src/getPerm.mjs:18
-            assert.strict.equal(e, 'invalid tokenTar', 'reject 字串應為 invalid tokenTar')
+            assert.strict.equal(e, 'invalidTokenTar', 'reject 應為 err key invalidTokenTar')
         }
     })
 
@@ -108,7 +108,7 @@ describe('api-getPerm', function() {
             assert.fail('應 reject（funConvertPerm 回傳 null）')
         }
         catch (e) {
-            assert.strict.equal(e, 'no user data after funConvertPerm', 'reject 字串應為 funConvertPerm 後無資料')
+            assert.strict.equal(e, 'noUserDataAfterConvert', 'reject 應為 err key noUserDataAfterConvert')
         }
     })
 

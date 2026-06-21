@@ -690,6 +690,18 @@ export default {
 
             let vo = this
 
+            //save按鈕第一行立刻釋放視覺鎖
+            msg.pm.resolve()
+
+            //fire-and-forget, 不 await
+            vo.doSave()
+
+        },
+
+        doSave: function() {
+
+            let vo = this
+
             async function core() {
 
                 //show loading
@@ -739,9 +751,6 @@ export default {
                 })
                 .catch(() => { })
                 .finally(() => {
-
-                    //save按鈕解除loading
-                    msg.pm.resolve()
 
                     //hide loading
                     vo.$ui.updateLoading(false)

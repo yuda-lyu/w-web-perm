@@ -23,15 +23,16 @@ import fsIsFolder from 'wsemi/src/fsIsFolder.mjs'
 import fsIsFile from 'wsemi/src/fsIsFile.mjs'
 import replace from 'wsemi/src/replace.mjs'
 import strdelleft from 'wsemi/src/strdelleft.mjs'
-import haskey from 'wsemi/src/haskey.mjs'
-import arrHas from 'wsemi/src/arrHas.mjs'
-import ltdtDiffByKey from 'wsemi/src/ltdtDiffByKey.mjs'
 import ltdtmapping from 'wsemi/src/ltdtmapping.mjs'
+import pmKeyMutex from 'wsemi/src/pmKeyMutex.mjs'
 import WServHapiServer from 'w-serv-hapi/src/WServHapiServer.mjs'
 import WServOrm from 'w-serv-orm/src/WServOrm.mjs'
 import ds from '../src/schema/index.mjs'
 import { getUserRules } from '../src/plugins/mShare.mjs'
+import procCore from './procCore.mjs'
 import procLang from './procLang.mjs'
+import srLogInit from './srLog.mjs'
+import procStaInfor from './procStaInfor.mjs'
 
 
 /**
@@ -268,6 +269,10 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     let kpLang = procLang({ kpLangExt, webName, webDescription })
 
 
+    //srLog
+    let srLog = srLogInit(opt)
+
+
     //WServOrm
     let optWServOrm = {
         useCheckUser,
@@ -284,8 +289,25 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     let { woItems, procOrm } = wp
 
 
+    //pmKeyMutex: per-key in-memory mutex, 同 key 序列化、不同 key 並行.
+    //perm 為「整表批次 diff」寫入, key 粒度為 {op}:{keyTable}, 防同表並行 race (lost update).
+    let kmx = pmKeyMutex()
+
+
+    //procCore: 整表批次 diff 寫入邏輯 (updateTabItems + updateTargets/Pemis/Grups/Users)
+    let pc = procCore(woItems, procOrm, { srLog, kmx })
+
+
+    //procStaInfor: 統計資訊, fdLog 對齊 srLog 使用同一目錄
+    let psi = procStaInfor({ fdLog: './_logs' })
+
+
     //getWebInfor
     let getWebInfor = (userId) => {
+
+        //info
+        srLog.info({ event: 'getWebInfor-success', userId })
+
         return {
 
             // webName, //已併入kpLang
@@ -348,162 +370,32 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     // }
 
 
-    //updateTabItems
-    let updateTabItems = async (keyTable, userId, rows, keyDetect) => {
-        // console.log('updateTabItems', keyTable, userId, rows.length, keyDetect)
-
-        //ltdtmapping
-        rows = ltdtmapping(rows, ds[keyTable].keys)
-        // console.log('ltdtmapping rows', rows)
-
-        //重給order
-        rows = map(rows, (r, k) => {
-            r.order = k + 1
-            return r
-        })
-
-        //ckKey
-        let ckKey = (rows, key) => {
-            let err = null
-
-            //check
-            let kp = {}
-            each(rows, (v, k) => {
-
-                //value
-                let value = get(v, key, '')
-
-                //check
-                if (!isestr(value)) {
-                    err = `rows[${k}].${key} is not an effective string`
-                    return false //跳出
-                }
-
-                //check
-                if (haskey(kp, value)) {
-                    err = `rows[${k}].${key}[${value}] is duplicate`
-                    return false //跳出
-                }
-
-                //kp
-                kp[value] = true
-
-            })
-
-            return err
-        }
-
-        //偵測未給予或重複
-        let err = null
-        if (true) {
-            if (arrHas(keyTable, ['targets'])) {
-                err = ckKey(rows, 'id')
-                if (err !== null) {
-                    return Promise.reject(err)
-                }
-            }
-            if (arrHas(keyTable, ['pemis', 'grups'])) { //users可重複name故不列入
-                err = ckKey(rows, 'name')
-                if (err !== null) {
-                    return Promise.reject(err)
-                }
-            }
-            if (arrHas(keyTable, ['users'])) {
-                err = ckKey(rows, 'email')
-                if (err !== null) {
-                    return Promise.reject(err)
-                }
-            }
-        }
-
-        //ltdtDiffByKey
-        let ltdtOld = await woItems[keyTable].select()
-        let ltdtNew = rows
-        let r = ltdtDiffByKey(ltdtOld, ltdtNew, keyDetect)
-        // console.log('ltdtDiffByKey r', r)
-
-        //del
-        if (size(r.del) > 0) {
-            await procOrm(userId, keyTable, 'del', r.del) //須使用procOrm才有辦法自動給予相關欄位
-            // .catch((err) => {
-            //     console.log('woItems[keyTable].del err', err)
-            // })
-        }
-
-        //add
-        if (size(r.add) > 0) {
-            await procOrm(userId, keyTable, 'insert', r.add) //須使用procOrm才有辦法自動給予相關欄位
-            // .catch((err) => {
-            //     console.log('woItems[keyTable].insert err', err)
-            // })
-        }
-
-        //diff
-        if (size(r.diff) > 0) {
-            await procOrm(userId, keyTable, 'save', r.diff) //須使用procOrm才有辦法自動給予相關欄位
-            // .catch((err) => {
-            //     console.log('woItems[keyTable].save err', err)
-            // })
-        }
-
-        return ltdtNew
-    }
-
-
-    //updateTargets
-    let updateTargets = async (userId, rows) => {
-        rows = await updateTabItems('targets', userId, rows, 'id')
-        return rows
-    }
-
-
-    //updatePemis
-    let updatePemis = async (userId, rows) => {
-        rows = await updateTabItems('pemis', userId, rows, 'name')
-        return rows
-    }
-
-
-    //updateGrups
-    let updateGrups = async (userId, rows) => {
-        rows = await updateTabItems('grups', userId, rows, 'name')
-        return rows
-    }
-
-
-    //updateUsers
-    let updateUsers = async (userId, rows) => {
-        rows = await updateTabItems('users', userId, rows, 'id')
-        return rows
-    }
-
-
     //checkUser
     let checkUser = async(user) => {
         let id = get(user, 'id', '')
         if (!isestr(id)) {
             console.log('user', user)
-            console.log('can not get the userId')
-            return Promise.reject(`can not get the userId`)
+            srLog.error({ event: 'checkUser-error', msg: 'cannotGetUserId' })
+            return Promise.reject(`cannotGetUserId`)
         }
         let email = get(user, 'email', '')
         if (!isestr(email)) {
             console.log('user', user)
-            console.log('can not get the email of user')
-            return Promise.reject(`can not get the email of user`)
+            srLog.error({ event: 'checkUser-error', msg: 'cannotGetUserEmail' })
+            return Promise.reject(`cannotGetUserEmail`)
         }
         let name = get(user, 'name', '')
         if (!isestr(name)) {
             console.log('user', user)
-            console.log('can not get userName')
-            return Promise.reject(`can not get userName`)
+            srLog.error({ event: 'checkUser-error', msg: 'cannotGetUserName' })
+            return Promise.reject(`cannotGetUserName`)
         }
         let isAdmin = get(user, 'isAdmin', '')
         if (isAdmin !== 'y' && isAdmin !== 'n') {
             console.log('user', user)
             console.log('user.isAdmin is not y or n', user.isAdmin)
-            console.log('can not get the role of user')
-            return Promise.reject(`can not get the role of user`)
+            srLog.error({ event: 'checkUser-error', msg: 'cannotGetUserRole' })
+            return Promise.reject(`cannotGetUserRole`)
         }
         return true
     }
@@ -526,8 +418,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         //check
         if (!iseobj(userSelf)) {
             console.log(`token`, token)
-            console.log(`can not find the user from token`)
-            return Promise.reject(`can not find the user from token`)
+            srLog.error({ event: 'getTokenUser-error', msg: 'cannotFindUserFromToken' })
+            return Promise.reject(`cannotFindUserFromToken`)
         }
 
         //check userSelf
@@ -541,8 +433,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         if (!isestr(vSelf)) {
             console.log('userSelf', userSelf)
             console.log('mappingBy', mappingBy)
-            console.log('can not get the prop of user by mappingBy')
-            return Promise.reject(`can not get the prop of user by mappingBy`)
+            srLog.error({ event: 'getTokenUser-error', msg: 'cannotGetUserProp', mappingBy })
+            return Promise.reject(`cannotGetUserProp`)
         }
 
         //userFind
@@ -554,8 +446,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         if (!iseobj(userFind)) {
             console.log('userSelf', userSelf)
             console.log('mappingBy', mappingBy)
-            console.log('can not get the user from perm')
-            return Promise.reject(`can not get the user from perm`)
+            srLog.error({ event: 'getTokenUser-error', msg: 'cannotGetUserFromPerm', mappingBy })
+            return Promise.reject(`cannotGetUserFromPerm`)
         }
 
         //複寫isAdmin
@@ -602,8 +494,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         //check
         if (!b) {
             console.log('user', user)
-            console.log(`user does not have permission`)
-            return Promise.reject(`user does not have permission`)
+            srLog.error({ event: 'getAndVerifyClientUser-error', msg: 'userNoPermission', from })
+            return Promise.reject(`userNoPermission`)
         }
 
         return user
@@ -627,8 +519,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         //check
         if (!iseobj(user)) {
             console.log(`token`, token)
-            console.log(`can not find the user from token`)
-            return Promise.reject(`can not find the user from token`)
+            srLog.error({ event: 'getAndVerifyAppUser-error', msg: 'cannotFindUserFromToken' })
+            return Promise.reject(`cannotFindUserFromToken`)
         }
 
         //verifyAppUser
@@ -640,8 +532,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         //check
         if (!b) {
             console.log('user', user)
-            console.log(`user does not have permission`)
-            return Promise.reject(`user does not have permission`)
+            srLog.error({ event: 'getAndVerifyAppUser-error', msg: 'userNoPermission', from })
+            return Promise.reject(`userNoPermission`)
         }
 
         return user
@@ -662,8 +554,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         //check
         if (!iseobj(payload)) {
             console.log('payload', payload)
-            console.log('invalid payload in req')
-            return Promise.reject(`invalid payload in req`)
+            srLog.error({ event: 'parsePayload-error', msg: 'invalidPayload' })
+            return Promise.reject(`invalidPayload`)
         }
 
         //from
@@ -672,8 +564,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         //check
         if (!isestr(from)) {
             console.log('payload', payload)
-            console.log('invalid from in payload')
-            return Promise.reject(`invalid from in payload`)
+            srLog.error({ event: 'parsePayload-error', msg: 'invalidFromInPayload' })
+            return Promise.reject(`invalidFromInPayload`)
         }
 
         //rows
@@ -682,8 +574,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         //check
         if (!isearr(rows)) {
             console.log('payload', payload)
-            console.log(`invalid rows in payload`)
-            return Promise.reject(`invalid rows in payload`)
+            srLog.error({ event: 'parsePayload-error', msg: 'invalidRowsInPayload' })
+            return Promise.reject(`invalidRowsInPayload`)
         }
 
         //inp
@@ -699,6 +591,9 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     //syncAndReplaceTabs
     let syncAndReplaceTabs = async (userId, inp, keyTable) => {
 
+        //序列化同表之並行整表 delAll+insert: 防 lost update (同 keyTable 序列化, 不同表並行)
+        return await kmx('syncAndReplaceTabs:' + keyTable, async () => {
+
         //from
         let from = get(inp, 'from', '')
         // console.log('from', from)
@@ -706,8 +601,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         //check
         if (!isestr(from)) {
             console.log('inp', inp)
-            console.log(`invalid from`)
-            return Promise.reject(`invalid from`)
+            srLog.error({ event: 'syncAndReplaceTabs-error', msg: 'invalidFrom', keyTable })
+            return Promise.reject(`invalidFrom`)
         }
 
         //rows
@@ -718,7 +613,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         if (!isearr(rows)) {
             console.log('inp', inp)
             console.log('keyTable', keyTable)
-            return Promise.reject(`invalid rows`)
+            srLog.error({ event: 'syncAndReplaceTabs-error', msg: 'invalidRows', keyTable })
+            return Promise.reject(`invalidRows`)
         }
 
         //save from
@@ -741,6 +637,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         // console.log('r', r)
 
         return r
+
+        })
     }
 
 
@@ -801,8 +699,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         //check
         if (!iseobj(kur)) {
             console.log('userId', userId)
-            console.log(`can not get rules of user`)
-            return Promise.reject(`can not get rules of user`)
+            srLog.error({ event: 'getGenUserAndRulesByUserId-error', msg: 'cannotGetUserRules', userId })
+            return Promise.reject(`cannotGetUserRules`)
         }
 
         //grupsNames
@@ -876,8 +774,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                         console.log('req.query', get(req, 'query'))
                         console.log('token', token)
                         console.log('[API]getUserByToken/check token: invalid token')
-                        console.log(`token does not have permission`)
-                        return Promise.reject(`token does not have permission`)
+                        srLog.error({ event: 'api/getUserByToken-error', msg: 'tokenNoPermission' })
+                        return Promise.reject(`tokenNoPermission`)
                     }
 
                     //getAndVerifyClientUser
@@ -888,9 +786,12 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                     if (!iseobj(user)) {
                         console.log('token', token)
                         console.log('[API]getUserByToken/check user: invalid user')
-                        console.log(`token does not have permission`)
-                        return Promise.reject(`token does not have permission`)
+                        srLog.error({ event: 'api/getUserByToken-error', msg: 'tokenNoPermission' })
+                        return Promise.reject(`tokenNoPermission`)
                     }
+
+                    //info
+                    srLog.info({ event: 'api/getUserByToken-success', userId: get(user, 'id', '') })
 
                     return user
                 }
@@ -923,8 +824,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                         console.log('req.query', get(req, 'query'))
                         console.log('token', token)
                         console.log('[API]getPerm/check token: invalid token')
-                        console.log(`token does not have permission`)
-                        return Promise.reject(`token does not have permission`)
+                        srLog.error({ event: 'api/getPerm-error', msg: 'tokenNoPermission' })
+                        return Promise.reject(`tokenNoPermission`)
                     }
 
                     //getAndVerifyClientUser, 發起token的所屬使用者, 驗證僅對client使用者, 不得使用app使用者
@@ -935,8 +836,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                     if (!iseobj(userSelf)) {
                         console.log('token', token)
                         console.log('[API]getPerm/check userSelf: invalid userSelf')
-                        console.log(`token does not have permission`)
-                        return Promise.reject(`token does not have permission`)
+                        srLog.error({ event: 'api/getPerm-error', msg: 'tokenNoPermission' })
+                        return Promise.reject(`tokenNoPermission`)
                     }
 
                     //userIdSelf, client使用者的userId
@@ -948,8 +849,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                         console.log('token', token)
                         console.log('userSelf', userSelf)
                         console.log('[API]getPerm/check userIdSelf: invalid userIdSelf')
-                        console.log(`token does not have permission`)
-                        return Promise.reject(`token does not have permission`)
+                        srLog.error({ event: 'api/getPerm-error', msg: 'tokenNoPermission' })
+                        return Promise.reject(`tokenNoPermission`)
                     }
 
                     //getGenUserAndRulesByUserId, 查找到的client使用者與權限
@@ -962,9 +863,12 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                         console.log('userSelf', userSelf)
                         console.log('userIdSelf', userIdSelf)
                         console.log('[API]getPerm/check userWithRulesSelf: invalid userWithRulesSelf')
-                        console.log(`token does not have permission`)
-                        return Promise.reject(`token does not have permission`)
+                        srLog.error({ event: 'api/getPerm-error', msg: 'tokenNoPermission' })
+                        return Promise.reject(`tokenNoPermission`)
                     }
+
+                    //info
+                    srLog.info({ event: 'api/getPerm-success', userId: userIdSelf })
 
                     return userWithRulesSelf
                 }
@@ -996,8 +900,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                     if (!isestr(tokenSelf)) {
                         console.log('req.query', get(req, 'query'))
                         console.log('[API]getPermUserInfor/check tokenSelf: invalid tokenSelf')
-                        console.log(`token does not have permission`)
-                        return Promise.reject(`token does not have permission`)
+                        srLog.error({ event: 'api/getPermUserInfor-error', msg: 'tokenNoPermission' })
+                        return Promise.reject(`tokenNoPermission`)
                     }
 
                     //getAndVerifyAppUser, 發起token的所屬使用者, 驗證須為app使用者
@@ -1009,8 +913,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                         console.log('req.query', get(req, 'query'))
                         console.log('tokenSelf', tokenSelf)
                         console.log('[API]getPermUserInfor/check userSelf: invalid userSelf')
-                        console.log(`token does not have permission`)
-                        return Promise.reject(`token does not have permission`)
+                        srLog.error({ event: 'api/getPermUserInfor-error', msg: 'tokenNoPermission' })
+                        return Promise.reject(`tokenNoPermission`)
                     }
 
                     //userIdFind, 欲查找使用者的userId
@@ -1022,8 +926,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                         console.log('req.query', get(req, 'query'))
                         console.log('tokenSelf', tokenSelf)
                         console.log('[API]getPermUserInfor/check userIdFind: invalid userIdFind')
-                        console.log(`token does not have permission`)
-                        return Promise.reject(`token does not have permission`)
+                        srLog.error({ event: 'api/getPermUserInfor-error', msg: 'tokenNoPermission' })
+                        return Promise.reject(`tokenNoPermission`)
                     }
 
                     //getGenUserAndRulesByUserId, 查找到的使用者與權限
@@ -1034,9 +938,12 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                     if (!iseobj(userWithRulesFind)) {
                         console.log('userIdFind', userIdFind)
                         console.log('[API]getPermUserInfor/check userWithRulesFind: invalid userWithRulesFind')
-                        console.log(`userId does not have permrules`)
-                        return Promise.reject(`userId does not have permrules`)
+                        srLog.error({ event: 'api/getPermUserInfor-error', msg: 'userIdNoPermrules' })
+                        return Promise.reject(`userIdNoPermrules`)
                     }
+
+                    //info
+                    srLog.info({ event: 'api/getPermUserInfor-success', userId: userIdFind })
 
                     return userWithRulesFind
                 }
@@ -1069,8 +976,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                         console.log('req.query', get(req, 'query'))
                         console.log('token', token)
                         console.log('[API]syncAndReplaceTabs/check token: invalid token')
-                        console.log(`token does not have permission`)
-                        return Promise.reject(`token does not have permission`)
+                        srLog.error({ event: 'api/syncAndReplaceTabs-error', msg: 'tokenNoPermission' })
+                        return Promise.reject(`tokenNoPermission`)
                     }
 
                     //keyTable
@@ -1081,15 +988,16 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                         console.log('req.query', get(req, 'query'))
                         console.log('keyTable', keyTable)
                         console.log('[API]syncAndReplaceTabs/check keyTable: invalid keyTable')
-                        console.log(`token does not have permission`)
-                        return Promise.reject(`token does not have permission`)
+                        srLog.error({ event: 'api/syncAndReplaceTabs-error', msg: 'tokenNoPermission' })
+                        return Promise.reject(`tokenNoPermission`)
                     }
 
                     //check keyTable
                     let allowedTables = ['targets', 'pemis', 'grups', 'users']
                     if (!allowedTables.includes(keyTable)) {
                         console.log('[API]syncAndReplaceTabs/check keyTable: unexpected keyTable', keyTable)
-                        return Promise.reject(`invalid keyTable: ${keyTable}`)
+                        srLog.error({ event: 'api/syncAndReplaceTabs-error', msg: 'invalidKeyTable', keyTable })
+                        return Promise.reject(`invalidKeyTable`)
                     }
 
                     //getAndVerifyAppUser
@@ -1099,8 +1007,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                     if (!iseobj(user)) {
                         console.log('token', token)
                         console.log('[API]syncAndReplaceTabs/check user: invalid user')
-                        console.log(`token does not have permission`)
-                        return Promise.reject(`token does not have permission`)
+                        srLog.error({ event: 'api/syncAndReplaceTabs-error', msg: 'tokenNoPermission' })
+                        return Promise.reject(`tokenNoPermission`)
                     }
 
                     //userId
@@ -1111,8 +1019,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                         console.log('token', token)
                         console.log('user', user)
                         console.log('[API]syncAndReplaceTabs/check userId: invalid userId')
-                        console.log(`token does not have permission`)
-                        return Promise.reject(`token does not have permission`)
+                        srLog.error({ event: 'api/syncAndReplaceTabs-error', msg: 'tokenNoPermission' })
+                        return Promise.reject(`tokenNoPermission`)
                     }
 
                     //parsePayload
@@ -1120,6 +1028,9 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                     //syncAndReplaceTabs
                     let r = await syncAndReplaceTabs(userId, inp, keyTable)
+
+                    //info
+                    srLog.info({ event: 'api/syncAndReplaceTabs-success', userId, keyTable })
 
                     return r
                 }
@@ -1171,6 +1082,21 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             let b = await p.checkToken(token)
             // console.log('b', b)
 
+            //ip, 對齊sso慣例x-forwarded-for取第1個, fallback到req remoteAddress, 取不到則略過
+            let ip = get(headers, 'x-forwarded-for', '').split(',')[0].trim()
+            if (!isestr(ip)) {
+                ip = get(req, 'info.remoteAddress', '') || get(req, 'socket.remoteAddress', '') || get(req, 'connection.remoteAddress', '')
+            }
+
+            //origin
+            let origin = get(headers, 'origin', '')
+
+            //referer
+            let referer = get(headers, 'referer', '')
+
+            //info
+            srLog.info({ event: 'verifyConn', ok: b, apiType, ip, origin, referer })
+
             return b
         },
         getUserIdByToken: async (token) => { //可使用async或sync函數
@@ -1180,7 +1106,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             if (!isestr(userId)) {
                 console.log('token', token)
                 console.log('userId', userId)
-                return Promise.reject(`can not find user.id`)
+                srLog.error({ event: 'getUserIdByToken-error', msg: 'cannotFindUserId' })
+                return Promise.reject(`cannotFindUserId`)
             }
             return userId
         },
@@ -1200,10 +1127,16 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             // getGrupsList,
             // getUsersList,
 
-            updateTargets,
-            updatePemis,
-            updateGrups,
-            updateUsers,
+            updateTargets: pc.updateTargets,
+            updatePemis: pc.updatePemis,
+            updateGrups: pc.updateGrups,
+            updateUsers: pc.updateUsers,
+
+            getStaEvent: async (userId, timeLength, timeInterval) => {
+                let rs = await psi.getStaEvent(userId, timeLength, timeInterval)
+                srLog.info({ event: 'getStaEvent-success', userId })
+                return rs
+            },
 
         },
         fnTableTags: 'tableTags-web-perm.json',

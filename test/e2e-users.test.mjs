@@ -5,11 +5,16 @@
 //act 走 user-facing input；assert = 語意斷言 + pixel baseline（§6.2 / §6.3）。
 import fs from 'fs'
 import assert from 'assert'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, waitUntilExist } from './e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, waitUntilExist, assertBaselineMatch } from './e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/users'
 const LANGS = ['eng', 'cht']
 const isBaseline = process.argv.includes('--baseline')
+
+//紅框標注目標（captureStableWithBox）：本 case 主要觀看區
+const SEL_GRID = '.ag-root-wrapper'                                            //清單 / grid 內容區
+const SEL_MODAL = 'div[style*="overscroll-behavior"] div[tabindex="0"] > div'  //WDialog 結果 modal / Ve 對話框
+const SEL_TOOLBAR = '[data-fmid="users-toolbar"]'                              //功能區工具列
 
 function picPath(lang, name) { return `${PICS_DIR}/users-${lang}-${name}.png` }
 
@@ -134,7 +139,7 @@ const CASES = [
         name: 'E2E-001-list-view',
         run: async (page) => {
             await gotoUsers(page)
-            return await captureStable(page)
+            return await captureStableWithBox(page, SEL_GRID) //觀看區：使用者清單 grid
         },
         semantic: async (page) => {
             const txt = await page.evaluate(() => document.body.innerText)
@@ -147,6 +152,7 @@ const CASES = [
         name: 'E2E-011-cgrups-dialog',
         run: async (page) => {
             await gotoUsers(page)
+            const s1 = await captureStableWithBox(page, rowBoxSel(0)) //階段1：來源列（點按鈕前）
             //點第 1 列 cgrups 欄按鈕（結構 selector：ag-grid col-id）
             await page.locator('.ag-row[row-index="0"] .ag-cell[col-id="cgrups"] button').first().click()
             //等 VeCgrups 對話框（以其標題 userEditCgrups 偵測）
@@ -156,7 +162,11 @@ const CASES = [
                 return (document.body.innerText || '').includes(label)
             }, { timeout: 15000 })
             await page.waitForTimeout(800)
-            return await captureStable(page)
+            const s2 = await captureStableWithBox(page, SEL_MODAL) //階段2：對話框開啟
+            return [
+                { name: 'E2E-011-1-source-row', buf: s1 },
+                { name: 'E2E-011-2-dialog-open', buf: s2 },
+            ]
         },
         semantic: async (page) => {
             const label = await page.evaluate(() => window.$vo.$t('userEditCgrups'))
@@ -170,7 +180,7 @@ const CASES = [
         run: async (page) => {
             await gotoUsers(page)
             await toggleEditMode(page)
-            return await captureStable(page)
+            return await captureStableWithBox(page, SEL_TOOLBAR) //觀看區：功能區工具列（按鈕隱藏）
         },
         semantic: async (page) => {
             const cnt = await iconBtn(page, MDI.plus).count()
@@ -183,9 +193,14 @@ const CASES = [
         run: async (page) => {
             await gotoUsers(page)
             await clickAdd(page)
+            const s1 = await captureStableWithBox(page, rowBoxSel(0)) //階段1：新增列、自動帶入名、填入前
             await typeIntoCell(page, 0, 'email', 'newuser-e007@test.com')
             await typeIntoCell(page, 0, 'name', '') //清空 name
-            return await captureStable(page)
+            const s2 = await captureStableWithBox(page, rowBoxSel(0)) //階段2：email 合法 + name 清空警告
+            return [
+                { name: 'E2E-007-1-row-added', buf: s1 },
+                { name: 'E2E-007-2-name-empty', buf: s2 },
+            ]
         },
         semantic: async (page) => {
             assert.ok(await cellHasWarn(page, 0, 'name'), 'name 空應顯示警告 icon')
@@ -199,8 +214,13 @@ const CASES = [
         run: async (page) => {
             await gotoUsers(page)
             await clickAdd(page)
+            const s1 = await captureStableWithBox(page, rowBoxSel(0)) //階段1：新增列、填入前
             await typeIntoCell(page, 0, 'email', 'notanemail')
-            return await captureStable(page)
+            const s2 = await captureStableWithBox(page, rowBoxSel(0)) //階段2：email 非法格式警告
+            return [
+                { name: 'E2E-008-1-row-added', buf: s1 },
+                { name: 'E2E-008-2-email-format', buf: s2 },
+            ]
         },
         semantic: async (page) => {
             assert.ok(await cellHasWarn(page, 0, 'email'), 'email 格式錯應顯示警告 icon')
@@ -212,8 +232,13 @@ const CASES = [
         run: async (page) => {
             await gotoUsers(page)
             await clickAdd(page)
+            const s1 = await captureStableWithBox(page, rowBoxSel(0)) //階段1：新增列、填入前
             await typeIntoCell(page, 0, 'email', 'peter@example.com')
-            return await captureStable(page)
+            const s2 = await captureStableWithBox(page, rowBoxSel(0)) //階段2：email 重複警告
+            return [
+                { name: 'E2E-009-1-row-added', buf: s1 },
+                { name: 'E2E-009-2-email-dup', buf: s2 },
+            ]
         },
         semantic: async (page) => {
             assert.ok(await cellHasWarn(page, 0, 'email'), 'email 重複應顯示警告 icon')
@@ -225,10 +250,17 @@ const CASES = [
         run: async (page) => {
             await gotoUsers(page)
             await clickAdd(page)
+            const s1 = await captureStableWithBox(page, rowBoxSel(0))  //階段1：新增空列（填入前）
             await typeIntoCell(page, 0, 'name', 'NewUserE003')
             await typeIntoCell(page, 0, 'email', 'newuser-e003@test.com')
+            const s2 = await captureStableWithBox(page, rowBoxSel(0))  //階段2：填妥 name+email（存檔前）
             await saveAndWaitModal(page)
-            return await captureStable(page)
+            const s3 = await captureStableWithBox(page, SEL_MODAL) //階段3：儲存成功結果 modal
+            return [
+                { name: 'E2E-003-1-row-blank', buf: s1 },
+                { name: 'E2E-003-2-row-filled', buf: s2 },
+                { name: 'E2E-003-3-add-save', buf: s3 },
+            ]
         },
         semantic: async (page) => {
             await assertModalMsg(page, 'userSaveUsersSuccess') //結果 modal 顯示儲存成功
@@ -245,8 +277,13 @@ const CASES = [
             await gotoUsers(page)
             await page.locator('.ag-row[row-index="0"] .ag-cell[col-id="isActive"] input[type="checkbox"]').first().click()
             await page.waitForTimeout(500)
+            const s1 = await captureStableWithBox(page, rowBoxSel(0))  //階段1：toggle isActive 後（存檔前）
             await saveAndWaitModal(page)
-            return await captureStable(page)
+            const s2 = await captureStableWithBox(page, SEL_MODAL) //階段2：儲存成功結果 modal
+            return [
+                { name: 'E2E-006-1-toggled', buf: s1 },
+                { name: 'E2E-006-2-toggle-isactive-save', buf: s2 },
+            ]
         },
         semantic: async (page) => {
             await assertModalMsg(page, 'userSaveUsersSuccess') //結果 modal 顯示儲存成功
@@ -261,10 +298,17 @@ const CASES = [
         run: async (page) => {
             await gotoUsers(page)
             await checkRow(page, 0) //勾選 peter（row 0）
+            const s1 = await captureStableWithBox(page, rowBoxSel(0))   //階段1：勾選列（按刪除前）
             await iconBtn(page, MDI.trash).first().click()
             await page.waitForTimeout(500)
+            const s2 = await captureStableWithBox(page, SEL_GRID)  //階段2：刪除後（列已移除、存檔前）
             await saveAndWaitModal(page)
-            return await captureStable(page)
+            const s3 = await captureStableWithBox(page, SEL_MODAL) //階段3：儲存成功結果 modal
+            return [
+                { name: 'E2E-005-1-row-checked', buf: s1 },
+                { name: 'E2E-005-2-deleted', buf: s2 },
+                { name: 'E2E-005-3-delete-save', buf: s3 },
+            ]
         },
         semantic: async (page) => {
             await assertModalMsg(page, 'userSaveUsersSuccess') //結果 modal 顯示儲存成功
@@ -280,11 +324,20 @@ const CASES = [
         run: async (page) => {
             await gotoUsers(page)
             await checkRow(page, 0) //勾選 peter
+            const s1 = await captureStableWithBox(page, rowBoxSel(0))   //階段1：勾選來源列（按複製前）
             await iconBtn(page, MDI.copy).first().click() //複製，複製列插入最首 row 0
             await page.waitForTimeout(700)
+            const s2 = await captureStableWithBox(page, rowBoxSel(0))  //階段2：複製出新列（改 email 前）
             await typeIntoCell(page, 0, 'email', 'peter-copy-e004@test.com') //改唯一 email（避免與來源重複）
+            const s3 = await captureStableWithBox(page, rowBoxSel(0))  //階段3：改妥唯一 email（存檔前）
             await saveAndWaitModal(page)
-            return await captureStable(page)
+            const s4 = await captureStableWithBox(page, SEL_MODAL) //階段4：儲存成功結果 modal
+            return [
+                { name: 'E2E-004-1-row-checked', buf: s1 },
+                { name: 'E2E-004-2-copied', buf: s2 },
+                { name: 'E2E-004-3-filled', buf: s3 },
+                { name: 'E2E-004-4-copy-save', buf: s4 },
+            ]
         },
         semantic: async (page) => {
             await assertModalMsg(page, 'userSaveUsersSuccess') //結果 modal 顯示儲存成功
@@ -302,9 +355,14 @@ const CASES = [
             await clickAdd(page)
             await typeIntoCell(page, 0, 'name', 'TokenFailUser')
             await typeIntoCell(page, 0, 'email', 'tokenfail-e010@test.com')
+            const s1 = await captureStableWithBox(page, rowBoxSel(0)) //階段1：填妥合法值、token 失效前
             await page.evaluate(() => { window.$vo.$ui.updateUserToken('invalid-token-e010') }) //setup：模擬 token 失效
             await saveAndWaitModal(page) //儲存失敗 → 顯示 CheckYes 失敗 modal（isModified 不重設、DB 不變）
-            return await captureStable(page)
+            const s2 = await captureStableWithBox(page, SEL_MODAL) //階段2：儲存失敗結果 modal
+            return [
+                { name: 'E2E-010-1-row-filled', buf: s1 },
+                { name: 'E2E-010-2-fail-modal', buf: s2 },
+            ]
         },
         semantic: async (page) => {
             await assertModalMsg(page, 'userSaveUsersFail') //結果 modal 顯示儲存失敗（前綴；字尾為後端 errTemp 確定字串）
@@ -342,9 +400,13 @@ async function generateBaseline() {
             await resetDb(browser, BASE_SEED) //throwaway page 還原 DB 為 4 筆 base seed，關閉後再開 case page
             const page = await openApp(browser)
             await setLang(page, lang) //eng 也切（symmetric）：補等同 cht setLang 的 re-render+settle 時間，治 eng-vs-cht layout 收斂不對稱（sso 殷鑑）
-            const buf = await c.run(page, lang)
-            fs.writeFileSync(picPath(lang, c.name), buf)
-            console.log('wrote', picPath(lang, c.name), buf.length, 'bytes')
+            //run 回傳「單張 Buffer」或「多階段 [{name, buf}]」；統一正規化為陣列後逐張寫入
+            let shots = await c.run(page, lang)
+            if (Buffer.isBuffer(shots)) shots = [{ name: c.name, buf: shots }]
+            for (const s of shots) {
+                fs.writeFileSync(picPath(lang, s.name), s.buf)
+                console.log('wrote', picPath(lang, s.name), s.buf.length, 'bytes')
+            }
             await browser.close()
         }
     }
@@ -377,13 +439,12 @@ else {
                 it(c.name, async () => {
                     const page = await openApp(browser)
                     await setLang(page, lang) //eng 也切（symmetric，治 eng marathon flake）
-                    const buf = await c.run(page, lang)
+                    let shots = await c.run(page, lang)
                     if (c.semantic) await c.semantic(page)
-                    const p = picPath(lang, c.name)
-                    assert.ok(fs.existsSync(p), `baseline 不存在: ${p}（先跑 --baseline 產製）`)
-                    if (!buf.equals(fs.readFileSync(p))) {
-                        fs.writeFileSync(`./tmp/${lang}-${c.name}-actual.png`, buf) //供 diff
-                        assert.fail(`pixel 不一致: ${p}（當次截圖存 ./tmp/${lang}-${c.name}-actual.png）`)
+                    //run 回傳「單張 Buffer」或「多階段 [{name, buf}]」；統一正規化為陣列後逐張比對
+                    if (Buffer.isBuffer(shots)) shots = [{ name: c.name, buf: shots }]
+                    for (const s of shots) {
+                        assertBaselineMatch(s.buf, picPath(lang, s.name), `users-${lang}-${s.name}`)
                     }
                 })
             }

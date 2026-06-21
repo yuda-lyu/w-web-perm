@@ -22,13 +22,17 @@
 import fs from 'fs'
 import assert from 'assert'
 import JSON5 from 'json5'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, waitUntilExist, getResolvedActiveTargets } from './e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal } from './e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/rela-grup-pemi'
 const LANGS = ['eng', 'cht']
 const isBaseline = process.argv.includes('--baseline')
 
 function picPath(lang, name) { return `${PICS_DIR}/rela-grup-pemi-${lang}-${name}.png` }
+
+//紅框標注目標（captureStableWithBox）：本 case 主要觀看區
+const SEL_GRID = '.ag-root-wrapper'                                            //清單 / grid 內容區
+const SEL_MODAL = 'div[style*="overscroll-behavior"] div[tabindex="0"] > div'  //WDialog 結果 modal / Ve 對話框
 
 //設定語系（test setup 層，非 act-under-test；對齊雙語覆蓋維度）。沿用 e2e-grups / e2e-rela-user-grup 之對稱 buffer 慣例：
 //cht 走語系切換；eng 為預設不切，但補等同的 settle buffer，治 eng-vs-cht 收斂不對稱（sso e2e-adduser 殷鑑）。
@@ -200,8 +204,13 @@ const CASES = [
         name: 'E2E-001-cpemis-open',
         run: async (page) => {
             await gotoGrups(page)
+            const s1 = await captureStableWithBox(page, rowBoxSel(0)) //階段1：來源列（點 cpemis 按鈕前）
             await openCpemisDialog(page, 0) //row 0 = 權限群組M1（cpemis: P1,P2）
-            return await captureStable(page)
+            const s2 = await captureStableWithBox(page, SEL_MODAL) //階段2：VeCpemis 對話框初始開啟態
+            return [
+                { name: 'E2E-001-1-source-row', buf: s1 },
+                { name: 'E2E-001-2-dialog-open', buf: s2 },
+            ]
         },
         semantic: async (page) => {
             const label = await page.evaluate(() => window.$vo.$t('grupEditCpemis'))
@@ -216,19 +225,33 @@ const CASES = [
         //→ 再點群組頁工具列存檔 → updateGrups 寫 DB + 成功 modal。
         //斷言（有 DB 寫入）：結果 modal 顯示 grupSaveGrupsSuccess；DB M1.cpemis 含 權限P3 鍵 = { mode:'AND', isActive:'y' }。
         //對話框內列＝全部 pemis（依 order）：row0=P1, row1=P2, row2=P3, row3=P4（M1 原無 P3）。
+        //多階段：E2E-002-1-dialog-toggled（toggle+mode 後、Save 前之對話框態）→ E2E-002-cpemis-save-ok（存檔成功 modal）。
         name: 'E2E-002-cpemis-save-ok',
         run: async (page) => {
             await gotoGrups(page)
+            const s1 = await captureStableWithBox(page, rowBoxSel(0)) //階段1：來源列（點 cpemis 按鈕前）
             await openCpemisDialog(page, 0) //row 0 = 權限群組M1
+            const s2 = await captureStableWithBox(page, SEL_MODAL) //階段2：對話框初始態（toggleDialogEnable 前）
             await toggleDialogEnable(page, 2) //勾選 權限P3 enable（y）→ isModified=true → Save 鈕現身
             await setDialogMode(page, 2, 'AND') //將 權限P3 mode 切為 AND
+            const s3 = await captureStableWithBox(page, dialogRowBoxSel(2)) //階段3：對話框內被切的 row2（權限P3），toggle+mode 後 Save 前
             await clickDialogSave(page) //resolve cpemis 字串回填群組列、isModified=true，對話框關閉
             await waitDialogClosed(page, 'grupEditCpemis')
             await saveGrupsAndWaitModal(page) //群組頁工具列存檔 → updateGrups 寫 DB → 成功 modal
-            return await captureStable(page)
+            const s4 = await captureStableWithBox(page, SEL_MODAL) //階段4：群組頁存檔成功結果 modal
+            await assertModalMsg(page, 'grupSaveGrupsSuccess') //關 modal 前斷言成功訊息（dismiss 後文字消失，故移此處）
+            await dismissResultModal(page)
+            const s5 = await captureStableWithBox(page, rowBoxSel(0)) //階段5 data-changed：關 modal 後、主清單 M1 列摘要已變更（由『使用 2 項權限』→『使用 3 項權限』）
+            return [
+                { name: 'E2E-002-1-source-row', buf: s1 },
+                { name: 'E2E-002-2-dialog-open', buf: s2 },
+                { name: 'E2E-002-3-row-toggled', buf: s3 },
+                { name: 'E2E-002-4-cpemis-save-ok', buf: s4 },
+                { name: 'E2E-002-5-data-changed', buf: s5 },
+            ]
         },
         semantic: async (page) => {
-            await assertModalMsg(page, 'grupSaveGrupsSuccess')
+            //（成功 modal 文字斷言已移至 run() dismiss 前）
             //DB M1.cpemis 應含 權限P3 鍵，且 mode/isActive 符所選
             const cpemis = await readDbGrupCpemis(page, '權限群組M1')
             assert.ok(cpemis && typeof cpemis === 'object' && cpemis['權限P3'], 'M1.cpemis 應含 權限P3 鍵（新勾選）')
@@ -252,8 +275,13 @@ const CASES = [
         name: 'E2E-003-blnggrups-open',
         run: async (page) => {
             await gotoPemis(page)
+            const s1 = await captureStableWithBox(page, rowBoxSel(0)) //階段1：來源列（點 belongGrups 按鈕前）
             await openBelongDialog(page, 0) //row 0 = 權限P1（僅 M1 使用之）
-            return await captureStable(page)
+            const s2 = await captureStableWithBox(page, SEL_MODAL) //階段2：VePemiBlngGrups 對話框初始開啟態
+            return [
+                { name: 'E2E-003-1-source-row', buf: s1 },
+                { name: 'E2E-003-2-dialog-open', buf: s2 },
+            ]
         },
         semantic: async (page) => {
             const label = await page.evaluate(() => window.$vo.$t('pemiBlngEditGrups'))
@@ -270,17 +298,31 @@ const CASES = [
         //E2E-004：於 VePemiBlngGrups 勾選 權限群組M2（原無 P1）enable + 切其 mode → 點對話框 Save → updateGrups 寫 DB + 成功 modal。
         //斷言（有 DB 寫入）：結果 modal 顯示 grupSaveGrupsSuccess；DB M2.cpemis 含 權限P1 鍵 = { mode:'AND', isActive:'y' }。
         //對話框內列＝全部 grups（依 order）：row0=M1, row1=M2, row2=M3, row3=M4。
+        //多階段：E2E-004-1-dialog-toggled（toggle+mode 後、Save 前之對話框態）→ E2E-004-blnggrups-save-ok（存檔成功 modal）。
         name: 'E2E-004-blnggrups-save-ok',
         run: async (page) => {
             await gotoPemis(page)
+            const s1 = await captureStableWithBox(page, rowBoxSel(0)) //階段1：來源列（點 belongGrups 按鈕前）
             await openBelongDialog(page, 0) //row 0 = 權限P1
+            const s2 = await captureStableWithBox(page, SEL_MODAL) //階段2：對話框初始態（toggleDialogEnable 前）
             await toggleDialogEnable(page, 1) //勾選 權限群組M2 enable（y）→ 將 P1 掛入 M2 → isModified=true → Save 鈕現身
             await setDialogMode(page, 1, 'AND') //切 M2 對 P1 之 mode 為 AND
+            const s3 = await captureStableWithBox(page, dialogRowBoxSel(1)) //階段3：對話框內被切的 row1（權限群組M2），toggle+mode 後 Save 前
             await saveBelongAndWaitModal(page) //updateGrups 寫 DB → 成功 modal
-            return await captureStable(page)
+            const s4 = await captureStableWithBox(page, SEL_MODAL) //階段4：對話框 Save 後成功結果 modal
+            await assertModalMsg(page, 'grupSaveGrupsSuccess') //關 modal 前斷言成功訊息（dismiss 後文字消失，故移此處）
+            await dismissResultModal(page)
+            const s5 = await captureStableWithBox(page, rowBoxSel(0)) //階段5 data-changed：關 modal 後、權限頁 P1 列摘要已變更（所屬群組含 M2）
+            return [
+                { name: 'E2E-004-1-source-row', buf: s1 },
+                { name: 'E2E-004-2-dialog-open', buf: s2 },
+                { name: 'E2E-004-3-row-toggled', buf: s3 },
+                { name: 'E2E-004-4-blnggrups-save-ok', buf: s4 },
+                { name: 'E2E-004-5-data-changed', buf: s5 },
+            ]
         },
         semantic: async (page) => {
-            await assertModalMsg(page, 'grupSaveGrupsSuccess')
+            //（成功 modal 文字斷言已移至 run() dismiss 前）
             //DB M2.cpemis 應含 權限P1 鍵，且 mode/isActive 符所選
             const cpemis = await readDbGrupCpemis(page, '權限群組M2')
             assert.ok(cpemis && typeof cpemis === 'object' && cpemis['權限P1'], 'M2.cpemis 應含 權限P1 鍵（已掛入本權限）')
@@ -297,6 +339,7 @@ const CASES = [
         run: async (page) => {
             await gotoGrups(page)
             await toggleEditMode(page) //關閉編輯模式 → isEditable=false
+            const s1 = await captureStableWithBox(page, rowBoxSel(0)) //階段1：來源列（toggleEditMode 後、點 cpemis 按鈕前）
             //關編輯模式後 cpemis 欄仍為按鈕（getCpemisText），點之開檢視版對話框
             await page.locator(`.ag-row[row-index="0"] .ag-cell[col-id="cpemis"] button`).first().click()
             await waitUntilExist(page, 'VeCpemis 檢視版標題', () => {
@@ -304,7 +347,11 @@ const CASES = [
                 return (document.body.innerText || '').includes(vo.$t('grupEditCpemisForDisplay'))
             }, { timeout: 15000 })
             await waitDialogGrid(page)
-            return await captureStable(page)
+            const s2 = await captureStableWithBox(page, SEL_MODAL) //階段2：VeCpemis 唯讀檢視對話框開啟態
+            return [
+                { name: 'E2E-005-1-source-row', buf: s1 },
+                { name: 'E2E-005-2-dialog-open', buf: s2 },
+            ]
         },
         semantic: async (page) => {
             const dispLabel = await page.evaluate(() => window.$vo.$t('grupEditCpemisForDisplay'))
@@ -353,9 +400,13 @@ async function generateBaseline() {
             await resetDb(browser, BASE_SEED) //throwaway page 還原 DB 為 base seed，關閉後再開 case page
             const page = await openApp(browser)
             await setLang(page, lang) //eng 也切（symmetric）：補等同 cht setLang 的 re-render+settle 時間
-            const buf = await c.run(page, lang)
-            fs.writeFileSync(picPath(lang, c.name), buf)
-            console.log('wrote', picPath(lang, c.name), buf.length, 'bytes')
+            //run 回傳「單張 Buffer」或「多階段 [{name, buf}]」；統一正規化為陣列後逐張寫入
+            let shots = await c.run(page, lang)
+            if (Buffer.isBuffer(shots)) shots = [{ name: c.name, buf: shots }]
+            for (const s of shots) {
+                fs.writeFileSync(picPath(lang, s.name), s.buf)
+                console.log('wrote', picPath(lang, s.name), s.buf.length, 'bytes')
+            }
             await browser.close()
         }
     }
@@ -387,13 +438,12 @@ else {
                 it(c.name, async () => {
                     const page = await openApp(browser)
                     await setLang(page, lang)
-                    const buf = await c.run(page, lang)
+                    let shots = await c.run(page, lang)
                     if (c.semantic) await c.semantic(page)
-                    const p = picPath(lang, c.name)
-                    assert.ok(fs.existsSync(p), `baseline 不存在: ${p}（先跑 --baseline 產製）`)
-                    if (!buf.equals(fs.readFileSync(p))) {
-                        fs.writeFileSync(`./tmp/${lang}-${c.name}-actual.png`, buf) //供 diff
-                        assert.fail(`pixel 不一致: ${p}（當次截圖存 ./tmp/${lang}-${c.name}-actual.png）`)
+                    //run 回傳「單張 Buffer」或「多階段 [{name, buf}]」；統一正規化為陣列後逐張比對
+                    if (Buffer.isBuffer(shots)) shots = [{ name: c.name, buf: shots }]
+                    for (const s of shots) {
+                        assertBaselineMatch(s.buf, picPath(lang, s.name), `rela-grup-pemi-${lang}-${s.name}`)
                     }
                 })
             }

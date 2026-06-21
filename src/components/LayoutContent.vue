@@ -89,6 +89,11 @@
                                 v-if="menuKey==='mmUsers'"
                             ></LayoutContentUsers>
 
+                            <LayoutContentStaInfor
+                                :drawer="drawer"
+                                v-if="menuKey==='mmStaInfor'"
+                            ></LayoutContentStaInfor>
+
                         </template>
 
                         <div
@@ -129,7 +134,7 @@
 </template>
 
 <script>
-import { mdiArrowLeftBoldHexagonOutline, mdiArrowRightBoldHexagonOutline, mdiGamepadCircle, mdiStackOverflow, mdiSelectGroup, mdiAccountGroupOutline } from '@mdi/js/mdi.js'
+import { mdiArrowLeftBoldHexagonOutline, mdiArrowRightBoldHexagonOutline, mdiGamepadCircle, mdiStackOverflow, mdiSelectGroup, mdiAccountGroupOutline, mdiChartBoxOutline } from '@mdi/js/mdi.js'
 import get from 'lodash-es/get.js'
 import find from 'lodash-es/find.js'
 import WDrawer from 'w-component-vue/src/components/WDrawer.vue'
@@ -139,6 +144,7 @@ import LayoutContentTargets from './LayoutContentTargets.vue'
 import LayoutContentPemis from './LayoutContentPemis.vue'
 import LayoutContentGrups from './LayoutContentGrups.vue'
 import LayoutContentUsers from './LayoutContentUsers.vue'
+import LayoutContentStaInfor from './LayoutContentStaInfor.vue'
 
 
 export default {
@@ -150,6 +156,7 @@ export default {
         LayoutContentPemis,
         LayoutContentGrups,
         LayoutContentUsers,
+        LayoutContentStaInfor,
     },
     props: {
     },
@@ -199,6 +206,11 @@ export default {
                     key: 'mmUsers',
                     text: vo.$t('mmUsers'),
                     icon: mdiAccountGroupOutline,
+                },
+                {
+                    key: 'mmStaInfor',
+                    text: vo.$t('mmStaInfor'),
+                    icon: mdiChartBoxOutline,
                 },
             ]
             return ms

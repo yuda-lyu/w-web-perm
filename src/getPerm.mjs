@@ -12,10 +12,10 @@ async function getPerm(url, tokenTar, opt = {}) {
 
     //check
     if (!isestr(url)) {
-        return Promise.reject('invalid url')
+        return Promise.reject('invalidUrl')
     }
     if (!isestr(tokenTar)) {
-        return Promise.reject('invalid tokenTar')
+        return Promise.reject('invalidTokenTar')
     }
 
     //funConvertPerm
@@ -23,7 +23,7 @@ async function getPerm(url, tokenTar, opt = {}) {
 
     //url
     if (url.indexOf('token={token}') < 0) {
-        return Promise.reject(`no 'token={token}' in url`)
+        return Promise.reject('noTokenInUrl')
     }
     url = url.replaceAll('{token}', tokenTar)
     // console.log('getPerm: url', url)
@@ -36,7 +36,7 @@ async function getPerm(url, tokenTar, opt = {}) {
 
     //check
     if (errTemp !== null) {
-        return Promise.reject(`can not get user by url[${url}]`) //由SSO取得使用者資訊錯誤
+        return Promise.reject('cannotGetUserByUrl') //由SSO取得使用者資訊錯誤
     }
 
     //data
@@ -50,7 +50,7 @@ async function getPerm(url, tokenTar, opt = {}) {
 
     //check
     if (state !== 'success') {
-        return Promise.reject(`can not get user data by url[${url}]`) //取得使用者資訊失敗
+        return Promise.reject('cannotGetUserDataByUrl') //取得使用者資訊失敗
     }
 
     //ur
@@ -59,7 +59,7 @@ async function getPerm(url, tokenTar, opt = {}) {
 
     //check
     if (!iseobj(ur)) {
-        return Promise.reject(`no user data by url[${url}]`)
+        return Promise.reject('noUserDataByUrl')
     }
 
     //check
@@ -74,7 +74,7 @@ async function getPerm(url, tokenTar, opt = {}) {
 
         //check
         if (!iseobj(ur)) {
-            return Promise.reject(`no user data after funConvertPerm`)
+            return Promise.reject('noUserDataAfterConvert')
         }
 
     }

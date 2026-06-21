@@ -74,7 +74,7 @@ async function provideTabs(url, keyTable, from, rows) {
 
     //ks
     if (!haskey(kpKs, `ks_${keyTable}`)) {
-        return Promise.reject(`invalid keyTable[${keyTable}]`)
+        return Promise.reject('invalidKeyTable')
     }
     let ks = kpKs[`ks_${keyTable}`]
     // console.log('ks', ks)

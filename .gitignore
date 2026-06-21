@@ -2,10 +2,13 @@ node_modules
 .opencode
 .claude
 CLAUDE.md
+CLAUDE_settings.md
 .env
-tmp
-user_data
 
 _logs
 db
 uploadTemp
+testPending
+user_data
+
+tmp

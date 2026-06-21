@@ -1,55 +1,29 @@
+import fs from 'fs'
+import JSON5 from 'json5'
 import WOrm from 'w-orm-lmdb/src/WOrmLmdb.mjs'
 import WWebPerm from './server/WWebPerm.mjs'
 import getSettings from './g.getSettings.mjs'
 
 
-//st
+//st(DB 設定)
 let st = getSettings()
 
 let url = st.dbUrl
 let db = st.dbName
+
+//app 設定來源: argv[2] 指定之 settings 檔(供 e2e restartBackend 注入不同語系等), 預設 ./settings.json.(對齊 SSO srv.mjs)
+//JSON5 格式(無引號鍵 / 單引號 / 註解 / 尾逗號); language / webName / modeEdit* / webLogo 等資料設定皆在此檔.
+let pathSettings = process.argv[2] || './settings.json'
+let appSt = JSON5.parse(fs.readFileSync(pathSettings, 'utf8'))
+
 let opt = {
 
     useCheckUser: false,
     getUserById: null,
     useExcludeWhenNotAdmin: false,
 
-    serverPort: 11006,
-    subfolder: '', //mperm
-    urlRedirect: 'https://www.google.com/', //本機測試時得先編譯, 再瀏覽: http://localhost:11006/
-
-    showLanguage: 'y', //'n',
-    language: 'eng', //'eng', 'cht'
-
-    showModeEditTargets: 'y', //'n',
-    showModeEditPemis: 'y',
-    showModeEditGrups: 'y',
-    showModeEditUsers: 'y',
-    modeEditTargets: 'y', //'n',
-    modeEditPemis: 'y',
-    modeEditGrups: 'y',
-    modeEditUsers: 'y',
-
-    webName: {
-        'eng': 'Permission Service',
-        'cht': '權限管理系統',
-    },
-    webDescription: {
-        'eng': 'A web service package for user permissions and management targets.',
-        'cht': '基於簡易分層架構來給予與設定使用者所需之權限及群組管理功能',
-    },
-    webLogo: 'data:image/svg+xml;base64,PHN2ZyBmaWxsPSJub25lIiBoZWlnaHQ9IjQ4IiB3aWR0aD0iNDgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTQ4IDBIMHY0OGg0OFYwWiIgZmlsbD0iI2ZmZiIgZmlsbC1vcGFjaXR5PSIuMDEiLz48cGF0aCBkPSJNMzcuODU2IDIwdjhNMjcuNDY0IDM4bDMuNDY0LTIgMy40NjQtMk0yMC41MzYgMzhsLTMuNDY1LTItMy40NjQtMk0xMC4xNDQgMjB2OE0xMy42MDcgMTRsMy40NjUtMiAzLjQ2NC0yTTI3LjQ2NCAxMGwzLjQ2NCAyIDMuNDY0IDIiIHN0cm9rZT0iI0ZGOTgwMCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIiBzdHJva2Utd2lkdGg9IjIiLz48cGF0aCBkPSJNMjQgNDRhNCA0IDAgMSAwIDAtOCA0IDQgMCAwIDAgMCA4Wk0yNCAxMmE0IDQgMCAxIDAgMC04IDQgNCAwIDAgMCAwIDhaTTI0IDI4YTQgNCAwIDEgMCAwLTggNCA0IDAgMCAwIDAgOFpNMzggMjBhNCA0IDAgMSAwIDAtOCA0IDQgMCAwIDAgMCA4Wk0zOCAzNmE0IDQgMCAxIDAgMC04IDQgNCAwIDAgMCAwIDhaTTEwIDIwYTQgNCAwIDEgMCAwLTggNCA0IDAgMCAwIDAgOFpNMTAgMzZhNCA0IDAgMSAwIDAtOCA0IDQgMCAwIDAgMCA4WiIgZmlsbD0iI0ZGRTBCMiIgc3Ryb2tlPSIjRkY5ODAwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiIHN0cm9rZS13aWR0aD0iMiIvPjwvc3ZnPg==',
-
-    // kpLangExt: {
-    //     mmTargets: {
-    //         eng: `Current features list`,
-    //         cht: `現有功能清單`,
-    //     },
-    //     mmTargetsMsg: {
-    //         eng: `Features generally refer to entities such as pages, data, etc., and can also include features or services.`,
-    //         cht: `現有功能泛指實體的頁面、數據等，亦可為的功能或服務。`,
-    //     },
-    // },
+    //serverPort / subfolder / urlRedirect / showLanguage / language / showModeEdit* / modeEdit* / webName / webDescription / webLogo / kpLangExt 皆由 settings.json 提供
+    ...appSt,
 
 }
 
@@ -99,3 +73,4 @@ instWWebPerm.on('error', (err) => {
 })
 
 //node srv.mjs
+//node srv.mjs <pathSettings>  //指定 settings 檔(e2e 注入語系用)

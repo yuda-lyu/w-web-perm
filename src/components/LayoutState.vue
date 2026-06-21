@@ -3,6 +3,9 @@
         :style="`position:absolute; top:0px; left:0px; width:100%; height:100%; transition:all 0.5s linear; display:flex; align-items:center; justify-content:center;`"
     >
 
+        <!-- conn-state 觀看區包覆層（e2e 紅框標注用；display:flex 與原置中內容布局一致，不改視覺） -->
+        <div data-fmid="conn-state" style="display:flex; align-items:center;">
+
         <template v-if="connState==='csIng'">
 
             <img style="width:100px; height:100px;" :src="img_connection">
@@ -62,6 +65,8 @@
             </div>
 
         </template>
+
+        </div>
 
     </div>
 </template>

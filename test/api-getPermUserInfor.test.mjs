@@ -49,7 +49,7 @@ describe('api-getPermUserInfor', function() {
         }
         catch (e) {
             //對應 spec E2E-002 驗證 1：reject 固定字串（getPermUserInfor.mjs:29），不打後端
-            assert.strict.equal(e, `no 'token={sysToken}', 'userId={userId}' in url`, 'reject 字串應為缺佔位符訊息')
+            assert.strict.equal(e, 'noTokenUserIdInUrl', 'reject 應為 err key noTokenUserIdInUrl')
         }
 
         //對照子斷言：url 只缺 userId={userId} 但保留 token={sysToken} → && 為 false → 不走此 reject。
@@ -65,7 +65,7 @@ describe('api-getPermUserInfor', function() {
             rejMsg = String(e)
         }
         //對應 spec E2E-002：保留 token 佔位符時不應走「缺佔位符」前置 reject
-        assert.strict.notEqual(rejMsg, `no 'token={sysToken}', 'userId={userId}' in url`, '保留 token 佔位符時不應走缺佔位符 reject')
+        assert.strict.notEqual(rejMsg, 'noTokenUserIdInUrl', '保留 token 佔位符時不應走缺佔位符 reject')
     })
 
     it('API-getPermUserInfor-003-invalid-args-reject', async () => {
@@ -78,7 +78,7 @@ describe('api-getPermUserInfor', function() {
             assert.fail('應 reject（url 空字串）')
         }
         catch (e) {
-            assert.strict.equal(e, 'invalid url', 'reject 字串應為 invalid url')
+            assert.strict.equal(e, 'invalidUrl', 'reject 應為 err key invalidUrl')
         }
 
         //tokenSelf 空字串 → reject 'invalid tokenSelf'（getPermUserInfor.mjs:17-18）
@@ -87,7 +87,7 @@ describe('api-getPermUserInfor', function() {
             assert.fail('應 reject（tokenSelf 空字串）')
         }
         catch (e) {
-            assert.strict.equal(e, 'invalid tokenSelf', 'reject 字串應為 invalid tokenSelf')
+            assert.strict.equal(e, 'invalidTokenSelf', 'reject 應為 err key invalidTokenSelf')
         }
 
         //userIdTar 空字串 → reject 'invalid userIdTar'（getPermUserInfor.mjs:20-21）
@@ -96,7 +96,7 @@ describe('api-getPermUserInfor', function() {
             assert.fail('應 reject（userIdTar 空字串）')
         }
         catch (e) {
-            assert.strict.equal(e, 'invalid userIdTar', 'reject 字串應為 invalid userIdTar')
+            assert.strict.equal(e, 'invalidUserIdTar', 'reject 應為 err key invalidUserIdTar')
         }
     })
 
@@ -108,8 +108,8 @@ describe('api-getPermUserInfor', function() {
             assert.fail('應 reject（bad token）')
         }
         catch (e) {
-            //對應 spec E2E-004 驗證 1：reject startsWith 'can not get user data by url'（getPermUserInfor.mjs:65）
-            assert.strict.ok(String(e).startsWith('can not get user data by url'), `reject 字串應以 'can not get user data by url' 開頭，實得：${e}`)
+            //對應 spec E2E-004 驗證 1：reject 已改為 camelCase key（getPermUserInfor.mjs:65）
+            assert.strict.equal(e, 'cannotGetUserDataByUrl', `reject 應為 'cannotGetUserDataByUrl'，實得：${e}`)
         }
     })
 
@@ -150,7 +150,7 @@ describe('api-getPermUserInfor', function() {
             assert.fail('應 reject（funConvertPerm 回 null）')
         }
         catch (e) {
-            assert.strict.equal(e, 'no user data after funConvertPerm', 'reject 字串應為 no user data after funConvertPerm')
+            assert.strict.equal(e, 'noUserDataAfterConvert', 'reject 應為 err key noUserDataAfterConvert')
         }
     })
 })

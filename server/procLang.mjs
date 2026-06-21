@@ -130,6 +130,97 @@ let kpLang = {
         eng: `An unexpected error occurred, please contact the administrator`,
         cht: `發生非預期錯誤，請洽管理員`,
     },
+
+    //後端 reject 之 err key (eng + cht), 前端 .catch 依 lang 用 $tErr 反查顯示
+    cannotConnectServer: {
+        eng: `Cannot connect to server`,
+        cht: `無法連線至伺服器`,
+    },
+    saveRowFieldInvalid: {
+        eng: `Invalid field value in saved data`,
+        cht: `儲存資料的欄位值無效`,
+    },
+    saveRowFieldDuplicate: {
+        eng: `Duplicate field value in saved data`,
+        cht: `儲存資料的欄位值重複`,
+    },
+    saveTabItemsSuccess: {
+        eng: `Saved successfully`,
+        cht: `儲存成功`,
+    },
+    cannotGetUserId: {
+        eng: `Cannot get the user id`,
+        cht: `無法取得使用者 Id`,
+    },
+    cannotGetUserEmail: {
+        eng: `Cannot get the email of user`,
+        cht: `無法取得使用者 Email`,
+    },
+    cannotGetUserName: {
+        eng: `Cannot get the name of user`,
+        cht: `無法取得使用者名稱`,
+    },
+    cannotGetUserRole: {
+        eng: `Cannot get the role of user`,
+        cht: `無法取得使用者角色`,
+    },
+    cannotFindUserFromToken: {
+        eng: `Cannot identify the user from token`,
+        cht: `無法由 token 識別使用者`,
+    },
+    cannotGetUserProp: {
+        eng: `Cannot get the property of user`,
+        cht: `無法取得使用者對應屬性`,
+    },
+    cannotGetUserFromPerm: {
+        eng: `Cannot find the user in permission system`,
+        cht: `無法於權限系統取得使用者`,
+    },
+    userNoPermission: {
+        eng: `User does not have permission`,
+        cht: `使用者權限不足`,
+    },
+    invalidPayload: {
+        eng: `Invalid payload in request`,
+        cht: `請求內容無效`,
+    },
+    invalidFromInPayload: {
+        eng: `Invalid from in payload`,
+        cht: `請求來源欄位無效`,
+    },
+    invalidRowsInPayload: {
+        eng: `Invalid rows in payload`,
+        cht: `請求資料列無效`,
+    },
+    invalidFrom: {
+        eng: `Invalid from`,
+        cht: `來源欄位無效`,
+    },
+    invalidRows: {
+        eng: `Invalid rows`,
+        cht: `資料列無效`,
+    },
+    cannotGetUserRules: {
+        eng: `Cannot get rules of user`,
+        cht: `無法取得使用者權限規則`,
+    },
+    tokenNoPermission: {
+        eng: `Token does not have permission`,
+        cht: `權限不足`,
+    },
+    userIdNoPermrules: {
+        eng: `The user id does not have permission rules`,
+        cht: `此使用者沒有權限規則`,
+    },
+    invalidKeyTable: {
+        eng: `Invalid key table`,
+        cht: `資料表名稱無效`,
+    },
+    cannotFindUserId: {
+        eng: `Cannot find the user id`,
+        cht: `無法找到使用者 Id`,
+    },
+
     unknow: {
         eng: `Unknow`,
         cht: `未知`,
@@ -749,6 +840,80 @@ let kpLang = {
     timeUpdate: {
         eng: `Updated time`,
         cht: '更新時間',
+    },
+
+    invalidUrl: {
+        eng: `Invalid url`,
+        cht: `網址無效`,
+    },
+    invalidTokenTar: {
+        eng: `Invalid target token`,
+        cht: `目標 token 無效`,
+    },
+    invalidTokenSelf: {
+        eng: `Invalid self token`,
+        cht: `自身 token 無效`,
+    },
+    invalidUserIdTar: {
+        eng: `Invalid target user id`,
+        cht: `目標使用者 Id 無效`,
+    },
+    noTokenInUrl: {
+        eng: `Missing token in url`,
+        cht: `網址缺少 token`,
+    },
+    noTokenUserIdInUrl: {
+        eng: `Missing token or userId in url`,
+        cht: `網址缺少 token 或 userId`,
+    },
+    cannotGetUserByUrl: {
+        eng: `Cannot get user by url`,
+        cht: `無法由網址取得使用者`,
+    },
+    cannotGetUserDataByUrl: {
+        eng: `Cannot get user data by url`,
+        cht: `無法由網址取得使用者資料`,
+    },
+    noUserDataByUrl: {
+        eng: `No user data by url`,
+        cht: `該網址無使用者資料`,
+    },
+    noUserDataAfterConvert: {
+        eng: `No user data after permission conversion`,
+        cht: `權限轉換後無使用者資料`,
+    },
+
+    mmStaInfor: {
+        eng: `Statistics`,
+        cht: `統計資訊`,
+    },
+    staEventTitle: {
+        eng: `Event Frequency`,
+        cht: `事件發生頻率`,
+    },
+    staTimeGroup: {
+        eng: `Time grouping`,
+        cht: `時間分組`,
+    },
+    staTimeHr: {
+        eng: `Hourly`,
+        cht: `每小時`,
+    },
+    staTimeDay: {
+        eng: `Daily`,
+        cht: `每日`,
+    },
+    staShowIndividually: {
+        eng: `Show each event`,
+        cht: `各事件分別呈現`,
+    },
+    staTotal: {
+        eng: `Total`,
+        cht: `全部`,
+    },
+    staNoData: {
+        eng: `No event data`,
+        cht: `尚無事件資料`,
     },
 
 }

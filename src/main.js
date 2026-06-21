@@ -32,6 +32,7 @@ let dssm = mDataSelectorSchema(ds)
 //prototype
 Vue.prototype.$ui = ui
 Vue.prototype.$t = ui.getKpText
+Vue.prototype.$tErr = ui.tErr
 Vue.prototype.$s = s
 Vue.prototype.$dssm = dssm
 Vue.prototype.$ds = ds

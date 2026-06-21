@@ -103,7 +103,7 @@ describe('api-syncAndReplaceTabs', function() {
         //spec E2E-002：以空 rows 推送 → 被拒（不支援以空集合清源）
         let resEmpty = await postSync('grups', TOKEN_APP, { from: F, rows: [] })
         assert.strict.equal(resEmpty.state, 'error', `空 rows 應被拒（state='error'），實得: ${JSON.stringify(resEmpty)}`)
-        assert.strict.ok(String(resEmpty.msg).includes('invalid rows in payload'), `msg 應含 'invalid rows in payload'，實得: ${resEmpty.msg}`)
+        assert.strict.ok(String(resEmpty.msg).includes('invalidRowsInPayload'), `msg 應為 err key 'invalidRowsInPayload'，實得: ${resEmpty.msg}`)
 
         //spec E2E-002：因被拒、未進入 delAll，先前兩筆 grups 仍在（未被清空）
         let woItems = await getWoItems()
@@ -124,8 +124,8 @@ describe('api-syncAndReplaceTabs', function() {
             rows: [{ id: 'id-app-bad', order: 0, name: 'badTokenUser', email: 'bad@appTest.com', from: F, cgrups: '{}', isAdmin: 'n', isActive: 'y' }],
         })
         assert.strict.equal(res.state, 'error', `無效 token 應回 state='error'，實得: ${JSON.stringify(res)}`)
-        //TOKEN_BAD（非空但無效）→ getUserByToken 回 {} → !iseobj → WWebPerm.mjs:631
-        assert.strict.equal(res.msg, 'can not find the user from token', `reject msg 應為 token 守門字串，實得: ${res.msg}`)
+        //TOKEN_BAD（非空但無效）→ getUserByToken 回 {} → !iseobj → getAndVerifyAppUser reject err key
+        assert.strict.equal(res.msg, 'cannotFindUserFromToken', `reject msg 應為 err key 'cannotFindUserFromToken'，實得: ${res.msg}`)
 
         //被拒未寫入 —— 該 from 分區為空
         let woItems = await getWoItems()
@@ -139,8 +139,8 @@ describe('api-syncAndReplaceTabs', function() {
 
         let res = await postSync('foobar', TOKEN_APP, { from: F, rows: [{ id: 'x', order: 0, from: F }] })
         assert.strict.equal(res.state, 'error', `非白名單 keyTable 應回 state='error'，實得: ${JSON.stringify(res)}`)
-        //WWebPerm.mjs:1092
-        assert.strict.ok(String(res.msg).includes('invalid keyTable'), `reject msg 應含 'invalid keyTable'，實得: ${res.msg}`)
+        //WWebPerm.mjs invalidKeyTable（keyTable 細節改記 srLog）
+        assert.strict.ok(String(res.msg).includes('invalidKeyTable'), `reject msg 應為 err key 'invalidKeyTable'，實得: ${res.msg}`)
 
         //四個合法表的該 from 分區皆無變動（保持空）
         let woItems = await getWoItems()
@@ -154,20 +154,20 @@ describe('api-syncAndReplaceTabs', function() {
     it('API-sync-005-invalid-payload-reject', async function() {
         const F = 'appTest-5'
 
-        //(a) 缺 from → WWebPerm.mjs:676 'invalid from in payload'
+        //(a) 缺 from → err key invalidFromInPayload
         let resA = await postSync('users', TOKEN_APP, { rows: [{ id: 'x', order: 0, name: 'x', email: 'x@x.com' }] })
         assert.strict.equal(resA.state, 'error', `缺 from 應回 state='error'，實得: ${JSON.stringify(resA)}`)
-        assert.strict.ok(String(resA.msg).includes('invalid from in payload'), `reject msg 應含 'invalid from in payload'，實得: ${resA.msg}`)
+        assert.strict.ok(String(resA.msg).includes('invalidFromInPayload'), `reject msg 應為 err key 'invalidFromInPayload'，實得: ${resA.msg}`)
 
-        //(b) rows 非陣列 → WWebPerm.mjs:686 'invalid rows in payload'
+        //(b) rows 非陣列 → err key invalidRowsInPayload
         let resB = await postSync('users', TOKEN_APP, { from: F, rows: 'x' })
         assert.strict.equal(resB.state, 'error', `rows 非陣列應回 state='error'，實得: ${JSON.stringify(resB)}`)
-        assert.strict.ok(String(resB.msg).includes('invalid rows in payload'), `reject msg 應含 'invalid rows in payload'，實得: ${resB.msg}`)
+        assert.strict.ok(String(resB.msg).includes('invalidRowsInPayload'), `reject msg 應為 err key 'invalidRowsInPayload'，實得: ${resB.msg}`)
 
-        //(c) payload 完全非物件（text/plain body 'x'）→ WWebPerm.mjs:666 'invalid payload in req'
+        //(c) payload 完全非物件（text/plain body 'x'）→ err key invalidPayload
         let resC = await postSync('users', TOKEN_APP, 'x', 'text/plain; charset=utf-8')
         assert.strict.equal(resC.state, 'error', `非物件 payload 應回 state='error'，實得: ${JSON.stringify(resC)}`)
-        assert.strict.ok(String(resC.msg).includes('invalid payload in req'), `reject msg 應含 'invalid payload in req'，實得: ${resC.msg}`)
+        assert.strict.ok(String(resC.msg).includes('invalidPayload'), `reject msg 應為 err key 'invalidPayload'，實得: ${resC.msg}`)
 
         //三類無效 payload 皆未寫 DB —— 該 from 分區為空
         let woItems = await getWoItems()

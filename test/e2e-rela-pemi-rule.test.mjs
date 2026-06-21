@@ -18,13 +18,17 @@
 import fs from 'fs'
 import assert from 'assert'
 import JSON5 from 'json5'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, waitUntilExist, getResolvedActiveTargets } from './e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal } from './e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/rela-pemi-rule'
 const LANGS = ['eng', 'cht']
 const isBaseline = process.argv.includes('--baseline')
 
 function picPath(lang, name) { return `${PICS_DIR}/rela-pemi-rule-${lang}-${name}.png` }
+
+//紅框標注目標（captureStableWithBox）：本 case 主要觀看區
+const SEL_GRID = '.ag-root-wrapper'                                            //清單 / grid 內容區
+const SEL_MODAL = 'div[style*="overscroll-behavior"] div[tabindex="0"] > div'  //WDialog 結果 modal / Ve 對話框
 
 //設定語系（test setup 層，非 act-under-test；對齊雙語覆蓋維度）。沿用 e2e-grups / e2e-rela-* 之對稱 buffer 慣例：
 //cht 走語系切換；eng 為預設不切，但補等同的 settle buffer，治 eng-vs-cht 收斂不對稱（sso e2e-adduser 殷鑑）。
@@ -185,8 +189,13 @@ const CASES = [
         name: 'E2E-001-open-dialog',
         run: async (page) => {
             await gotoPemis(page)
+            const s1 = await captureStableWithBox(page, rowBoxSel(0)) //來源列：導航後、開窗前
             await openCrulesDialog(page, 0) //row 0 = 權限P1
-            return await captureStable(page)
+            const s2 = await captureStableWithBox(page, SEL_MODAL) //對話框初始態：開窗後
+            return [
+                { name: 'E2E-001-1-source-row', buf: s1 },
+                { name: 'E2E-001-2-dialog-open', buf: s2 },
+            ]
         },
         semantic: async (page) => {
             const label = await page.evaluate(() => window.$vo.$t('pemiEditCrules'))
@@ -211,9 +220,16 @@ const CASES = [
         name: 'E2E-002-check-yes',
         run: async (page) => {
             await gotoPemis(page)
+            const s1 = await captureStableWithBox(page, rowBoxSel(0)) //來源列：導航後、開窗前
             await openCrulesDialog(page, 0) //row 0 = 權限P1
+            const s2 = await captureStableWithBox(page, SEL_MODAL) //對話框初始態：開窗後、toggle 前
             await toggleDialogEnable(page, TARGET_N_ROW) //專案A/頁B/區塊A：n→y → isModified=true → Save 鈕現身
-            return await captureStable(page)
+            const s3 = await captureStableWithBox(page, dialogRowBoxSel(TARGET_N_ROW)) //操作中：toggle 後該列（row 3）
+            return [
+                { name: 'E2E-002-1-source-row', buf: s1 },
+                { name: 'E2E-002-2-dialog-open', buf: s2 },
+                { name: 'E2E-002-3-row-toggled', buf: s3 },
+            ]
         },
         semantic: async (page) => {
             //該 target 列 checkbox 由未勾選轉為勾選
@@ -230,9 +246,16 @@ const CASES = [
         name: 'E2E-003-check-no',
         run: async (page) => {
             await gotoPemis(page)
+            const s1 = await captureStableWithBox(page, rowBoxSel(0)) //來源列：導航後、開窗前
             await openCrulesDialog(page, 0) //row 0 = 權限P1
+            const s2 = await captureStableWithBox(page, SEL_MODAL) //對話框初始態：開窗後、toggle 前
             await toggleDialogEnable(page, TARGET_Y_ROW) //專案A/頁A/區塊A：y→n → isModified=true
-            return await captureStable(page)
+            const s3 = await captureStableWithBox(page, dialogRowBoxSel(TARGET_Y_ROW)) //操作中：toggle 後該列（row 0）
+            return [
+                { name: 'E2E-003-1-source-row', buf: s1 },
+                { name: 'E2E-003-2-dialog-open', buf: s2 },
+                { name: 'E2E-003-3-row-toggled', buf: s3 },
+            ]
         },
         semantic: async (page) => {
             //該 target 列 checkbox 由勾選轉為未勾選
@@ -251,18 +274,32 @@ const CASES = [
         //→ 再點權限頁工具列存檔 → updatePemis 寫 DB + 成功 modal。
         //斷言（有 DB 寫入）：結果 modal 顯示 pemiSavePemisSuccess；DB P1.crules 含 專案A/頁B/區塊A=y（新啟用）。
         //本案啟用 1 個原為 'n' 的 target，P1 啟用數由 1→2，crules 欄摘要 N 隨之變動。
+        //多階段：E2E-004-1-dialog-toggled（toggle enable 後、Save 前之對話框態）→ E2E-004-save-back（存檔成功 modal）。
         name: 'E2E-004-save-back',
         run: async (page) => {
             await gotoPemis(page)
+            const s1 = await captureStableWithBox(page, rowBoxSel(0)) //來源列：導航後、開窗前
             await openCrulesDialog(page, 0) //row 0 = 權限P1
+            const s2 = await captureStableWithBox(page, SEL_MODAL) //對話框初始態：開窗後、toggle 前
             await toggleDialogEnable(page, TARGET_N_ROW) //專案A/頁B/區塊A：n→y（啟用數 1→2）
+            const s3 = await captureStableWithBox(page, dialogRowBoxSel(TARGET_N_ROW)) //操作中：toggle 後該列（row 3）
             await clickDialogSave(page) //resolve crules 字串回填權限列、權限頁 isModified=true，對話框關閉
             await waitDialogClosed(page, 'pemiEditCrules')
             await savePemisAndWaitModal(page) //權限頁工具列存檔 → updatePemis 寫 DB → 成功 modal
-            return await captureStable(page)
+            const s4 = await captureStableWithBox(page, SEL_MODAL) //最終階段：權限頁存檔成功結果 modal
+            await assertModalMsg(page, 'pemiSavePemisSuccess') //關 modal 前斷言成功訊息（dismiss 後文字消失，故移此處）
+            await dismissResultModal(page)
+            const s5 = await captureStableWithBox(page, rowBoxSel(0)) //data-changed：關 modal 後、權限頁該權限列摘要已反映規則變更
+            return [
+                { name: 'E2E-004-1-source-row', buf: s1 },
+                { name: 'E2E-004-2-dialog-open', buf: s2 },
+                { name: 'E2E-004-3-row-toggled', buf: s3 },
+                { name: 'E2E-004-4-save-back', buf: s4 },
+                { name: 'E2E-004-5-data-changed', buf: s5 },
+            ]
         },
         semantic: async (page) => {
-            await assertModalMsg(page, 'pemiSavePemisSuccess')
+            //（成功 modal 文字斷言已移至 run() dismiss 前）
             //DB P1.crules 應含 專案A/頁B/區塊A=y（新啟用），且原 'y' 之 專案A/頁A/區塊A 仍 y
             const crules = await readDbPemiCrules(page, '權限P1')
             assert.ok(crules && typeof crules === 'object', 'P1.crules 應為物件')
@@ -286,13 +323,22 @@ const CASES = [
             await gotoPemis(page)
             //先記錄開啟前 權限P1 crules 欄摘要文字（原值）
             const before = await readPemiRowCrulesText(page, 0)
+            const s1 = await captureStableWithBox(page, rowBoxSel(0)) //來源列：導航後、開窗前
             await openCrulesDialog(page, 0) //row 0 = 權限P1
+            const s2 = await captureStableWithBox(page, SEL_MODAL) //對話框初始態：開窗後、toggle 前
             await toggleDialogEnable(page, TARGET_N_ROW) //製造變更（n→y）
+            const s3 = await captureStableWithBox(page, dialogRowBoxSel(TARGET_N_ROW)) //操作中：toggle 後該列（row 3）、Close 前
             await clickDialogClose(page) //Close → reject，權限頁 .catch 不回填
             await waitDialogClosed(page, 'pemiEditCrules')
             //把原值掛到 page 供 semantic 取用
             await page.evaluate((b) => { window.__crulesBefore = b }, before)
-            return await captureStable(page)
+            const s4 = await captureStableWithBox(page, rowBoxSel(0)) //結果：對話框已關閉，該權限列摘要維持原值未變（證明取消放棄變更）
+            return [
+                { name: 'E2E-005-1-source-row', buf: s1 },
+                { name: 'E2E-005-2-dialog-open', buf: s2 },
+                { name: 'E2E-005-3-row-toggled', buf: s3 },
+                { name: 'E2E-005-4-cancelled-grid', buf: s4 },
+            ]
         },
         semantic: async (page) => {
             const after = await readPemiRowCrulesText(page, 0)
@@ -331,9 +377,13 @@ async function generateBaseline() {
             await resetDb(browser, BASE_SEED) //throwaway page 還原 DB 為 base seed，關閉後再開 case page
             const page = await openApp(browser)
             await setLang(page, lang) //eng 也切（symmetric）：補等同 cht setLang 的 re-render+settle 時間
-            const buf = await c.run(page, lang)
-            fs.writeFileSync(picPath(lang, c.name), buf)
-            console.log('wrote', picPath(lang, c.name), buf.length, 'bytes')
+            //run 回傳「單張 Buffer」或「多階段 [{name, buf}]」；統一正規化為陣列後逐張寫入
+            let shots = await c.run(page, lang)
+            if (Buffer.isBuffer(shots)) shots = [{ name: c.name, buf: shots }]
+            for (const s of shots) {
+                fs.writeFileSync(picPath(lang, s.name), s.buf)
+                console.log('wrote', picPath(lang, s.name), s.buf.length, 'bytes')
+            }
             await browser.close()
         }
     }
@@ -365,13 +415,12 @@ else {
                 it(c.name, async () => {
                     const page = await openApp(browser)
                     await setLang(page, lang)
-                    const buf = await c.run(page, lang)
+                    let shots = await c.run(page, lang)
                     if (c.semantic) await c.semantic(page)
-                    const p = picPath(lang, c.name)
-                    assert.ok(fs.existsSync(p), `baseline 不存在: ${p}（先跑 --baseline 產製）`)
-                    if (!buf.equals(fs.readFileSync(p))) {
-                        fs.writeFileSync(`./tmp/${lang}-${c.name}-actual.png`, buf) //供 diff
-                        assert.fail(`pixel 不一致: ${p}（當次截圖存 ./tmp/${lang}-${c.name}-actual.png）`)
+                    //run 回傳「單張 Buffer」或「多階段 [{name, buf}]」；統一正規化為陣列後逐張比對
+                    if (Buffer.isBuffer(shots)) shots = [{ name: c.name, buf: shots }]
+                    for (const s of shots) {
+                        assertBaselineMatch(s.buf, picPath(lang, s.name), `rela-pemi-rule-${lang}-${s.name}`)
                     }
                 })
             }

@@ -39,6 +39,7 @@
 
             <!-- 功能區 -->
             <div
+                data-fmid="grups-toolbar"
                 style="padding:5px; border-top:1px solid #ddd; display:flex; align-items:center;"
                 _v-if="showIsEditable || isEditable"
             >
@@ -185,6 +186,7 @@
                         :iconColor="'#eee'"
                         :iconColorHover="'#fff'"
                         :shadow="false"
+                        :promiseUnlock="true"
                         @click="saveGrups"
                     ></WButtonCircle>
 
@@ -1177,20 +1179,27 @@ export default {
 
         },
 
-        saveGrups: function() {
-            // console.log('method saveGrups')
+        saveGrups: function(msg) {
+
+            let vo = this
+
+            //第一行立刻釋放按鈕視覺鎖
+            msg.pm.resolve()
+
+            //fire-and-forget, 不 await
+            vo.doSaveGrups()
+
+        },
+
+        doSaveGrups: function() {
+            // console.log('method doSaveGrups')
 
             let vo = this
 
             async function core() {
-                let errTemp = null
 
-                //show loading
-                vo.$ui.updateLoading(true)
-
-                //check
+                //1) 同步檢測 (在開 loading 之前)
                 if (isestr(vo.isError)) {
-                    vo.$ui.updateLoading(false)
                     await vo.$dg.showCheckYes(`${vo.isError}`)
                     return
                 }
@@ -1200,38 +1209,34 @@ export default {
 
                 //check
                 if (size(rows) === 0) {
-                    vo.$ui.updateLoading(false)
                     await vo.$dg.showCheckYes(`${vo.$t('grupAddEmpty')}`)
                     return
                 }
 
-                //updateGrups
-                await vo.$fapi.updateGrups(rows)
-                    .catch((err) => {
-                        errTemp = err
-                    })
+                //2) 確定打 API 才開 loading
+                vo.$ui.updateLoading(true)
 
-                //check
-                if (errTemp !== null) {
-                    vo.$ui.updateLoading(false)
-                    await vo.$dg.showCheckYes(`${vo.$t('grupSaveGrupsFail')}: ${errTemp}`)
-                    return
-                }
+                //3) updateGrups, 各自 catch + 旗標短路
+                let okSave = false
+                await vo.$fapi.updateGrups(rows)
+                    .then(() => { okSave = true })
+                    .catch(async (err) => {
+                        vo.$ui.updateLoading(false) //showCheckYes 前關 loading（modal 阻斷期間避免 loading 疊在底下）
+                        await vo.$dg.showCheckYes(`${vo.$t('grupSaveGrupsFail')}: ${vo.$tErr(err)}`)
+                    })
+                if (!okSave) return
 
                 //isModified
                 vo.isModified = false
 
-                //alert
+                //alert（showCheckYes 前關 loading，避免 modal 等待期間 loading 疊在底下）
                 vo.$ui.updateLoading(false)
-                await vo.$dg.showCheckYes(vo.$t('grupSaveGrupsSuccess'))
+                await vo.$dg.showCheckYes(vo.$t('grupSaveGrupsSuccess'), { type: 'success' })
 
             }
 
             //core
             core()
-                // .then((res) => {
-                //     console.log('then', res)
-                // })
                 .catch((err) => {
                     console.log('catch', err)
                     vo.$alert(vo.$t('anUnexpectedErrorOccurred'), { type: 'error' })

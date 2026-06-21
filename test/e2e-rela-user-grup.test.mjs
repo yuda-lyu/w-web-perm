@@ -20,13 +20,17 @@
 import fs from 'fs'
 import assert from 'assert'
 import JSON5 from 'json5'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, waitUntilExist, getResolvedActiveTargets } from './e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal } from './e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/rela-user-grup'
 const LANGS = ['eng', 'cht']
 const isBaseline = process.argv.includes('--baseline')
 
 function picPath(lang, name) { return `${PICS_DIR}/rela-user-grup-${lang}-${name}.png` }
+
+//紅框標注目標（captureStableWithBox）：本 case 主要觀看區
+const SEL_GRID = '.ag-root-wrapper'                                            //清單 / grid 內容區
+const SEL_MODAL = 'div[style*="overscroll-behavior"] div[tabindex="0"] > div'  //WDialog 結果 modal / Ve 對話框
 
 //設定語系（test setup 層，非 act-under-test；對齊雙語覆蓋維度）。沿用 e2e-users / e2e-grups 之對稱 buffer 慣例：
 //cht 走語系切換；eng 為預設不切，但補等同的 settle buffer，治 eng-vs-cht 收斂不對稱（sso e2e-adduser 殷鑑）。
@@ -190,8 +194,13 @@ const CASES = [
         name: 'E2E-001-cgrups-open',
         run: async (page) => {
             await gotoUsers(page)
+            const s1 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-001-1-source-row：開窗前來源列（peter，row 0）
             await openCgrupsDialog(page, 0) //row 0 = peter（cgrups: 權限群組M1）
-            return await captureStable(page)
+            const s2 = await captureStableWithBox(page, SEL_MODAL) //E2E-001-2-dialog-open：VeCgrups 對話框初始開啟態
+            return [
+                { name: 'E2E-001-1-source-row', buf: s1 },
+                { name: 'E2E-001-2-dialog-open', buf: s2 },
+            ]
         },
         semantic: async (page) => {
             const label = await page.evaluate(() => window.$vo.$t('userEditCgrups'))
@@ -204,16 +213,26 @@ const CASES = [
     {
         //E2E-002：於 VeCgrups 勾選 權限群組M2 enable + 切其 mode→AND → 點對話框 Save → resolve 回填使用者列。
         //斷言（前端回填，無 DB 寫入）：peter 使用者列 cgrups 文字由 1→2 群組；對話框關閉。不可斷言 userSaveUsersSuccess。
+        //多階段：E2E-002-1-dialog-toggled（toggle+mode 後、Save 前之對話框態）→ E2E-002-cgrups-saved（回到清單 grid，cgrups 已回填）。
         name: 'E2E-002-cgrups-saved',
         run: async (page) => {
             await gotoUsers(page)
+            const s1 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-002-1-source-row：開窗前來源列（peter，row 0）
             await openCgrupsDialog(page, 0) //row 0 = peter
+            const s2 = await captureStableWithBox(page, SEL_MODAL) //E2E-002-2-dialog-open：VeCgrups 對話框初始態（第一個 toggle 前）
             //對話框內列＝全部 grups（依 order）：row0=M1, row1=M2, row2=M3, row3=M4
             await toggleDialogEnable(page, 1) //勾選 權限群組M2 enable（y）→ isModified=true → Save 鈕現身
             await setDialogMode(page, 1, 'AND') //將 權限群組M2 mode 切為 AND
+            const s3 = await captureStableWithBox(page, dialogRowBoxSel(1)) //E2E-002-3-row-toggled：對話框內 row1（M2）toggle+mode 後
             await clickDialogSave(page) //resolve cgrups 字串回填使用者列，對話框關閉
             await waitDialogClosed(page, 'userEditCgrups')
-            return await captureStable(page)
+            const s4 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-002-4-cgrups-saved：對話框已關閉，peter 列 cgrups 欄文字已由 1→2 群組回填
+            return [
+                { name: 'E2E-002-1-source-row', buf: s1 },
+                { name: 'E2E-002-2-dialog-open', buf: s2 },
+                { name: 'E2E-002-3-row-toggled', buf: s3 },
+                { name: 'E2E-002-4-cgrups-saved', buf: s4 },
+            ]
         },
         semantic: async (page) => {
             //回填後 peter 使用者列 cgrups button 文字應反映 2 個群組（原 M1 + 新增 M2）。
@@ -234,13 +253,22 @@ const CASES = [
             await gotoUsers(page)
             //先記錄開啟前 peter cgrups 文字（原值）
             const before = await readUserRowCgrupsText(page, 0)
+            const s1 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-003-1-source-row：開窗前來源列（peter，row 0）
             await openCgrupsDialog(page, 0) //row 0 = peter
+            const s2 = await captureStableWithBox(page, SEL_MODAL) //E2E-003-2-dialog-open：VeCgrups 對話框初始態（第一個 toggle 前）
             await toggleDialogEnable(page, 1) //勾選 權限群組M2 enable（製造變更）
+            const s3 = await captureStableWithBox(page, dialogRowBoxSel(1)) //E2E-003-3-row-toggled：對話框內 row1（M2）toggle 後、Close 前
             await clickDialogClose(page) //Close → reject，入口 A .catch 不回填
             await waitDialogClosed(page, 'userEditCgrups')
             //把原值掛到 page 供 semantic 取用
             await page.evaluate((b) => { window.__cgrupsBefore = b }, before)
-            return await captureStable(page)
+            const s4 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-003-4-cancelled-grid：對話框已關閉，peter 列 cgrups 欄文字維持原值未變
+            return [
+                { name: 'E2E-003-1-source-row', buf: s1 },
+                { name: 'E2E-003-2-dialog-open', buf: s2 },
+                { name: 'E2E-003-3-row-toggled', buf: s3 },
+                { name: 'E2E-003-4-cancelled-grid', buf: s4 },
+            ]
         },
         semantic: async (page) => {
             const after = await readUserRowCgrupsText(page, 0)
@@ -259,8 +287,13 @@ const CASES = [
         name: 'E2E-004-belong-open',
         run: async (page) => {
             await gotoGrups(page)
+            const s1 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-004-1-source-row：開窗前來源列（權限群組M1，row 0）
             await openBelongDialog(page, 0) //row 0 = 權限群組M1（peter 屬之）
-            return await captureStable(page)
+            const s2 = await captureStableWithBox(page, SEL_MODAL) //E2E-004-2-dialog-open：VeGrupBlngUsers 對話框初始開啟態
+            return [
+                { name: 'E2E-004-1-source-row', buf: s1 },
+                { name: 'E2E-004-2-dialog-open', buf: s2 },
+            ]
         },
         semantic: async (page) => {
             const label = await page.evaluate(() => window.$vo.$t('grupBlngEditUsers'))
@@ -277,17 +310,31 @@ const CASES = [
         //E2E-005：於 VeGrupBlngUsers 勾選 mary（原不屬 M1）enable + 切其 mode → 點對話框 Save → updateUsers 寫 DB + 成功 modal。
         //斷言（有 DB 寫入）：結果 modal 顯示 userSaveUsersSuccess；DB mary.cgrups 含 權限群組M1 鍵。
         //對話框內列＝全部 users（依 order）：row0=peter, row1=mary, row2=john, row3=admin。
+        //多階段：E2E-005-1-dialog-toggled（toggle+mode 後、Save 前之對話框態）→ E2E-005-belong-saved（存檔成功 modal）。
         name: 'E2E-005-belong-saved',
         run: async (page) => {
             await gotoGrups(page)
+            const s1 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-005-1-source-row：開窗前來源列（權限群組M1，row 0）
             await openBelongDialog(page, 0) //row 0 = 權限群組M1
+            const s2 = await captureStableWithBox(page, SEL_MODAL) //E2E-005-2-dialog-open：VeGrupBlngUsers 對話框初始態（第一個 toggle 前）
             await toggleDialogEnable(page, 1) //勾選 mary enable（y）→ 歸屬 M1 → isModified=true → Save 鈕現身
             await setDialogMode(page, 1, 'AND') //切 mary 對 M1 之 mode 為 AND
+            const s3 = await captureStableWithBox(page, dialogRowBoxSel(1)) //E2E-005-3-row-toggled：對話框內 row1（mary）toggle+mode 後、Save 前
             await saveBelongAndWaitModal(page) //updateUsers 寫 DB → 成功 modal
-            return await captureStable(page)
+            const s4 = await captureStableWithBox(page, SEL_MODAL) //E2E-005-4-belong-saved：對話框 Save 後成功結果 modal
+            await assertModalMsg(page, 'userSaveUsersSuccess') //關 modal 前斷言成功訊息（dismiss 後文字消失，故移此處）
+            await dismissResultModal(page)
+            const s5 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-005-5-data-changed：關 modal 後、群組頁 M1 列「管控所屬使用者」已含 mary
+            return [
+                { name: 'E2E-005-1-source-row', buf: s1 },
+                { name: 'E2E-005-2-dialog-open', buf: s2 },
+                { name: 'E2E-005-3-row-toggled', buf: s3 },
+                { name: 'E2E-005-4-belong-saved', buf: s4 },
+                { name: 'E2E-005-5-data-changed', buf: s5 },
+            ]
         },
         semantic: async (page) => {
-            await assertModalMsg(page, 'userSaveUsersSuccess')
+            //（成功 modal 文字斷言已移至 run() dismiss 前）
             //DB mary.cgrups 應含 權限群組M1 鍵，且 mode/isActive 符所選
             const cgrups = await readDbUserCgrups(page, 'mary@example.com')
             assert.ok(cgrups && typeof cgrups === 'object' && cgrups['權限群組M1'], 'mary.cgrups 應含 權限群組M1 鍵（已歸屬本群組）')
@@ -306,11 +353,20 @@ const CASES = [
         name: 'E2E-006-belong-cancel',
         run: async (page) => {
             await gotoGrups(page)
+            const s1 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-006-1-source-row：開窗前來源列（權限群組M1，row 0）
             await openBelongDialog(page, 0) //row 0 = 權限群組M1
+            const s2 = await captureStableWithBox(page, SEL_MODAL) //E2E-006-2-dialog-open：VeGrupBlngUsers 對話框初始態（第一個 toggle 前）
             await toggleDialogEnable(page, 1) //勾選 mary enable（製造變更）
+            const s3 = await captureStableWithBox(page, dialogRowBoxSel(1)) //E2E-006-3-row-toggled：對話框內 row1（mary）toggle 後、Close 前
             await clickDialogClose(page) //Close → reject，入口 B .catch 接住、未寫 DB
             await waitDialogClosed(page, 'grupBlngEditUsers')
-            return await captureStable(page)
+            const s4 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-006-4-cancelled-grid：對話框已關閉，M1 列摘要維持原值未變（DB 未寫入）
+            return [
+                { name: 'E2E-006-1-source-row', buf: s1 },
+                { name: 'E2E-006-2-dialog-open', buf: s2 },
+                { name: 'E2E-006-3-row-toggled', buf: s3 },
+                { name: 'E2E-006-4-cancelled-grid', buf: s4 },
+            ]
         },
         semantic: async (page) => {
             //無成功 modal（systemMessage 未出現於本流程）
@@ -350,9 +406,13 @@ async function generateBaseline() {
             await resetDb(browser, BASE_SEED) //throwaway page 還原 DB 為 base seed，關閉後再開 case page
             const page = await openApp(browser)
             await setLang(page, lang) //eng 也切（symmetric）：補等同 cht setLang 的 re-render+settle 時間
-            const buf = await c.run(page, lang)
-            fs.writeFileSync(picPath(lang, c.name), buf)
-            console.log('wrote', picPath(lang, c.name), buf.length, 'bytes')
+            //run 回傳「單張 Buffer」或「多階段 [{name, buf}]」；統一正規化為陣列後逐張寫入
+            let shots = await c.run(page, lang)
+            if (Buffer.isBuffer(shots)) shots = [{ name: c.name, buf: shots }]
+            for (const s of shots) {
+                fs.writeFileSync(picPath(lang, s.name), s.buf)
+                console.log('wrote', picPath(lang, s.name), s.buf.length, 'bytes')
+            }
             await browser.close()
         }
     }
@@ -384,13 +444,12 @@ else {
                 it(c.name, async () => {
                     const page = await openApp(browser)
                     await setLang(page, lang)
-                    const buf = await c.run(page, lang)
+                    let shots = await c.run(page, lang)
                     if (c.semantic) await c.semantic(page)
-                    const p = picPath(lang, c.name)
-                    assert.ok(fs.existsSync(p), `baseline 不存在: ${p}（先跑 --baseline 產製）`)
-                    if (!buf.equals(fs.readFileSync(p))) {
-                        fs.writeFileSync(`./tmp/${lang}-${c.name}-actual.png`, buf) //供 diff
-                        assert.fail(`pixel 不一致: ${p}（當次截圖存 ./tmp/${lang}-${c.name}-actual.png）`)
+                    //run 回傳「單張 Buffer」或「多階段 [{name, buf}]」；統一正規化為陣列後逐張比對
+                    if (Buffer.isBuffer(shots)) shots = [{ name: c.name, buf: shots }]
+                    for (const s of shots) {
+                        assertBaselineMatch(s.buf, picPath(lang, s.name), `rela-user-grup-${lang}-${s.name}`)
                     }
                 })
             }

@@ -215,6 +215,16 @@ function getKpText(key) {
 }
 
 
+function tErr(err) {
+    let key = isestr(err) ? err : 'anUnexpectedErrorOccurred'
+    let msg = getKpText(key)           //後端 err key → 翻譯
+    if (msg === key) {                 //getKpText 查無 → 回傳 key 本身 → 非 procLang key (連線層 raw 等)
+        msg = getKpText('cannotConnectServer')
+    }
+    return msg
+}
+
+
 function gv(o, k, cv = null) {
     let r = get(o, k, '')
     if (!isestr(r)) {
@@ -290,6 +300,7 @@ let mUI = {
 
     setLang,
     getKpText,
+    tErr,
 
     gv,
     syncHeight,

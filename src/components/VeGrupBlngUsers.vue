@@ -979,13 +979,13 @@ export default {
             //check
             if (errTemp !== null) {
                 vo.$ui.updateLoading(false)
-                await vo.$dg.showCheckYes(`${vo.$t('userSaveUsersFail')}: ${errTemp}`)
+                await vo.$dg.showCheckYes(`${vo.$t('userSaveUsersFail')}: ${vo.$tErr(errTemp)}`)
                 return
             }
 
             //alert
             vo.$ui.updateLoading(false)
-            await vo.$dg.showCheckYes(vo.$t('userSaveUsersSuccess'))
+            await vo.$dg.showCheckYes(vo.$t('userSaveUsersSuccess'), { type: 'success' })
 
         },
 
@@ -1006,6 +1006,18 @@ export default {
 
         clickSave: function(msg) {
             //console.log('methods clickSave', msg)
+
+            let vo = this
+
+            //save按鈕第一行立刻釋放視覺鎖
+            msg.pm.resolve()
+
+            //fire-and-forget, 不 await
+            vo.doSave()
+
+        },
+
+        doSave: function() {
 
             let vo = this
 
@@ -1089,9 +1101,6 @@ export default {
                 })
                 .catch(() => { })
                 .finally(() => {
-
-                    //save按鈕解除loading
-                    msg.pm.resolve()
 
                     //hide loading
                     vo.$ui.updateLoading(false)
