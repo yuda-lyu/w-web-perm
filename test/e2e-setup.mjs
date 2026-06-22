@@ -109,7 +109,7 @@ export async function startServersOnce(opts = {}) {
     }
 }
 
-//—— initlang 等「需注入不同語系/設定」測試專用：genTempSettings + restartBackend（對齊 SSO）——
+//—— init 等「需注入不同語系/設定」測試專用：genTempSettings + restartBackend（對齊 SSO）——
 //產生臨時 settings：複製 ./settings.json(JSON5) + overrides → 寫 ./tmp/ 回傳路徑。
 let tmpSettingsSeq = 0
 export function genTempSettings(overrides = {}) {

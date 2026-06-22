@@ -903,17 +903,49 @@ let kpLang = {
         eng: `Daily`,
         cht: `每日`,
     },
-    staShowIndividually: {
-        eng: `Show each event`,
-        cht: `各事件分別呈現`,
+    staSelectEvents: {
+        eng: `Events`,
+        cht: `事件`,
+    },
+    staSelectAll: {
+        eng: `Select all`,
+        cht: `全選`,
+    },
+    staClear: {
+        eng: `Clear`,
+        cht: `清除`,
     },
     staTotal: {
         eng: `Total`,
-        cht: `全部`,
+        cht: `全部加總`,
     },
     staNoData: {
         eng: `No event data`,
         cht: `尚無事件資料`,
+    },
+    staTableTitle: {
+        eng: `Event Statistics`,
+        cht: `事件統計表`,
+    },
+    staColEvent: {
+        eng: `Event`,
+        cht: `事件`,
+    },
+    staColLast1Day: {
+        eng: `Last 1 Day`,
+        cht: `最近1日`,
+    },
+    staColLast8Hour: {
+        eng: `Last 8 Hours`,
+        cht: `最近8小時`,
+    },
+    staColLast4Hour: {
+        eng: `Last 4 Hours`,
+        cht: `最近4小時`,
+    },
+    staColLast1Hour: {
+        eng: `Last 1 Hour`,
+        cht: `最近1小時`,
     },
 
 }

@@ -298,8 +298,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     let pc = procCore(woItems, procOrm, { srLog, kmx })
 
 
-    //procStaInfor: 統計資訊, fdLog 對齊 srLog 使用同一目錄
-    let psi = procStaInfor({ fdLog: './_logs' })
+    //procStaInfor: 統計資訊, fdLog 對齊 srLog 使用同一目錄; mock 由 settings.staEventMock 注入(e2e 統計圖穩定用)
+    let psi = procStaInfor({ fdLog: './_logs', mock: get(opt, 'staEventMock', false) })
 
 
     //getWebInfor
@@ -1135,6 +1135,12 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             getStaEvent: async (userId, timeLength, timeInterval) => {
                 let rs = await psi.getStaEvent(userId, timeLength, timeInterval)
                 srLog.info({ event: 'getStaEvent-success', userId })
+                return rs
+            },
+
+            getStaEventTable: async (userId) => {
+                let rs = await psi.getStaEventTable(userId)
+                srLog.info({ event: 'getStaEventTable-success', userId })
                 return rs
             },
 
