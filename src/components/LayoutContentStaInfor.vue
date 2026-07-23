@@ -179,7 +179,6 @@ export default {
 
             dbc: debounce(300),
 
-            panelWidth: 100,
             panelHeight: 100,
 
             firstLoading: true,
@@ -259,7 +258,6 @@ export default {
             let vo = this
 
             //panelWidth, panelHeight
-            vo.panelWidth = msg.snew.offsetWidth
             vo.panelHeight = msg.snew.offsetHeight
 
         },

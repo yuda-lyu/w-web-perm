@@ -57,10 +57,11 @@ let kpLang = {
         cht: '等待數據中...',
     },
 
-    isEditabled: {
-        eng: 'Editable',
-        cht: '是否編輯',
-    },
+    //目前無引用,保留供日後使用(見 spec/設計要點與取捨.md ADR-014)
+    // isEditabled: {
+    //     eng: 'Editable',
+    //     cht: '是否編輯',
+    // },
     saveChanges: {
         eng: `Save changes`,
         cht: `儲存變更`,
@@ -85,10 +86,11 @@ let kpLang = {
         eng: `Delete`,
         cht: `刪除`,
     },
-    cancel: {
-        eng: `Cancel`,
-        cht: `取消`,
-    },
+    //目前無引用,保留供日後使用(見 spec/設計要點與取捨.md ADR-014)
+    // cancel: {
+    //     eng: `Cancel`,
+    //     cht: `取消`,
+    // },
     screenFull: {
         eng: `Max size`,
         cht: `最大化尺寸`,
@@ -221,10 +223,11 @@ let kpLang = {
         cht: `無法找到使用者 Id`,
     },
 
-    unknow: {
-        eng: `Unknow`,
-        cht: `未知`,
-    },
+    //目前無引用,保留供日後使用(見 spec/設計要點與取捨.md ADR-014)
+    // unknow: {
+    //     eng: `Unknow`,
+    //     cht: `未知`,
+    // },
 
     username: {
         eng: `Username`,
@@ -263,10 +266,11 @@ let kpLang = {
         eng: `Use groups`,
         cht: `所屬權限群組`,
     },
-    belongPemis: {
-        eng: `Use permissions`,
-        cht: `所屬權限`,
-    },
+    //目前無引用,保留供日後使用(見 spec/設計要點與取捨.md ADR-014)
+    // belongPemis: {
+    //     eng: `Use permissions`,
+    //     cht: `所屬權限`,
+    // },
     belongGrupsNames: {
         eng: `Use permission groups`,
         cht: `所屬權限群組名稱`,
@@ -288,6 +292,10 @@ let kpLang = {
     errInNames: {
         eng: `Name errors`,
         cht: `名稱出現錯誤待修復`,
+    },
+    errInIds: {
+        eng: `ID errors`,
+        cht: `ID 出現錯誤待修復`,
     },
     errInEmails: {
         eng: `Email errors`,
@@ -383,10 +391,11 @@ let kpLang = {
         eng: `Enable`,
         cht: `是否使用`,
     },
-    targetClearTargetsFail: {
-        eng: `Failed to clear existing targets`,
-        cht: `清除既有對象數據失敗`,
-    },
+    //目前無引用,保留供日後使用(見 spec/設計要點與取捨.md ADR-014)
+    // targetClearTargetsFail: {
+    //     eng: `Failed to clear existing targets`,
+    //     cht: `清除既有對象數據失敗`,
+    // },
     targetSaveTargetsFail: {
         eng: `Failed to save targets`,
         cht: `儲存對象數據失敗`,
@@ -476,10 +485,11 @@ let kpLang = {
         eng: `Has {n} rule(s){nms}`,
         cht: `使用共 {n} 項對象{nms}`,
     },
-    pemiClearPemisFail: {
-        eng: `Failed to clear existing permissions`,
-        cht: `清除既有權限數據失敗`,
-    },
+    //目前無引用,保留供日後使用(見 spec/設計要點與取捨.md ADR-014)
+    // pemiClearPemisFail: {
+    //     eng: `Failed to clear existing permissions`,
+    //     cht: `清除既有權限數據失敗`,
+    // },
     pemiSavePemisFail: {
         eng: `Failed to save permissions`,
         cht: `儲存權限數據失敗`,
@@ -603,10 +613,11 @@ let kpLang = {
         eng: `Has {n} permission(s){nms}`,
         cht: `使用 {n} 項權限{nms}`,
     },
-    grupClearGrupsFail: {
-        eng: `Failed to clear existing permission groups`,
-        cht: `清除既有權限群組數據失敗`,
-    },
+    //目前無引用,保留供日後使用(見 spec/設計要點與取捨.md ADR-014)
+    // grupClearGrupsFail: {
+    //     eng: `Failed to clear existing permission groups`,
+    //     cht: `清除既有權限群組數據失敗`,
+    // },
     grupSaveGrupsEmpty: {
         eng: `No user`,
         cht: `未有變更權限群組資料`,
@@ -727,7 +738,7 @@ let kpLang = {
         cht: `編輯使用權限群組`,
     },
     userEditCgrupsForDisplay: {
-        eng: `Edit list of user`,
+        eng: `Permission groups of user`, //展示版不帶 Edit 動詞(2026-07-10 訂正: 原誤與編輯版同值, 唯讀對話框標題顯示「Edit...」且 e2e 無法以標題區分模式)
         cht: `展示使用權限群組`,
     },
     userEditCgrupsNoUserId: {
@@ -784,10 +795,11 @@ let kpLang = {
         cht: `刪除勾選權限`,
     },
 
-    allDefaults: {
-        eng: `All defaults`,
-        cht: `全部項目預設值`,
-    },
+    //目前無引用,保留供日後使用(見 spec/設計要點與取捨.md ADR-014)
+    // allDefaults: {
+    //     eng: `All defaults`,
+    //     cht: `全部項目預設值`,
+    // },
     show: {
         eng: `Show`,
         cht: `顯示`,
@@ -796,34 +808,36 @@ let kpLang = {
         eng: `Active`,
         cht: `啟用`,
     },
-    showChildren: {
-        eng: `Show children`,
-        cht: `所屬顯示`,
-    },
-    hideChildren: {
-        eng: `Hide children`,
-        cht: `所屬不顯示`,
-    },
-    activateChildren: {
-        eng: `Activate children`,
-        cht: `所屬啟用`,
-    },
-    deactivateChildren: {
-        eng: `Deactivate children`,
-        cht: `所屬不啟用`,
-    },
-    isUsernameEmpty: {
-        eng: `Username is empty`,
-        cht: `使用者名稱不得為空`,
-    },
-    failedToSaveUser: {
-        eng: `Failed to save the user`,
-        cht: `變更使用者失敗`,
-    },
-    successfulToSaveUser: {
-        eng: `Save the user successfully`,
-        cht: `變更使用者成功`,
-    },
+    //目前無引用,保留供日後使用(見 spec/設計要點與取捨.md ADR-014)
+    // showChildren: {
+    //     eng: `Show children`,
+    //     cht: `所屬顯示`,
+    // },
+    // hideChildren: {
+    //     eng: `Hide children`,
+    //     cht: `所屬不顯示`,
+    // },
+    // activateChildren: {
+    //     eng: `Activate children`,
+    //     cht: `所屬啟用`,
+    // },
+    // deactivateChildren: {
+    //     eng: `Deactivate children`,
+    //     cht: `所屬不啟用`,
+    // },
+    //目前無引用,保留供日後使用(見 spec/設計要點與取捨.md ADR-014)
+    // isUsernameEmpty: {
+    //     eng: `Username is empty`,
+    //     cht: `使用者名稱不得為空`,
+    // },
+    // failedToSaveUser: {
+    //     eng: `Failed to save the user`,
+    //     cht: `變更使用者失敗`,
+    // },
+    // successfulToSaveUser: {
+    //     eng: `Save the user successfully`,
+    //     cht: `變更使用者成功`,
+    // },
 
     userId: {
         eng: `ID of the created user`,
@@ -891,10 +905,11 @@ let kpLang = {
         eng: `Event Frequency`,
         cht: `事件發生頻率`,
     },
-    staTimeGroup: {
-        eng: `Time grouping`,
-        cht: `時間分組`,
-    },
+    //目前無引用,保留供日後使用(見 spec/設計要點與取捨.md ADR-014)
+    // staTimeGroup: {
+    //     eng: `Time grouping`,
+    //     cht: `時間分組`,
+    // },
     staTimeHr: {
         eng: `Hourly`,
         cht: `每小時`,
@@ -922,6 +937,10 @@ let kpLang = {
     staNoData: {
         eng: `No event data`,
         cht: `尚無事件資料`,
+    },
+    getDataError: {
+        eng: `Failed to load data`,
+        cht: `資料載入失敗`,
     },
     staTableTitle: {
         eng: `Event Statistics`,

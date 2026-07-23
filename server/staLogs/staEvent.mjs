@@ -9,6 +9,7 @@ import genPm from 'wsemi/src/genPm.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import fsTreeFolder from 'wsemi/src/fsTreeFolder.mjs'
 import fsBuildReadStreamText from 'wsemi/src/fsBuildReadStreamText.mjs'
+import filterVpfsByWindow from './filterVpfsByWindow.mjs'
 
 
 //統計各 event 事件於各時間桶之發生頻率（鏡像 SSO staLogs/staToken.mjs；差異：不限特定 event，改依 event 名分組）。
@@ -40,6 +41,7 @@ async function staEvent(timeLength = 7, timeInterval = 'hr', opt = {}) {
 
     //vpfs
     let vpfs = fsTreeFolder(fdLog)
+    vpfs = filterVpfsByWindow(vpfs, tStart, fmt) //開檔前剔除窗外檔, 見該模組註解
 
     //logs
     let logs = []

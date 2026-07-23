@@ -3,7 +3,7 @@
 //
 //雙模式：
 //  - 產 baseline：node test/e2e-stainfor.test.mjs --baseline （寫 test/pics/stainfor/）
-//  - 驗證（mocha）：npx mocha test/e2e-stainfor.test.mjs --reporter list
+//  - 驗證（mocha）：npx mocha test/e2e-stainfor.test.mjs --reporter list （pixelmatch 反鋸齒感知 + maxDiffPixels 容差比對，非 byte-exact）
 //  --names <eng-E2E-001-event-all,...> 進行手術式 baseline 重產
 //
 //標準圖存放：test/pics/stainfor/stainfor-{lang}-{name}.png（4 cases × 2 lang = 8 baselines）

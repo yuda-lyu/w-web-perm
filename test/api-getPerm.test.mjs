@@ -11,7 +11,7 @@
 //  → pm2resolve 包成 {state:'error', msg:...}（HTTP 200）→ client 見 state!=='success' → reject 'can not get user data by url[...]'。
 
 import assert from 'assert'
-import { startApi, cleanup, apiBaseUrl, TOKEN_ADMIN, TOKEN_BAD, urlGetPerm, SEED } from './api-setup.mjs'
+import { startApi, cleanup, apiBaseUrl, TOKEN_ADMIN, TOKEN_BAD, urlGetPerm, SEED, getWoItems } from './api-setup.mjs'
 import getPerm from '../src/getPerm.mjs'
 import perm from '../src/perm.mjs'
 
@@ -38,8 +38,22 @@ describe('api-getPerm', function() {
         assert.strict.equal(ur.user.id, SEED.adminId, 'user.id 應為 admin id')
         assert.strict.equal(ur.user.grupsNames, SEED.adminGrup, 'user.grupsNames 應為 admin 權限群組')
 
-        //spec：rules 對應全部 targets（22 筆）
-        assert.strict.equal(ur.rules.length, SEED.targetCount, `rules.length 應為 ${SEED.targetCount}`)
+        //spec：rules 以「當前全部 targets」為輸出主軸（mShare.mjs:491 getUserRules 逐 target 產一條 rule，
+        //  woItems.targets.select() 不帶 from 篩選 → 涵蓋所有 from 分區）。
+        //  原斷言寫死 ur.rules.length === SEED.targetCount(22)，受 sync 測試殘留之 appTest from targets 污染（隔離脆弱）：
+        //  若他檔殘留 appTest-N targets，ur.rules 會多出該批 → 22 斷言誤失敗。
+        //  改以「對 from='' base seed targets 計數基準」為穩定錨：
+        //    (1) base seed（from=''）每一個 target id 都應出現在 rules（核心契約：admin 權限樹涵蓋既有管控對象）；
+        //    (2) rules.length 等於 DB 實際 targets 總數（自洽核對 1:1 對應，不寫死 22；殘留分區不致誤判 base seed 契約）。
+        let woItems = await getWoItems()
+        let targetsBase = await woItems.targets.select({ from: '' })
+        assert.strict.equal(targetsBase.length, SEED.targetCount, `base seed（from=''）targets 應為 ${SEED.targetCount} 筆`)
+        let ruleNames = new Set(ur.rules.map((r) => r.name))
+        for (let t of targetsBase) {
+            assert.strict.ok(ruleNames.has(t.id), `base seed target '${t.id}' 應出現在 rules（以 from='' targets 為計數基準）`)
+        }
+        let targetsAll = await woItems.targets.select()
+        assert.strict.equal(ur.rules.length, targetsAll.length, 'rules.length 應與 DB 實際 targets 總數一致（逐 target 1:1 產 rule）')
 
         //spec：每筆 rule 含 name(string) 與 isActive(∈'y'/'n')
         for (let r of ur.rules) {
@@ -49,7 +63,7 @@ describe('api-getPerm', function() {
     })
 
     //對應 spec：無效 token → 後端回 state='error' → client 轉拋查詢失敗訊息。
-    it('API-getPerm-002-invalid-token-reject', async function() {
+    it('API-getPerm-003-invalid-token-reject', async function() {
         try {
             await getPerm(urlGetPerm, TOKEN_BAD)
             assert.fail('應 reject（無效 token）')
@@ -62,7 +76,7 @@ describe('api-getPerm', function() {
     })
 
     //對應 spec：url 缺少 token={token} 佔位符 → 前端送出前攔截。
-    it('API-getPerm-003-missing-placeholder-reject', async function() {
+    it('API-getPerm-004-missing-placeholder-reject', async function() {
         try {
             await getPerm(`${apiBaseUrl}/api/getPerm`, TOKEN_ADMIN)
             assert.fail('應 reject（url 無佔位符）')
@@ -74,7 +88,7 @@ describe('api-getPerm', function() {
     })
 
     //對應 spec：url / tokenTar 為空字串等無效引數 → 前置檢測 reject。
-    it('API-getPerm-004-invalid-args-reject', async function() {
+    it('API-getPerm-006-invalid-args-reject', async function() {
         try {
             await getPerm('', TOKEN_ADMIN)
             assert.fail('應 reject（空 url）')
@@ -96,11 +110,18 @@ describe('api-getPerm', function() {
 
     //對應 spec：funConvertPerm 可在 resolve 前轉換 ur；回傳非物件（null）則視為無效 → reject。
     it('API-getPerm-005-funConvertPerm', async function() {
-        //成功轉換：附加欄位後仍含 user / rules
+        //成功轉換（同步）：附加欄位後仍含 user / rules
         let ur = await getPerm(urlGetPerm, TOKEN_ADMIN, { funConvertPerm: (ur) => ({ ...ur, _extra: 1 }) })
         assert.strict.equal(ur._extra, 1, 'funConvertPerm 附加欄位應保留')
         assert.strict.ok(ur.user && typeof ur.user === 'object', '轉換後仍應含 user')
         assert.strict.ok(Array.isArray(ur.rules), '轉換後仍應含 rules')
+
+        //成功轉換（非同步）：spec 明列 funConvertPerm「同步或回 Promise 皆支援」，
+        //回傳 Promise 時 src/getPerm.mjs:70-72 以 ispm 偵測後 await 取值，resolve 出 await 後的物件。
+        let urAsync = await getPerm(urlGetPerm, TOKEN_ADMIN, { funConvertPerm: async (ur) => ({ ...ur, _async: true }) })
+        assert.strict.equal(urAsync._async, true, 'funConvertPerm 回 Promise 時應 await 後取附加欄位 _async===true')
+        assert.strict.ok(urAsync.user && typeof urAsync.user === 'object', '非同步轉換後仍應含 user')
+        assert.strict.ok(Array.isArray(urAsync.rules), '非同步轉換後仍應含 rules')
 
         //轉換回傳 null → src/getPerm.mjs:87
         try {
@@ -113,7 +134,7 @@ describe('api-getPerm', function() {
     })
 
     //對應 spec：perm() factory 連線後可由 accessors 取得 user / rules，並以 active(name) 查詢單一目標權限。
-    it('API-getPerm-006-perm-factory-accessors', async function() {
+    it('API-getPerm-002-perm-factory-accessors', async function() {
         let p = perm()
 
         //url 已帶妥 token=sys（非佔位符）；perm.conn 走 axios → pmInvResolve → 取 {user, rules}

@@ -1,21 +1,21 @@
 {
   "name": "w-web-perm",
-  "version": "1.0.49",
+  "version": "1.0.50",
   "main": "dist/w-web-perm.umd.js",
   "dependencies": {
     "@mdi/js": "^7.4.47",
-    "axios": "^1.18.0",
+    "axios": "^1.18.1",
     "json5": "^2.2.3",
     "lodash-es": "^4.18.1",
     "showdown": "^2.1.0",
-    "w-aggrid-vue": "^2.0.57",
-    "w-component-vue": "^2.4.66",
-    "w-data-collector": "^1.0.22",
-    "w-serv-hapi": "^1.0.72",
-    "w-serv-orm": "^1.0.38",
-    "w-ui-loginout": "^1.0.10",
-    "w-syslog": "^1.0.8",
-    "wsemi": "^1.8.61"
+    "w-aggrid-vue": "^2.0.58",
+    "w-component-vue": "^2.4.74",
+    "w-data-collector": "^1.0.23",
+    "w-serv-hapi": "^1.0.73",
+    "w-serv-orm": "^1.0.40",
+    "w-ui-loginout": "^1.0.11",
+    "w-syslog": "^1.0.10",
+    "wsemi": "^1.8.66"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^5.0.8",
@@ -29,18 +29,21 @@
     "eslint-plugin-promise": "^6.1.1",
     "eslint-plugin-vue": "^9.10.0",
     "pixelmatch": "^7.2.0",
-    "playwright": "^1.61.0",
+    "playwright": "^1.61.1",
     "pngjs": "^7.0.0",
     "vue": "^2.6.14",
     "vuex": "^3.6.2",
-    "w-orm-lmdb": "^1.0.6",
-    "w-screenctl": "^1.0.3",
-    "w-package-tools": "^1.1.9"
+    "w-orm-lmdb": "^1.0.8",
+    "w-screenctl": "^1.0.4",
+    "w-package-tools": "^1.1.11"
   },
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
-    "test": "mocha --timeout 300000",
+    "test:unit": "mocha test/unit-staEvent.test.mjs --timeout 300000",
+    "test:apiunit": "mocha test/unit-*.test.mjs test/api-*.test.mjs test/getUserRules.test.mjs --timeout 300000",
+    "test:e2e": "node test/run-e2e-isolated.mjs",
+    "test": "npm run test:apiunit && npm run test:e2e",
     "lint": "vue-cli-service lint",
     "deploy": "gh-pages -d docs"
   },

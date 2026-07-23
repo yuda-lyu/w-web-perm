@@ -198,7 +198,6 @@ export default {
 
             fullscreen: false,
 
-            panelWidth: 100,
             panelHeight: 100,
             headHeight: 100,
 
@@ -339,7 +338,6 @@ export default {
             let vo = this
 
             //panelWidth, panelHeight
-            vo.panelWidth = msg.panelWidth
             vo.panelHeight = msg.contentHeightMax
 
         },
@@ -411,9 +409,9 @@ export default {
                         'mode': 'text',
                         'enable': 'text',
                     },
-                    // kpHeadCheckBox: {
-                    //     'name': true,
-                    // },
+                    kpHeadCheckBox: {
+                        'name': true,
+                    },
                     rowsChange: (rs) => {
                         // console.log('rowsChange', rs)
                         // console.log('rowsChange cloneDeep(vo.opt.rows)', cloneDeep(vo.opt.rows))
@@ -814,7 +812,10 @@ export default {
                     vo.bShow = false
 
                 })
-                .catch(() => { })
+                .catch((err) => {
+                    console.log('doSave', err)
+                    vo.$alert(vo.$t('anUnexpectedErrorOccurred'), { type: 'error' }) //§5.1: 非預期例外須告知, 不靜默吞 (失敗時 .then 不執行→視窗不關)
+                })
                 .finally(() => {
 
                     //hide loading

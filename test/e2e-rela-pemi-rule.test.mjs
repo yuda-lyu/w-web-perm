@@ -7,7 +7,7 @@
 //    LayoutContentPemis.vue:1211,1228）。
 //雙模式：
 //  - 產 baseline：node test/e2e-rela-pemi-rule.test.mjs --baseline （寫 test/pics/rela-pemi-rule/）
-//  - 驗證（mocha）：npx mocha test/e2e-rela-pemi-rule.test.mjs --reporter list （buf.equals 比對）
+//  - 驗證（mocha）：npx mocha test/e2e-rela-pemi-rule.test.mjs --reporter list （pixelmatch 反鋸齒感知 + maxDiffPixels 容差比對，非 byte-exact）
 //act 走 user-facing input；assert = 語意斷言 + pixel baseline（§6.2 / §6.3）。
 //
 //base seed（g.initialTestData → src/schema/tables/*）：
@@ -347,6 +347,44 @@ const CASES = [
             //對話框已關閉
             const open = await page.evaluate(() => (document.body.innerText || '').includes(window.$vo.$t('pemiEditCrules')))
             assert.ok(!open, 'VeCrules 對話框應已關閉')
+        },
+    },
+
+    //—————————————— 唯讀檢視（isEditable=false 守門，與可編輯案例共覆蓋兩分支）——————————————
+
+    {
+        //E2E-006：權限頁關閉編輯模式後開 VeCrules → 展示模式標題（pemiEditCrulesForDisplay）、無儲存鈕、enable checkbox 皆 disabled。
+        //本對話框無 mode 下拉欄（crules 值為純 'y'/'n' 字串），故 disabled 斷言僅檢查 enable checkbox。
+        //對應 spec 流程_權限規則關聯.md E2E-006。單階段截圖：唯讀檢視對話框開啟態。
+        name: 'E2E-006-readonly-view',
+        run: async (page) => {
+            await gotoPemis(page)
+            await toggleEditMode(page) //關閉編輯模式 → isEditable=false
+            //關編輯模式後 crules 欄仍為按鈕（getCrulesText），點之開展示模式對話框
+            await page.locator(`.ag-row[row-index="0"] .ag-cell[col-id="crules"] button`).first().click()
+            await waitUntilExist(page, 'VeCrules 展示模式標題', () => {
+                const vo = window.$vo
+                return (document.body.innerText || '').includes(vo.$t('pemiEditCrulesForDisplay'))
+            }, { timeout: 15000 })
+            await waitDialogGrid(page)
+            return await captureStableWithBox(page, SEL_MODAL) //VeCrules 唯讀檢視對話框開啟態
+        },
+        semantic: async (page) => {
+            //對應 spec E2E-006 驗證1：標題為展示模式鍵（pemiEditCrulesForDisplay，eng/cht 皆與編輯版相異）。
+            const dispLabel = await page.evaluate(() => window.$vo.$t('pemiEditCrulesForDisplay'))
+            const editLabel = await page.evaluate(() => window.$vo.$t('pemiEditCrules'))
+            const txt = await page.evaluate(() => document.body.innerText)
+            assert.ok(txt.includes(dispLabel), `應顯示展示模式標題（${dispLabel}）`)
+            assert.ok(!txt.includes(editLabel) || dispLabel.includes(editLabel) === false, '不應為可編輯版標題')
+            //對應 spec E2E-006 驗證1：無對話框儲存鈕（hasSaveBtn=isEditable && isModified，isEditable=false 恆不渲染）。
+            const saveCnt = await pathBtn(page, DLG_MDI.save).count()
+            assert.equal(saveCnt, 0, '唯讀檢視不應出現對話框儲存鈕')
+            //對應 spec E2E-006 驗證1：各 target 列 enable checkbox 皆 disabled（VeCrules.vue:131；本對話框無 mode 下拉欄）。
+            const allDisabled = await page.evaluate(() => {
+                const chks = [...document.querySelectorAll('.ag-cell[col-id="enable"] input[type="checkbox"]')]
+                return chks.length > 0 && chks.every((e) => e.disabled === true)
+            })
+            assert.ok(allDisabled, '唯讀檢視之 enable checkbox 應皆 disabled')
         },
     },
 ]

@@ -1,7 +1,7 @@
 //後台標的清單 e2e。對應 spec/流程_後台標的清單.md。鏡像 test/e2e-users.test.mjs（canonical pilot）。
 //雙模式：
 //  - 產 baseline：node test/e2e-targets.test.mjs --baseline （寫 test/pics/targets/）
-//  - 驗證（mocha）：npx mocha test/e2e-targets.test.mjs --reporter list （buf.equals 比對）
+//  - 驗證（mocha）：npx mocha test/e2e-targets.test.mjs --reporter list （pixelmatch 反鋸齒感知 + maxDiffPixels 容差比對，非 byte-exact）
 //act 走 user-facing input；assert = 語意斷言 + pixel baseline（§6.2 / §6.3）。
 //targets 與 users 差異：主鍵為 id（路徑式字串）、無 name / email / isActive / 關聯欄；
 //checkbox 與警告 icon 皆在 col-id="id"；save 結果走 $dg.showCheckYes 持久 modal。
@@ -287,7 +287,7 @@ const CASES = [
         },
     },
     {
-        //E2E-007：新增列後清空 id → id 欄警告 icon；Save 送出後端 ckKey('id') 攔截 → fail modal
+        //E2E-007：新增列後清空 id → id 欄警告 icon；Save 時前端 isError 攔截（不送後端）→ errInIds modal。後端 ckKey('id') 為縱深防禦、UI 流程不會觸及
         name: 'E2E-007-id-empty',
         run: async (page) => {
             await gotoTargets(page)
@@ -297,7 +297,7 @@ const CASES = [
             assert.ok(await cellHasWarn(page, 0, 'id'), 'id 空應顯示警告 icon（Save 前）')
             const s2 = await captureStableWithBox(page, rowBoxSel(0)) //階段2：id 清空警告、存檔前
             await saveAndWaitModal(page)
-            const s3 = await captureStableWithBox(page, SEL_MODAL) //階段3：後端 ckKey fail modal
+            const s3 = await captureStableWithBox(page, SEL_MODAL) //階段3：前端 isError 攔截 modal（errInIds）
             return [
                 { name: 'E2E-007-1-row-added', buf: s1 },
                 { name: 'E2E-007-2-id-empty', buf: s2 },
@@ -305,13 +305,13 @@ const CASES = [
             ]
         },
         semantic: async (page) => {
-            await assertModalMsg(page, 'targetSaveTargetsFail') //後端 ckKey('id') 攔截，聚合為 fail
+            await assertModalMsg(page, 'errInIds') //T04 後前端 isError 偵測 id 錯誤（空/重複），存檔前攔截、不送後端，改顯示 errInIds
             const n = await page.evaluate(() => (window.$vo.$store.state.targets || []).length)
-            assert.equal(n, BASE_SEED.length, '未儲存（後端拒），DB 仍為 base seed 筆數')
+            assert.equal(n, BASE_SEED.length, '前端攔截未送出，DB 仍為 base seed 筆數')
         },
     },
     {
-        //E2E-008：新增列 id 取既有 target id（重複）→ id 欄警告 icon；Save 送出後端 ckKey('id') 攔截 → fail modal
+        //E2E-008：新增列 id 取既有 target id（重複）→ id 欄警告 icon；Save 時前端 isError 攔截（不送後端）→ errInIds modal。後端 ckKey('id') 為縱深防禦、UI 流程不會觸及
         name: 'E2E-008-id-dup',
         run: async (page) => {
             await gotoTargets(page)
@@ -321,7 +321,7 @@ const CASES = [
             assert.ok(await cellHasWarn(page, 0, 'id'), 'id 重複應顯示警告 icon（Save 前）')
             const s2 = await captureStableWithBox(page, rowBoxSel(0)) //階段2：id 重複警告、存檔前
             await saveAndWaitModal(page)
-            const s3 = await captureStableWithBox(page, SEL_MODAL) //階段3：後端 ckKey fail modal
+            const s3 = await captureStableWithBox(page, SEL_MODAL) //階段3：前端 isError 攔截 modal（errInIds）
             return [
                 { name: 'E2E-008-1-row-added', buf: s1 },
                 { name: 'E2E-008-2-id-dup', buf: s2 },
@@ -329,9 +329,9 @@ const CASES = [
             ]
         },
         semantic: async (page) => {
-            await assertModalMsg(page, 'targetSaveTargetsFail') //後端 ckKey('id') 攔截，聚合為 fail
+            await assertModalMsg(page, 'errInIds') //T04 後前端 isError 偵測 id 錯誤（空/重複），存檔前攔截、不送後端，改顯示 errInIds
             const n = await page.evaluate(() => (window.$vo.$store.state.targets || []).length)
-            assert.equal(n, BASE_SEED.length, '未儲存（後端拒），DB 仍為 base seed 筆數')
+            assert.equal(n, BASE_SEED.length, '前端攔截未送出，DB 仍為 base seed 筆數')
         },
     },
     {

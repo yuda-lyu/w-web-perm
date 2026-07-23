@@ -1,7 +1,7 @@
 //後台使用者清單 e2e（pilot）。對應 spec/流程_後台使用者清單.md。
 //雙模式：
 //  - 產 baseline：node test/e2e-users.test.mjs --baseline （寫 test/pics/users/）
-//  - 驗證（mocha）：npx mocha test/e2e-users.test.mjs --reporter list （buf.equals 比對）
+//  - 驗證（mocha）：npx mocha test/e2e-users.test.mjs --reporter list （pixelmatch 反鋸齒感知 + maxDiffPixels 容差比對，非 byte-exact）
 //act 走 user-facing input；assert = 語意斷言 + pixel baseline（§6.2 / §6.3）。
 import fs from 'fs'
 import assert from 'assert'

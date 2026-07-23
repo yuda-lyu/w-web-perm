@@ -122,9 +122,18 @@ function proc(woItems, procOrm, { srLog, kmx }) {
     }
 
 
+    //errLog: 失敗統一記 err key (updateTabItems reject 為 key 字串如 saveRowFieldInvalid; procOrm 失敗為 Error)
+    let errLog = (event, userId, err) => {
+        srLog.error({ event, userId, msg: (typeof err === 'string') ? err : ((err && err.message) || event) })
+    }
+
+
     //updateTargets
     let updateTargets = async (userId, rows) => {
-        await updateTabItems('targets', userId, rows, 'id')
+        try {
+            await updateTabItems('targets', userId, rows, 'id')
+        }
+        catch (err) { errLog('updateTargets-error', userId, err); throw err }
         srLog.info({ event: 'updateTargets-success', userId })
         return 'saveTabItemsSuccess' //成功 msg key
     }
@@ -132,7 +141,10 @@ function proc(woItems, procOrm, { srLog, kmx }) {
 
     //updatePemis
     let updatePemis = async (userId, rows) => {
-        await updateTabItems('pemis', userId, rows, 'name')
+        try {
+            await updateTabItems('pemis', userId, rows, 'name')
+        }
+        catch (err) { errLog('updatePemis-error', userId, err); throw err }
         srLog.info({ event: 'updatePemis-success', userId })
         return 'saveTabItemsSuccess' //成功 msg key
     }
@@ -140,7 +152,10 @@ function proc(woItems, procOrm, { srLog, kmx }) {
 
     //updateGrups
     let updateGrups = async (userId, rows) => {
-        await updateTabItems('grups', userId, rows, 'name')
+        try {
+            await updateTabItems('grups', userId, rows, 'name')
+        }
+        catch (err) { errLog('updateGrups-error', userId, err); throw err }
         srLog.info({ event: 'updateGrups-success', userId })
         return 'saveTabItemsSuccess' //成功 msg key
     }
@@ -148,7 +163,10 @@ function proc(woItems, procOrm, { srLog, kmx }) {
 
     //updateUsers
     let updateUsers = async (userId, rows) => {
-        await updateTabItems('users', userId, rows, 'id')
+        try {
+            await updateTabItems('users', userId, rows, 'id')
+        }
+        catch (err) { errLog('updateUsers-error', userId, err); throw err }
         srLog.info({ event: 'updateUsers-success', userId })
         return 'saveTabItemsSuccess' //成功 msg key
     }

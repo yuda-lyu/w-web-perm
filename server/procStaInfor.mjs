@@ -77,6 +77,11 @@ function proc(opt = {}) {
         let cacheKey = `${timeLength}:${timeInterval}`
 
         let r = await ocGetStaEvent.getProxy(cacheKey, { fun: _getStaEvent, inputs: [timeLength, timeInterval], timeExpired: 30 * 1000 }) //快取30秒
+        if (!Array.isArray(r)) {
+            //_getStaEvent(worker) 失敗時 cache 之 .catch 會回 undefined 並把 undefined 快取 30s; 清除該快取避免窗內重試仍拿 undefined, 並 reject 讓上層 (kpFunExt) 記 err key
+            ocGetStaEvent.clear(cacheKey)
+            return Promise.reject('cannotGetStaEvent')
+        }
         return r
     }
 
@@ -98,6 +103,11 @@ function proc(opt = {}) {
     let getStaEventTable = async (userId) => {
 
         let r = await ocGetStaEventTable.getProxy('staEventTable', { fun: _getStaEventTable, inputs: [], timeExpired: 30 * 1000 }) //快取30秒
+        if (!Array.isArray(r)) {
+            //同 getStaEvent: staEventTable 失敗時 cache 回 undefined 並快取 30s; 清除避免窗內重試仍拿 undefined, 並 reject 讓上層記 err key
+            ocGetStaEventTable.clear('staEventTable')
+            return Promise.reject('cannotGetStaEventTable')
+        }
         return r
     }
 

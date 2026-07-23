@@ -1,10 +1,8 @@
 import path from 'path'
 import fs from 'fs'
 import get from 'lodash-es/get.js'
-import each from 'lodash-es/each.js'
 import map from 'lodash-es/map.js'
 import keys from 'lodash-es/keys.js'
-import size from 'lodash-es/size.js'
 import join from 'lodash-es/join.js'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
@@ -42,7 +40,7 @@ import procStaInfor from './procStaInfor.mjs'
  * @param {Function} WOrm 輸入資料庫ORM函數
  * @param {String} url 輸入資料庫連線字串，例如w-orm-lmdb為'./db'，或w-orm-mongodb為'mongodb://username:password@$127.0.0.1:27017'
  * @param {String} db 輸入資料庫名稱字串
- * @param {Function} getUserByToken 輸入處理函數，函數會傳入使用者token，通過此函數處理後並回傳使用者資訊物件，並至少須提供'id'、'email'、'name'、'isAdmin'欄位，且'isAdmin'限輸入'y'或'n'，且輸入'y'時會複寫權限系統該使用者之'isAdmin'欄位值
+ * @param {Function} getUserByToken 輸入處理函數，函數會傳入使用者token，通過此函數處理後並回傳使用者資訊物件，並至少須提供'id'、'email'、'name'、'isAdmin'欄位，且'isAdmin'限輸入'y'或'n'。注意: token 回傳之'isAdmin'僅供識別，權限系統一律以自身users表該使用者之'isAdmin'欄位值為權威，不會被 token 宣稱之值複寫
  * @param {Function} verifyClientUser 輸入驗證瀏覽使用者身份之處理函數，函數會傳入使用者資訊物件，通過此函數識別後回傳布林值，允許使用者回傳true，反之回傳false
  * @param {Function} verifyAppUser 輸入驗證應用程序使用者身份之處理函數，函數會傳入使用者資訊物件，通過此函數識別後回傳布林值，允許使用者回傳true，反之回傳false
  * @param {Object} [opt={}] 輸入設定物件，預設{}
@@ -285,6 +283,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     }
     catch (err) {
         console.log(err)
+        srLog.error({ event: 'WServOrm-init-error', msg: (err && err.message) || 'WServOrmInitFailed' })
+        throw err //fail-fast: ORM 初始化失敗直接終止啟動, 不以 wp={} 繼續組裝出「port 起得來但 woItems/procOrm 為 undefined、CRUD 全 crash」的半死伺服器
     }
     let { woItems, procOrm } = wp
 
@@ -298,8 +298,12 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     let pc = procCore(woItems, procOrm, { srLog, kmx })
 
 
-    //procStaInfor: 統計資訊, fdLog 對齊 srLog 使用同一目錄; mock 由 settings.staEventMock 注入(e2e 統計圖穩定用)
-    let psi = procStaInfor({ fdLog: './_logs', mock: get(opt, 'staEventMock', false) })
+    //procStaInfor: 統計資訊, fdLog 對齊 srLog 使用同一目錄(讀 settings.logFd, fallback 邏輯同 srLog.mjs); mock 由 settings.staEventMock 注入(e2e 統計圖穩定用)
+    let logFd = get(opt, 'logFd', '')
+    if (!isestr(logFd)) {
+        logFd = './_logs'
+    }
+    let psi = procStaInfor({ fdLog: logFd, mock: get(opt, 'staEventMock', false) })
 
 
     //getWebInfor
@@ -450,13 +454,10 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             return Promise.reject(`cannotGetUserFromPerm`)
         }
 
-        //複寫isAdmin
-        let isAdminSrc = get(userSelf, 'isAdmin', '')
-        let isAdminSelf = get(userFind, 'isAdmin', '')
-        if (isAdminSrc !== isAdminSelf) {
-            userFind.isAdmin = isAdminSelf
-        }
-        // console.log('userFind(isAdmin)', userFind)
+        //isAdmin 權威為 perm users 表之欄位值, 不以 token(getUserByToken)宣稱之 isAdmin 複寫。
+        //(2026-07-11 稽核 A-C1 裁決(b): 原此處有一段恆為 no-op 之「複寫isAdmin」死碼
+        // (userFind.isAdmin = isAdminSelf, 把自己指派給自己), 與 JSDoc 舊文「輸入'y'時會複寫」互斥;
+        // 依業主裁決採保守解: 刪除死碼、文件對齊實際行為, 不啟用 token→admin 提權路徑。)
 
         return userFind
     }
@@ -1058,7 +1059,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
     //WServHapiServer
     instWServHapiServer = new WServHapiServer({
-        port: opt.serverPort,
+        port: serverPort,
         pathStaticFiles,
         apiName: 'api',
         apis,
@@ -1133,15 +1134,27 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             updateUsers: pc.updateUsers,
 
             getStaEvent: async (userId, timeLength, timeInterval) => {
-                let rs = await psi.getStaEvent(userId, timeLength, timeInterval)
-                srLog.info({ event: 'getStaEvent-success', userId })
-                return rs
+                try {
+                    let rs = await psi.getStaEvent(userId, timeLength, timeInterval)
+                    srLog.info({ event: 'getStaEvent-success', userId })
+                    return rs
+                }
+                catch (err) {
+                    srLog.error({ event: 'getStaEvent-error', userId, msg: (typeof err === 'string') ? err : ((err && err.message) || 'cannotGetStaEvent') })
+                    throw err
+                }
             },
 
             getStaEventTable: async (userId) => {
-                let rs = await psi.getStaEventTable(userId)
-                srLog.info({ event: 'getStaEventTable-success', userId })
-                return rs
+                try {
+                    let rs = await psi.getStaEventTable(userId)
+                    srLog.info({ event: 'getStaEventTable-success', userId })
+                    return rs
+                }
+                catch (err) {
+                    srLog.error({ event: 'getStaEventTable-error', userId, msg: (typeof err === 'string') ? err : ((err && err.message) || 'cannotGetStaEventTable') })
+                    throw err
+                }
             },
 
         },

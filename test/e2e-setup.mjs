@@ -32,7 +32,8 @@ export const appUrl = `${baseUrl}/?token=sys`
 
 const isWin = process.platform === 'win32'
 
-let started = false
+let startedBackend = false //once 旗標依服務分拆, 理由見 startServersOnce 內註解
+let startedFrontend = false
 let spawned = [] //{ name, child }
 
 function httpOk(url, timeoutMs = 2500) {
@@ -84,28 +85,36 @@ function spawnSrv(name, cmd, args, opts = {}) {
 }
 
 export async function startServersOnce(opts = {}) {
-    if (started) return
-    started = true
-
+    //once 旗標依「服務」分拆：合併跑批（mocha 單進程載多檔, 如 npm test）時 api 檔先以
+    //backendOnly 呼叫本函式——若用單一 started 旗標, 會被設為 true 而只起後端就返回,
+    //後續 e2e 檔再呼叫時直接 return → 前端永遠沒被 spawn → openApp goto 連線失敗
+    //（chrome-error://）→「Execution context was destroyed」連環失敗
+    //（2026-07-10 以 api-getPerm + e2e-grups 兩檔合跑最小重現確證; 單檔跑不受影響）。
     const { backendOnly = false } = opts
 
     //後端：已起→reuse；沒人→先 seed 再 spawn（seed 須在後端開 lmdb 前）
-    const backendUp = await httpOk(`${apiBaseUrl}/`)
-    if (!backendUp) {
-        await seedDb()
-        spawnSrv('backend', 'node', ['srv.mjs'])
-        await waitPort(`${apiBaseUrl}/`, 'backend 11006', 60000)
+    if (!startedBackend) {
+        startedBackend = true
+        const backendUp = await httpOk(`${apiBaseUrl}/`)
+        if (!backendUp) {
+            await seedDb()
+            spawnSrv('backend', 'node', ['srv.mjs'])
+            await waitPort(`${apiBaseUrl}/`, 'backend 11006', 60000)
+        }
     }
 
     //API 契約測試（D 類）只需 backend，省去 frontend webpack 首編（~2 分）；e2e 不傳此旗標→照起前端
     if (backendOnly) return
 
     //前端 dev server：已起→reuse；沒人→spawn（webpack 首編較久）
-    const frontendUp = await httpOk(`${baseUrl}/`)
-    if (!frontendUp) {
-        //Windows 下 npm 為 npm.cmd，需 shell；顯式 --port 確保落在 FRONTEND_PORT
-        spawnSrv('frontend', 'npm', ['run', 'serve', '--', '--port', String(FRONTEND_PORT)], { shell: isWin })
-        await waitPort(`${baseUrl}/`, `frontend ${FRONTEND_PORT}`, 180000)
+    if (!startedFrontend) {
+        startedFrontend = true
+        const frontendUp = await httpOk(`${baseUrl}/`)
+        if (!frontendUp) {
+            //Windows 下 npm 為 npm.cmd，需 shell；顯式 --port 確保落在 FRONTEND_PORT
+            spawnSrv('frontend', 'npm', ['run', 'serve', '--', '--port', String(FRONTEND_PORT)], { shell: isWin })
+            await waitPort(`${baseUrl}/`, `frontend ${FRONTEND_PORT}`, 180000)
+        }
     }
 }
 

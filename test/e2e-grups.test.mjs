@@ -1,7 +1,7 @@
 //後台群組清單 e2e。對應 spec/流程_後台群組清單.md。鏡像 test/e2e-targets.test.mjs / e2e-users.test.mjs（canonical pilot）。
 //雙模式：
 //  - 產 baseline：node test/e2e-grups.test.mjs --baseline （寫 test/pics/grups/）
-//  - 驗證（mocha）：npx mocha test/e2e-grups.test.mjs --reporter list （buf.equals 比對）
+//  - 驗證（mocha）：npx mocha test/e2e-grups.test.mjs --reporter list （pixelmatch 反鋸齒感知 + maxDiffPixels 容差比對，非 byte-exact）
 //act 走 user-facing input；assert = 語意斷言 + pixel baseline（§6.2 / §6.3）。
 //grups 與 targets 差異：主鍵為 id（funNew 自動產生、清單隱藏），列鍵以 name 去重；
 //name 空 / 重複為「前端 errItemsByName 攔截」（isError 引用 errItemsByName，非空→errInNames 擋存、不送後端，

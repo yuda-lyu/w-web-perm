@@ -57,7 +57,7 @@ describe('getUserRules - 權限樹組裝', function() {
     // ===========================================================
     describe('基本場景', function() {
 
-        it('單一使用者、單一群組、單一權限、單一target — 授權 y', function() {
+        it('UNIT-001-單一使用者、單一群組、單一權限、單一target — 授權 y', function() {
             let targets = [t('A')]
             let pemis = [p('P1', { A: 'y' })]
             let grups = [g('G1', { P1: OR })]
@@ -67,7 +67,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'A'), 'y')
         })
 
-        it('單一使用者、單一群組、單一權限、單一target — 拒絕 n', function() {
+        it('UNIT-001a-單一使用者、單一群組、單一權限、單一target — 拒絕 n', function() {
             let targets = [t('A')]
             let pemis = [p('P1', { A: 'n' })]
             let grups = [g('G1', { P1: OR })]
@@ -88,7 +88,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'B'), 'n')
         })
 
-        it('cgrups 為空字串 — 不會拋錯、全部 target 預設 n', function() {
+        it('UNIT-009-cgrups 為空字串 — 不會拋錯、全部 target 預設 n', function() {
             let targets = [t('A')]
             let pemis = []
             let grups = []
@@ -105,9 +105,9 @@ describe('getUserRules - 權限樹組裝', function() {
             let user = u({ G1: OR })
 
             let { rules } = getUserRules(user, grups, pemis, targets)
-            // 沒有 targets 需要展開，但 crules 中的 A 仍在 rules 中
-            // A 不在 targets 中，但 merge 結果會包含它
-            assert.ok(Array.isArray(rules))
+            // 輸出以「當前 targets」為主軸：targets 為空 → 沒有任何節點可輸出。
+            // crules 雖授權 A，但 A 不在 targets 中（孤兒），不應殘留於 rules。
+            assert.deepStrictEqual(rules, [])
         })
 
     })
@@ -118,7 +118,7 @@ describe('getUserRules - 權限樹組裝', function() {
     // ===========================================================
     describe('target 展開', function() {
 
-        it('未被任何權限提及的 target 預設為 n', function() {
+        it('UNIT-002-未被任何權限提及的 target 預設為 n', function() {
             let targets = [t('A'), t('B'), t('C')]
             let pemis = [p('P1', { A: 'y' })]
             let grups = [g('G1', { P1: OR })]
@@ -130,7 +130,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'C'), 'n')
         })
 
-        it('多個權限覆蓋部分 targets — 其餘仍為 n', function() {
+        it('UNIT-002a-多個權限覆蓋部分 targets — 其餘仍為 n', function() {
             let targets = [t('A'), t('B'), t('C'), t('D')]
             let pemis = [
                 p('P1', { A: 'y', B: 'n' }),
@@ -146,6 +146,20 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'D'), 'n')
         })
 
+        it('crules 引用但已從 targets 刪除的孤兒 target — 不出現在 rules', function() {
+            // targets 只剩 B（A 已被刪除），但 crules 對 A 與 B 皆授權。
+            // 輸出以「當前 targets」為主軸：只列 B，孤兒 A 不殘留於權限樹。
+            let targets = [t('B')]
+            let pemis = [p('P1', { A: 'y', B: 'y' })]
+            let grups = [g('G1', { P1: OR })]
+            let user = u({ G1: OR })
+
+            let { rules } = getUserRules(user, grups, pemis, targets)
+            assert.strictEqual(ruleOf(rules, 'B'), 'y')
+            assert.ok(!rules.some((r) => r.name === 'A'), '孤兒 target A 不應出現在 rules')
+            assert.deepStrictEqual(rules.map((r) => r.name), ['B'])
+        })
+
     })
 
 
@@ -154,7 +168,7 @@ describe('getUserRules - 權限樹組裝', function() {
     // ===========================================================
     describe('OR 模式 — 權限層級', function() {
 
-        it('兩個權限 OR：其中一個 y 另一個 n → y', function() {
+        it('UNIT-003-兩個權限 OR：其中一個 y 另一個 n → y', function() {
             let targets = [t('A')]
             let pemis = [
                 p('P1', { A: 'y' }),
@@ -167,7 +181,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'A'), 'y')
         })
 
-        it('兩個權限 OR：兩個都 n → n', function() {
+        it('UNIT-003a-兩個權限 OR：兩個都 n → n', function() {
             let targets = [t('A')]
             let pemis = [
                 p('P1', { A: 'n' }),
@@ -180,7 +194,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'A'), 'n')
         })
 
-        it('兩個權限 OR：互不重疊的 target 聯集', function() {
+        it('UNIT-003b-兩個權限 OR：互不重疊的 target 聯集', function() {
             let targets = [t('A'), t('B')]
             let pemis = [
                 p('P1', { A: 'y' }),
@@ -194,7 +208,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'B'), 'y')
         })
 
-        it('三個權限 OR：漸進聯集', function() {
+        it('UNIT-003c-三個權限 OR：漸進聯集', function() {
             let targets = [t('A'), t('B'), t('C')]
             let pemis = [
                 p('P1', { A: 'y', B: 'n', C: 'n' }),
@@ -214,7 +228,7 @@ describe('getUserRules - 權限樹組裝', function() {
 
     describe('OR 模式 — 群組層級', function() {
 
-        it('兩個群組 OR：其中一個群組授權 y → y', function() {
+        it('UNIT-004-兩個群組 OR：其中一個群組授權 y → y', function() {
             let targets = [t('A')]
             let pemis = [
                 p('P1', { A: 'y' }),
@@ -230,7 +244,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'A'), 'y')
         })
 
-        it('兩個群組 OR：互不重疊的 target 聯集', function() {
+        it('UNIT-004a-兩個群組 OR：互不重疊的 target 聯集', function() {
             let targets = [t('A'), t('B')]
             let pemis = [
                 p('P1', { A: 'y' }),
@@ -255,7 +269,7 @@ describe('getUserRules - 權限樹組裝', function() {
     // ===========================================================
     describe('AND 模式 — 權限層級', function() {
 
-        it('兩個權限 AND：都是 y → y', function() {
+        it('UNIT-005-兩個權限 AND：都是 y → y', function() {
             let targets = [t('A')]
             let pemis = [
                 p('P1', { A: 'y' }),
@@ -268,7 +282,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'A'), 'y')
         })
 
-        it('兩個權限 AND：一個 y 一個 n → n', function() {
+        it('UNIT-005a-兩個權限 AND：一個 y 一個 n → n', function() {
             let targets = [t('A')]
             let pemis = [
                 p('P1', { A: 'y' }),
@@ -281,7 +295,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'A'), 'n')
         })
 
-        it('AND 非對稱性：key 只存在於 obj1 → 保留 obj1 的值', function() {
+        it('UNIT-005b-AND 非對稱性：key 只存在於 obj1 → 保留 obj1 的值', function() {
             // P1 有 A 和 B，P2 只有 A
             // AND 以 P1 為基底，P2 只影響 A
             // B 不在 P2 中，保留 P1 的值
@@ -298,7 +312,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'B'), 'y') // B 保留自 P1
         })
 
-        it('AND 非對稱性：key 只存在於 obj2 → 強制為 n', function() {
+        it('UNIT-005c-AND 非對稱性：key 只存在於 obj2 → 強制為 n', function() {
             // P1 只有 A，P2 有 A 和 B
             // AND 以 P1 為基底 {A:'y'}，遍歷 P2：
             //   A: 都是 y → y
@@ -320,7 +334,7 @@ describe('getUserRules - 權限樹組裝', function() {
 
     describe('AND 模式 — 群組層級', function() {
 
-        it('兩個群組 AND：同一 target 都授權 → y', function() {
+        it('UNIT-005d-兩個群組 AND：同一 target 都授權 → y', function() {
             let targets = [t('A')]
             let pemis = [
                 p('P1', { A: 'y' }),
@@ -336,7 +350,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'A'), 'y')
         })
 
-        it('兩個群組 AND：一個授權一個拒絕 → n', function() {
+        it('UNIT-005e-兩個群組 AND：一個授權一個拒絕 → n', function() {
             let targets = [t('A')]
             let pemis = [
                 p('P1', { A: 'y' }),
@@ -360,7 +374,7 @@ describe('getUserRules - 權限樹組裝', function() {
     // ===========================================================
     describe('混合 OR/AND', function() {
 
-        it('權限層級混合：OR 和 AND 權限共存於同一群組', function() {
+        it('UNIT-006-權限層級混合：OR 和 AND 權限共存於同一群組', function() {
             // P1(OR): A=y, B=n
             // P2(OR): A=n, B=y
             // P3(AND): A=y, B=y
@@ -381,7 +395,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'B'), 'y')
         })
 
-        it('權限層級混合：AND 收緊 OR 結果', function() {
+        it('UNIT-006a-權限層級混合：AND 收緊 OR 結果', function() {
             // P1(OR): A=y, B=y
             // P2(AND): A=y, B=n
             //
@@ -400,7 +414,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'B'), 'n') // AND 收緊
         })
 
-        it('群組層級混合：OR 群組 + AND 群組', function() {
+        it('UNIT-006b-群組層級混合：OR 群組 + AND 群組', function() {
             // G1(OR): P1 → {A:'y', B:'y'}
             // G2(AND): P2 → {A:'y', B:'n'}
             //
@@ -422,7 +436,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'B'), 'n')
         })
 
-        it('群組層級混合：多 OR + 多 AND 交互', function() {
+        it('UNIT-006c-群組層級混合：多 OR + 多 AND 交互', function() {
             // G1(OR): P1 → {A:'y', B:'n', C:'n'}
             // G2(OR): P2 → {A:'n', B:'y', C:'n'}
             // G3(AND): P3 → {A:'y', B:'y', C:'y'}
@@ -456,7 +470,7 @@ describe('getUserRules - 權限樹組裝', function() {
     // ===========================================================
     describe('isActive 過濾', function() {
 
-        it('群組 isActive=n — 該群組被忽略', function() {
+        it('UNIT-007-群組 isActive=n — 該群組被忽略', function() {
             let targets = [t('A')]
             let pemis = [p('P1', { A: 'y' })]
             let grups = [g('G1', { P1: OR })]
@@ -466,7 +480,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'A'), 'n') // 群組被忽略，預設 n
         })
 
-        it('權限 isActive=n — 該權限被忽略', function() {
+        it('UNIT-007a-權限 isActive=n — 該權限被忽略', function() {
             let targets = [t('A')]
             let pemis = [
                 p('P1', { A: 'y' }),
@@ -480,7 +494,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'A'), 'n')
         })
 
-        it('全部群組皆 inactive — 全部 target 為 n', function() {
+        it('UNIT-007b-全部群組皆 inactive — 全部 target 為 n', function() {
             let targets = [t('A'), t('B')]
             let pemis = [p('P1', { A: 'y', B: 'y' })]
             let grups = [g('G1', { P1: OR })]
@@ -493,7 +507,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'B'), 'n')
         })
 
-        it('混合 active/inactive 權限', function() {
+        it('UNIT-007c-混合 active/inactive 權限', function() {
             let targets = [t('A'), t('B')]
             let pemis = [
                 p('P1', { A: 'y', B: 'n' }),
@@ -508,7 +522,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'B'), 'n')
         })
 
-        it('群組內所有權限皆 inactive — 該群組產出空 rules', function() {
+        it('UNIT-007d-群組內所有權限皆 inactive — 該群組產出空 rules', function() {
             let targets = [t('A')]
             let pemis = [p('P1', { A: 'y' })]
             let grups = [g('G1', { P1: OR_OFF })]
@@ -526,7 +540,7 @@ describe('getUserRules - 權限樹組裝', function() {
     // ===========================================================
     describe('名稱匹配失敗', function() {
 
-        it('使用者引用不存在的群組 — 被忽略', function() {
+        it('UNIT-008-使用者引用不存在的群組 — 被忽略', function() {
             let targets = [t('A')]
             let pemis = [p('P1', { A: 'y' })]
             let grups = [g('G1', { P1: OR })]
@@ -536,7 +550,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'A'), 'n')
         })
 
-        it('群組引用不存在的權限 — 被忽略', function() {
+        it('UNIT-008a-群組引用不存在的權限 — 被忽略', function() {
             let targets = [t('A')]
             let pemis = [p('P1', { A: 'y' })]
             let grups = [g('G1', { P_NOT_EXIST: OR })]
@@ -546,7 +560,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'A'), 'n')
         })
 
-        it('部分匹配 — 只有匹配到的生效', function() {
+        it('UNIT-008b-部分匹配 — 只有匹配到的生效', function() {
             let targets = [t('A'), t('B')]
             let pemis = [p('P1', { A: 'y' })]
             let grups = [g('G1', { P1: OR, P_NOT_EXIST: OR })]
@@ -600,7 +614,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.ok(Array.isArray(result.rules))
         })
 
-        it('grups 回傳中僅包含 active 且匹配的群組', function() {
+        it('UNIT-007e-grups 回傳中僅包含 active 且匹配的群組', function() {
             let targets = [t('A')]
             let pemis = [p('P1', { A: 'y' })]
             let grups = [g('G1', { P1: OR }), g('G2', { P1: OR })]
@@ -624,7 +638,7 @@ describe('getUserRules - 權限樹組裝', function() {
     // ===========================================================
     describe('複雜實際場景', function() {
 
-        it('模擬完整權限樹：多使用者群組、多權限、多 target', function() {
+        it('UNIT-010-模擬完整權限樹：多使用者群組、多權限、多 target', function() {
             // Targets: 頁面結構
             let targets = [
                 t('專案A/頁A'),
@@ -704,7 +718,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(m['一般區'], 'y') // 兩者都 y → y
         })
 
-        it('大量 targets 與稀疏權限 — 未涵蓋全部為 n', function() {
+        it('UNIT-010a-大量 targets 與稀疏權限 — 未涵蓋全部為 n', function() {
             let targets = []
             for (let i = 0; i < 50; i++) {
                 targets.push(t(`target-${i}`))
@@ -739,7 +753,7 @@ describe('getUserRules - 權限樹組裝', function() {
     // ===========================================================
     describe('mergeRules 處理順序', function() {
 
-        it('OR 先執行再 AND — AND 可從 OR 結果收緊', function() {
+        it('UNIT-006d-OR 先執行再 AND — AND 可從 OR 結果收緊', function() {
             // P1(OR): {A:'y', B:'y', C:'y'}
             // P2(AND): {A:'y', B:'n', C:'y'}
             //
@@ -761,7 +775,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(m.C, 'y')
         })
 
-        it('純 AND 無 OR — 以第一筆為基底逐步交集', function() {
+        it('UNIT-005f-純 AND 無 OR — 以第一筆為基底逐步交集', function() {
             // P1(AND): {A:'y', B:'y', C:'n'}
             // P2(AND): {A:'y', B:'n', C:'y'}
             //
@@ -781,7 +795,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(m.C, 'n')
         })
 
-        it('多 OR + 多 AND 權限 — 驗證最終結果', function() {
+        it('UNIT-006e-多 OR + 多 AND 權限 — 驗證最終結果', function() {
             // P1(OR): {A:'y', B:'n'}
             // P2(OR): {A:'n', B:'y'}
             // P3(AND): {A:'y', B:'y'}
@@ -814,7 +828,7 @@ describe('getUserRules - 權限樹組裝', function() {
     // ===========================================================
     describe('兩層巢狀合併', function() {
 
-        it('群組內 OR 合併後，群組間再 AND', function() {
+        it('UNIT-006f-群組內 OR 合併後，群組間再 AND', function() {
             // G1 (OR mode at group level):
             //   P1(OR): {A:'y', B:'n'}
             //   P2(OR): {A:'n', B:'y'}
@@ -845,7 +859,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(m.B, 'n')
         })
 
-        it('群組內 AND 合併後，群組間再 OR', function() {
+        it('UNIT-006g-群組內 AND 合併後，群組間再 OR', function() {
             // G1:
             //   P1(AND): {A:'y', B:'y'}
             //   P2(AND): {A:'y', B:'n'}
@@ -882,7 +896,7 @@ describe('getUserRules - 權限樹組裝', function() {
     // ===========================================================
     describe('JSON5 格式', function() {
 
-        it('cgrups 使用 JSON5 格式（單引號）— 正常解析', function() {
+        it('UNIT-009a-cgrups 使用 JSON5 格式（單引號）— 正常解析', function() {
             let targets = [t('A')]
             let pemis = [p('P1', { A: 'y' })]
             let grups = [g('G1', { P1: OR })]

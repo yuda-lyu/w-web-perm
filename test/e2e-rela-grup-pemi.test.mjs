@@ -3,7 +3,7 @@
 //且 VeCpemis（群組頁入口）Save 不打 API 只 resolve 回填、DB 寫入延到「群組頁工具列存檔」一步。
 //雙模式：
 //  - 產 baseline：node test/e2e-rela-grup-pemi.test.mjs --baseline （寫 test/pics/rela-grup-pemi/）
-//  - 驗證（mocha）：npx mocha test/e2e-rela-grup-pemi.test.mjs --reporter list （buf.equals 比對）
+//  - 驗證（mocha）：npx mocha test/e2e-rela-grup-pemi.test.mjs --reporter list （pixelmatch 反鋸齒感知 + maxDiffPixels 容差比對，非 byte-exact）
 //act 走 user-facing input；assert = 語意斷言 + pixel baseline（§6.2 / §6.3）。
 //
 //兩入口（spec 重要流程）：
@@ -363,6 +363,42 @@ const CASES = [
             const saveCnt = await pathBtn(page, DLG_MDI.save).count()
             assert.equal(saveCnt, 0, '唯讀檢視不應出現對話框 Save 鈕')
             //對話框內 select / checkbox 皆 disabled
+            const allDisabled = await page.evaluate(() => {
+                const sels = [...document.querySelectorAll('.ag-cell[col-id="mode"] select')]
+                const chks = [...document.querySelectorAll('.ag-cell[col-id="enable"] input[type="checkbox"]')]
+                const els = [...sels, ...chks]
+                return els.length > 0 && els.every((e) => e.disabled === true)
+            })
+            assert.ok(allDisabled, '唯讀檢視之 mode 下拉與 enable checkbox 應皆 disabled')
+        },
+    },
+    {
+        //E2E-006：權限頁關閉編輯模式後開 VePemiBlngGrups（入口 B）→ 檢視版標題（pemiBlngEditGrupsForDisplay）、無 Save 鈕、下拉 / checkbox 皆 disabled。
+        //對應 spec 流程_群組權限關聯.md E2E-006（補權限頁入口唯讀；E2E-005 已涵蓋群組頁入口 VeCpemis 唯讀）。單階段截圖：唯讀檢視對話框開啟態。
+        name: 'E2E-006-readonly-view',
+        run: async (page) => {
+            await gotoPemis(page)
+            await toggleEditMode(page) //關閉編輯模式 → isEditable=false
+            //關編輯模式後 belongGrups 欄仍為按鈕，點之開檢視版對話框
+            await page.locator(`.ag-row[row-index="0"] .ag-cell[col-id="belongGrups"] button`).first().click()
+            await waitUntilExist(page, 'VePemiBlngGrups 檢視版標題', () => {
+                const vo = window.$vo
+                return (document.body.innerText || '').includes(vo.$t('pemiBlngEditGrupsForDisplay'))
+            }, { timeout: 15000 })
+            await waitDialogGrid(page)
+            return await captureStableWithBox(page, SEL_MODAL) //VePemiBlngGrups 唯讀檢視對話框開啟態
+        },
+        semantic: async (page) => {
+            //對應 spec E2E-006 驗證1：標題為檢視版鍵（pemiBlngEditGrupsForDisplay，eng/cht 皆與編輯版相異）。
+            const dispLabel = await page.evaluate(() => window.$vo.$t('pemiBlngEditGrupsForDisplay'))
+            const editLabel = await page.evaluate(() => window.$vo.$t('pemiBlngEditGrups'))
+            const txt = await page.evaluate(() => document.body.innerText)
+            assert.ok(txt.includes(dispLabel), `應顯示檢視版標題（${dispLabel}）`)
+            assert.ok(!txt.includes(editLabel) || dispLabel.includes(editLabel) === false, '不應為可編輯版標題')
+            //對應 spec E2E-006 驗證1：無對話框 Save 鈕（hasSaveBtn=isEditable && isModified，isEditable=false 恆不渲染）。
+            const saveCnt = await pathBtn(page, DLG_MDI.save).count()
+            assert.equal(saveCnt, 0, '唯讀檢視不應出現對話框 Save 鈕')
+            //對應 spec E2E-006 驗證1：mode 下拉與 enable checkbox 皆 disabled（VePemiBlngGrups.vue:155,159）。
             const allDisabled = await page.evaluate(() => {
                 const sels = [...document.querySelectorAll('.ag-cell[col-id="mode"] select')]
                 const chks = [...document.querySelectorAll('.ag-cell[col-id="enable"] input[type="checkbox"]')]

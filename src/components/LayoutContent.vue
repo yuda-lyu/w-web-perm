@@ -167,7 +167,6 @@ export default {
 
             menuKey: 'mmTargets',
 
-            panelWidth: 0,
             panelHeight: 0,
 
             drawer: true,
@@ -232,7 +231,6 @@ export default {
             let vo = this
 
             //save
-            vo.panelWidth = msg.snew.clientWidth
             vo.panelHeight = msg.snew.clientHeight
             // console.log('vo.panelHeight', vo.panelHeight)
 

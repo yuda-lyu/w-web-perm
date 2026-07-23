@@ -23,12 +23,11 @@ function perm() {
         if (!isestr(url)) {
             throw new Error(`invalid url`)
         }
-        if (url.indexOf('token=') === 0) {
+        if (url.indexOf('token=') < 0) {
             throw new Error(`url does not include 'token='`)
         }
-        if (url.indexOf('userId=') === 0) {
-            throw new Error(`url does not include 'userId='`)
-        }
+        //註: conn() 為通用連線, getPerm 之 url 僅含 token=、getPermUserInfor 才含 userId=,
+        //故此處不強制 userId=（端點專屬之 userId 驗證由後端對應 handler 負責）。
 
         //permSuccess
         let permSuccess = get(opt, 'permSuccess')

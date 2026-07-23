@@ -1,17 +1,18 @@
 //updateTabs 寫入 RPC 契約測試。對應 perm 4 個寫入 RPC（updateUsers / updateGrups / updatePemis / updateTargets，
-//server/WWebPerm.mjs:464-489，核心走 updateTabItems:362）。
+//server/procCore.mjs:132-172 之 4 個 wrapper，核心走 updateTabItems（procCore.mjs:17））。
 //
-//【與既有 api 查詢測之差異】perm 的 4 個寫入函式註冊於 WServHapiServer 的 kpFunExt（WWebPerm.mjs:1210-1224），
-//走 w-converhp RPC 通道（POST {apiBaseUrl}/api/main，body 為 obj2u8arr 編碼），非裸 axios 查詢 URL。故本檔仿
+//【與既有 api 查詢測之差異】perm 的 4 個寫入函式註冊於 WServHapiServer 的 kpFunExt（WWebPerm.mjs:1132-1135，
+//委派 pc.updateTargets 等，pc 為 procCore 實例，WWebPerm.mjs:300），走 w-converhp RPC 通道（POST
+//{apiBaseUrl}/api/main，body 為 obj2u8arr 編碼），非裸 axios 查詢 URL。故本檔仿
 //w-web-sso/test/e2e-doubleclick.test.mjs 之 callRpc：用 Node 內建 fetch + wsemi 之 obj2u8arr/u8arr2obj 直打。
 //RPC 為 stateless POST（非常駐連線），無 sso 的 force-exit 顧慮；process 由 e2e-setup 的 mocha root after 殺 backend。
 //
 //【整表 diff 語意（已 Read 原始碼確認）】updateTabItems 對整張表（select() 無 from 過濾）做 ltdtDiffByKey：
-//  - diff 鍵（keyDetect）：targets/users=id、pemis/grups=name（WWebPerm.mjs:466/473/480/487）。
-//  - 送入 rows 經 ltdtmapping 取 schema 欄位、order 一律重給為陣列位置 k+1（WWebPerm.mjs:365-372）。
+//  - diff 鍵（keyDetect）：targets/users=id、pemis/grups=name（procCore.mjs:134/145/156/167）。
+//  - 送入 rows 經 ltdtmapping 取 schema 欄位（procCore.mjs:24）、order 一律重給為陣列位置 k+1（procCore.mjs:27-31）。
 //  - DB 終態 = 送入 rows：未列出的舊列被 del、新 id/name 被 add、同 key 但內容不同被 save(diff)。
 //  - 因此「修改一列」「新增一列」「刪除一列」皆須送「整張表的完整 rows（含未改動列）」，僅調整目標列。
-//  - 去重鍵檢測（WWebPerm.mjs:405-426）：targets 同 id、pemis/grups 同 name、users 同 email 重複 → reject。
+//  - 去重鍵檢測（procCore.mjs:66-87）：targets 同 id、pemis/grups 同 name、users 同 email 重複 → reject（saveRowFieldDuplicate，procCore.mjs:54）。
 //
 //token 用 TOKEN_ADMIN（'sys' → id-for-admin，過 verifyConn.checkToken + 為 isAdmin='y'）。
 //每 case 前以 restoreBaseSeed 將目標表復原為 base seed（送 base 快照經同一 RPC 寫回），確保 case 間隔離。

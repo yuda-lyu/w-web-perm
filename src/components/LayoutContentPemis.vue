@@ -296,7 +296,6 @@ export default {
             mdiPencilOutline,
             mdiContentCopy,
 
-            panelWidth: 100,
             panelHeight: 100,
             headHeight: 100,
 
@@ -624,7 +623,6 @@ export default {
             let vo = this
 
             //panelWidth, panelHeight
-            vo.panelWidth = msg.snew.offsetWidth
             vo.panelHeight = msg.snew.offsetHeight
 
         },

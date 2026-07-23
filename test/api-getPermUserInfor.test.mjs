@@ -142,6 +142,14 @@ describe('api-getPermUserInfor', function() {
         assert.strict.ok(ur && typeof ur === 'object', 'resolve 值應為物件')
         assert.strict.equal(ur._wrapped, true, 'resolve 物件應含 funConvertPerm 注入的 _wrapped:true')
 
+        //對應 spec E2E-006：funConvertPerm「支援同步或回傳 Promise」，此子斷言驗回 Promise 分支
+        //（getPermUserInfor.mjs:74-76 以 ispm 偵測並 await）→ 以 resolve 後物件 resolve。
+        let urAsync = await getPermUserInfor(urlGetPermUserInfor, TOKEN_APP, SEED.peterId, {
+            funConvertPerm: async (ur) => ({ ...ur, _async: true }),
+        })
+        assert.strict.ok(urAsync && typeof urAsync === 'object', 'async funConvertPerm resolve 值應為物件')
+        assert.strict.equal(urAsync._async, true, 'resolve 物件應含 async funConvertPerm 注入的 _async:true（await 分支生效）')
+
         //對應 spec E2E-006 驗證 1：funConvertPerm 回非物件（null）時 reject（getPermUserInfor.mjs:89-91）
         try {
             await getPermUserInfor(urlGetPermUserInfor, TOKEN_APP, SEED.peterId, {

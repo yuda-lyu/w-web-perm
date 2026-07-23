@@ -15,7 +15,7 @@
 // 使用方式:
 //   1. 先 npm run build 產 dist。
 //   2. 產標準圖: node test/e2e-init.test.mjs --baseline
-//   3. 跑測試:   npx mocha test/e2e-init.test.mjs --timeout 120000 --reporter list
+//   3. 跑測試:   npx mocha test/e2e-init.test.mjs --timeout 120000 --reporter list （pixelmatch 反鋸齒感知 + maxDiffPixels 容差比對，非 byte-exact）
 //
 // 標準圖: test/pics/init/init-{lang}-{NNN-name}.png（同 SSO 命名）
 //

@@ -3,7 +3,7 @@
 //（勾選 enable checkbox / 切 OR-AND mode select / 點對話框 Save 或 Close）。
 //雙模式：
 //  - 產 baseline：node test/e2e-rela-user-grup.test.mjs --baseline （寫 test/pics/rela-user-grup/）
-//  - 驗證（mocha）：npx mocha test/e2e-rela-user-grup.test.mjs --reporter list （buf.equals 比對）
+//  - 驗證（mocha）：npx mocha test/e2e-rela-user-grup.test.mjs --reporter list （pixelmatch 反鋸齒感知 + maxDiffPixels 容差比對，非 byte-exact）
 //act 走 user-facing input；assert = 語意斷言 + pixel baseline（§6.2 / §6.3）。
 //
 //兩入口（spec 重要流程）：
@@ -55,6 +55,14 @@ async function gotoGrups(page) {
     await page.getByText(grupsLabel, { exact: true }).first().click()
     await waitUntilExist(page, '群組 ag-grid 列', () => document.querySelectorAll('.ag-row').length > 0, { timeout: 20000 })
     await page.waitForTimeout(500)
+}
+
+//切換清單頁編輯模式（點 WSwitch，以「Edit mode/編輯模式」標籤觸發其 click 區）。預設編輯模式 ON，故唯讀案例需切一次關閉。
+//沿用 e2e-rela-grup-pemi / e2e-rela-pemi-rule 之同名 helper（本檔原無此 helper，唯讀案例需要，逐字沿用 sibling canonical）。
+async function toggleEditMode(page) {
+    const label = await page.evaluate(() => window.$vo.$t('modeEdit'))
+    await page.getByText(label, { exact: true }).first().click()
+    await page.waitForTimeout(2000) //toggle 觸發 grid 欄位 reflow（增/減拖曳·勾選欄），等其完全 settle
 }
 
 //—— 對話框 Save / Close 鈕定位（WDialog header 之 WButtonCircle）——
@@ -376,6 +384,81 @@ const CASES = [
             const cgrups = await readDbUserCgrups(page, 'mary@example.com')
             assert.ok(cgrups && typeof cgrups === 'object' && !cgrups['權限群組M1'], 'mary.cgrups 不應含 權限群組M1（Close 未寫 DB）')
             assert.ok(cgrups['權限群組M2'], 'mary.cgrups 應維持 base seed 之 權限群組M2')
+        },
+    },
+
+    //—————————————— 唯讀檢視（isEditable=false 守門，與可編輯案例共覆蓋兩分支）——————————————
+
+    {
+        //E2E-007：使用者頁關閉編輯模式後開 VeCgrups → 檢視版標題（userEditCgrupsForDisplay）、無 Save 鈕、mode 下拉 / enable checkbox 皆 disabled。
+        //對應 spec 流程_使用者群組關聯.md E2E-007。單階段截圖：唯讀檢視對話框開啟態。
+        name: 'E2E-007-readonly-view',
+        run: async (page) => {
+            await gotoUsers(page)
+            await toggleEditMode(page) //關閉編輯模式 → isEditable=false
+            //關編輯模式後 cgrups 欄仍為按鈕（getCgrupsText），點之開檢視版對話框
+            await page.locator(`.ag-row[row-index="0"] .ag-cell[col-id="cgrups"] button`).first().click()
+            await waitUntilExist(page, 'VeCgrups 檢視版標題', () => {
+                const vo = window.$vo
+                return (document.body.innerText || '').includes(vo.$t('userEditCgrupsForDisplay'))
+            }, { timeout: 15000 })
+            await waitDialogGrid(page)
+            return await captureStableWithBox(page, SEL_MODAL) //VeCgrups 唯讀檢視對話框開啟態
+        },
+        semantic: async (page) => {
+            //對應 spec E2E-007 驗證1：標題為檢視版鍵。
+            const dispLabel = await page.evaluate(() => window.$vo.$t('userEditCgrupsForDisplay'))
+            const txt = await page.evaluate(() => document.body.innerText)
+            assert.ok(txt.includes(dispLabel), `應顯示檢視版標題（${dispLabel}）`)
+            //對應 spec E2E-007 驗證1：無對話框 Save 鈕（hasSaveBtn=isEditable && isModified，isEditable=false 恆不渲染）。
+            //註：userEditCgrupsForDisplay 之 eng 值與編輯版 userEditCgrups 相同（procLang.mjs:737,741，eng 未在地化），
+            //故 eng 無法以標題文字區分編輯/檢視；唯讀之決定性判據為「無 Save 鈕 + 控件 disabled」。
+            const saveCnt = await dlgBtn(page, DLG_MDI.save).count()
+            assert.equal(saveCnt, 0, '唯讀檢視不應出現對話框 Save 鈕')
+            //對應 spec E2E-007 驗證1：mode 下拉與 enable checkbox 皆 disabled（VeCgrups.vue:131,135）。
+            const allDisabled = await page.evaluate(() => {
+                const sels = [...document.querySelectorAll('.ag-cell[col-id="mode"] select')]
+                const chks = [...document.querySelectorAll('.ag-cell[col-id="enable"] input[type="checkbox"]')]
+                const els = [...sels, ...chks]
+                return els.length > 0 && els.every((e) => e.disabled === true)
+            })
+            assert.ok(allDisabled, '唯讀檢視之 mode 下拉與 enable checkbox 應皆 disabled')
+        },
+    },
+    {
+        //E2E-008：群組頁關閉編輯模式後開 VeGrupBlngUsers → 檢視版標題（grupBlngEditUsersForDisplay）、無 Save 鈕、mode 下拉 / enable checkbox 皆 disabled。
+        //對應 spec 流程_使用者群組關聯.md E2E-008。單階段截圖：唯讀檢視對話框開啟態。
+        name: 'E2E-008-readonly-view',
+        run: async (page) => {
+            await gotoGrups(page)
+            await toggleEditMode(page) //關閉編輯模式 → isEditable=false
+            //關編輯模式後 belongUsers 欄仍為按鈕，點之開檢視版對話框
+            await page.locator(`.ag-row[row-index="0"] .ag-cell[col-id="belongUsers"] button`).first().click()
+            await waitUntilExist(page, 'VeGrupBlngUsers 檢視版標題', () => {
+                const vo = window.$vo
+                return (document.body.innerText || '').includes(vo.$t('grupBlngEditUsersForDisplay'))
+            }, { timeout: 15000 })
+            await waitDialogGrid(page)
+            return await captureStableWithBox(page, SEL_MODAL) //VeGrupBlngUsers 唯讀檢視對話框開啟態
+        },
+        semantic: async (page) => {
+            //對應 spec E2E-008 驗證1：標題為檢視版鍵（grupBlngEditUsersForDisplay，eng/cht 皆與編輯版相異）。
+            const dispLabel = await page.evaluate(() => window.$vo.$t('grupBlngEditUsersForDisplay'))
+            const editLabel = await page.evaluate(() => window.$vo.$t('grupBlngEditUsers'))
+            const txt = await page.evaluate(() => document.body.innerText)
+            assert.ok(txt.includes(dispLabel), `應顯示檢視版標題（${dispLabel}）`)
+            assert.ok(!txt.includes(editLabel) || dispLabel.includes(editLabel) === false, '不應為可編輯版標題')
+            //對應 spec E2E-008 驗證1：無對話框 Save 鈕（hasSaveBtn=isEditable && isModified）。
+            const saveCnt = await dlgBtn(page, DLG_MDI.save).count()
+            assert.equal(saveCnt, 0, '唯讀檢視不應出現對話框 Save 鈕')
+            //對應 spec E2E-008 驗證1：mode 下拉與 enable checkbox 皆 disabled（VeGrupBlngUsers.vue:155,159）。
+            const allDisabled = await page.evaluate(() => {
+                const sels = [...document.querySelectorAll('.ag-cell[col-id="mode"] select')]
+                const chks = [...document.querySelectorAll('.ag-cell[col-id="enable"] input[type="checkbox"]')]
+                const els = [...sels, ...chks]
+                return els.length > 0 && els.every((e) => e.disabled === true)
+            })
+            assert.ok(allDisabled, '唯讀檢視之 mode 下拉與 enable checkbox 應皆 disabled')
         },
     },
 ]

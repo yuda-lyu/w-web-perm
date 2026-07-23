@@ -2,13 +2,10 @@ import Vue from 'vue'
 import get from 'lodash-es/get.js'
 import WServHapiClient from 'w-serv-hapi/src/WServHapiClient.mjs'
 import WAlert from 'w-component-vue/src/components/WAlert.mjs'
-import domMutation from 'w-component-vue/src/js/domMutation.mjs'
 import domResize from 'w-component-vue/src/js/domResize.mjs'
-import domDragDrop from 'w-component-vue/src/js/domDragDrop.mjs'
 import App from './App.vue'
 import store from './store/index.mjs'
 import ui from './plugins/mUI.mjs'
-import mDataSelectorSchema from './plugins/mDataSelectorSchema.mjs'
 import * as s from './plugins/mShare.mjs'
 import ds from './schema/index.mjs'
 // console.log('ds', ds)
@@ -26,22 +23,16 @@ Vue.prototype.$alert = function() {
     }
 }
 
-//dssm
-let dssm = mDataSelectorSchema(ds)
-
 //prototype
 Vue.prototype.$ui = ui
 Vue.prototype.$t = ui.getKpText
 Vue.prototype.$tErr = ui.tErr
 Vue.prototype.$s = s
-Vue.prototype.$dssm = dssm
 Vue.prototype.$ds = ds
 Vue.prototype.$dg = {}
 
 //directive
 Vue.directive('domresize', domResize())
-Vue.directive('dommutation', domMutation())
-Vue.directive('domdragdrop', domDragDrop())
 
 //WServHapiClient
 // let bFirstSync = false //不需要bFirstSync, 由getWebInfor結束代表第1次完成同步
@@ -76,6 +67,9 @@ WServHapiClient({
             })
             .catch((err) => {
                 console.log(err)
+                //getWebInfor 失敗時, connState 已為 csLogin 但 webInfor 為空 → ready 永遠為 false 會永久卡「已登入」轉圈畫面.
+                //改落到 csErrConn, 讓 LayoutState 顯示「無法連線」狀態畫面 (使用者可見錯誤而非靜默卡死).
+                ui.updateConnState('csErrConn')
             })
 
     },

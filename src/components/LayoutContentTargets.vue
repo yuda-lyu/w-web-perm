@@ -284,7 +284,6 @@ export default {
             mdiPencilOutline,
             mdiContentCopy,
 
-            panelWidth: 100,
             panelHeight: 100,
             headHeight: 100,
 
@@ -489,9 +488,9 @@ export default {
 
             let c = ''
             let b = false
-            b = iseobj(vo.errItemsByName)
+            b = iseobj(vo.errItemsById)
             if (b) {
-                c = vo.$t('errInNames')
+                c = vo.$t('errInIds')
             }
 
             return c
@@ -522,7 +521,6 @@ export default {
             let vo = this
 
             //panelWidth, panelHeight
-            vo.panelWidth = msg.snew.offsetWidth
             vo.panelHeight = msg.snew.offsetHeight
 
         },
@@ -610,7 +608,7 @@ export default {
                     defHeadMinWidth: 150,
                     kpHeadWidth: {
                         'id': isnum(vo.widthTargetId) ? cdbl(vo.widthTargetId) : 600,
-                        'description': isnum(vo.widthTargetId) ? cdbl(vo.widthTargetId) : 600,
+                        'description': isnum(vo.widthTargetDescription) ? cdbl(vo.widthTargetDescription) : 600,
                         'timeCreate': 220,
                         'timeUpdate': 220,
                     },

@@ -44,6 +44,23 @@ describe('api-syncAndReplaceTabs', function() {
         await startApi()
     })
 
+    //本檔 per-case 清理：各成功案例（appTest-1 users、appTest-6 targets、appTest-2 grups 等）寫入 DB 後，
+    //  原僅倚賴下次 fresh spawn 之 seedDb 重建 base seed 自動移除；但 backend 被 reuse（已啟動）時不重 seed，
+    //  appTest-N 列會殘留 → 污染同進程其他唯讀斷言（如 api-getPerm T28 以 targets 總數斷言）。
+    //  後端 sync 路徑無法以空 rows 清源（isearr 安全閘拒空陣列，WWebPerm.mjs:683），故直接以 woItems.delAll({from})
+    //  刪除本檔用到的每個 appTest-N 分區列（delAll 同 backend 全量取代所用之刪除機制，WWebPerm.mjs:736）。
+    //  僅刪本檔特化之 appTest from，base seed（from='' / 'teamA'）不動。
+    after(async function() {
+        this.timeout(60000)
+        let woItems = await getWoItems()
+        let froms = ['appTest-1', 'appTest-2', 'appTest-3', 'appTest-4', 'appTest-5', 'appTest-6']
+        for (let kt of ['users', 'grups', 'pemis', 'targets']) {
+            for (let from of froms) {
+                await woItems[kt].delAll({ from })
+            }
+        }
+    })
+
     //對應 spec E2E-001：以 app token 全量取代某 from 分區的 users —— 先推一筆舊資料、再推新批，舊批應被整批替換，
     //base seed 其他分區（teamA 的 peter/mary/john）不受影響，新列稽核欄位由後端自動補入。
     it('API-sync-001-success-replace-users', async function() {

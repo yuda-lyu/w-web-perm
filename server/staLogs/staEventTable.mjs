@@ -5,6 +5,7 @@ import genPm from 'wsemi/src/genPm.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import fsTreeFolder from 'wsemi/src/fsTreeFolder.mjs'
 import fsBuildReadStreamText from 'wsemi/src/fsBuildReadStreamText.mjs'
+import filterVpfsByWindow from './filterVpfsByWindow.mjs'
 
 
 //統計各 event 事件於近 1日/8hr/4hr/1hr 各窗內之發生數量（鏡像 staEvent.mjs 的 NDJSON 讀取方式）。
@@ -26,6 +27,7 @@ async function staEventTable(opt = {}) {
 
     //vpfs
     let vpfs = fsTreeFolder(fdLog)
+    vpfs = filterVpfsByWindow(vpfs, now.subtract(25, 'hour'), 'YYYY-MM-DDTHH') //開檔前剔除窗外檔; 用 25h(非 24h)是因 diff('hour') 取整, 最舊可能到 now-25h, 多留一小時確保不漏讀
 
     //逐檔逐行讀取
     for (let vpf of vpfs) {

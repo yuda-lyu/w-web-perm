@@ -225,7 +225,6 @@ export default {
 
             fullscreen: false,
 
-            panelWidth: 100,
             panelHeight: 100,
             headHeight: 100,
 
@@ -374,7 +373,6 @@ export default {
             let vo = this
 
             //panelWidth, panelHeight
-            vo.panelWidth = msg.panelWidth
             vo.panelHeight = msg.contentHeightMax
 
         },
@@ -960,30 +958,19 @@ export default {
 
             let vo = this
 
-            //errTemp
-            let errTemp = null
-
-            //check
-            if (size(rows) === 0) {
-                vo.$ui.updateLoading(false) //showCheckYes 前關 loading（modal 阻斷、避免 clickSave 包裝層 loading 疊在 modal 後）
-                await vo.$dg.showCheckYes(`${vo.$t('grupSaveGrupsEmpty')}`)
-                return
-            }
-
-            //updateGrups
+            //3) updateGrups, 各自 catch + okX 旗標短路 (canonical 五段結構; 空清單檢查已上移至 doSave core())
+            let okSave = false
             await vo.$fapi.updateGrups(rows)
-                .catch((err) => {
-                    errTemp = err
+                .then(() => { okSave = true })
+                .catch(async (err) => {
+                    vo.$ui.updateLoading(false) //showCheckYes 前關 loading（modal 阻斷期間避免 loading 疊在底下）
+                    await vo.$dg.showCheckYes(`${vo.$t('grupSaveGrupsFail')}: ${vo.$tErr(err)}`)
                 })
-
-            //check
-            if (errTemp !== null) {
-                vo.$ui.updateLoading(false)
-                await vo.$dg.showCheckYes(`${vo.$t('grupSaveGrupsFail')}: ${vo.$tErr(errTemp)}`)
+            if (!okSave) {
                 return
             }
 
-            //alert
+            //alert（showCheckYes 前關 loading，避免 modal 等待期間 loading 疊在底下）
             vo.$ui.updateLoading(false)
             await vo.$dg.showCheckYes(vo.$t('grupSaveGrupsSuccess'), { type: 'success' })
 
@@ -1023,15 +1010,19 @@ export default {
 
             async function core() {
 
-                //show loading
+                //1) 事先檢測 (所有同步檢查在開 loading 之前, 空清單不應先閃 loading)
+                let rows = get(vo, 'opt.rows', [])
+                // console.log('rows', rows)
+                if (size(rows) === 0) {
+                    await vo.$dg.showCheckYes(`${vo.$t('grupSaveGrupsEmpty')}`)
+                    return
+                }
+
+                //2) 確定打 API 才開 loading
                 vo.$ui.updateLoading(true)
 
                 //delay
                 await delay(300)
-
-                //rows
-                let rows = get(vo, 'opt.rows', [])
-                // console.log('rows', rows)
 
                 //grups
                 let grups = cloneDeep(vo.grups)
@@ -1099,7 +1090,10 @@ export default {
                     vo.bShow = false
 
                 })
-                .catch(() => { })
+                .catch((err) => {
+                    console.log('doSave', err)
+                    vo.$alert(vo.$t('anUnexpectedErrorOccurred'), { type: 'error' }) //§5.1: 非預期例外須告知, 不靜默吞 (失敗時 .then 不執行→視窗不關)
+                })
                 .finally(() => {
 
                     //hide loading
