@@ -45,7 +45,7 @@ async function setLang(page, lang) {
 async function gotoStaInfor(page) {
     const staLabel = await page.evaluate(() => window.$vo.$t('mmStaInfor'))
     await page.getByText(staLabel, { exact: true }).first().click()
-    //等事件展示區標題 + 圖表 canvas 渲染（mock 後端確定有資料 → optEvent 非 null → WEchartsVueDyn 掛 canvas）
+    //等事件展示區標題 + 圖表 canvas 渲染（mock 後端確定有資料 → optEvent 非 null → WEchartsVue 掛 canvas）
     await waitUntilExist(page, '統計事件圖表 canvas', () => document.querySelector('canvas') !== null, { timeout: 30000 })
     //echarts 初始化 + resize debounce 充分 settle（給足 6-8s，圖表大量繪製）
     await page.waitForTimeout(7000)

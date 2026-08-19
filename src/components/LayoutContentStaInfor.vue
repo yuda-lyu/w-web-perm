@@ -63,11 +63,11 @@
 
                             </div>
 
-                            <WEchartsVueDyn
+                            <WEchartsVue
                                 style="width:100%; height:300px;"
                                 :options="optEvent"
                                 v-if="optEvent"
-                            ></WEchartsVueDyn>
+                            ></WEchartsVue>
 
                             <div
                                 style="padding:0px; font-size:0.8rem; color:#777;"
@@ -155,14 +155,14 @@ import sortBy from 'lodash-es/sortBy.js'
 import reverse from 'lodash-es/reverse.js'
 import debounce from 'wsemi/src/debounce.mjs'
 import isearr from 'wsemi/src/isearr.mjs'
-import WEchartsVueDyn from 'w-component-vue/src/components/WEchartsVueDyn.vue'
+import WEchartsVue from 'w-echarts-vue/src/components/WEchartsVue.vue'
 import { mdiChartBoxOutline, mdiTableLarge } from '@mdi/js/mdi.js'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
 
 
 export default {
     components: {
-        WEchartsVueDyn,
+        WEchartsVue,
         WIcon,
     },
     props: {
