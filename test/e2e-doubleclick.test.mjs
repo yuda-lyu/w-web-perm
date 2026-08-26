@@ -72,7 +72,7 @@ function summarize(results) {
 //唯讀讀整張表
 let _woItems = null
 async function readTable(keyTable) {
-    if (!_woItems) { const m = await import('../g.mOrm.mjs'); _woItems = m.woItems }
+    if (!_woItems) { const m = await import('../g_mOrm.mjs'); _woItems = m.woItems }
     return await _woItems[keyTable].select()
 }
 

@@ -165,7 +165,7 @@ export default {
             mdiArrowLeftBoldHexagonOutline,
             mdiArrowRightBoldHexagonOutline,
 
-            menuKey: 'mmTargets',
+            menuKey: 'mmStaInfor',
 
             panelHeight: 0,
 
@@ -187,6 +187,11 @@ export default {
             let vo = this
             let ms = [
                 {
+                    key: 'mmStaInfor',
+                    text: vo.$t('mmStaInfor'),
+                    icon: mdiChartBoxOutline,
+                },
+                {
                     key: 'mmTargets',
                     text: vo.$t('mmTargets'),
                     icon: mdiGamepadCircle,
@@ -205,11 +210,6 @@ export default {
                     key: 'mmUsers',
                     text: vo.$t('mmUsers'),
                     icon: mdiAccountGroupOutline,
-                },
-                {
-                    key: 'mmStaInfor',
-                    text: vo.$t('mmStaInfor'),
-                    icon: mdiChartBoxOutline,
                 },
             ]
             return ms

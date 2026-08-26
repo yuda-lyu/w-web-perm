@@ -15,6 +15,7 @@ import sharp from 'sharp'
 import pixelmatch from 'pixelmatch'
 import { PNG } from 'pngjs'
 import { chromium } from 'playwright'
+import { mdiArrowLeftBoldHexagonOutline as diagAL, mdiArrowRightBoldHexagonOutline as diagAR } from '@mdi/js/mdi.js' //【暫時診斷 E2E_DIAG 用, 完成後移除】
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 
@@ -56,7 +57,7 @@ async function waitPort(url, label, timeoutMs = 180000) {
     throw new Error(`等待 ${label} (${url}) 逾時 ${timeoutMs}ms`)
 }
 
-//種子 DB（base seed：peter/mary/john/admin + grups/pemis/targets）。g.initialTestData 刪舊重建，
+//種子 DB（base seed：peter/mary/john/admin + grups/pemis/targets）。g_initialTestData 刪舊重建，
 //須在後端開啟 lmdb 之前完成。偵測 stdout 'finish.' 即視為完成並結束該子進程（避免 lmdb 卡 event loop）。
 function seedDb() {
     return new Promise((resolve, reject) => {
@@ -64,7 +65,7 @@ function seedDb() {
         //僅在 backend 未啟動時呼叫 seedDb，故無進程持有 lmdb，刪除安全。
         try { fs.rmSync(join(projRoot, 'db'), { recursive: true, force: true }) }
         catch (e) { console.log('警告: 無法刪除 ./db（可能被占用），改在既有 DB 上 seed:', e.message) }
-        const child = spawn('node', ['g.initialTestData.mjs'], { cwd: projRoot, stdio: ['ignore', 'pipe', 'pipe'] })
+        const child = spawn('node', ['g_initialTestData.mjs'], { cwd: projRoot, stdio: ['ignore', 'pipe', 'pipe'] })
         let done = false
         const finish = () => { if (done) return; done = true; try { child.kill() } catch (e) {} ; resolve() }
         let buf = ''
@@ -181,8 +182,27 @@ export function cleanup() {
     spawned = []
 }
 
+//確定性渲染組（對齊 w-web-api test/e2e-setup.mjs:28-39 實測組合：六旗標 self-consistency 5/5、裸 launch 僅 2/4）。
+//why：2026-08 查得側欄選單（WListVertical→WPanelScrolly 捲動內容層）launch 級 1px 剛性位移 flake——
+//DOM layout 整數穩定、同 launch 連拍位元級穩定、失敗時內容連 AA 色階原封不動整體左移 1px（testPending 四組
+//現場逐像素驗證 capture(x,y)==baseline(x+1,y) 零失配）→ 誤差在 raster/compositing 層之 launch 級非決定性，
+//非字形 subpixel 重畫、非 DOM/scrollLeft（scrollWidth==clientWidth 實測排除）。本專案原為三姊妹專案中唯一
+//裸 launch 者。根因調查全文見 spec/設計要點與取捨.md。
+const chromiumLaunchArgs = [
+    '--disable-gpu', //關 GPU 硬體加速，raster 改走 CPU Skia
+    '--force-color-profile=srgb', //固定色彩描述，不吃主機 ICC/HDR
+    '--disable-lcd-text', //關 LCD/subpixel 字形 AA
+    '--disable-font-subpixel-positioning', //關字形 subpixel 定位
+    '--disable-skia-runtime-opts', //固定 Skia runtime 最佳化路徑
+    '--disable-partial-raster', //關 partial raster/tile 重用（與本案剛性 bitmap 位移最直接相關）
+]
+
 export async function launchBrowser() {
-    return await chromium.launch({ headless: true })
+    //【暫時診斷 E2E_BARE, 根因鑑別完成後移除】裸 launch 重現原始 flake 條件供現場解剖
+    if (process.env.E2E_BARE) {
+        return await chromium.launch({ headless: true })
+    }
+    return await chromium.launch({ headless: true, args: chromiumLaunchArgs })
 }
 
 //開乾淨頁（清 localStorage token 後以 ?token=sys 進入），回傳已可互動的 page。
@@ -214,6 +234,141 @@ async function maskRegions(buf, rects, color = { r: 0, g: 0, b: 0 }) {
     }))
     if (composite.length === 0) return buf
     return await sharp(buf).composite(composite).png().toBuffer()
+}
+
+//【暫時診斷 E2E_DIAG, 根因鑑別完成後移除】1px 剛性位移之失敗現場解剖: 治癒階梯 A開合/B語系重繪/C捲動微擾/D transform:none。
+//每級後重拍全頁並將側欄區(x2..198,y60..320)與 baseline 比對: same=該級治癒(責任落在該層), 全不治=更深層固著。
+export async function diagnoseShiftLadder(page, baselinePath, label) {
+    const AL = diagAL
+    const AR = diagAR
+    const baseBuf = fs.readFileSync(baselinePath)
+    const side = (bufA, bufB, dx) => {
+        const a = PNG.sync.read(bufA)
+        const b = PNG.sync.read(bufB)
+        let n = 0
+        for (let y = 60; y < 320; y++) {
+            for (let x = 2; x < 194; x++) { //上限 194: 避開紅框左邊框殘像素(195..199)
+                const i = (y * a.width + x) * 4
+                const j = (y * b.width + (x + dx)) * 4
+                if (a.data[i] !== b.data[j] || a.data[i + 1] !== b.data[j + 1] || a.data[i + 2] !== b.data[j + 2]) n += 1
+            }
+        }
+        return n
+    }
+    const cls = (bufB) => {
+        const n = side(baseBuf, bufB, 0)
+        if (n < 300) return { c: 'same', n }
+        const l = side(baseBuf, bufB, -1)
+        const r = side(baseBuf, bufB, 1)
+        if (l < n * 0.15) return { c: 'SHIFT-L', n }
+        if (r < n * 0.15) return { c: 'SHIFT-R', n }
+        return { c: 'other', n }
+    }
+    const shot = async () => {
+        await page.mouse.move(0, 0)
+        await page.waitForTimeout(600)
+        return await page.screenshot({ fullPage: true, animations: 'disabled' })
+    }
+    const waitState = async (want) => {
+        await page.waitForFunction((w) => {
+            const ss = Array.from(document.querySelectorAll('[state]')).map((e) => e.getAttribute('state'))
+                .filter((s) => ['hidden', 'opening', 'opened', 'hiding'].includes(s))
+            return ss.length > 0 && ss.every((s) => s === w)
+        }, want, { timeout: 8000, polling: 60 }).catch(() => {})
+    }
+    const out = []
+    const step = async (name, fn) => {
+        await fn()
+        const b = await shot()
+        const r = cls(b)
+        out.push(`${name}=${r.c}(n=${r.n})`)
+        fs.writeFileSync(path.join('./testPending', `diag-${label}-${name}.png`), b)
+        console.log(`  【診斷】${label} ${name}: ${r.c} (n=${r.n})`)
+        return r.c === 'same'
+    }
+    console.log(`  【診斷】${label} 開始現場解剖(治癒階梯)`)
+    //先關閉可能開著的結果 modal(全屏遮罩會壓暗側欄且擋掉治癒點擊)
+    for (let k = 0; k < 3; k++) {
+        const hasModal = await page.evaluate(() => (document.body.innerText || '').includes(window.$vo.$t('systemMessage')))
+        if (!hasModal) break
+        const okText = await page.evaluate(() => window.$vo.$t('ok'))
+        await page.getByText(okText, { exact: true }).last().click({ timeout: 3000 }).catch(() => {})
+        await page.waitForTimeout(700)
+    }
+    const b0 = await shot()
+    const r0 = cls(b0)
+    console.log(`  【診斷】${label} 初判: ${r0.c} (n=${r0.n})`)
+    if (r0.c === 'same') { console.log('  【診斷】重拍已無差異(瞬時態?), 停'); return }
+    if (await step('A-toggle', async () => {
+        await page.locator(`svg:has(path[d="${AL}"])`).first().click({ timeout: 5000 }).catch(() => {})
+        await waitState('hidden')
+        await page.waitForTimeout(150)
+        await page.locator(`svg:has(path[d="${AR}"])`).first().click({ timeout: 5000 }).catch(() => {})
+        await waitState('opened')
+    })) return
+    if (await step('B-relang', async () => {
+        await page.evaluate(() => { window.$vo.$ui.setLang('cht', 'diag') })
+        await page.waitForTimeout(900)
+        await page.evaluate(() => { window.$vo.$ui.setLang('eng', 'diag') })
+        await page.waitForTimeout(900)
+    })) return
+    if (await step('C-scroll', async () => {
+        await page.evaluate(() => {
+            Array.from(document.querySelectorAll('div')).filter((e) => getComputedStyle(e).overflowY === 'scroll' && e.getBoundingClientRect().left < 200 && e.getBoundingClientRect().width > 100)
+                .forEach((e) => { e.scrollTop = 1; e.scrollTop = 0 })
+        })
+        await page.waitForTimeout(400)
+    })) return
+    await step('D-tfnone', async () => {
+        await page.evaluate(() => { document.querySelectorAll('.ts').forEach((e) => { e.style.transform = 'none' }) })
+        await page.waitForTimeout(500)
+    })
+}
+
+//【暫時診斷 E2E_DIAG2, 根因鑑別完成後移除】launch 級 A/B 態分類 + GPU 指紋:
+//openApp 後(統計頁, eng)截圖與固定參考(./tmp/force-ref.png)比對側欄; B 態時印 GPU featureStatus 供 A/B 對比並跑治癒階梯。
+export async function diagLaunchProbe(browser, page, label) {
+    if (!fs.existsSync('./tmp/force-ref.png')) { console.log('  【DIAG2】無參考圖, 略過'); return }
+    const refBuf = fs.readFileSync('./tmp/force-ref.png')
+    const sideN = (bufA, bufB, dx) => {
+        const a = PNG.sync.read(bufA)
+        const b = PNG.sync.read(bufB)
+        let n = 0
+        for (let y = 60; y < 320; y++) {
+            for (let x = 2; x < 194; x++) {
+                const i = (y * a.width + x) * 4
+                const j = (y * b.width + (x + dx)) * 4
+                if (a.data[i] !== b.data[j] || a.data[i + 1] !== b.data[j + 1] || a.data[i + 2] !== b.data[j + 2]) n += 1
+            }
+        }
+        return n
+    }
+    await page.mouse.move(0, 0)
+    await page.waitForTimeout(500)
+    const cur = await page.screenshot({ fullPage: true, animations: 'disabled' })
+    const n = sideN(refBuf, cur, 0)
+    let state = 'A'
+    if (n >= 300) {
+        const l = sideN(refBuf, cur, -1)
+        const r = sideN(refBuf, cur, 1)
+        state = (l < n * 0.15) ? 'B-L' : (r < n * 0.15) ? 'B-R' : `other(${n})`
+    }
+    //GPU 指紋(每 launch 皆印, 供 A/B 對比)
+    let gpuSig = '(cdp fail)'
+    try {
+        const cdp = await browser.newBrowserCDPSession()
+        const info = await cdp.send('SystemInfo.getInfo')
+        const fs2 = info && info.gpu && info.gpu.featureStatus ? info.gpu.featureStatus : {}
+        gpuSig = Object.entries(fs2).map(([k, v]) => `${k}=${v}`).sort().join(' ')
+        await cdp.detach().catch(() => {})
+    }
+    catch (e) { gpuSig = `(err ${String(e).slice(0, 60)})` }
+    console.log(`  【DIAG2】${label}: ${state} (n=${n}) | gpu: ${gpuSig}`)
+    if (state.startsWith('B')) {
+        fs.writeFileSync(`./testPending/diag2-B-${label}.png`, cur)
+        console.log(`  【DIAG2】★★ 活體 B 態! 存證 testPending/diag2-B-${label}.png, 跑治癒階梯`)
+        await diagnoseShiftLadder(page, './tmp/force-ref.png', `diag2-${label}`).catch((e) => console.log('  【DIAG2】階梯例外', e))
+    }
 }
 
 //等 WDrawer 抽屜到達穩定態（opened/hidden）才放行——讀 WDrawer 元件根節點 [state]（w-component-vue
@@ -337,32 +492,60 @@ export async function captureStableWithBox(page, target, opts = {}) {
             if (r) rects.push(r)
         }
     }
-    //畫紅框（多個取聯集；四邊夾在視窗內避免貼邊元素框線跑出畫面而少邊）
-    await page.evaluate((rs) => {
+    //畫紅框——改為「截圖後以 sharp 疊圖」，不再注入/移除 DOM。why：w-web-api 實測記載 headless Chromium
+    //對「插入後移除的暫時 DOM」偶發整頁偏移 1px（api test/e2e-edit.test.mjs:37 toast 殷鑑）；本專案 2026-08
+    //查得側欄 1px 剛性位移 flake（launch 級二態），紅框 DOM mutation 為可疑 invalidation 觸發源之一，
+    //故量測工具自身不再改動被測頁之 DOM/layer tree。幾何與原 DOM 版一致：聯集 rect ±6 外擴、
+    //四邊夾在視窗內（M=3）、5px #f26 框線、圓角 4px。疊圖在 captureStable 內建遮罩之後（框永遠可見）。
+    //【暫時診斷 E2E_BARE, 根因鑑別完成後移除】走修正前之 DOM 注入紅框路徑, 重現原始 flake 條件
+    if (process.env.E2E_BARE) {
+        await page.evaluate((rs) => {
+            const M = 3
+            const vw = window.innerWidth
+            const vh = window.innerHeight
+            if (rs.length > 0) {
+                const left = Math.min(...rs.map((r) => r.x))
+                const top = Math.min(...rs.map((r) => r.y))
+                const right = Math.max(...rs.map((r) => r.x + r.width))
+                const bottom = Math.max(...rs.map((r) => r.y + r.height))
+                const bl = Math.max(M, left - 6)
+                const bt = Math.max(M, top - 6)
+                const br = Math.min(vw - M, right + 6)
+                const bb = Math.min(vh - M, bottom + 6)
+                const box = document.createElement('div')
+                box.id = '__e2e_box__'
+                box.style.cssText = `position:fixed; left:${bl}px; top:${bt}px; width:${br - bl}px; height:${bb - bt}px; border:5px solid #f26; box-sizing:border-box; z-index:2147483647; pointer-events:none; border-radius:4px;`
+                document.body.appendChild(box)
+            }
+        }, rects)
+        await page.waitForTimeout(150)
+        const bufOld = await captureStable(page, opts)
+        await page.evaluate(() => {
+            const b = document.getElementById('__e2e_box__')
+            if (b) b.remove()
+        })
+        return bufOld
+    }
+    const env = await page.evaluate(() => ({ vw: window.innerWidth, vh: window.innerHeight, sx: window.scrollX, sy: window.scrollY }))
+    let buf = await captureStable(page, opts)
+    if (rects.length > 0) {
         const M = 3
-        const vw = window.innerWidth
-        const vh = window.innerHeight
-        if (rs.length > 0) {
-            const left = Math.min(...rs.map((r) => r.x))
-            const top = Math.min(...rs.map((r) => r.y))
-            const right = Math.max(...rs.map((r) => r.x + r.width))
-            const bottom = Math.max(...rs.map((r) => r.y + r.height))
-            const bl = Math.max(M, left - 6)
-            const bt = Math.max(M, top - 6)
-            const br = Math.min(vw - M, right + 6)
-            const bb = Math.min(vh - M, bottom + 6)
-            const box = document.createElement('div')
-            box.id = '__e2e_box__'
-            box.style.cssText = `position:fixed; left:${bl}px; top:${bt}px; width:${br - bl}px; height:${bb - bt}px; border:5px solid #f26; box-sizing:border-box; z-index:2147483647; pointer-events:none; border-radius:4px;`
-            document.body.appendChild(box)
-        }
-    }, rects)
-    await page.waitForTimeout(150)
-    const buf = await captureStable(page, opts)
-    await page.evaluate(() => {
-        const b = document.getElementById('__e2e_box__')
-        if (b) b.remove()
-    })
+        //fullPage 截圖座標 = viewport rect + scroll offset（本專案頁高皆 <= 視窗，offset 通常為 0）
+        const left = Math.min(...rects.map((r) => r.x)) + env.sx
+        const top = Math.min(...rects.map((r) => r.y)) + env.sy
+        const right = Math.max(...rects.map((r) => r.x + r.width)) + env.sx
+        const bottom = Math.max(...rects.map((r) => r.y + r.height)) + env.sy
+        const bl = Math.max(env.sx + M, left - 6)
+        const bt = Math.max(env.sy + M, top - 6)
+        const br = Math.min(env.sx + env.vw - M, right + 6)
+        const bb = Math.min(env.sy + env.vh - M, bottom + 6)
+        const meta = await sharp(buf).metadata()
+        //SVG stroke 置中於路徑：外緣落在 bl..br / bt..bb，等效原 DOM 版 border-box 之 5px 內縮框線
+        const svg = `<svg width="${meta.width}" height="${meta.height}" xmlns="http://www.w3.org/2000/svg">` +
+            `<rect x="${bl + 2.5}" y="${bt + 2.5}" width="${br - bl - 5}" height="${bb - bt - 5}" fill="none" stroke="#f26" stroke-width="5" rx="4" ry="4"/>` +
+            `</svg>`
+        buf = await sharp(buf).composite([{ input: Buffer.from(svg), top: 0, left: 0 }]).png().toBuffer()
+    }
     return buf
 }
 

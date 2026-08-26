@@ -1,6 +1,6 @@
 import map from 'lodash-es/map.js'
 import ds from './src/schema/index.mjs'
-import { woItems } from './g.mOrm.mjs'
+import { woItems } from './g_mOrm.mjs'
 
 
 async function initialData() {
@@ -208,4 +208,4 @@ initialData()
 
 
 //重建資料庫
-//node g.initialData.mjs
+//node g_initialData.mjs

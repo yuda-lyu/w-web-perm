@@ -1,10 +1,10 @@
 //逐檔隔離執行 e2e：每個 browser e2e 檔以「獨立 mocha 進程 + 全新後端」跑，前端(dev server)保持暖機共用。
 //
-//why：本專案 e2e 檔本就設計為逐檔獨立(各自 seedDb g.initialTestData + 自 spawn 後端 + 自管 browser 生命週期，
+//why：本專案 e2e 檔本就設計為逐檔獨立(各自 seedDb g_initialTestData + 自 spawn 後端 + 自管 browser 生命週期，
 //  且有 --baseline 直跑入口)。把它們塞進單一 mocha 進程(npm test 的 `mocha` 全 glob)時，會共用「api 相先 seed
 //  並經 updateXxx 還原 RPC 正規化過 order 欄位」的後端 → 對話框類 case 之 grid 列序(sortBy order)與 solo 自產
 //  baseline 不符 → 整批 pixel mismatch(2026-07-10 以 grups E2E-008 之 diff 圖確證: 同資料、列序相反)。
-//  逐檔各給全新後端(純 g.initialTestData 種子)即回到 solo 之綠燈狀態，且無須改動任何 baseline 或 production 碼。
+//  逐檔各給全新後端(純 g_initialTestData 種子)即回到 solo 之綠燈狀態，且無須改動任何 baseline 或 production 碼。
 //
 //機制：每檔前只殺後端(11006)、保留前端(8090, 無狀態且啟動慢)。新 mocha 進程 startedBackend=false → seedDb+spawn
 //  全新後端；startedFrontend 段偵測 8090 已起 → reuse。

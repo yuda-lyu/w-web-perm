@@ -43,12 +43,12 @@ export const SEED = {
     SYNC_FROM: 'appTest',
 }
 
-//lazy 取 woItems（唯讀斷言用）：必須在 startApi() 之後才 import g.mOrm.mjs，否則其 constructor 開 lmdb 會與
+//lazy 取 woItems（唯讀斷言用）：必須在 startApi() 之後才 import g_mOrm.mjs，否則其 constructor 開 lmdb 會與
 //seedDb 的 fs.rmSync('./db') 衝突。跨進程唯讀 select 已實測可行（backend 同開 lmdb，讀不寫風險低）。
 let _woItems = null
 export async function getWoItems() {
     if (!_woItems) {
-        const m = await import('../g.mOrm.mjs')
+        const m = await import('../g_mOrm.mjs')
         _woItems = m.woItems
     }
     return _woItems

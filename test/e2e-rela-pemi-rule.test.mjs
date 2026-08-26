@@ -10,7 +10,7 @@
 //  - 驗證（mocha）：npx mocha test/e2e-rela-pemi-rule.test.mjs --reporter list （pixelmatch 反鋸齒感知 + maxDiffPixels 容差比對，非 byte-exact）
 //act 走 user-facing input；assert = 語意斷言 + pixel baseline（§6.2 / §6.3）。
 //
-//base seed（g.initialTestData → src/schema/tables/*）：
+//base seed（g_initialTestData → src/schema/tables/*）：
 //  pemis(order0-3): 權限P1(crules: 專案A/頁A/區塊A=y, 專案A/頁B/區塊A=n, 專案A/頁C=n),
 //                   權限P2, 權限P3, 權限P4
 //  targets(order0-22): 路徑式 id（如 專案A/頁A/區塊A），row0=專案A/頁A/區塊A, row1=專案A/頁A/區塊A/執行按鈕,

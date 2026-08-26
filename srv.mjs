@@ -2,7 +2,7 @@ import fs from 'fs'
 import JSON5 from 'json5'
 import WOrm from 'w-orm-lmdb/src/WOrmLmdb.mjs'
 import WWebPerm from './server/WWebPerm.mjs'
-import getSettings from './g.getSettings.mjs'
+import getSettings from './g_getSettings.mjs'
 
 
 //st(DB 設定)

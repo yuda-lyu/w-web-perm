@@ -16,7 +16,7 @@
 //    斷言＝DB 被勾選群組 grups.cpemis（$store.state.grups）含本權限鍵 ＋ 結果 modal。
 //  唯讀（E2E-005）：清單頁未開編輯模式（isEditable=false）即開對話框，標題為檢視版、無 Save 鈕、下拉 / checkbox 皆 disabled。
 //
-//base seed（g.initialTestData → src/schema/tables/*）：
+//base seed（g_initialTestData → src/schema/tables/*）：
 //  grups(order0-3): 權限群組M1(cpemis P1=OR/y,P2=OR/y), M2(P2=OR/y,P3=OR/y), M3(P2=OR/y,P3=AND/y), M4(P3=OR/y,P4=OR/y)
 //  pemis(order0-3): 權限P1, 權限P2, 權限P3, 權限P4
 import fs from 'fs'

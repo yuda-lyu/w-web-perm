@@ -59,7 +59,7 @@ import procStaInfor from './procStaInfor.mjs'
  *
  * import WOrm from 'w-orm-lmdb/src/WOrmLmdb.mjs'
  * import WWebPerm from './server/WWebPerm.mjs'
- * import getSettings from './g.getSettings.mjs'
+ * import getSettings from './g_getSettings.mjs'
  *
  *
  * //st

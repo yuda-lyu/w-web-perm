@@ -22,8 +22,7 @@
 import assert from 'assert'
 import fs from 'fs'
 import path from 'path'
-import { chromium } from 'playwright'
-import { cleanup, captureStableWithBox, apiBaseUrl, genTempSettings, restartBackend, assertBaselineMatch } from './e2e-setup.mjs'
+import { cleanup, launchBrowser, captureStableWithBox, apiBaseUrl, genTempSettings, restartBackend, assertBaselineMatch } from './e2e-setup.mjs'
 
 
 const baselineDir = './test/pics/init'
@@ -60,7 +59,7 @@ function ensureIndexTmpl() {
 //使其懸而不答 → connState 卡 csIng → 穩定呈現「連線中」。spinner SVG 由 captureStable 之 animatedRects 自動填黑遮蔽。
 async function captureConnecting(lang) {
     await restartBackend(genTempSettings({ language: lang }))
-    const browser = await chromium.launch({ headless: true })
+    const browser = await launchBrowser() //確定性渲染組經 launchBrowser 統一供給, 不再裸 launch(旗標分叉防護)
     try {
         const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
         const page = await context.newPage()
@@ -95,7 +94,7 @@ async function captureConnecting(lang) {
 //此時 $t 走 mUI fallback → getLang() → ___pmwperm___.language（注入語系）, 故畫面文字 = 注入語系。無需 DB / 無需真連線。
 async function captureConnState(lang, connState, expectKey) {
     await restartBackend(genTempSettings({ language: lang }))
-    const browser = await chromium.launch({ headless: true })
+    const browser = await launchBrowser() //確定性渲染組經 launchBrowser 統一供給, 不再裸 launch(旗標分叉防護)
     try {
         const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
         const page = await context.newPage()
@@ -140,45 +139,47 @@ async function captureErrConn(lang) {
 
 
 //E2E-002: 已登入過場畫面（csLogin LayoutState）。登入成功但 webInfor 尚未回填（ready=false）時，LayoutState 以連線動畫圖加
-//「已登入」文字呈現之過場態（此態之後 webInfor 回填、ready 轉真才切到四頁籤殼層 E2E-003-login-ok）。
+//「已登入」文字呈現之過場態（此態之後 webInfor 回填、ready 轉真才切到五頁籤殼層 E2E-003-login-ok）。
 //連線懸置 → 強制 connState='csLogin'（webInfor 未回填 → ready=false → LayoutState csLogin 分支）→ 穩定呈現「已登入」/「Logged in」。
 async function captureLoggedIn(lang) {
     return await captureConnState(lang, 'csLogin', 'login')
 }
 
 
-//E2E-003: 登入成功後台四頁籤（golden 終態）。語系亦為 server 注入：後端以指定 language 啟動 → dist 注入該語系，
+//E2E-003: 登入成功後台五頁籤（golden 終態）。語系亦為 server 注入：後端以指定 language 啟動 → dist 注入該語系，
 //且後端 getWebInfor 回傳 webInfor.language=該語系（WWebPerm.mjs:236,319），main.js 登入後 setLang(null) 只重刷不覆蓋
-//→ 殼層四頁籤 / webName 以注入語系渲染（較 dev server + 前端 setLang 更貼近 production）。
+//→ 殼層五頁籤 / webName 以注入語系渲染（較 dev server + 前端 setLang 更貼近 production）。
 //機制：restartBackend 注入語系 → 打後端 dist + ?token=sys（不攔截，走真實登入）→ 等 connState='csLogin' + webInfor 回填
-//（ready 為真，四頁籤殼層渲染）→ 截頂列。需 base seed 之 sys token（持久種子，與其他 e2e 同源）。
+//（ready 為真，五頁籤殼層渲染）→ 截頂列。需 base seed 之 sys token（持久種子，與其他 e2e 同源）。
 async function captureLoginOk(lang) {
-    await restartBackend(genTempSettings({ language: lang }))
-    const browser = await chromium.launch({ headless: true })
+    //staEventMock: 預設頁為統計頁, 其圖表/統計表若吃真實 srLog 則計數逐次遞增, x 軸日期隨當日變動 → baseline 逐日失效;
+    //故與 e2e-stainfor 同樣注入確定性事件資料集(48 桶, 固定起點 2025-01-01, 固定 sin 計數)
+    await restartBackend(genTempSettings({ language: lang, staEventMock: true }))
+    const browser = await launchBrowser() //確定性渲染組經 launchBrowser 統一供給, 不再裸 launch(旗標分叉防護)
     try {
         const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
         const page = await context.newPage()
         await page.goto(`${apiBaseUrl}/?token=sys`, { waitUntil: 'domcontentloaded', timeout: 20000 })
-        //等真實登入完成（ready=真：connState=csLogin 且 webInfor 為非空物件 → 四頁籤殼層渲染）
+        //等真實登入完成（ready=真：connState=csLogin 且 webInfor 為非空物件 → 五頁籤殼層渲染）
         await page.waitForFunction(() => {
             const vo = window.$vo
             if (!vo) return false
             const st = vo.$store && vo.$store.state
             return !!(st && st.connState === 'csLogin' && st.webInfor && Object.keys(st.webInfor).length > 0)
         }, null, { timeout: 60000 })
-        await page.waitForTimeout(600) //殼層 + 四頁籤譯文 settle
+        await page.waitForTimeout(600) //殼層 + 五頁籤譯文 settle
         await page.mouse.move(0, 0)
         const info = await page.evaluate(() => {
             const vo = window.$vo
             return {
                 winLang: (window.___pmwperm___ || {}).language,
                 body: (document.body.innerText || '').replace(/\s+/g, ' '),
-                tabs: ['mmTargets', 'mmPemis', 'mmGrups', 'mmUsers'].map((k) => vo.$t(k)),
+                tabs: ['mmStaInfor', 'mmTargets', 'mmPemis', 'mmGrups', 'mmUsers'].map((k) => vo.$t(k)),
                 webName: vo.$t('webName'),
                 csIng: vo.$t('csIng'),
             }
         })
-        //觀看區 = Layout 頂部工具列（webName + 語言選單），四頁籤之渲染由語意斷言驗
+        //觀看區 = Layout 頂部工具列（webName + 語言選單），五頁籤之渲染由語意斷言驗
         const buf = await captureStableWithBox(page, '[data-fmid="app-topbar"]')
         return { buf, info }
     }
@@ -209,11 +210,11 @@ function assertConnLang(lang, info, key) {
 }
 
 
-//登入成功語意斷言: 注入語系正確 + 四頁籤（以注入語系）與 webName 呈現 + 連線過場文字已消失。
+//登入成功語意斷言: 注入語系正確 + 五頁籤（以注入語系）與 webName 呈現 + 連線過場文字已消失。
 function assertLoginOk(lang, info) {
     assert.strictEqual(info.winLang, lang, `window.___pmwperm___.language 應=${lang}, 實際: ${info.winLang}`)
     for (const tab of info.tabs) {
-        assert.ok(tab && info.body.includes(tab), `登入成功應顯示四頁籤文字（${tab}）`)
+        assert.ok(tab && info.body.includes(tab), `登入成功應顯示五頁籤文字（${tab}）`)
     }
     assert.ok(info.webName && info.body.includes(info.webName), '頂列應顯示 webName')
     assert.ok(!info.body.includes(info.csIng), '進入後台後不應再有連線中過場文字')

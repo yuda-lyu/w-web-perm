@@ -14,7 +14,7 @@
 //    對話框 Save 於對話框內**自行** $fapi.updateUsers 直接寫 DB ＋ showCheckYes 結果 modal（userSaveUsersSuccess/Fail）；
 //    斷言＝DB 對應 user.cgrups（$store.state.users）改變 ＋ 結果 modal 訊息。
 //
-//base seed（g.initialTestData → src/schema/tables/*）：
+//base seed（g_initialTestData → src/schema/tables/*）：
 //  users(order0-3): peter(cgrups:權限群組M1), mary(權限群組M2), john(權限群組M3), admin(權限群組M4,isAdmin=y)
 //  grups(order0-3): 權限群組M1, 權限群組M2, 權限群組M3, 權限群組M4
 import fs from 'fs'

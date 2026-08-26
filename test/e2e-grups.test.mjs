@@ -9,7 +9,7 @@
 //save 結果（成功 / 失敗 / 空 / errInNames）皆走 $dg.showCheckYes 持久 modal。
 import fs from 'fs'
 import assert from 'assert'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch } from './e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, diagnoseShiftLadder, diagLaunchProbe } from './e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/grups'
 const LANGS = ['eng', 'cht']
@@ -411,6 +411,8 @@ async function generateBaseline() {
             const browser = await launchBrowser()
             await resetDb(browser, BASE_SEED) //throwaway page 還原 DB 為 base seed，關閉後再開 case page
             const page = await openApp(browser)
+            //【暫時診斷 E2E_DIAG2, 根因鑑別完成後移除】每 launch 分類 A/B 態 + GPU 指紋(僅 eng, 參考圖為 eng 統計頁)
+            if (process.env.E2E_DIAG2 && lang === 'eng') { await diagLaunchProbe(browser, page, `${lang}-${c.name}`) }
             await setLang(page, lang) //eng 也切（symmetric）：補等同 cht setLang 的 re-render+settle 時間，治 eng-vs-cht layout 收斂不對稱（sso 殷鑑）
             //run 回傳「單張 Buffer」或「多階段 [{name, buf}]」；統一正規化為陣列後逐張寫入
             let shots = await c.run(page, lang)
@@ -456,7 +458,16 @@ else {
                     //run 回傳「單張 Buffer」或「多階段 [{name, buf}]」；統一正規化為陣列後逐張比對
                     if (Buffer.isBuffer(shots)) shots = [{ name: c.name, buf: shots }]
                     for (const s of shots) {
-                        assertBaselineMatch(s.buf, picPath(lang, s.name), `grups-${lang}-${s.name}`)
+                        //【暫時診斷 E2E_DIAG, 根因鑑別完成後移除】失敗現場 page 尚存活, 當場跑治癒階梯解剖
+                        try {
+                            assertBaselineMatch(s.buf, picPath(lang, s.name), `grups-${lang}-${s.name}`)
+                        }
+                        catch (err) {
+                            if (process.env.E2E_DIAG) {
+                                await diagnoseShiftLadder(page, picPath(lang, s.name), `grups-${lang}-${s.name}`).catch((e2) => { console.log('診斷例外', e2) })
+                            }
+                            throw err
+                        }
                     }
                 })
             }
