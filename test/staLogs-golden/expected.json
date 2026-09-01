@@ -1,0 +1,2243 @@
+{
+  "hr": [
+    {
+      "time": "2026-08-24T12",
+      "data": {
+        "count": 8,
+        "getWebInfor-success": 3,
+        "checkUser-error": 1,
+        "boundary-plus1": 1,
+        "spill-a": 1,
+        "spill-b": 1,
+        "spill-c": 1
+      }
+    },
+    {
+      "time": "2026-08-24T13",
+      "data": {
+        "count": 15,
+        "api/syncAndReplaceTabs-success": 3,
+        "updateTargets-success": 4,
+        "kpfun-getUsersList": 3,
+        "checkUser-error": 2,
+        "getWebInfor-success": 3
+      }
+    },
+    {
+      "time": "2026-08-24T14",
+      "data": {
+        "count": 15,
+        "verifyConn": 3,
+        "checkUser-error": 3,
+        "api/getPerm-success": 1,
+        "api/syncAndReplaceTabs-success": 2,
+        "kpfun-getUsersList": 2,
+        "updateTargets-success": 3,
+        "getWebInfor-success": 1
+      }
+    },
+    {
+      "time": "2026-08-24T15",
+      "data": {
+        "count": 14,
+        "api/syncAndReplaceTabs-success": 1,
+        "api/getPerm-success": 5,
+        "getWebInfor-success": 1,
+        "verifyConn": 3,
+        "kpfun-getUsersList": 3,
+        "checkUser-error": 1
+      }
+    },
+    {
+      "time": "2026-08-24T16",
+      "data": {
+        "count": 15,
+        "getWebInfor-success": 4,
+        "checkUser-error": 4,
+        "api/syncAndReplaceTabs-success": 2,
+        "updateTargets-success": 1,
+        "api/getPerm-success": 3,
+        "verifyConn": 1
+      }
+    },
+    {
+      "time": "2026-08-24T17",
+      "data": {
+        "count": 8,
+        "verifyConn": 3,
+        "checkUser-error": 2,
+        "kpfun-getUsersList": 2,
+        "api/syncAndReplaceTabs-success": 1
+      }
+    },
+    {
+      "time": "2026-08-24T18",
+      "data": {
+        "count": 19,
+        "api/syncAndReplaceTabs-success": 4,
+        "getWebInfor-success": 1,
+        "checkUser-error": 5,
+        "kpfun-getUsersList": 3,
+        "api/getPerm-success": 2,
+        "verifyConn": 2,
+        "updateTargets-success": 2
+      }
+    },
+    {
+      "time": "2026-08-24T19",
+      "data": {
+        "count": 16,
+        "updateTargets-success": 3,
+        "verifyConn": 3,
+        "api/syncAndReplaceTabs-success": 5,
+        "checkUser-error": 2,
+        "getWebInfor-success": 1,
+        "kpfun-getUsersList": 2
+      }
+    },
+    {
+      "time": "2026-08-24T20",
+      "data": {
+        "count": 18,
+        "api/syncAndReplaceTabs-success": 5,
+        "verifyConn": 2,
+        "api/getPerm-success": 3,
+        "getWebInfor-success": 3,
+        "checkUser-error": 2,
+        "kpfun-getUsersList": 1,
+        "updateTargets-success": 2
+      }
+    },
+    {
+      "time": "2026-08-24T21",
+      "data": {
+        "count": 14,
+        "api/getPerm-success": 6,
+        "kpfun-getUsersList": 2,
+        "verifyConn": 3,
+        "getWebInfor-success": 2,
+        "updateTargets-success": 1
+      }
+    },
+    {
+      "time": "2026-08-24T22",
+      "data": {
+        "count": 17,
+        "kpfun-getUsersList": 7,
+        "api/getPerm-success": 1,
+        "verifyConn": 3,
+        "getWebInfor-success": 1,
+        "checkUser-error": 3,
+        "api/syncAndReplaceTabs-success": 1,
+        "updateTargets-success": 1
+      }
+    },
+    {
+      "time": "2026-08-24T23",
+      "data": {
+        "count": 9,
+        "updateTargets-success": 1,
+        "checkUser-error": 2,
+        "api/getPerm-success": 2,
+        "api/syncAndReplaceTabs-success": 2,
+        "getWebInfor-success": 1,
+        "verifyConn": 1
+      }
+    },
+    {
+      "time": "2026-08-25T00",
+      "data": {
+        "count": 18,
+        "getWebInfor-success": 5,
+        "verifyConn": 4,
+        "updateTargets-success": 4,
+        "api/syncAndReplaceTabs-success": 3,
+        "kpfun-getUsersList": 1,
+        "api/getPerm-success": 1
+      }
+    },
+    {
+      "time": "2026-08-25T01",
+      "data": {
+        "count": 10,
+        "getWebInfor-success": 1,
+        "checkUser-error": 1,
+        "api/syncAndReplaceTabs-success": 2,
+        "updateTargets-success": 3,
+        "kpfun-getUsersList": 2,
+        "api/getPerm-success": 1
+      }
+    },
+    {
+      "time": "2026-08-25T02",
+      "data": {
+        "count": 11,
+        "verifyConn": 1,
+        "updateTargets-success": 3,
+        "getWebInfor-success": 2,
+        "api/syncAndReplaceTabs-success": 4,
+        "api/getPerm-success": 1
+      }
+    },
+    {
+      "time": "2026-08-25T03",
+      "data": {
+        "count": 9,
+        "kpfun-getUsersList": 1,
+        "api/getPerm-success": 3,
+        "checkUser-error": 2,
+        "updateTargets-success": 2,
+        "getWebInfor-success": 1
+      }
+    },
+    {
+      "time": "2026-08-25T04",
+      "data": {
+        "count": 8,
+        "updateTargets-success": 1,
+        "kpfun-getUsersList": 1,
+        "checkUser-error": 1,
+        "verifyConn": 3,
+        "getWebInfor-success": 1,
+        "api/syncAndReplaceTabs-success": 1
+      }
+    },
+    {
+      "time": "2026-08-25T05",
+      "data": {
+        "count": 15,
+        "api/getPerm-success": 4,
+        "kpfun-getUsersList": 2,
+        "checkUser-error": 2,
+        "getWebInfor-success": 2,
+        "verifyConn": 3,
+        "updateTargets-success": 2
+      }
+    },
+    {
+      "time": "2026-08-25T06",
+      "data": {
+        "count": 12,
+        "getWebInfor-success": 6,
+        "verifyConn": 1,
+        "updateTargets-success": 2,
+        "api/syncAndReplaceTabs-success": 1,
+        "kpfun-getUsersList": 1,
+        "checkUser-error": 1
+      }
+    },
+    {
+      "time": "2026-08-25T07",
+      "data": {
+        "count": 12,
+        "getWebInfor-success": 2,
+        "kpfun-getUsersList": 3,
+        "api/getPerm-success": 1,
+        "verifyConn": 3,
+        "checkUser-error": 1,
+        "updateTargets-success": 1,
+        "api/syncAndReplaceTabs-success": 1
+      }
+    },
+    {
+      "time": "2026-08-25T08",
+      "data": {
+        "count": 12,
+        "api/getPerm-success": 3,
+        "verifyConn": 4,
+        "checkUser-error": 4,
+        "updateTargets-success": 1
+      }
+    },
+    {
+      "time": "2026-08-25T09",
+      "data": {
+        "count": 9,
+        "verifyConn": 1,
+        "updateTargets-success": 1,
+        "api/getPerm-success": 2,
+        "api/syncAndReplaceTabs-success": 3,
+        "kpfun-getUsersList": 2
+      }
+    },
+    {
+      "time": "2026-08-25T10",
+      "data": {
+        "count": 14,
+        "checkUser-error": 1,
+        "getWebInfor-success": 1,
+        "api/getPerm-success": 4,
+        "api/syncAndReplaceTabs-success": 3,
+        "kpfun-getUsersList": 2,
+        "verifyConn": 3
+      }
+    },
+    {
+      "time": "2026-08-25T11",
+      "data": {
+        "count": 15,
+        "checkUser-error": 5,
+        "verifyConn": 3,
+        "api/getPerm-success": 1,
+        "api/syncAndReplaceTabs-success": 3,
+        "updateTargets-success": 2,
+        "kpfun-getUsersList": 1
+      }
+    },
+    {
+      "time": "2026-08-25T12",
+      "data": {
+        "count": 18,
+        "updateTargets-success": 5,
+        "verifyConn": 2,
+        "api/getPerm-success": 3,
+        "getWebInfor-success": 3,
+        "kpfun-getUsersList": 2,
+        "api/syncAndReplaceTabs-success": 2,
+        "checkUser-error": 1
+      }
+    },
+    {
+      "time": "2026-08-25T13",
+      "data": {
+        "count": 9,
+        "updateTargets-success": 3,
+        "verifyConn": 3,
+        "checkUser-error": 1,
+        "kpfun-getUsersList": 1,
+        "getWebInfor-success": 1
+      }
+    },
+    {
+      "time": "2026-08-25T14",
+      "data": {
+        "count": 8,
+        "api/getPerm-success": 2,
+        "updateTargets-success": 1,
+        "api/syncAndReplaceTabs-success": 1,
+        "getWebInfor-success": 2,
+        "verifyConn": 1,
+        "kpfun-getUsersList": 1
+      }
+    },
+    {
+      "time": "2026-08-25T15",
+      "data": {
+        "count": 11,
+        "verifyConn": 3,
+        "checkUser-error": 3,
+        "updateTargets-success": 1,
+        "api/syncAndReplaceTabs-success": 2,
+        "getWebInfor-success": 1,
+        "api/getPerm-success": 1
+      }
+    },
+    {
+      "time": "2026-08-25T16",
+      "data": {
+        "count": 14,
+        "kpfun-getUsersList": 2,
+        "verifyConn": 3,
+        "getWebInfor-success": 4,
+        "api/getPerm-success": 1,
+        "api/syncAndReplaceTabs-success": 3,
+        "updateTargets-success": 1
+      }
+    },
+    {
+      "time": "2026-08-25T17",
+      "data": {
+        "count": 10,
+        "getWebInfor-success": 1,
+        "kpfun-getUsersList": 1,
+        "checkUser-error": 2,
+        "updateTargets-success": 1,
+        "api/syncAndReplaceTabs-success": 1,
+        "api/getPerm-success": 1,
+        "verifyConn": 3
+      }
+    },
+    {
+      "time": "2026-08-25T18",
+      "data": {
+        "count": 15,
+        "verifyConn": 2,
+        "updateTargets-success": 2,
+        "checkUser-error": 4,
+        "getWebInfor-success": 1,
+        "api/syncAndReplaceTabs-success": 2,
+        "kpfun-getUsersList": 1,
+        "api/getPerm-success": 3
+      }
+    },
+    {
+      "time": "2026-08-25T19",
+      "data": {
+        "count": 17,
+        "api/getPerm-success": 3,
+        "kpfun-getUsersList": 4,
+        "verifyConn": 3,
+        "api/syncAndReplaceTabs-success": 2,
+        "checkUser-error": 1,
+        "updateTargets-success": 3,
+        "getWebInfor-success": 1
+      }
+    },
+    {
+      "time": "2026-08-25T20",
+      "data": {
+        "count": 15,
+        "api/syncAndReplaceTabs-success": 2,
+        "getWebInfor-success": 4,
+        "api/getPerm-success": 1,
+        "updateTargets-success": 3,
+        "checkUser-error": 3,
+        "kpfun-getUsersList": 2
+      }
+    },
+    {
+      "time": "2026-08-25T21",
+      "data": {
+        "count": 14,
+        "kpfun-getUsersList": 1,
+        "getWebInfor-success": 2,
+        "checkUser-error": 4,
+        "api/syncAndReplaceTabs-success": 2,
+        "verifyConn": 2,
+        "updateTargets-success": 3
+      }
+    },
+    {
+      "time": "2026-08-25T22",
+      "data": {
+        "count": 17,
+        "verifyConn": 2,
+        "api/syncAndReplaceTabs-success": 5,
+        "getWebInfor-success": 3,
+        "checkUser-error": 3,
+        "api/getPerm-success": 2,
+        "kpfun-getUsersList": 2
+      }
+    },
+    {
+      "time": "2026-08-25T23",
+      "data": {
+        "count": 10,
+        "api/syncAndReplaceTabs-success": 1,
+        "checkUser-error": 2,
+        "api/getPerm-success": 2,
+        "getWebInfor-success": 1,
+        "updateTargets-success": 3,
+        "kpfun-getUsersList": 1
+      }
+    },
+    {
+      "time": "2026-08-26T00",
+      "data": {
+        "count": 17,
+        "kpfun-getUsersList": 6,
+        "getWebInfor-success": 4,
+        "checkUser-error": 1,
+        "api/getPerm-success": 3,
+        "updateTargets-success": 1,
+        "api/syncAndReplaceTabs-success": 1,
+        "verifyConn": 1
+      }
+    },
+    {
+      "time": "2026-08-26T01",
+      "data": {
+        "count": 12,
+        "api/getPerm-success": 1,
+        "checkUser-error": 3,
+        "updateTargets-success": 2,
+        "getWebInfor-success": 2,
+        "api/syncAndReplaceTabs-success": 2,
+        "verifyConn": 1,
+        "kpfun-getUsersList": 1
+      }
+    },
+    {
+      "time": "2026-08-26T02",
+      "data": {
+        "count": 15,
+        "api/syncAndReplaceTabs-success": 2,
+        "kpfun-getUsersList": 2,
+        "getWebInfor-success": 4,
+        "verifyConn": 3,
+        "checkUser-error": 1,
+        "api/getPerm-success": 3
+      }
+    },
+    {
+      "time": "2026-08-26T03",
+      "data": {
+        "count": 13,
+        "updateTargets-success": 2,
+        "api/getPerm-success": 4,
+        "api/syncAndReplaceTabs-success": 2,
+        "kpfun-getUsersList": 2,
+        "getWebInfor-success": 2,
+        "checkUser-error": 1
+      }
+    },
+    {
+      "time": "2026-08-26T04",
+      "data": {
+        "count": 16,
+        "api/getPerm-success": 2,
+        "checkUser-error": 2,
+        "updateTargets-success": 3,
+        "api/syncAndReplaceTabs-success": 2,
+        "verifyConn": 3,
+        "kpfun-getUsersList": 3,
+        "getWebInfor-success": 1
+      }
+    },
+    {
+      "time": "2026-08-26T05",
+      "data": {
+        "count": 17,
+        "verifyConn": 2,
+        "checkUser-error": 2,
+        "kpfun-getUsersList": 5,
+        "api/getPerm-success": 3,
+        "getWebInfor-success": 2,
+        "updateTargets-success": 2,
+        "iso-string-time": 1
+      }
+    },
+    {
+      "time": "2026-08-26T06",
+      "data": {
+        "count": 16,
+        "api/syncAndReplaceTabs-success": 6,
+        "getWebInfor-success": 3,
+        "verifyConn": 1,
+        "api/getPerm-success": 1,
+        "kpfun-getUsersList": 2,
+        "checkUser-error": 2,
+        "updateTargets-success": 1
+      }
+    },
+    {
+      "time": "2026-08-26T07",
+      "data": {
+        "count": 16,
+        "verifyConn": 3,
+        "getWebInfor-success": 4,
+        "checkUser-error": 4,
+        "updateTargets-success": 2,
+        "api/syncAndReplaceTabs-success": 1,
+        "api/getPerm-success": 1,
+        "kpfun-getUsersList": 1
+      }
+    },
+    {
+      "time": "2026-08-26T08",
+      "data": {
+        "count": 13,
+        "kpfun-getUsersList": 1,
+        "getWebInfor-success": 2,
+        "checkUser-error": 4,
+        "api/getPerm-success": 2,
+        "api/syncAndReplaceTabs-success": 2,
+        "updateTargets-success": 1,
+        "verifyConn": 1
+      }
+    },
+    {
+      "time": "2026-08-26T09",
+      "data": {
+        "count": 14,
+        "getWebInfor-success": 3,
+        "updateTargets-success": 1,
+        "api/getPerm-success": 2,
+        "checkUser-error": 4,
+        "api/syncAndReplaceTabs-success": 1,
+        "kpfun-getUsersList": 3
+      }
+    },
+    {
+      "time": "2026-08-26T10",
+      "data": {
+        "count": 12,
+        "api/getPerm-success": 4,
+        "checkUser-error": 1,
+        "api/syncAndReplaceTabs-success": 1,
+        "kpfun-getUsersList": 2,
+        "updateTargets-success": 2,
+        "getWebInfor-success": 1,
+        "verifyConn": 1
+      }
+    },
+    {
+      "time": "2026-08-26T11",
+      "data": {
+        "count": 18,
+        "verifyConn": 3,
+        "kpfun-getUsersList": 2,
+        "getWebInfor-success": 4,
+        "updateTargets-success": 4,
+        "api/getPerm-success": 2,
+        "api/syncAndReplaceTabs-success": 3
+      }
+    },
+    {
+      "time": "2026-08-26T12",
+      "data": {
+        "count": 12,
+        "verifyConn": 2,
+        "kpfun-getUsersList": 1,
+        "updateTargets-success": 3,
+        "getWebInfor-success": 3,
+        "api/getPerm-success": 1,
+        "api/syncAndReplaceTabs-success": 2
+      }
+    },
+    {
+      "time": "2026-08-26T13",
+      "data": {
+        "count": 18,
+        "updateTargets-success": 5,
+        "api/getPerm-success": 1,
+        "checkUser-error": 3,
+        "getWebInfor-success": 2,
+        "kpfun-getUsersList": 2,
+        "api/syncAndReplaceTabs-success": 3,
+        "verifyConn": 2
+      }
+    },
+    {
+      "time": "2026-08-26T14",
+      "data": {
+        "count": 15,
+        "api/getPerm-success": 2,
+        "getWebInfor-success": 5,
+        "verifyConn": 1,
+        "checkUser-error": 4,
+        "api/syncAndReplaceTabs-success": 2,
+        "updateTargets-success": 1
+      }
+    },
+    {
+      "time": "2026-08-26T15",
+      "data": {
+        "count": 12,
+        "api/syncAndReplaceTabs-success": 2,
+        "kpfun-getUsersList": 1,
+        "checkUser-error": 1,
+        "updateTargets-success": 3,
+        "verifyConn": 2,
+        "api/getPerm-success": 3
+      }
+    },
+    {
+      "time": "2026-08-26T16",
+      "data": {
+        "count": 10,
+        "updateTargets-success": 3,
+        "verifyConn": 2,
+        "getWebInfor-success": 4,
+        "kpfun-getUsersList": 1
+      }
+    },
+    {
+      "time": "2026-08-26T17",
+      "data": {
+        "count": 10,
+        "checkUser-error": 2,
+        "kpfun-getUsersList": 3,
+        "api/syncAndReplaceTabs-success": 1,
+        "verifyConn": 2,
+        "getWebInfor-success": 1,
+        "updateTargets-success": 1
+      }
+    },
+    {
+      "time": "2026-08-26T18",
+      "data": {
+        "count": 13,
+        "kpfun-getUsersList": 3,
+        "updateTargets-success": 1,
+        "api/getPerm-success": 2,
+        "getWebInfor-success": 2,
+        "checkUser-error": 2,
+        "api/syncAndReplaceTabs-success": 2,
+        "verifyConn": 1
+      }
+    },
+    {
+      "time": "2026-08-26T19",
+      "data": {
+        "count": 8,
+        "getWebInfor-success": 3,
+        "checkUser-error": 3,
+        "verifyConn": 1,
+        "api/getPerm-success": 1
+      }
+    },
+    {
+      "time": "2026-08-26T20",
+      "data": {
+        "count": 9,
+        "api/syncAndReplaceTabs-success": 1,
+        "checkUser-error": 3,
+        "getWebInfor-success": 3,
+        "kpfun-getUsersList": 1,
+        "api/getPerm-success": 1
+      }
+    },
+    {
+      "time": "2026-08-26T21",
+      "data": {
+        "count": 18,
+        "updateTargets-success": 3,
+        "api/syncAndReplaceTabs-success": 1,
+        "kpfun-getUsersList": 4,
+        "getWebInfor-success": 3,
+        "verifyConn": 3,
+        "api/getPerm-success": 1,
+        "checkUser-error": 3
+      }
+    },
+    {
+      "time": "2026-08-26T22",
+      "data": {
+        "count": 10,
+        "api/syncAndReplaceTabs-success": 3,
+        "verifyConn": 2,
+        "updateTargets-success": 1,
+        "checkUser-error": 1,
+        "kpfun-getUsersList": 2,
+        "getWebInfor-success": 1
+      }
+    },
+    {
+      "time": "2026-08-26T23",
+      "data": {
+        "count": 8,
+        "updateTargets-success": 2,
+        "api/syncAndReplaceTabs-success": 1,
+        "checkUser-error": 2,
+        "getWebInfor-success": 2,
+        "verifyConn": 1
+      }
+    },
+    {
+      "time": "2026-08-27T00",
+      "data": {
+        "count": 6,
+        "getWebInfor-success": 2,
+        "updateTargets-success": 1,
+        "api/syncAndReplaceTabs-success": 1,
+        "verifyConn": 1,
+        "kpfun-getUsersList": 1
+      }
+    },
+    {
+      "time": "2026-08-27T01",
+      "data": {
+        "count": 12,
+        "kpfun-getUsersList": 2,
+        "updateTargets-success": 2,
+        "api/syncAndReplaceTabs-success": 3,
+        "getWebInfor-success": 2,
+        "checkUser-error": 1,
+        "verifyConn": 2
+      }
+    },
+    {
+      "time": "2026-08-27T02",
+      "data": {
+        "count": 13,
+        "kpfun-getUsersList": 4,
+        "verifyConn": 2,
+        "getWebInfor-success": 3,
+        "api/syncAndReplaceTabs-success": 2,
+        "api/getPerm-success": 1,
+        "updateTargets-success": 1
+      }
+    },
+    {
+      "time": "2026-08-27T03",
+      "data": {
+        "count": 9,
+        "getWebInfor-success": 1,
+        "api/getPerm-success": 2,
+        "kpfun-getUsersList": 1,
+        "verifyConn": 2,
+        "checkUser-error": 3
+      }
+    },
+    {
+      "time": "2026-08-27T04",
+      "data": {
+        "count": 7,
+        "kpfun-getUsersList": 1,
+        "api/syncAndReplaceTabs-success": 4,
+        "verifyConn": 1,
+        "api/getPerm-success": 1
+      }
+    },
+    {
+      "time": "2026-08-27T05",
+      "data": {
+        "count": 9,
+        "updateTargets-success": 3,
+        "getWebInfor-success": 2,
+        "checkUser-error": 1,
+        "kpfun-getUsersList": 2,
+        "verifyConn": 1
+      }
+    },
+    {
+      "time": "2026-08-27T06",
+      "data": {
+        "count": 12,
+        "checkUser-error": 3,
+        "kpfun-getUsersList": 3,
+        "api/syncAndReplaceTabs-success": 2,
+        "api/getPerm-success": 2,
+        "getWebInfor-success": 2
+      }
+    },
+    {
+      "time": "2026-08-27T07",
+      "data": {
+        "count": 12,
+        "checkUser-error": 2,
+        "api/syncAndReplaceTabs-success": 4,
+        "updateTargets-success": 1,
+        "verifyConn": 4,
+        "api/getPerm-success": 1
+      }
+    },
+    {
+      "time": "2026-08-27T08",
+      "data": {
+        "count": 12,
+        "getWebInfor-success": 4,
+        "api/getPerm-success": 3,
+        "kpfun-getUsersList": 2,
+        "checkUser-error": 1,
+        "verifyConn": 2
+      }
+    },
+    {
+      "time": "2026-08-27T09",
+      "data": {
+        "count": 15,
+        "api/getPerm-success": 2,
+        "checkUser-error": 1,
+        "kpfun-getUsersList": 3,
+        "verifyConn": 4,
+        "updateTargets-success": 2,
+        "getWebInfor-success": 2,
+        "api/syncAndReplaceTabs-success": 1
+      }
+    },
+    {
+      "time": "2026-08-27T10",
+      "data": {
+        "count": 16,
+        "api/syncAndReplaceTabs-success": 3,
+        "kpfun-getUsersList": 5,
+        "api/getPerm-success": 3,
+        "getWebInfor-success": 3,
+        "updateTargets-success": 1,
+        "checkUser-error": 1
+      }
+    },
+    {
+      "time": "2026-08-27T11",
+      "data": {
+        "count": 15,
+        "verifyConn": 1,
+        "api/getPerm-success": 3,
+        "checkUser-error": 3,
+        "updateTargets-success": 4,
+        "kpfun-getUsersList": 1,
+        "api/syncAndReplaceTabs-success": 3
+      }
+    },
+    {
+      "time": "2026-08-27T12",
+      "data": {
+        "count": 8,
+        "checkUser-error": 2,
+        "verifyConn": 2,
+        "api/getPerm-success": 1,
+        "getWebInfor-success": 2,
+        "updateTargets-success": 1
+      }
+    },
+    {
+      "time": "2026-08-27T13",
+      "data": {
+        "count": 15,
+        "api/syncAndReplaceTabs-success": 3,
+        "getWebInfor-success": 3,
+        "updateTargets-success": 2,
+        "kpfun-getUsersList": 1,
+        "api/getPerm-success": 3,
+        "verifyConn": 3
+      }
+    },
+    {
+      "time": "2026-08-27T14",
+      "data": {
+        "count": 13,
+        "api/getPerm-success": 2,
+        "checkUser-error": 4,
+        "verifyConn": 1,
+        "updateTargets-success": 3,
+        "getWebInfor-success": 3
+      }
+    },
+    {
+      "time": "2026-08-27T15",
+      "data": {
+        "count": 20,
+        "getWebInfor-success": 4,
+        "kpfun-getUsersList": 4,
+        "checkUser-error": 3,
+        "api/getPerm-success": 4,
+        "verifyConn": 2,
+        "api/syncAndReplaceTabs-success": 3
+      }
+    },
+    {
+      "time": "2026-08-27T16",
+      "data": {
+        "count": 11,
+        "kpfun-getUsersList": 1,
+        "api/syncAndReplaceTabs-success": 5,
+        "api/getPerm-success": 3,
+        "verifyConn": 1,
+        "updateTargets-success": 1
+      }
+    },
+    {
+      "time": "2026-08-27T17",
+      "data": {
+        "count": 13,
+        "getWebInfor-success": 1,
+        "verifyConn": 2,
+        "kpfun-getUsersList": 2,
+        "checkUser-error": 2,
+        "api/getPerm-success": 4,
+        "api/syncAndReplaceTabs-success": 1,
+        "updateTargets-success": 1
+      }
+    },
+    {
+      "time": "2026-08-27T18",
+      "data": {
+        "count": 8,
+        "verifyConn": 1,
+        "getWebInfor-success": 1,
+        "kpfun-getUsersList": 4,
+        "updateTargets-success": 1,
+        "api/syncAndReplaceTabs-success": 1
+      }
+    },
+    {
+      "time": "2026-08-27T19",
+      "data": {
+        "count": 12,
+        "updateTargets-success": 1,
+        "checkUser-error": 2,
+        "verifyConn": 4,
+        "api/getPerm-success": 2,
+        "kpfun-getUsersList": 1,
+        "getWebInfor-success": 2
+      }
+    },
+    {
+      "time": "2026-08-27T20",
+      "data": {
+        "count": 12,
+        "getWebInfor-success": 2,
+        "api/syncAndReplaceTabs-success": 2,
+        "api/getPerm-success": 3,
+        "updateTargets-success": 1,
+        "checkUser-error": 1,
+        "kpfun-getUsersList": 2,
+        "verifyConn": 1
+      }
+    },
+    {
+      "time": "2026-08-27T21",
+      "data": {
+        "count": 6,
+        "api/syncAndReplaceTabs-success": 3,
+        "getWebInfor-success": 1,
+        "api/getPerm-success": 2
+      }
+    },
+    {
+      "time": "2026-08-27T22",
+      "data": {
+        "count": 15,
+        "verifyConn": 1,
+        "updateTargets-success": 4,
+        "api/getPerm-success": 3,
+        "checkUser-error": 1,
+        "kpfun-getUsersList": 3,
+        "api/syncAndReplaceTabs-success": 2,
+        "getWebInfor-success": 1
+      }
+    },
+    {
+      "time": "2026-08-27T23",
+      "data": {
+        "count": 14,
+        "api/syncAndReplaceTabs-success": 4,
+        "verifyConn": 2,
+        "checkUser-error": 3,
+        "updateTargets-success": 2,
+        "kpfun-getUsersList": 2,
+        "getWebInfor-success": 1
+      }
+    },
+    {
+      "time": "2026-08-28T00",
+      "data": {
+        "count": 14,
+        "checkUser-error": 3,
+        "updateTargets-success": 1,
+        "kpfun-getUsersList": 3,
+        "api/getPerm-success": 4,
+        "getWebInfor-success": 2,
+        "verifyConn": 1
+      }
+    },
+    {
+      "time": "2026-08-28T01",
+      "data": {
+        "count": 9,
+        "updateTargets-success": 1,
+        "api/syncAndReplaceTabs-success": 3,
+        "getWebInfor-success": 2,
+        "api/getPerm-success": 2,
+        "kpfun-getUsersList": 1
+      }
+    },
+    {
+      "time": "2026-08-28T02",
+      "data": {
+        "count": 10,
+        "api/syncAndReplaceTabs-success": 3,
+        "getWebInfor-success": 2,
+        "kpfun-getUsersList": 2,
+        "verifyConn": 1,
+        "updateTargets-success": 1,
+        "checkUser-error": 1
+      }
+    },
+    {
+      "time": "2026-08-28T03",
+      "data": {
+        "count": 10,
+        "api/getPerm-success": 3,
+        "api/syncAndReplaceTabs-success": 2,
+        "getWebInfor-success": 1,
+        "verifyConn": 2,
+        "updateTargets-success": 2
+      }
+    },
+    {
+      "time": "2026-08-28T04",
+      "data": {
+        "count": 14,
+        "kpfun-getUsersList": 1,
+        "api/syncAndReplaceTabs-success": 2,
+        "verifyConn": 3,
+        "updateTargets-success": 2,
+        "checkUser-error": 3,
+        "api/getPerm-success": 2,
+        "getWebInfor-success": 1
+      }
+    },
+    {
+      "time": "2026-08-28T05",
+      "data": {
+        "count": 6,
+        "verifyConn": 3,
+        "api/getPerm-success": 1,
+        "getWebInfor-success": 1,
+        "api/syncAndReplaceTabs-success": 1
+      }
+    },
+    {
+      "time": "2026-08-28T06",
+      "data": {
+        "count": 11,
+        "api/syncAndReplaceTabs-success": 5,
+        "kpfun-getUsersList": 4,
+        "getWebInfor-success": 2
+      }
+    },
+    {
+      "time": "2026-08-28T07",
+      "data": {
+        "count": 10,
+        "getWebInfor-success": 2,
+        "kpfun-getUsersList": 3,
+        "updateTargets-success": 2,
+        "checkUser-error": 2,
+        "api/syncAndReplaceTabs-success": 1
+      }
+    },
+    {
+      "time": "2026-08-28T08",
+      "data": {
+        "count": 12,
+        "api/syncAndReplaceTabs-success": 4,
+        "checkUser-error": 2,
+        "updateTargets-success": 1,
+        "verifyConn": 2,
+        "api/getPerm-success": 2,
+        "kpfun-getUsersList": 1
+      }
+    },
+    {
+      "time": "2026-08-28T09",
+      "data": {
+        "count": 14,
+        "kpfun-getUsersList": 2,
+        "api/getPerm-success": 3,
+        "verifyConn": 3,
+        "updateTargets-success": 2,
+        "getWebInfor-success": 2,
+        "checkUser-error": 2
+      }
+    },
+    {
+      "time": "2026-08-28T10",
+      "data": {
+        "count": 15,
+        "getWebInfor-success": 3,
+        "api/getPerm-success": 6,
+        "api/syncAndReplaceTabs-success": 3,
+        "updateTargets-success": 1,
+        "kpfun-getUsersList": 2
+      }
+    },
+    {
+      "time": "2026-08-28T11",
+      "data": {
+        "count": 15,
+        "api/syncAndReplaceTabs-success": 5,
+        "updateTargets-success": 1,
+        "checkUser-error": 3,
+        "verifyConn": 3,
+        "getWebInfor-success": 2,
+        "api/getPerm-success": 1
+      }
+    },
+    {
+      "time": "2026-08-28T12",
+      "data": {
+        "count": 16,
+        "api/getPerm-success": 2,
+        "checkUser-error": 2,
+        "kpfun-getUsersList": 2,
+        "api/syncAndReplaceTabs-success": 3,
+        "verifyConn": 3,
+        "updateTargets-success": 4
+      }
+    },
+    {
+      "time": "2026-08-28T13",
+      "data": {
+        "count": 10,
+        "getWebInfor-success": 2,
+        "api/getPerm-success": 4,
+        "api/syncAndReplaceTabs-success": 1,
+        "verifyConn": 2,
+        "kpfun-getUsersList": 1
+      }
+    },
+    {
+      "time": "2026-08-28T14",
+      "data": {
+        "count": 17,
+        "verifyConn": 3,
+        "kpfun-getUsersList": 3,
+        "api/getPerm-success": 2,
+        "checkUser-error": 2,
+        "updateTargets-success": 2,
+        "api/syncAndReplaceTabs-success": 1,
+        "getWebInfor-success": 4
+      }
+    },
+    {
+      "time": "2026-08-28T15",
+      "data": {
+        "count": 17,
+        "api/getPerm-success": 6,
+        "getWebInfor-success": 5,
+        "api/syncAndReplaceTabs-success": 1,
+        "updateTargets-success": 2,
+        "kpfun-getUsersList": 3
+      }
+    },
+    {
+      "time": "2026-08-28T16",
+      "data": {
+        "count": 11,
+        "kpfun-getUsersList": 1,
+        "checkUser-error": 3,
+        "api/getPerm-success": 1,
+        "api/syncAndReplaceTabs-success": 1,
+        "updateTargets-success": 4,
+        "verifyConn": 1
+      }
+    },
+    {
+      "time": "2026-08-28T17",
+      "data": {
+        "count": 16,
+        "getWebInfor-success": 5,
+        "verifyConn": 2,
+        "checkUser-error": 2,
+        "kpfun-getUsersList": 1,
+        "updateTargets-success": 3,
+        "api/syncAndReplaceTabs-success": 1,
+        "api/getPerm-success": 2
+      }
+    },
+    {
+      "time": "2026-08-28T18",
+      "data": {
+        "count": 10,
+        "checkUser-error": 3,
+        "verifyConn": 2,
+        "api/getPerm-success": 3,
+        "updateTargets-success": 2
+      }
+    },
+    {
+      "time": "2026-08-28T19",
+      "data": {
+        "count": 15,
+        "api/syncAndReplaceTabs-success": 3,
+        "getWebInfor-success": 2,
+        "kpfun-getUsersList": 3,
+        "verifyConn": 1,
+        "api/getPerm-success": 2,
+        "checkUser-error": 1,
+        "updateTargets-success": 3
+      }
+    },
+    {
+      "time": "2026-08-28T20",
+      "data": {
+        "count": 11,
+        "checkUser-error": 1,
+        "api/syncAndReplaceTabs-success": 3,
+        "api/getPerm-success": 3,
+        "updateTargets-success": 3,
+        "kpfun-getUsersList": 1
+      }
+    },
+    {
+      "time": "2026-08-28T21",
+      "data": {
+        "count": 18,
+        "checkUser-error": 4,
+        "getWebInfor-success": 2,
+        "api/getPerm-success": 3,
+        "api/syncAndReplaceTabs-success": 2,
+        "updateTargets-success": 3,
+        "verifyConn": 2,
+        "kpfun-getUsersList": 2
+      }
+    },
+    {
+      "time": "2026-08-28T22",
+      "data": {
+        "count": 8,
+        "api/syncAndReplaceTabs-success": 2,
+        "checkUser-error": 1,
+        "kpfun-getUsersList": 3,
+        "getWebInfor-success": 1,
+        "updateTargets-success": 1
+      }
+    },
+    {
+      "time": "2026-08-28T23",
+      "data": {
+        "count": 11,
+        "kpfun-getUsersList": 1,
+        "api/getPerm-success": 1,
+        "verifyConn": 3,
+        "updateTargets-success": 3,
+        "checkUser-error": 2,
+        "getWebInfor-success": 1
+      }
+    },
+    {
+      "time": "2026-08-29T00",
+      "data": {
+        "count": 17,
+        "checkUser-error": 4,
+        "updateTargets-success": 2,
+        "kpfun-getUsersList": 2,
+        "getWebInfor-success": 3,
+        "verifyConn": 3,
+        "api/syncAndReplaceTabs-success": 3
+      }
+    },
+    {
+      "time": "2026-08-29T01",
+      "data": {
+        "count": 13,
+        "updateTargets-success": 1,
+        "getWebInfor-success": 4,
+        "kpfun-getUsersList": 1,
+        "api/getPerm-success": 3,
+        "api/syncAndReplaceTabs-success": 1,
+        "verifyConn": 1,
+        "checkUser-error": 2
+      }
+    },
+    {
+      "time": "2026-08-29T02",
+      "data": {
+        "count": 13,
+        "updateTargets-success": 4,
+        "checkUser-error": 3,
+        "api/getPerm-success": 2,
+        "api/syncAndReplaceTabs-success": 2,
+        "verifyConn": 2
+      }
+    },
+    {
+      "time": "2026-08-29T03",
+      "data": {
+        "count": 11,
+        "updateTargets-success": 3,
+        "checkUser-error": 1,
+        "api/syncAndReplaceTabs-success": 1,
+        "getWebInfor-success": 3,
+        "kpfun-getUsersList": 1,
+        "verifyConn": 2
+      }
+    },
+    {
+      "time": "2026-08-29T04",
+      "data": {
+        "count": 10,
+        "kpfun-getUsersList": 3,
+        "verifyConn": 1,
+        "api/syncAndReplaceTabs-success": 2,
+        "api/getPerm-success": 1,
+        "getWebInfor-success": 2,
+        "checkUser-error": 1
+      }
+    },
+    {
+      "time": "2026-08-29T05",
+      "data": {
+        "count": 13,
+        "updateTargets-success": 5,
+        "api/syncAndReplaceTabs-success": 3,
+        "kpfun-getUsersList": 2,
+        "api/getPerm-success": 1,
+        "verifyConn": 1,
+        "getWebInfor-success": 1
+      }
+    },
+    {
+      "time": "2026-08-29T06",
+      "data": {
+        "count": 16,
+        "verifyConn": 3,
+        "checkUser-error": 6,
+        "kpfun-getUsersList": 2,
+        "updateTargets-success": 2,
+        "getWebInfor-success": 1,
+        "api/syncAndReplaceTabs-success": 2
+      }
+    },
+    {
+      "time": "2026-08-29T07",
+      "data": {
+        "count": 7,
+        "api/getPerm-success": 2,
+        "updateTargets-success": 1,
+        "api/syncAndReplaceTabs-success": 1,
+        "checkUser-error": 1,
+        "kpfun-getUsersList": 1,
+        "getWebInfor-success": 1
+      }
+    },
+    {
+      "time": "2026-08-29T08",
+      "data": {
+        "count": 9,
+        "api/getPerm-success": 2,
+        "getWebInfor-success": 1,
+        "api/syncAndReplaceTabs-success": 1,
+        "verifyConn": 2,
+        "updateTargets-success": 1,
+        "checkUser-error": 1,
+        "notes-event": 1
+      }
+    },
+    {
+      "time": "2026-08-29T09",
+      "data": {
+        "count": 17,
+        "api/getPerm-success": 2,
+        "updateTargets-success": 4,
+        "getWebInfor-success": 3,
+        "verifyConn": 2,
+        "kpfun-getUsersList": 1,
+        "checkUser-error": 3,
+        "api/syncAndReplaceTabs-success": 2
+      }
+    },
+    {
+      "time": "2026-08-29T10",
+      "data": {
+        "count": 15,
+        "checkUser-error": 3,
+        "updateTargets-success": 2,
+        "verifyConn": 2,
+        "kpfun-getUsersList": 3,
+        "getWebInfor-success": 2,
+        "api/getPerm-success": 1,
+        "api/syncAndReplaceTabs-success": 2
+      }
+    },
+    {
+      "time": "2026-08-29T11",
+      "data": {
+        "count": 14,
+        "api/syncAndReplaceTabs-success": 3,
+        "verifyConn": 4,
+        "api/getPerm-success": 2,
+        "getWebInfor-success": 3,
+        "updateTargets-success": 1,
+        "kpfun-getUsersList": 1
+      }
+    },
+    {
+      "time": "2026-08-29T12",
+      "data": {
+        "count": 13,
+        "updateTargets-success": 2,
+        "getWebInfor-success": 1,
+        "api/syncAndReplaceTabs-success": 2,
+        "api/getPerm-success": 3,
+        "kpfun-getUsersList": 2,
+        "checkUser-error": 3
+      }
+    },
+    {
+      "time": "2026-08-29T13",
+      "data": {
+        "count": 17,
+        "verifyConn": 3,
+        "api/getPerm-success": 3,
+        "updateTargets-success": 1,
+        "checkUser-error": 2,
+        "kpfun-getUsersList": 2,
+        "getWebInfor-success": 2,
+        "api/syncAndReplaceTabs-success": 4
+      }
+    },
+    {
+      "time": "2026-08-29T14",
+      "data": {
+        "count": 12,
+        "api/syncAndReplaceTabs-success": 3,
+        "updateTargets-success": 1,
+        "checkUser-error": 1,
+        "verifyConn": 4,
+        "kpfun-getUsersList": 1,
+        "api/getPerm-success": 2
+      }
+    },
+    {
+      "time": "2026-08-29T15",
+      "data": {
+        "count": 13,
+        "api/syncAndReplaceTabs-success": 4,
+        "kpfun-getUsersList": 2,
+        "verifyConn": 1,
+        "getWebInfor-success": 2,
+        "api/getPerm-success": 2,
+        "checkUser-error": 2
+      }
+    },
+    {
+      "time": "2026-08-29T16",
+      "data": {
+        "count": 9,
+        "updateTargets-success": 1,
+        "kpfun-getUsersList": 2,
+        "verifyConn": 2,
+        "api/getPerm-success": 2,
+        "api/syncAndReplaceTabs-success": 1,
+        "checkUser-error": 1
+      }
+    },
+    {
+      "time": "2026-08-29T17",
+      "data": {
+        "count": 18,
+        "verifyConn": 2,
+        "api/getPerm-success": 5,
+        "updateTargets-success": 3,
+        "kpfun-getUsersList": 3,
+        "api/syncAndReplaceTabs-success": 2,
+        "getWebInfor-success": 3
+      }
+    },
+    {
+      "time": "2026-08-29T18",
+      "data": {
+        "count": 11,
+        "getWebInfor-success": 3,
+        "checkUser-error": 1,
+        "api/getPerm-success": 2,
+        "kpfun-getUsersList": 2,
+        "api/syncAndReplaceTabs-success": 2,
+        "verifyConn": 1
+      }
+    },
+    {
+      "time": "2026-08-29T19",
+      "data": {
+        "count": 19,
+        "kpfun-getUsersList": 5,
+        "updateTargets-success": 3,
+        "getWebInfor-success": 5,
+        "verifyConn": 4,
+        "api/getPerm-success": 1,
+        "checkUser-error": 1
+      }
+    },
+    {
+      "time": "2026-08-29T20",
+      "data": {
+        "count": 16,
+        "getWebInfor-success": 7,
+        "updateTargets-success": 2,
+        "checkUser-error": 4,
+        "api/getPerm-success": 2,
+        "api/syncAndReplaceTabs-success": 1
+      }
+    },
+    {
+      "time": "2026-08-29T21",
+      "data": {
+        "count": 13,
+        "getWebInfor-success": 4,
+        "updateTargets-success": 5,
+        "api/getPerm-success": 2,
+        "api/syncAndReplaceTabs-success": 1,
+        "checkUser-error": 1
+      }
+    },
+    {
+      "time": "2026-08-29T22",
+      "data": {
+        "count": 14,
+        "verifyConn": 6,
+        "getWebInfor-success": 3,
+        "kpfun-getUsersList": 2,
+        "api/syncAndReplaceTabs-success": 1,
+        "api/getPerm-success": 1,
+        "checkUser-error": 1
+      }
+    },
+    {
+      "time": "2026-08-29T23",
+      "data": {
+        "count": 14,
+        "kpfun-getUsersList": 4,
+        "verifyConn": 2,
+        "api/getPerm-success": 4,
+        "updateTargets-success": 3,
+        "api/syncAndReplaceTabs-success": 1
+      }
+    },
+    {
+      "time": "2026-08-30T00",
+      "data": {
+        "count": 6,
+        "checkUser-error": 2,
+        "api/syncAndReplaceTabs-success": 2,
+        "updateTargets-success": 1,
+        "verifyConn": 1
+      }
+    },
+    {
+      "time": "2026-08-30T01",
+      "data": {
+        "count": 17,
+        "api/getPerm-success": 5,
+        "kpfun-getUsersList": 3,
+        "checkUser-error": 4,
+        "getWebInfor-success": 1,
+        "verifyConn": 1,
+        "api/syncAndReplaceTabs-success": 2,
+        "updateTargets-success": 1
+      }
+    },
+    {
+      "time": "2026-08-30T02",
+      "data": {
+        "count": 11,
+        "api/getPerm-success": 2,
+        "kpfun-getUsersList": 2,
+        "getWebInfor-success": 4,
+        "checkUser-error": 2,
+        "updateTargets-success": 1
+      }
+    },
+    {
+      "time": "2026-08-30T03",
+      "data": {
+        "count": 17,
+        "verifyConn": 1,
+        "checkUser-error": 3,
+        "updateTargets-success": 7,
+        "api/getPerm-success": 2,
+        "api/syncAndReplaceTabs-success": 2,
+        "kpfun-getUsersList": 2
+      }
+    },
+    {
+      "time": "2026-08-30T04",
+      "data": {
+        "count": 7,
+        "api/getPerm-success": 1,
+        "verifyConn": 2,
+        "kpfun-getUsersList": 1,
+        "updateTargets-success": 1,
+        "api/syncAndReplaceTabs-success": 2
+      }
+    },
+    {
+      "time": "2026-08-30T05",
+      "data": {
+        "count": 13,
+        "verifyConn": 3,
+        "updateTargets-success": 4,
+        "api/getPerm-success": 1,
+        "checkUser-error": 3,
+        "getWebInfor-success": 1,
+        "kpfun-getUsersList": 1
+      }
+    },
+    {
+      "time": "2026-08-30T06",
+      "data": {
+        "count": 12,
+        "api/getPerm-success": 2,
+        "verifyConn": 2,
+        "getWebInfor-success": 4,
+        "checkUser-error": 2,
+        "kpfun-getUsersList": 1,
+        "api/syncAndReplaceTabs-success": 1
+      }
+    },
+    {
+      "time": "2026-08-30T07",
+      "data": {
+        "count": 8,
+        "kpfun-getUsersList": 2,
+        "api/syncAndReplaceTabs-success": 1,
+        "api/getPerm-success": 2,
+        "verifyConn": 1,
+        "checkUser-error": 1,
+        "getWebInfor-success": 1
+      }
+    },
+    {
+      "time": "2026-08-30T08",
+      "data": {
+        "count": 12,
+        "checkUser-error": 1,
+        "api/syncAndReplaceTabs-success": 2,
+        "getWebInfor-success": 1,
+        "kpfun-getUsersList": 2,
+        "api/getPerm-success": 4,
+        "verifyConn": 1,
+        "updateTargets-success": 1
+      }
+    },
+    {
+      "time": "2026-08-30T09",
+      "data": {
+        "count": 14,
+        "checkUser-error": 2,
+        "kpfun-getUsersList": 2,
+        "api/syncAndReplaceTabs-success": 4,
+        "updateTargets-success": 2,
+        "getWebInfor-success": 3,
+        "api/getPerm-success": 1
+      }
+    },
+    {
+      "time": "2026-08-30T10",
+      "data": {
+        "count": 15,
+        "kpfun-getUsersList": 4,
+        "checkUser-error": 5,
+        "api/syncAndReplaceTabs-success": 2,
+        "updateTargets-success": 3,
+        "verifyConn": 1
+      }
+    },
+    {
+      "time": "2026-08-30T11",
+      "data": {
+        "count": 16,
+        "api/getPerm-success": 3,
+        "verifyConn": 3,
+        "api/syncAndReplaceTabs-success": 5,
+        "getWebInfor-success": 2,
+        "updateTargets-success": 3
+      }
+    },
+    {
+      "time": "2026-08-30T12",
+      "data": {
+        "count": 17,
+        "getWebInfor-success": 5,
+        "checkUser-error": 1,
+        "api/syncAndReplaceTabs-success": 2,
+        "verifyConn": 2,
+        "api/getPerm-success": 2,
+        "kpfun-getUsersList": 2,
+        "win-24h": 3
+      }
+    },
+    {
+      "time": "2026-08-30T13",
+      "data": {
+        "count": 16,
+        "getWebInfor-success": 2,
+        "verifyConn": 3,
+        "updateTargets-success": 2,
+        "api/syncAndReplaceTabs-success": 2,
+        "kpfun-getUsersList": 3,
+        "checkUser-error": 3,
+        "api/getPerm-success": 1
+      }
+    },
+    {
+      "time": "2026-08-30T14",
+      "data": {
+        "count": 17,
+        "kpfun-getUsersList": 2,
+        "verifyConn": 1,
+        "checkUser-error": 4,
+        "updateTargets-success": 3,
+        "api/syncAndReplaceTabs-success": 4,
+        "getWebInfor-success": 1,
+        "api/getPerm-success": 2
+      }
+    },
+    {
+      "time": "2026-08-30T15",
+      "data": {
+        "count": 16,
+        "api/getPerm-success": 1,
+        "kpfun-getUsersList": 5,
+        "updateTargets-success": 5,
+        "verifyConn": 2,
+        "getWebInfor-success": 1,
+        "checkUser-error": 1,
+        "api/syncAndReplaceTabs-success": 1
+      }
+    },
+    {
+      "time": "2026-08-30T16",
+      "data": {
+        "count": 12,
+        "kpfun-getUsersList": 2,
+        "api/getPerm-success": 3,
+        "updateTargets-success": 3,
+        "verifyConn": 2,
+        "getWebInfor-success": 1,
+        "checkUser-error": 1
+      }
+    },
+    {
+      "time": "2026-08-30T17",
+      "data": {
+        "count": 16,
+        "api/getPerm-success": 3,
+        "getWebInfor-success": 2,
+        "api/syncAndReplaceTabs-success": 2,
+        "kpfun-getUsersList": 4,
+        "updateTargets-success": 3,
+        "verifyConn": 1,
+        "checkUser-error": 1
+      }
+    },
+    {
+      "time": "2026-08-30T18",
+      "data": {
+        "count": 11,
+        "verifyConn": 2,
+        "api/getPerm-success": 3,
+        "kpfun-getUsersList": 2,
+        "api/syncAndReplaceTabs-success": 1,
+        "updateTargets-success": 3
+      }
+    },
+    {
+      "time": "2026-08-30T19",
+      "data": {
+        "count": 9,
+        "api/getPerm-success": 4,
+        "checkUser-error": 1,
+        "updateTargets-success": 1,
+        "verifyConn": 3
+      }
+    },
+    {
+      "time": "2026-08-30T20",
+      "data": {
+        "count": 14,
+        "checkUser-error": 5,
+        "api/getPerm-success": 3,
+        "getWebInfor-success": 2,
+        "verifyConn": 2,
+        "updateTargets-success": 1,
+        "kpfun-getUsersList": 1
+      }
+    },
+    {
+      "time": "2026-08-30T21",
+      "data": {
+        "count": 10,
+        "api/getPerm-success": 4,
+        "verifyConn": 2,
+        "kpfun-getUsersList": 2,
+        "checkUser-error": 1,
+        "updateTargets-success": 1
+      }
+    },
+    {
+      "time": "2026-08-30T22",
+      "data": {
+        "count": 12,
+        "kpfun-getUsersList": 2,
+        "getWebInfor-success": 2,
+        "updateTargets-success": 3,
+        "api/syncAndReplaceTabs-success": 2,
+        "api/getPerm-success": 1,
+        "checkUser-error": 1,
+        "verifyConn": 1
+      }
+    },
+    {
+      "time": "2026-08-30T23",
+      "data": {
+        "count": 9,
+        "updateTargets-success": 1,
+        "verifyConn": 1,
+        "kpfun-getUsersList": 1,
+        "api/syncAndReplaceTabs-success": 1,
+        "api/getPerm-success": 3,
+        "checkUser-error": 2
+      }
+    },
+    {
+      "time": "2026-08-31T00",
+      "data": {
+        "count": 11,
+        "verifyConn": 2,
+        "api/getPerm-success": 2,
+        "updateTargets-success": 1,
+        "getWebInfor-success": 1,
+        "kpfun-getUsersList": 3,
+        "api/syncAndReplaceTabs-success": 2
+      }
+    },
+    {
+      "time": "2026-08-31T01",
+      "data": {
+        "count": 10,
+        "updateTargets-success": 3,
+        "kpfun-getUsersList": 3,
+        "verifyConn": 2,
+        "api/syncAndReplaceTabs-success": 1,
+        "api/getPerm-success": 1
+      }
+    },
+    {
+      "time": "2026-08-31T02",
+      "data": {
+        "count": 15,
+        "verifyConn": 2,
+        "api/getPerm-success": 5,
+        "kpfun-getUsersList": 1,
+        "getWebInfor-success": 4,
+        "api/syncAndReplaceTabs-success": 2,
+        "checkUser-error": 1
+      }
+    },
+    {
+      "time": "2026-08-31T03",
+      "data": {
+        "count": 13,
+        "api/syncAndReplaceTabs-success": 4,
+        "kpfun-getUsersList": 1,
+        "api/getPerm-success": 3,
+        "updateTargets-success": 2,
+        "getWebInfor-success": 1,
+        "checkUser-error": 2
+      }
+    },
+    {
+      "time": "2026-08-31T04",
+      "data": {
+        "count": 12,
+        "updateTargets-success": 1,
+        "verifyConn": 1,
+        "getWebInfor-success": 2,
+        "kpfun-getUsersList": 2,
+        "api/getPerm-success": 3,
+        "win-8h": 3
+      }
+    },
+    {
+      "time": "2026-08-31T05",
+      "data": {
+        "count": 17,
+        "updateTargets-success": 1,
+        "getWebInfor-success": 2,
+        "verifyConn": 3,
+        "kpfun-getUsersList": 5,
+        "checkUser-error": 2,
+        "api/getPerm-success": 3,
+        "api/syncAndReplaceTabs-success": 1
+      }
+    },
+    {
+      "time": "2026-08-31T06",
+      "data": {
+        "count": 12,
+        "api/getPerm-success": 4,
+        "api/syncAndReplaceTabs-success": 6,
+        "updateTargets-success": 2
+      }
+    },
+    {
+      "time": "2026-08-31T07",
+      "data": {
+        "count": 10,
+        "api/getPerm-success": 2,
+        "verifyConn": 2,
+        "api/syncAndReplaceTabs-success": 2,
+        "updateTargets-success": 1,
+        "getWebInfor-success": 1,
+        "checkUser-error": 2
+      }
+    },
+    {
+      "time": "2026-08-31T08",
+      "data": {
+        "count": 19,
+        "checkUser-error": 3,
+        "kpfun-getUsersList": 3,
+        "updateTargets-success": 1,
+        "api/getPerm-success": 2,
+        "verifyConn": 1,
+        "api/syncAndReplaceTabs-success": 5,
+        "getWebInfor-success": 1,
+        "win-4h": 3
+      }
+    },
+    {
+      "time": "2026-08-31T09",
+      "data": {
+        "count": 8,
+        "updateTargets-success": 3,
+        "kpfun-getUsersList": 1,
+        "api/syncAndReplaceTabs-success": 1,
+        "api/getPerm-success": 2,
+        "checkUser-error": 1
+      }
+    },
+    {
+      "time": "2026-08-31T10",
+      "data": {
+        "count": 13,
+        "kpfun-getUsersList": 3,
+        "verifyConn": 1,
+        "api/getPerm-success": 3,
+        "getWebInfor-success": 5,
+        "api/syncAndReplaceTabs-success": 1
+      }
+    },
+    {
+      "time": "2026-08-31T11",
+      "data": {
+        "count": 11,
+        "api/syncAndReplaceTabs-success": 2,
+        "updateTargets-success": 1,
+        "kpfun-getUsersList": 2,
+        "verifyConn": 1,
+        "checkUser-error": 1,
+        "win-1h": 3,
+        "notes-event": 1
+      }
+    },
+    {
+      "time": "2026-08-31T12",
+      "data": {
+        "count": 15,
+        "getWebInfor-success": 3,
+        "api/getPerm-success": 4,
+        "updateTargets-success": 3,
+        "checkUser-error": 3,
+        "verifyConn": 2
+      }
+    },
+    {
+      "time": "2026-08-31T13",
+      "data": {
+        "count": 1,
+        "future-30m": 1
+      }
+    },
+    {
+      "time": "2026-09-01T13",
+      "data": {
+        "count": 1,
+        "future-1d": 1
+      }
+    }
+  ],
+  "day": [
+    {
+      "time": "2026-08-24",
+      "data": {
+        "count": 168,
+        "getWebInfor-success": 21,
+        "checkUser-error": 27,
+        "boundary-plus1": 1,
+        "spill-a": 1,
+        "spill-b": 1,
+        "spill-c": 1,
+        "api/syncAndReplaceTabs-success": 26,
+        "updateTargets-success": 18,
+        "kpfun-getUsersList": 25,
+        "verifyConn": 24,
+        "api/getPerm-success": 23
+      }
+    },
+    {
+      "time": "2026-08-25",
+      "data": {
+        "count": 303,
+        "getWebInfor-success": 45,
+        "verifyConn": 50,
+        "updateTargets-success": 48,
+        "api/syncAndReplaceTabs-success": 44,
+        "kpfun-getUsersList": 34,
+        "api/getPerm-success": 40,
+        "checkUser-error": 42
+      }
+    },
+    {
+      "time": "2026-08-26",
+      "data": {
+        "count": 322,
+        "kpfun-getUsersList": 48,
+        "getWebInfor-success": 61,
+        "checkUser-error": 49,
+        "api/getPerm-success": 40,
+        "updateTargets-success": 44,
+        "api/syncAndReplaceTabs-success": 41,
+        "verifyConn": 38,
+        "iso-string-time": 1
+      }
+    },
+    {
+      "time": "2026-08-27",
+      "data": {
+        "count": 285,
+        "getWebInfor-success": 42,
+        "updateTargets-success": 32,
+        "api/syncAndReplaceTabs-success": 47,
+        "verifyConn": 40,
+        "kpfun-getUsersList": 45,
+        "checkUser-error": 34,
+        "api/getPerm-success": 45
+      }
+    },
+    {
+      "time": "2026-08-28",
+      "data": {
+        "count": 300,
+        "checkUser-error": 37,
+        "updateTargets-success": 44,
+        "kpfun-getUsersList": 40,
+        "api/getPerm-success": 53,
+        "getWebInfor-success": 42,
+        "verifyConn": 37,
+        "api/syncAndReplaceTabs-success": 47
+      }
+    },
+    {
+      "time": "2026-08-29",
+      "data": {
+        "count": 324,
+        "checkUser-error": 42,
+        "updateTargets-success": 47,
+        "kpfun-getUsersList": 42,
+        "getWebInfor-success": 54,
+        "verifyConn": 48,
+        "api/syncAndReplaceTabs-success": 45,
+        "api/getPerm-success": 45,
+        "notes-event": 1
+      }
+    },
+    {
+      "time": "2026-08-30",
+      "data": {
+        "count": 307,
+        "api/getPerm-success": 53,
+        "updateTargets-success": 50,
+        "verifyConn": 38,
+        "checkUser-error": 46,
+        "kpfun-getUsersList": 46,
+        "api/syncAndReplaceTabs-success": 38,
+        "getWebInfor-success": 33,
+        "win-24h": 3
+      }
+    },
+    {
+      "time": "2026-08-31",
+      "data": {
+        "count": 167,
+        "verifyConn": 17,
+        "api/getPerm-success": 34,
+        "updateTargets-success": 19,
+        "getWebInfor-success": 20,
+        "kpfun-getUsersList": 24,
+        "api/syncAndReplaceTabs-success": 27,
+        "checkUser-error": 15,
+        "win-8h": 3,
+        "win-4h": 3,
+        "win-1h": 3,
+        "future-30m": 1,
+        "notes-event": 1
+      }
+    },
+    {
+      "time": "2026-09-01",
+      "data": {
+        "count": 1,
+        "future-1d": 1
+      }
+    }
+  ],
+  "table": [
+    {
+      "event": "api/getPerm-success",
+      "last1Day": 65,
+      "last8Hour": 23,
+      "last4Hour": 11,
+      "last1Hour": 4
+    },
+    {
+      "event": "kpfun-getUsersList",
+      "last1Day": 50,
+      "last8Hour": 16,
+      "last4Hour": 9,
+      "last1Hour": 3
+    },
+    {
+      "event": "updateTargets-success",
+      "last1Day": 47,
+      "last8Hour": 13,
+      "last4Hour": 9,
+      "last1Hour": 4
+    },
+    {
+      "event": "api/syncAndReplaceTabs-success",
+      "last1Day": 43,
+      "last8Hour": 21,
+      "last4Hour": 9,
+      "last1Hour": 3
+    },
+    {
+      "event": "verifyConn",
+      "last1Day": 40,
+      "last8Hour": 11,
+      "last4Hour": 6,
+      "last1Hour": 3
+    },
+    {
+      "event": "getWebInfor-success",
+      "last1Day": 37,
+      "last8Hour": 15,
+      "last4Hour": 10,
+      "last1Hour": 6
+    },
+    {
+      "event": "checkUser-error",
+      "last1Day": 36,
+      "last8Hour": 14,
+      "last4Hour": 10,
+      "last1Hour": 4
+    },
+    {
+      "event": "win-24h",
+      "last1Day": 3,
+      "last8Hour": 0,
+      "last4Hour": 0,
+      "last1Hour": 0
+    },
+    {
+      "event": "win-8h",
+      "last1Day": 3,
+      "last8Hour": 3,
+      "last4Hour": 0,
+      "last1Hour": 0
+    },
+    {
+      "event": "win-4h",
+      "last1Day": 3,
+      "last8Hour": 3,
+      "last4Hour": 3,
+      "last1Hour": 0
+    },
+    {
+      "event": "win-1h",
+      "last1Day": 3,
+      "last8Hour": 3,
+      "last4Hour": 3,
+      "last1Hour": 3
+    },
+    {
+      "event": "future-30m",
+      "last1Day": 1,
+      "last8Hour": 1,
+      "last4Hour": 1,
+      "last1Hour": 1
+    },
+    {
+      "event": "notes-event",
+      "last1Day": 1,
+      "last8Hour": 1,
+      "last4Hour": 1,
+      "last1Hour": 1
+    }
+  ]
+}

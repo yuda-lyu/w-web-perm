@@ -918,18 +918,6 @@ let kpLang = {
         eng: `Daily`,
         cht: `每日`,
     },
-    staSelectEvents: {
-        eng: `Events`,
-        cht: `事件`,
-    },
-    staSelectAll: {
-        eng: `Select all`,
-        cht: `全選`,
-    },
-    staClear: {
-        eng: `Clear`,
-        cht: `清除`,
-    },
     staTotal: {
         eng: `Total`,
         cht: `全部加總`,

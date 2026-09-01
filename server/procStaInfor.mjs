@@ -3,7 +3,7 @@ import get from 'lodash-es/get.js'
 import isestr from 'wsemi/src/isestr.mjs'
 import cache from 'wsemi/src/cache.mjs'
 import staEvent from './staLogs/staEvent.callWorker.mjs'
-import staEventTable from './staLogs/staEventTable.mjs'
+import staEventTable from './staLogs/staEventTable.callWorker.mjs'
 
 
 //mock 確定性資料集（供 e2e 統計圖穩定用）：固定起點時間 + 固定 sin 計數，不依 now / log → 每次完全相同。
@@ -49,12 +49,16 @@ function proc(opt = {}) {
     //fdLog
     let fdLog = get(opt, 'fdLog', '')
     if (!isestr(fdLog)) {
-        fdLog = './_logs'
+        fdLog = './logs'
     }
 
 
     //mock（e2e 統計圖穩定用）
     let mock = get(opt, 'mock', false)
+
+
+    //srLog（staLogsCore 單檔略過時記 warn）
+    let srLog = get(opt, 'srLog', null)
 
 
     //getStaEvent
@@ -66,7 +70,7 @@ function proc(opt = {}) {
         }
 
         //staEvent
-        let rs = await staEvent(timeLength, timeInterval, { fdLog })
+        let rs = await staEvent(timeLength, timeInterval, { fdLog, srLog })
 
         return rs
     }
@@ -76,10 +80,13 @@ function proc(opt = {}) {
         //cacheKey: 含 timeLength + timeInterval 避免不同分組互蓋快取
         let cacheKey = `${timeLength}:${timeInterval}`
 
-        let r = await ocGetStaEvent.getProxy(cacheKey, { fun: _getStaEvent, inputs: [timeLength, timeInterval], timeExpired: 30 * 1000 }) //快取30秒
+        //wsemi ≥1.8.81 cache: 執行中共用 in-flight promise (併發不輪詢); timeFrom:'end' 使 30 秒自掃描完成起算; cacheError:false 失敗不快取且拋錯
+        //(取代原「非陣列即 clear + reject」之繞道), 失敗一律 reject 'cannotGetStaEvent' 讓上層 (kpFunExt) 記 err key
+        let r = await ocGetStaEvent.getProxy(cacheKey, { fun: _getStaEvent, inputs: [timeLength, timeInterval], timeExpired: 30 * 1000, timeFrom: 'end', cacheError: false }) //快取30秒
+            .catch(() => {
+                return Promise.reject('cannotGetStaEvent')
+            })
         if (!Array.isArray(r)) {
-            //_getStaEvent(worker) 失敗時 cache 之 .catch 會回 undefined 並把 undefined 快取 30s; 清除該快取避免窗內重試仍拿 undefined, 並 reject 讓上層 (kpFunExt) 記 err key
-            ocGetStaEvent.clear(cacheKey)
             return Promise.reject('cannotGetStaEvent')
         }
         return r
@@ -95,17 +102,19 @@ function proc(opt = {}) {
         }
 
         //staEventTable
-        let rs = await staEventTable({ fdLog })
+        let rs = await staEventTable({ fdLog, srLog })
 
         return rs
     }
     let ocGetStaEventTable = cache()
     let getStaEventTable = async (userId) => {
 
-        let r = await ocGetStaEventTable.getProxy('staEventTable', { fun: _getStaEventTable, inputs: [], timeExpired: 30 * 1000 }) //快取30秒
+        //cache 選項同 getStaEvent
+        let r = await ocGetStaEventTable.getProxy('staEventTable', { fun: _getStaEventTable, inputs: [], timeExpired: 30 * 1000, timeFrom: 'end', cacheError: false }) //快取30秒
+            .catch(() => {
+                return Promise.reject('cannotGetStaEventTable')
+            })
         if (!Array.isArray(r)) {
-            //同 getStaEvent: staEventTable 失敗時 cache 回 undefined 並快取 30s; 清除避免窗內重試仍拿 undefined, 並 reject 讓上層記 err key
-            ocGetStaEventTable.clear('staEventTable')
             return Promise.reject('cannotGetStaEventTable')
         }
         return r

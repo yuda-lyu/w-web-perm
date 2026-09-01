@@ -7,7 +7,7 @@
 //checkbox 與警告 icon 皆在 col-id="id"；save 結果走 $dg.showCheckYes 持久 modal。
 import fs from 'fs'
 import assert from 'assert'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch } from './e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, typeIntoCell, captureBaseSeed, resetDb } from './e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/targets'
 const LANGS = ['eng', 'cht']
@@ -72,22 +72,7 @@ async function clickAdd(page) {
     await iconBtn(page, MDI.plus).first().click()
     await page.waitForTimeout(600)
 }
-//Pattern D：dblclick cell → 清空(Backspace) → insertText → Enter 提交（ag-grid Vue v-model）
-async function typeIntoCell(page, rowIndex, colId, value) {
-    const cellSel = `.ag-row[row-index="${rowIndex}"] .ag-cell[col-id="${colId}"]`
-    await page.locator(cellSel).first().dblclick()
-    const inp = page.locator(`${cellSel} input`).first()
-    await inp.waitFor({ state: 'visible', timeout: 5000 })
-    await page.waitForTimeout(800) //editor mount / v-model binding settle
-    await inp.click()
-    const cur = await inp.inputValue()
-    await page.keyboard.press('End')
-    for (let k = 0; k < cur.length + 2; k++) await page.keyboard.press('Backspace')
-    if (value) await page.keyboard.insertText(value)
-    await page.waitForTimeout(200)
-    await page.keyboard.press('Enter')
-    await page.waitForTimeout(500)
-}
+//typeIntoCell（Pattern D）收斂進 e2e-setup.mjs 共用（原本 grups/pemis/targets/users 四檔重複定義）。
 //該 cell 是否出現警告 icon（errItemsById → <img warning>）
 async function cellHasWarn(page, rowIndex, colId) {
     return await page.evaluate(({ r, c }) => {
@@ -98,26 +83,8 @@ async function cellHasWarn(page, rowIndex, colId) {
 //—— DB 衛生 + 儲存 helpers ——
 //pristine base seed（含全欄位），每 case 前還原 DB，使跨 case／跨語系可重現
 let BASE_SEED = null
-async function captureBaseSeed(page) {
-    //targets 表資料經 recvData 廣播同步，較 syncState 晚到；須等載入後再讀，否則抓到空陣列
-    await page.waitForFunction(() => (window.$vo.$store.state.targets || []).length > 0, null, { timeout: 30000 })
-    await page.waitForTimeout(1500) //確保整批同步完成
-    return await page.evaluate(() => {
-        const us = (window.$vo.$store.state.targets || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0))
-        return JSON.parse(JSON.stringify(us))
-    })
-}
-//在獨立 throwaway page 還原 DB（diff：刪多餘/補缺漏），關閉後再開 case page。
-//不可在 case page 上 reset：updateTargets 的 late 廣播(recvData)會在 clickAdd 後到、觸發 changeParams 重算
-//把已新增列洗掉（曾導致 typeIntoCell 改到既有列）。test setup 層、非 act。
-async function resetDb(browser, seed) {
-    if (!seed || seed.length === 0) throw new Error('resetDb: BASE_SEED 為空，拒絕還原（避免清空 DB）')
-    const p = await openApp(browser)
-    await p.evaluate((s) => window.$vo.$fapi.updateTargets(s), seed)
-    await p.waitForFunction((n) => (window.$vo.$store.state.targets || []).length === n, seed.length, { timeout: 15000 })
-    await p.waitForTimeout(800)
-    await p.context().close()
-}
+//captureBaseSeed(page,'targets') / resetDb(browser,'targets',seed) 收斂進 e2e-setup.mjs 共用
+//（原本 grups/pemis/rela-grup-pemi/rela-pemi-rule/rela-user-grup/targets/users 七檔重複定義）。
 async function clickSave(page) {
     await iconBtn(page, MDI.upload).first().click()
 }
@@ -399,8 +366,9 @@ async function generateBaseline() {
     const onlyLangs = argList('--langs')
     await startServersOnce()
     fs.mkdirSync(PICS_DIR, { recursive: true })
+    process.env.E2E_STRICT_CAPTURE = '1' //regen 端：captureStable 未 settle 即 throw，拒絕寫入未穩定畫面
     //擷取 pristine base seed（DB 剛 fresh seed）——用臨時 browser
-    { const b = await launchBrowser(); const pp = await openApp(b); BASE_SEED = await captureBaseSeed(pp); await b.close() }
+    { const b = await launchBrowser(); const pp = await openApp(b); BASE_SEED = await captureBaseSeed(pp, 'targets'); await b.close() }
     for (const lang of LANGS) {
         if (onlyLangs && !nameMatch(onlyLangs, lang)) continue //§6.3 手術式：跳過未指定語系
         for (const c of CASES) {
@@ -408,7 +376,7 @@ async function generateBaseline() {
             //per-case fresh browser（每 case 全新 browser 進程，消除 GPU/font/CSS cache 跨 case 累積造成
             //的 cold/warm 差異；對齊 sso e2e-adduser 之 per-case chromium.launch，確保 gen 與 mocha 收斂同態）
             const browser = await launchBrowser()
-            await resetDb(browser, BASE_SEED) //throwaway page 還原 DB 為 base seed，關閉後再開 case page
+            await resetDb(browser, 'targets', BASE_SEED) //throwaway page 還原 DB 為 base seed，關閉後再開 case page
             const page = await openApp(browser)
             await setLang(page, lang) //eng 也切（symmetric）：補等同 cht setLang 的 re-render+settle 時間，治 eng-vs-cht layout 收斂不對稱（sso 殷鑑）
             //run 回傳「單張 Buffer」或「多階段 [{name, buf}]」；統一正規化為陣列後逐張寫入
@@ -437,13 +405,13 @@ else {
                 this.timeout(200000)
                 await startServersOnce()
                 //擷取 BASE_SEED 一次（用臨時 browser）
-                if (!BASE_SEED) { const b = await launchBrowser(); const pp = await openApp(b); BASE_SEED = await captureBaseSeed(pp); await b.close() }
+                if (!BASE_SEED) { const b = await launchBrowser(); const pp = await openApp(b); BASE_SEED = await captureBaseSeed(pp, 'targets'); await b.close() }
             })
             //per-case fresh browser：每 case 全新 browser 進程（對齊 sso），消 cross-case GPU/font cache 累積
             beforeEach(async function() {
                 this.timeout(90000)
                 browser = await launchBrowser()
-                await resetDb(browser, BASE_SEED) //throwaway page 還原 DB 為 base seed
+                await resetDb(browser, 'targets', BASE_SEED) //throwaway page 還原 DB 為 base seed
             })
             afterEach(async function() { if (browser) { await browser.close(); browser = null } })
             for (const c of CASES) {

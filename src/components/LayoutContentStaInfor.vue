@@ -8,7 +8,7 @@
 
         <div
             style="height:100%; background:#f9fafb; overflow-y:auto;"
-            v-if="!firstLoading && !errMsg"
+            v-if="!errMsg"
         >
 
             <div style="padding:20px 30px;">
@@ -27,27 +27,8 @@
                                 <WIcon :icon="mdiChartBoxOutline" :size="24" :color="'currentColor'" :colorHover="'currentColor'" class="text-purple-600 mr-2"></WIcon>
                                 <span class="text-lg">{{$t('staEventTitle')}}</span>
                             </div>
-                            <!-- 控制區: 事件多選 checklist + 全選/清除 + 全部加總 + 時間分組 -->
+                            <!-- 控制區: 全部加總 + 時間分組; 各事件之顯示切換由圖表圖例提供, 不另設 checklist -->
                             <div class="staCtrl">
-
-                                <!-- 事件多選 checklist -->
-                                <div class="staEventSel" v-if="allEvents.length > 0">
-                                    <span class="text-sm font-medium text-gray-700 mr-2">{{$t('staSelectEvents')}}</span>
-                                    <div class="staEventList">
-                                        <label
-                                            v-for="ev in allEvents"
-                                            :key="ev"
-                                            class="staEventItem"
-                                        >
-                                            <input type="checkbox" :value="ev" v-model="selectedEvents" @change="updateChartsDebounce" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
-                                            <span class="ml-1 text-sm text-gray-900">{{ev}}</span>
-                                        </label>
-                                    </div>
-                                    <div class="staEventBtns">
-                                        <button type="button" @click="selectAllEvents" class="staBtn">{{$t('staSelectAll')}}</button>
-                                        <button type="button" @click="clearEvents" class="staBtn">{{$t('staClear')}}</button>
-                                    </div>
-                                </div>
 
                                 <!-- 全部加總 + 時間分組 -->
                                 <div class="staCtrlRight">
@@ -68,6 +49,15 @@
                                 :options="optEvent"
                                 v-if="optEvent"
                             ></WEchartsVue>
+
+                            <!-- 載入中: 與圖同高之轉圈佔位 (不跳版); 載入後無資料才顯示 staNoData -->
+                            <div
+                                style="height:300px; display:flex; align-items:center; justify-content:center; gap:8px; font-size:0.8rem; color:#6b7280;"
+                                v-else-if="loadingEvent"
+                            >
+                                <WIconLoading :name="'cir-rotate'" :size="24" :color="'#6b7280'"></WIconLoading>
+                                <span>{{$t('waitingData')}}</span>
+                            </div>
 
                             <div
                                 style="padding:0px; font-size:0.8rem; color:#777;"
@@ -110,6 +100,15 @@
                                 </table>
                             </div>
 
+                            <!-- 載入中: 轉圈佔位; 載入後無資料才顯示 staNoData -->
+                            <div
+                                style="padding:12px 0px; display:flex; align-items:center; gap:8px; font-size:0.8rem; color:#6b7280;"
+                                v-else-if="loadingTable"
+                            >
+                                <WIconLoading :name="'cir-rotate'" :size="20" :color="'#6b7280'"></WIconLoading>
+                                <span>{{$t('waitingData')}}</span>
+                            </div>
+
                             <div
                                 style="padding:0px; font-size:0.8rem; color:#777;"
                                 v-else
@@ -126,12 +125,6 @@
 
         </div>
         <template v-else>
-            <div
-                style="padding:10px 15px; font-size:0.8rem;"
-                v-if="firstLoading"
-            >
-                {{$t('waitingData')}}
-            </div>
             <div
                 style="padding:10px 15px; font-size:0.8rem;"
                 v-if="errMsg"
@@ -158,12 +151,14 @@ import isearr from 'wsemi/src/isearr.mjs'
 import WEchartsVue from 'w-echarts-vue/src/components/WEchartsVue.vue'
 import { mdiChartBoxOutline, mdiTableLarge } from '@mdi/js/mdi.js'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
+import WIconLoading from 'w-component-vue/src/components/WIconLoading.vue'
 
 
 export default {
     components: {
         WEchartsVue,
         WIcon,
+        WIconLoading,
     },
     props: {
         drawer: {
@@ -181,13 +176,14 @@ export default {
 
             panelHeight: 100,
 
-            firstLoading: true,
+            //各區塊各自 loading 旗標 (先到先畫): 圖以 optEvent 是否為 null 與 loadingEvent 切換轉圈; 表以 eventTable 長度與 loadingTable 切換
+            loadingEvent: true,
+            loadingTable: true,
             errMsg: '',
 
             timeLength: 7,
             timeInterval: 'hr',
 
-            selectedEvents: [],
             showTotal: false,
 
             freqEvent: [],
@@ -203,18 +199,14 @@ export default {
 
         let vo = this
 
-        //firstLoading, errMsg
-        vo.firstLoading = true
+        //errMsg
         vo.errMsg = ''
 
-        //getAndRelaData
+        //getAndRelaData, 圖與表各自於資料到達時渲染 (先到先畫), 任一 reject 才整頁切為 errMsg
         vo.getAndRelaData()
             .catch((err) => {
                 console.log(err)
                 vo.errMsg = vo.$t('getDataError')
-            })
-            .finally(() => {
-                vo.firstLoading = false
             })
 
     },
@@ -232,7 +224,7 @@ export default {
             return ''
         },
 
-        //allEvents: 從 freqEvent 各桶 data 取 event 名 union (排除 count), 排序
+        //allEvents: 從 freqEvent 各桶 data 取 event 名 union (排除 count), 排序; 決定圖表要畫哪些事件系列
         allEvents: function() {
             let vo = this
             let evs = []
@@ -367,19 +359,19 @@ export default {
             let vo = this
 
             //getStaEvent
+            vo.loadingEvent = true
             await vo.$fapi.getStaEvent(vo.timeLength, vo.timeInterval)
                 .then((res) => {
                     // console.log('getStaEvent(freqEvent)', res)
                     vo.freqEvent = res
-                    //首次資料載入後 selectedEvents 為空 → 預設全選
-                    if (size(vo.selectedEvents) === 0) {
-                        vo.selectedEvents = vo.allEvents.slice()
-                    }
                     vo.updateCharts()
                 })
                 .catch((err) => {
                     console.log('getStaEvent catch', err)
                     throw err
+                })
+                .finally(() => {
+                    vo.loadingEvent = false
                 })
 
         },
@@ -388,6 +380,7 @@ export default {
             let vo = this
 
             //getStaEventTable
+            vo.loadingTable = true
             await vo.$fapi.getStaEventTable()
                 .then((res) => {
                     // console.log('getStaEventTable(eventTable)', res)
@@ -397,27 +390,30 @@ export default {
                     console.log('getStaEventTable catch', err)
                     throw err
                 })
+                .finally(() => {
+                    vo.loadingTable = false
+                })
 
         },
 
         getAndRelaData: async function() {
             let vo = this
 
-            //grStaEvent
-            await vo.grStaEvent()
-
-            //grStaEventTable
-            await vo.grStaEventTable()
+            //圖與表並行取得, 各自到達即渲染 (先到先畫); 任一 reject 即向上 propagate 至呼叫端 .catch 設 errMsg
+            await Promise.all([
+                vo.grStaEvent(),
+                vo.grStaEventTable(),
+            ])
 
         },
 
         updateCharts: function() {
             let vo = this
 
-            //ksEvent: showTotal 時前置 count 加總線, 其後接所選各 event (各一條系列)
+            //ksEvent: showTotal 時前置 count 加總線, 其後接全部 event (各一條系列); 使用者要隱藏哪條由圖表圖例切換
             let ksEvent = [
                 ...(vo.showTotal ? ['count'] : []),
-                ...vo.selectedEvents,
+                ...vo.allEvents,
             ]
 
             //optEvent
@@ -432,18 +428,6 @@ export default {
             })
         },
 
-        selectAllEvents: function() {
-            let vo = this
-            vo.selectedEvents = vo.allEvents.slice()
-            vo.updateChartsDebounce()
-        },
-
-        clearEvents: function() {
-            let vo = this
-            vo.selectedEvents = []
-            vo.updateChartsDebounce()
-        },
-
         formatNumber: function(num) {
             if (num === null || num === undefined) {
                 return 0
@@ -454,16 +438,12 @@ export default {
         changeTimeInterval: function() {
             let vo = this
 
-            //切換時間分組須重新向後端取數據 (hr/day 對應不同 time 粒度)
-            vo.firstLoading = true
+            //切換時間分組須重新向後端取數據 (hr/day 對應不同 time 粒度); 既有圖表維持顯示直到新資料到達 (不閃整頁等待)
             vo.errMsg = ''
             vo.getAndRelaData()
                 .catch((err) => {
                     console.log(err)
                     vo.errMsg = vo.$t('getDataError')
-                })
-                .finally(() => {
-                    vo.firstLoading = false
                 })
 
         },
@@ -521,15 +501,7 @@ export default {
 .w-4 { width: 1rem; }
 .w-full { width: 100%; }
 
-/* === 控制區 (事件多選 checklist + 全部加總 + 時間分組), RWD flex-wrap === */
+/* === 控制區 (全部加總 + 時間分組), RWD flex-wrap === */
 .staCtrl { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 8px 0; }
-.staEventSel { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; }
-.staEventList { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; }
-.staEventItem { display: inline-flex; align-items: center; cursor: pointer; }
-.staEventBtns { display: inline-flex; align-items: center; gap: 6px; }
-.staBtn { font-size: 0.8rem; color: rgb(37 99 235); border: 1px solid rgb(209 213 219); border-radius: 0.25rem; padding: 2px 8px; background: #fff; cursor: pointer; }
-.staBtn:hover { background: rgb(243 244 246); }
 .staCtrlRight { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
-.mr-2 { margin-right: 0.5rem; }
-.ml-1 { margin-left: 0.25rem; }
 </style>

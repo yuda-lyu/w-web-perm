@@ -1,5 +1,5 @@
 //後台「統計資訊」事件展示區 e2e。對應統計頁 src/components/LayoutContentStaInfor.vue 之事件發生頻率卡片。
-//act 走 user-facing input（點左側「統計資訊」選單 / 勾取消事件 checklist 之 checkbox）；assert = 語意斷言 + pixel baseline（§6.2 / §6.3）。
+//act 走 user-facing input（點左側「統計資訊」選單 / 點圖表圖例切換事件 / 勾「全部加總」checkbox）；assert = 語意斷言 + pixel baseline（§6.2 / §6.3）。
 //
 //雙模式：
 //  - 產 baseline：node test/e2e-stainfor.test.mjs --baseline （寫 test/pics/stainfor/）
@@ -7,14 +7,14 @@
 //  --names <eng-E2E-001-event-all,...> 進行手術式 baseline 重產
 //
 //標準圖存放：test/pics/stainfor/stainfor-{lang}-{name}.png（4 cases × 2 lang = 8 baselines）
-//  E2E-001-event-all:      預設全選 → 圖表每個事件各一條折線（5 條）。
-//  E2E-002-event-selected: 只勾選特定 2 個事件（取消其餘）→ 僅該 2 條折線。
-//  E2E-003-event-total:    清除所有事件 + 勾「全部加總」→ 圖表僅單一 Total 加總線。
+//  E2E-001-event-all:      進頁預設 → 圖表每個事件各一條折線（5 條）。
+//  E2E-002-event-selected: 點圖例關掉其餘 3 事件 → 僅該 2 條折線可見（圖例切換為事件篩選之唯一入口）。
+//  E2E-003-event-total:    勾「全部加總」→ 圖表加入 Total 加總線（Total + 5 事件 = 6 條系列）。
 //  E2E-004-event-table:    事件統計表 → 5 列、依最近1日降序、表頭含各時間窗欄位。
 //
 //確定性來源：後端 staEventMock=true → getStaEvent 回固定資料集（48 桶、固定起點 2025-01-01、固定 sin 計數、5 個 event）。
 //  event 名（mock）：verifyConn, updateTargets-success, checkUser-error, api/getPerm-success, getWebInfor-success
-//  元件 allEvents 為 union 後排序 → checklist 顯示順序固定。
+//  元件 allEvents 為 union 後排序 → 圖表系列與圖例顯示順序固定。
 //  before(整體) restartBackend(genTempSettings({ staEventMock: true })) 啟動 mock 後端；
 //  after(整體) restartBackend('./settings.json') 還原預設後端。
 //  因 mock 圖表確定性穩定 → 直接 pixel baseline，不需 driveActivity / overlayRegions 貼圖。
@@ -26,8 +26,10 @@ const PICS_DIR = './test/pics/stainfor'
 const LANGS = ['eng', 'cht']
 const isBaseline = process.argv.includes('--baseline')
 
-//mock 5 個 event；E2E-002 只保留此 2 個（取消其餘 3 個），驗單一事件趨勢辨認功能。
+//mock 5 個 event；E2E-002 只保留此 2 個（以圖例關掉其餘 3 個），驗單一事件趨勢辨認功能。
 const KEEP_EVENTS = ['verifyConn', 'checkUser-error']
+//mock 之 5 個事件全集（元件 allEvents 排序後即此順序），供 E2E-002 逐一關閉非保留者。
+const ALL_MOCK_EVENTS = ['api/getPerm-success', 'checkUser-error', 'getWebInfor-success', 'updateTargets-success', 'verifyConn']
 
 function picPath(lang, name) { return `${PICS_DIR}/stainfor-${lang}-${name}.png` }
 
@@ -51,32 +53,53 @@ async function gotoStaInfor(page) {
     await page.waitForTimeout(7000)
 }
 
-//只保留指定事件（user-facing：取消其餘事件之 checkbox）→ 等圖表重繪 settle。
-//updateChartsDebounce 為 300ms debounce，故取消後須等重繪完成。
-async function keepOnlyEvents(page, keepEvents) {
-    //取得目前 checklist 所有事件名（依 :value）
-    const allEvents = await page.evaluate(() => {
-        const inps = Array.from(document.querySelectorAll('.staEventList input[type="checkbox"]'))
-        return inps.map((el) => el.value)
-    })
-    //取消不在 keepEvents 內的事件 checkbox（user-facing click/uncheck）
-    for (const ev of allEvents) {
-        if (!keepEvents.includes(ev)) {
-            await page.locator(`.staEventList input[type="checkbox"][value="${ev}"]`).uncheck()
-        }
+//—— echarts 圖例（畫在 canvas 內、無 DOM 節點）之定位與點擊 ——
+//圖例是事件顯示切換之唯一入口，DOM 選不到 → 由圖表實例之 zrender 顯示列表取出各圖例文字的視窗座標，
+//再以真滑鼠點擊該座標（L2 絕對座標，屬 selector 不可得時之合法層級），非 dispatchAction 之程式直呼。
+const EVAL_LEGEND_INFO = `(() => {
+    const findVm = (vm) => {
+        if (!vm) return null
+        if (vm.chart && typeof vm.chart.getOption === 'function') return vm
+        for (const c of (vm.$children || [])) { const r = findVm(c); if (r) return r }
+        return null
     }
-    //等 debounce(300) 觸發 + optEvent 重算 + echarts 重繪 settle
-    await page.waitForTimeout(5000)
+    const vm = findVm(window.$vo)
+    if (!vm) return null
+    const inst = vm.chart
+    const box = inst.getDom().getBoundingClientRect()
+    const items = []
+    for (const el of inst.getZr().storage.getDisplayList()) {
+        const t = el.style && el.style.text
+        if (!t) continue
+        if (typeof el.transformCoordToGlobal !== 'function') continue
+        const r = el.getBoundingRect()
+        const g = el.transformCoordToGlobal(r.x + r.width / 2, r.y + r.height / 2)
+        items.push({ text: t, x: box.left + g[0], y: box.top + g[1] })
+    }
+    const opt = inst.getOption()
+    return { items, selected: (opt.legend && opt.legend[0]) ? opt.legend[0].selected : null }
+})()`
+
+//取圖例狀態：{ items:[{text,x,y}], selected:{事件名:是否顯示} }；selected 為 {} 表全部顯示（尚未切換過）。
+async function getLegendInfo(page) {
+    return await page.evaluate(EVAL_LEGEND_INFO)
 }
 
-//清除所有事件（user-facing：點「清除」按鈕）→ 等圖表重繪 settle。清除後所有事件線移除（selectedEvents 清空）。
-async function clearAllEvents(page) {
-    const clearLabel = await page.evaluate(() => window.$vo.$t('staClear'))
-    await page.getByRole('button', { name: clearLabel, exact: true }).first().click()
-    await page.waitForTimeout(5000) //等 debounce(300) + optEvent 重算 + echarts 重繪 settle
+//以圖例關掉不在 keepEvents 內的事件（user-facing：真滑鼠點該圖例文字）→ 等重繪 settle。
+async function keepOnlyEventsByLegend(page, keepEvents, allEvents) {
+    for (const ev of allEvents) {
+        if (keepEvents.includes(ev)) continue
+        const info = await getLegendInfo(page) //每次點擊後圖例不位移，仍逐次重取以免受重繪影響
+        const it = (info && info.items || []).find((o) => o.text === ev)
+        assert.ok(it, `圖例應可定位到事件「${ev}」`)
+        await page.mouse.click(it.x, it.y)
+        await page.waitForTimeout(1200) //等圖例切換動畫與折線移除重繪
+    }
+    await page.mouse.move(0, 0) //離開圖例, 消 hover 高亮
+    await page.waitForTimeout(3000)
 }
 
-//勾選「全部加總」（user-facing：勾 #staShowTotal checkbox）→ 等圖表重繪 settle。勾選後圖表加入單一 Total 加總線。
+//勾選「全部加總」（user-facing：勾 #staShowTotal checkbox）→ 等圖表重繪 settle。勾選後圖表加入 Total 加總線。
 async function checkShowTotal(page) {
     await page.locator('#staShowTotal').check()
     await page.waitForTimeout(5000) //等 debounce(300) + optEvent 重算 + echarts 重繪 settle
@@ -130,8 +153,9 @@ async function getSeriesNames(page) {
 
 //—— 語意斷言 helper ——
 //驗：頁面含事件標題；事件展示卡片內 canvas 數 > 0（圖確實渲染）。
-//E2E-001：預設全選 → 系列為全部 mock event（5 條）。
-//E2E-002：只保留 KEEP_EVENTS → 系列恰為該 2 個事件（驗事件選擇功能：選誰畫誰）。
+//E2E-001：進頁預設 → 系列為全部 mock event（5 條）。
+//E2E-002：以圖例關掉其餘 3 事件 → 圖例僅 KEEP_EVENTS 為顯示中（驗事件篩選：留誰看誰）。
+//E2E-003：勾全部加總 → 系列加入 Total（Total + 5 事件 = 6 條）。
 async function assertSpecForCase(page, lang, name) {
     const title = await page.evaluate(() => window.$vo.$t('staEventTitle'))
 
@@ -156,26 +180,29 @@ async function assertSpecForCase(page, lang, name) {
     assert.ok(Array.isArray(seriesNames), `(${name}/${lang}) 應取得 optEvent.series 名單，實得 ${JSON.stringify(seriesNames)}`)
 
     if (name === 'E2E-001-event-all') {
-        //預設全選 → 5 個 mock event 各一條系列（showTotal 預設 false，無 Total 線）
+        //進頁預設 → 5 個 mock event 各一條系列（showTotal 預設 false，無 Total 線）
         assert.ok(seriesNames.length === 5, `(${name}/${lang}) 全選應為 5 條事件系列，實得 series=${JSON.stringify(seriesNames)}`)
         for (const ev of ['verifyConn', 'updateTargets-success', 'checkUser-error', 'api/getPerm-success', 'getWebInfor-success']) {
             assert.ok(seriesNames.includes(ev), `(${name}/${lang}) 全選系列應含 mock event '${ev}'，實得 ${JSON.stringify(seriesNames)}`)
         }
     }
     else if (name === 'E2E-002-event-selected') {
-        //只勾 2 個事件 → 系列恰為該 2 個（其餘已取消，不應出現）
-        assert.ok(seriesNames.length === KEEP_EVENTS.length, `(${name}/${lang}) 只勾 ${KEEP_EVENTS.length} 個事件，系列數應為 ${KEEP_EVENTS.length}，實得 series=${JSON.stringify(seriesNames)}`)
+        //以圖例關掉其餘 3 事件 → 圖例顯示中者恰為 KEEP_EVENTS，被關掉者為不顯示
+        const info = await getLegendInfo(page)
+        const selected = info && info.selected
+        assert.ok(selected && Object.keys(selected).length > 0, `(${name}/${lang}) 應取得圖例切換狀態，實得 ${JSON.stringify(selected)}`)
         for (const ev of KEEP_EVENTS) {
-            assert.ok(seriesNames.includes(ev), `(${name}/${lang}) 系列應含所選事件 '${ev}'，實得 ${JSON.stringify(seriesNames)}`)
+            assert.ok(selected[ev] === true, `(${name}/${lang}) 保留事件 '${ev}' 之圖例應為顯示中，實得 ${JSON.stringify(selected)}`)
         }
-        //取消的事件不應殘留為系列
-        assert.ok(!seriesNames.includes('updateTargets-success'), `(${name}/${lang}) 已取消事件 'updateTargets-success' 不應出現於系列，實得 ${JSON.stringify(seriesNames)}`)
+        for (const ev of ['updateTargets-success', 'api/getPerm-success', 'getWebInfor-success']) {
+            assert.ok(selected[ev] === false, `(${name}/${lang}) 已由圖例關掉之事件 '${ev}' 不應顯示，實得 ${JSON.stringify(selected)}`)
+        }
     }
     else if (name === 'E2E-003-event-total') {
-        //清除所有事件 + 勾「全部加總」→ 圖表僅單一 Total 加總線（系列恰 1 條、名為 $t('staTotal')）
+        //勾「全部加總」→ 系列加入 Total 加總線（Total + 5 事件 = 6 條；Total 置首）
         const totalName = await page.evaluate(() => window.$vo.$t('staTotal'))
-        assert.ok(seriesNames.length === 1, `(${name}/${lang}) 清除事件後僅勾全部加總，系列數應為 1，實得 series=${JSON.stringify(seriesNames)}`)
-        assert.ok(seriesNames[0] === totalName, `(${name}/${lang}) 唯一系列名應為全部加總「${totalName}」，實得 ${JSON.stringify(seriesNames)}`)
+        assert.ok(seriesNames.length === 6, `(${name}/${lang}) 勾全部加總後系列數應為 6（Total + 5 事件），實得 series=${JSON.stringify(seriesNames)}`)
+        assert.ok(seriesNames[0] === totalName, `(${name}/${lang}) 首條系列名應為全部加總「${totalName}」，實得 ${JSON.stringify(seriesNames)}`)
     }
 }
 
@@ -219,7 +246,7 @@ async function assertTableSpec(page, lang) {
 //case 定義：run(browser,lang) 走流程並回傳 { buf, page }；mocha 模式再加語意斷言。
 const CASES = [
     {
-        //E2E-001：進統計資訊頁，預設全選 → 每事件各一條折線（5 條）
+        //E2E-001：進統計資訊頁 → 每事件各一條折線（5 條）
         name: 'E2E-001-event-all',
         run: async (browser, lang) => {
             const page = await openApp(browser)
@@ -232,30 +259,29 @@ const CASES = [
         semantic: async (page, lang) => { await assertSpecForCase(page, lang, 'E2E-001-event-all') },
     },
     {
-        //E2E-002：取消其餘事件、只保留 2 個 → 僅 2 條折線（展示單一事件趨勢辨認）
+        //E2E-002：以圖例關掉其餘事件、只留 2 個 → 僅 2 條折線（展示單一事件趨勢辨認）
         name: 'E2E-002-event-selected',
         run: async (browser, lang) => {
             const page = await openApp(browser)
             await setLang(page, lang)
             await gotoStaInfor(page)
-            await keepOnlyEvents(page, KEEP_EVENTS)
+            await keepOnlyEventsByLegend(page, KEEP_EVENTS, ALL_MOCK_EVENTS)
             const title = await page.evaluate(() => window.$vo.$t('staEventTitle'))
-            const buf = await captureStableWithBox(page, eventCardLoc(page, title)) //觀看區：事件發生頻率卡片（只選 2 個事件）
+            const buf = await captureStableWithBox(page, eventCardLoc(page, title)) //觀看區：事件發生頻率卡片（圖例只留 2 個事件）
             return { buf, page }
         },
         semantic: async (page, lang) => { await assertSpecForCase(page, lang, 'E2E-002-event-selected') },
     },
     {
-        //E2E-003：清除所有事件 → 勾「全部加總」→ 圖表僅單一 Total 加總線
+        //E2E-003：勾「全部加總」→ 圖表加入 Total 加總線（Total + 5 事件）
         name: 'E2E-003-event-total',
         run: async (browser, lang) => {
             const page = await openApp(browser)
             await setLang(page, lang)
             await gotoStaInfor(page)
-            await clearAllEvents(page)   //點「清除」按鈕，移除所有事件線
             await checkShowTotal(page)   //勾「全部加總」#staShowTotal
             const title = await page.evaluate(() => window.$vo.$t('staEventTitle'))
-            const buf = await captureStableWithBox(page, eventCardLoc(page, title)) //觀看區：事件發生頻率卡片（僅 Total 線）
+            const buf = await captureStableWithBox(page, eventCardLoc(page, title)) //觀看區：事件發生頻率卡片（含 Total 線）
             return { buf, page }
         },
         semantic: async (page, lang) => { await assertSpecForCase(page, lang, 'E2E-003-event-total') },
@@ -301,6 +327,7 @@ async function generateBaseline() {
     //啟動 mock 後端（確定性事件資料集）
     await restartBackend(genTempSettings({ staEventMock: true }))
     fs.mkdirSync(PICS_DIR, { recursive: true })
+    process.env.E2E_STRICT_CAPTURE = '1' //regen 端：captureStable 未 settle 即 throw，拒絕寫入未穩定畫面
     try {
         for (const lang of LANGS) {
             if (onlyLangs && !nameMatch(onlyLangs, lang)) continue //§6.3 手術式：跳過未指定語系

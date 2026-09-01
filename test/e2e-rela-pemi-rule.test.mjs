@@ -18,7 +18,7 @@
 import fs from 'fs'
 import assert from 'assert'
 import JSON5 from 'json5'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal } from './e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal, captureBaseSeed, resetDb } from './e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/rela-pemi-rule'
 const LANGS = ['eng', 'cht']
@@ -141,23 +141,8 @@ async function assertModalMsg(page, i18nKey) {
 //—— DB 衛生 helpers（每 case 前還原 pemis 表為 base seed）——
 //E2E-004 會寫 DB（updatePemis）；其餘 case 雖不寫 DB 但為一致性與隔離仍每 case 還原。
 let BASE_SEED = null
-async function captureBaseSeed(page) {
-    await page.waitForFunction(() => (window.$vo.$store.state.pemis || []).length > 0, null, { timeout: 30000 })
-    await page.waitForTimeout(1500) //確保整批同步完成
-    return await page.evaluate(() => {
-        const ps = (window.$vo.$store.state.pemis || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0))
-        return JSON.parse(JSON.stringify(ps))
-    })
-}
-//在獨立 throwaway page 還原 pemis（$fapi.updatePemis 帶整批 base seed → 後端 diff 對齊）。關閉後再開 case page。
-async function resetDb(browser, seed) {
-    if (!seed || seed.length === 0) throw new Error('resetDb: BASE_SEED 為空，拒絕還原（避免清空 DB）')
-    const p = await openApp(browser)
-    await p.evaluate((s) => window.$vo.$fapi.updatePemis(s), seed)
-    await p.waitForFunction((n) => (window.$vo.$store.state.pemis || []).length === n, seed.length, { timeout: 15000 })
-    await p.waitForTimeout(800)
-    await p.context().close()
-}
+//captureBaseSeed(page,'pemis') / resetDb(browser,'pemis',seed) 收斂進 e2e-setup.mjs 共用
+//（原本 grups/pemis/rela-grup-pemi/rela-pemi-rule/rela-user-grup/targets/users 七檔重複定義）。
 //讀 DB（store 同步）某 name pemi 的 crules（原始 JSON5 字串），於 node 端以 JSON5 解析後回傳物件，供斷言。
 //（JSON5 為 node 端 import，不可於 page.evaluate browser context 使用，故只取原字串出來再 node 端解析。）
 async function readDbPemiCrules(page, pemiName) {
@@ -404,15 +389,16 @@ async function generateBaseline() {
     const onlyLangs = argList('--langs')
     await startServersOnce()
     fs.mkdirSync(PICS_DIR, { recursive: true })
+    process.env.E2E_STRICT_CAPTURE = '1' //regen 端：captureStable 未 settle 即 throw，拒絕寫入未穩定畫面
     //擷取 pristine base seed（DB 剛 fresh seed）——用臨時 browser
-    { const b = await launchBrowser(); const pp = await openApp(b); BASE_SEED = await captureBaseSeed(pp); await b.close() }
+    { const b = await launchBrowser(); const pp = await openApp(b); BASE_SEED = await captureBaseSeed(pp, 'pemis'); await b.close() }
     for (const lang of LANGS) {
         if (onlyLangs && !nameMatch(onlyLangs, lang)) continue //§6.3 手術式：跳過未指定語系
         for (const c of CASES) {
             if (onlyNames && !nameMatch(onlyNames, c.name)) continue //§6.3 手術式：截圖前 gate，跳過未指定 case
             //per-case fresh browser（消除 GPU/font/CSS cache 跨 case 累積造成的 cold/warm 差異；對齊 sso）
             const browser = await launchBrowser()
-            await resetDb(browser, BASE_SEED) //throwaway page 還原 DB 為 base seed，關閉後再開 case page
+            await resetDb(browser, 'pemis', BASE_SEED) //throwaway page 還原 DB 為 base seed，關閉後再開 case page
             const page = await openApp(browser)
             await setLang(page, lang) //eng 也切（symmetric）：補等同 cht setLang 的 re-render+settle 時間
             //run 回傳「單張 Buffer」或「多階段 [{name, buf}]」；統一正規化為陣列後逐張寫入
@@ -440,13 +426,13 @@ else {
             before(async function() {
                 this.timeout(200000)
                 await startServersOnce()
-                if (!BASE_SEED) { const b = await launchBrowser(); const pp = await openApp(b); BASE_SEED = await captureBaseSeed(pp); await b.close() }
+                if (!BASE_SEED) { const b = await launchBrowser(); const pp = await openApp(b); BASE_SEED = await captureBaseSeed(pp, 'pemis'); await b.close() }
             })
             //per-case fresh browser：每 case 全新 browser 進程（對齊 sso），消 cross-case GPU/font cache 累積
             beforeEach(async function() {
                 this.timeout(90000)
                 browser = await launchBrowser()
-                await resetDb(browser, BASE_SEED) //throwaway page 還原 DB 為 base seed
+                await resetDb(browser, 'pemis', BASE_SEED) //throwaway page 還原 DB 為 base seed
             })
             afterEach(async function() { if (browser) { await browser.close(); browser = null } })
             for (const c of CASES) {

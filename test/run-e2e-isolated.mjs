@@ -53,7 +53,8 @@ for (const f of E2E_FILES) {
     killPort(BACKEND_PORT)
     await sleep(2000)
     console.log(`\n=== [run-e2e-isolated] 執行 ${f}（全新後端）===`)
-    const r = spawnSync('npx', ['mocha', join('test', f), '--reporter', 'spec', '--timeout', '300000'], {
+    //--reporter list: 每 case 立即印 ✓/✗ (技能慣例; spec 會延遲到 describe 結束才輸出)
+    const r = spawnSync('npx', ['mocha', join('test', f), '--reporter', 'list', '--timeout', '300000'], {
         cwd: projRoot, stdio: 'inherit', shell: isWin,
     })
     results.push({ file: f, code: r.status })

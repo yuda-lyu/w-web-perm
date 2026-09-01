@@ -14,7 +14,7 @@
 //
 // 使用方式:
 //   1. 先 npm run build 產 dist。
-//   2. 產標準圖: node test/e2e-init.test.mjs --baseline
+//   2. 產標準圖: node test/e2e-init.test.mjs --baseline [--names E2E-001,...] [--langs eng,cht]（手術式重產，§6.3）
 //   3. 跑測試:   npx mocha test/e2e-init.test.mjs --timeout 120000 --reporter list （pixelmatch 反鋸齒感知 + maxDiffPixels 容差比對，非 byte-exact）
 //
 // 標準圖: test/pics/init/init-{lang}-{NNN-name}.png（同 SSO 命名）
@@ -228,13 +228,29 @@ function assertCase(lang, info, c) {
 }
 
 
+//手術式重產（§6.3）：--names a,b,c 只產指定 case；--langs eng,cht 只產指定語系。截圖（連 restartBackend/launch）「前」就 gate。
+function argList(flag) {
+    const i = process.argv.indexOf(flag)
+    if (i >= 0 && process.argv[i + 1]) return process.argv[i + 1].split(',').map((s) => s.trim()).filter(Boolean)
+    return null
+}
+//前綴或完整匹配：傳 'E2E-001' 即可匹配 'E2E-001-connecting-screen'（避免 §6.3 殷鑑「--names 只認字面」陷阱）
+function nameMatch(list, caseName) {
+    return list.some((nm) => caseName === nm || caseName.startsWith(nm))
+}
+
 async function generateBaseline() {
+    const onlyNames = argList('--names')
+    const onlyLangs = argList('--langs')
     if (!fs.existsSync(baselineDir)) {
         fs.mkdirSync(baselineDir, { recursive: true })
     }
     ensureIndexTmpl()
+    process.env.E2E_STRICT_CAPTURE = '1' //regen 端：captureStable 未 settle 即 throw，拒絕寫入未穩定畫面
     for (const lang of langs) {
+        if (onlyLangs && !nameMatch(onlyLangs, lang)) continue //§6.3 手術式：跳過未指定語系
         for (const { name, capture } of cases) {
+            if (onlyNames && !nameMatch(onlyNames, name)) continue //§6.3 手術式：截圖（含 restartBackend/launch）前 gate，跳過未指定 case
             const { buf } = await capture(lang)
             fs.writeFileSync(bp(lang, name), buf)
             console.log(`  wrote ${lang}/${name} (${buf.length} bytes)`)

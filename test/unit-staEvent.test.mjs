@@ -4,7 +4,7 @@
 //  server/staLogs/staEventTable.mjs   —— 巢狀窗累計 1hr⊂4hr⊂8hr⊂24hr(:50-73)
 //  server/staLogs/filterVpfsByWindow.mjs —— 檔名粒度自適應防線(:15-24)
 //
-//fixture 於 tmp/fixture-logs/ 自造 w-syslog 格式 log(檔名 `YYYY-MM-DDTHH.log`(hr)或 `YYYY-MM-DD.log`(day),
+//fixture 於 test/_tmp/fixture-logs/ 自造 w-syslog 格式 log(檔名 `YYYY-MM-DDTHH.log`(hr)或 `YYYY-MM-DD.log`(day),
 //每行一筆 JSON `{"time":"<ISO字串>","event":"<名稱>"}`),時間一律以執行當下 dayjs 相對推算(不寫死日期)。
 
 import assert from 'assert'
@@ -18,9 +18,11 @@ import filterVpfsByWindow from '../server/staLogs/filterVpfsByWindow.mjs'
 import proc from '../server/procStaInfor.mjs'
 
 
-//fixture 目錄錨定於 test 檔所在之上一層 tmp/(≡ 專案 cwd 下 tmp/),不受執行 cwd 影響
+//fixture 目錄錨定於 test 檔所在之 _tmp/,不受執行 cwd 影響。
+//刻意不用專案 ./tmp/:該處為 AI 代理暫存區,隨時可能被整個清除,測試中介資料放該處會被誤刪而假失敗。
 let __dirname = path.dirname(fileURLToPath(import.meta.url))
-let fdLog = path.resolve(__dirname, '..', 'tmp', 'fixture-logs')
+let fdTmp = path.resolve(__dirname, '_tmp')
+let fdLog = path.join(fdTmp, 'fixture-logs')
 
 //以 hr 粒度檔名寫入一批事件行(檔名取事件時刻之小時桶)
 function writeHrLog(t, event, n = 1) {
@@ -76,6 +78,8 @@ describe('unit-staEvent', function() {
 
     after(function() {
         fs.rmSync(fdLog, { recursive: true, force: true })
+        //測完不留臨時資料夾:_tmp 已空才移除(其他測試檔可能仍在用,故不強制遞迴刪)
+        try { if (fs.readdirSync(fdTmp).length === 0) { fs.rmdirSync(fdTmp) } } catch (e) {}
     })
 
 
@@ -209,7 +213,8 @@ describe('unit-staEvent', function() {
     //      故於 reject 源頭驗 key 等價覆蓋契約(api-level RPC 觸發需自建 client + 專屬後端, 成本不成比例, 見規劃書 M-7 裁決)。
     it('UNIT-006-procStaInfor-reject-keys-on-failure', async function() {
         //arrange: 建一個「檔案」充當 fdLog
-        let fpNotDir = path.resolve(__dirname, '..', 'tmp', 'not-a-dir.log')
+        let fpNotDir = path.join(fdTmp, 'not-a-dir.log')
+        fs.mkdirSync(fdTmp, { recursive: true }) //不倚賴他處已建好父目錄
         fs.writeFileSync(fpNotDir, 'x', 'utf8')
         let psi = proc({ mock: false, fdLog: fpNotDir })
         try {
