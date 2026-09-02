@@ -80,9 +80,9 @@ function proc(opt = {}) {
         //cacheKey: 含 timeLength + timeInterval 避免不同分組互蓋快取
         let cacheKey = `${timeLength}:${timeInterval}`
 
-        //wsemi ≥1.8.81 cache: 執行中共用 in-flight promise (併發不輪詢); timeFrom:'end' 使 30 秒自掃描完成起算; cacheError:false 失敗不快取且拋錯
+        //wsemi ≥1.8.81 cache: 執行中共用 in-flight promise (併發不輪詢); timeFrom:'end' 使 30 秒自掃描完成起算; useCacheWhenError:false 失敗不快取且拋錯
         //(取代原「非陣列即 clear + reject」之繞道), 失敗一律 reject 'cannotGetStaEvent' 讓上層 (kpFunExt) 記 err key
-        let r = await ocGetStaEvent.getProxy(cacheKey, { fun: _getStaEvent, inputs: [timeLength, timeInterval], timeExpired: 30 * 1000, timeFrom: 'end', cacheError: false }) //快取30秒
+        let r = await ocGetStaEvent.getProxy(cacheKey, { fun: _getStaEvent, inputs: [timeLength, timeInterval], timeExpired: 30 * 1000, timeFrom: 'end', useCacheWhenError: false }) //快取30秒
             .catch(() => {
                 return Promise.reject('cannotGetStaEvent')
             })
@@ -110,7 +110,7 @@ function proc(opt = {}) {
     let getStaEventTable = async (userId) => {
 
         //cache 選項同 getStaEvent
-        let r = await ocGetStaEventTable.getProxy('staEventTable', { fun: _getStaEventTable, inputs: [], timeExpired: 30 * 1000, timeFrom: 'end', cacheError: false }) //快取30秒
+        let r = await ocGetStaEventTable.getProxy('staEventTable', { fun: _getStaEventTable, inputs: [], timeExpired: 30 * 1000, timeFrom: 'end', useCacheWhenError: false }) //快取30秒
             .catch(() => {
                 return Promise.reject('cannotGetStaEventTable')
             })
