@@ -3,7 +3,7 @@
 <head>
     
     <meta charset="utf-8">
-    <title>WWebPerm.mjs - Documentation</title>
+    <title>server/WWebPerm.mjs - Documentation</title>
     
     
     <script src="scripts/prettify/prettify.js"></script>
@@ -29,13 +29,13 @@
 <nav >
     
     
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="WWebPerm.html">WWebPerm</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="WWebPerm.html">WWebPerm</a></li></ul><h3>Global</h3><ul><li><a href="global.html#fetchJson">fetchJson</a></li><li><a href="global.html#mergePickKeysOnly">mergePickKeysOnly</a></li></ul>
     
 </nav>
 
 <div id="main">
     
-    <h1 class="page-title">WWebPerm.mjs</h1>
+    <h1 class="page-title">server/WWebPerm.mjs</h1>
     
 
     
@@ -88,7 +88,7 @@ import procStaInfor from './procStaInfor.mjs'
  * @param {String} url 輸入資料庫連線字串，例如w-orm-lmdb為'./db'，或w-orm-mongodb為'mongodb://username:password@$127.0.0.1:27017'
  * @param {String} db 輸入資料庫名稱字串
  * @param {Function} getUserByToken 輸入處理函數，函數會傳入使用者token，通過此函數處理後並回傳使用者資訊物件，並至少須提供'id'、'email'、'name'、'isAdmin'欄位，且'isAdmin'限輸入'y'或'n'。注意: token 回傳之'isAdmin'僅供識別，權限系統一律以自身users表該使用者之'isAdmin'欄位值為權威，不會被 token 宣稱之值複寫
- * @param {Function} verifyClientUser 輸入驗證瀏覽使用者身份之處理函數，函數會傳入使用者資訊物件，通過此函數識別後回傳布林值，允許使用者回傳true，反之回傳false
+ * @param {Function} verifyClientUser 輸入驗證瀏覽使用者身份之處理函數，函數會傳入使用者資訊物件(perm users 表之列)與來源字串from，通過此函數識別後回傳布林值(可為Promise)，允許使用者回傳true，反之回傳false。from 值域: 'getUserByToken'(登入)、'getPerm'(api/getPerm)、以及資料通道之 apiType 'main'(RPC 與 ORM 執行)、'upload-controller'、'upload-slice'、'download-get-filename'、'download-get-file'、'download'；資料通道與登入採同一授權強度(反查 perm users 且 isActive='y' 後再經本函數)
  * @param {Function} verifyAppUser 輸入驗證應用程序使用者身份之處理函數，函數會傳入使用者資訊物件，通過此函數識別後回傳布林值，允許使用者回傳true，反之回傳false
  * @param {Object} [opt={}] 輸入設定物件，預設{}
  * @param {Integer} [opt.serverPort=11006] 輸入伺服器通訊port，預設11006
@@ -396,34 +396,6 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     }
 
 
-    // //getTargetsList
-    // let getTargetsList = async (userId) => {
-    //     let rs = await woItems.targets.select()
-    //     return rs
-    // }
-
-
-    // //getPemisList
-    // let getPemisList = async (userId) => {
-    //     let rs = await woItems.pemis.select()
-    //     return rs
-    // }
-
-
-    // //getGrupsList
-    // let getGrupsList = async (userId) => {
-    //     let rs = await woItems.grups.select()
-    //     return rs
-    // }
-
-
-    // //getUsersList
-    // let getUsersList = async (userId) => {
-    //     let rs = await woItems.users.select()
-    //     return rs
-    // }
-
-
     //checkUser
     let checkUser = async(user) => {
         let id = get(user, 'id', '')
@@ -513,22 +485,6 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     }
 
 
-    //p
-    let p = {
-        checkToken: async(token) => {
-
-            //getUserByToken
-            let u = await getUserByToken(token)
-            // console.log('u', u)
-
-            //checkUser
-            await checkUser(u)
-
-            return true
-        },
-    }
-
-
     //getAndVerifyClientUser
     let getAndVerifyClientUser = async (token, from = '') => {
         //基於token查找client使用者, 會基於外部getUserByToken以及perm內部users進行查找並比對
@@ -591,6 +547,25 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     }
 
 
+    //p
+    let p = {
+        //checkToken, 資料通道(/api/main 之 RPC 與 ORM 執行、上傳、下載)之連線驗證, 與 api/getUserByToken(登入)採同一授權強度:
+        //外部 getUserByToken → 欄位齊備 → 反查 perm users(mappingBy)且 isActive='y' → verifyClientUser(user, from)
+        //why: 2026-09-07 前僅驗外部 token 欄位齊備(checkUser), 不查 perm users 與 isActive, 亦不經 verifyClientUser,
+        //致不在 perm users 表之外部使用者、被停用(isActive='n')之使用者仍可經資料通道讀寫全部權限資料(實測 A3/A4, 見 tmp/probe-report.json);
+        //改為與登入入口對稱, 使 UI 之「是否有效」與部署層 verifyClientUser 政策對資料通道亦生效.
+        //from 為 w-converhp 之 apiType('main' / 'upload-controller' / 'upload-slice' / 'download-get-filename' / 'download-get-file' / 'download'),
+        //供部署層 verifyClientUser(user, from) 區分入口.
+        checkToken: async(token, from = '') => {
+
+            //getAndVerifyClientUser, reject 時 key: cannotFindUserFromToken / cannotGetUserFromPerm / userNoPermission 等
+            await getAndVerifyClientUser(token, from)
+
+            return true
+        },
+    }
+
+
     //parsePayload
     let parsePayload = async (req) => {
 
@@ -645,49 +620,49 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         //序列化同表之並行整表 delAll+insert: 防 lost update (同 keyTable 序列化, 不同表並行)
         return await kmx('syncAndReplaceTabs:' + keyTable, async () => {
 
-        //from
-        let from = get(inp, 'from', '')
-        // console.log('from', from)
+            //from
+            let from = get(inp, 'from', '')
+            // console.log('from', from)
 
-        //check
-        if (!isestr(from)) {
-            console.log('inp', inp)
-            srLog.error({ event: 'syncAndReplaceTabs-error', msg: 'invalidFrom', keyTable })
-            return Promise.reject(`invalidFrom`)
-        }
+            //check
+            if (!isestr(from)) {
+                console.log('inp', inp)
+                srLog.error({ event: 'syncAndReplaceTabs-error', msg: 'invalidFrom', keyTable })
+                return Promise.reject(`invalidFrom`)
+            }
 
-        //rows
-        let rows = get(inp, 'rows', [])
-        // console.log(keyTable, rows)
+            //rows
+            let rows = get(inp, 'rows', [])
+            // console.log(keyTable, rows)
 
-        //check
-        if (!isearr(rows)) {
-            console.log('inp', inp)
-            console.log('keyTable', keyTable)
-            srLog.error({ event: 'syncAndReplaceTabs-error', msg: 'invalidRows', keyTable })
-            return Promise.reject(`invalidRows`)
-        }
+            //check
+            if (!isearr(rows)) {
+                console.log('inp', inp)
+                console.log('keyTable', keyTable)
+                srLog.error({ event: 'syncAndReplaceTabs-error', msg: 'invalidRows', keyTable })
+                return Promise.reject(`invalidRows`)
+            }
 
-        //save from
-        rows = map(rows, (v, k) => {
+            //save from
+            rows = map(rows, (v, k) => {
             // v.order = k + 1 //order大部分由外部給予, 不能複寫
-            v.from = from
-            return v
-        })
+                v.from = from
+                return v
+            })
 
-        //ltdtmapping
-        rows = ltdtmapping(rows, ds[keyTable].keys)
-        // console.log('ltdtmapping rows', rows)
+            //ltdtmapping
+            rows = ltdtmapping(rows, ds[keyTable].keys)
+            // console.log('ltdtmapping rows', rows)
 
-        //delAll from
-        await woItems[keyTable].delAll({ from })
+            //delAll from
+            await woItems[keyTable].delAll({ from })
 
-        //insert
-        // let r = await woItems[keyTable].insert(rows)
-        let r = await procOrm(userId, keyTable, 'insert', rows) //須使用procOrm才有辦法自動給予相關欄位
-        // console.log('r', r)
+            //insert
+            // let r = await woItems[keyTable].insert(rows)
+            let r = await procOrm(userId, keyTable, 'insert', rows) //須使用procOrm才有辦法自動給予相關欄位
+            // console.log('r', r)
 
-        return r
+            return r
 
         })
     }
@@ -1129,8 +1104,16 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                 return false
             }
 
-            //checkToken
-            let b = await p.checkToken(token)
+            //checkToken, 失敗一律回 false(傳輸層回 permission denied); reject 之 err key 記於 verifyConn log 之 msg
+            let b = false
+            let msg = ''
+            await p.checkToken(token, apiType)
+                .then(() => {
+                    b = true
+                })
+                .catch((err) => {
+                    msg = (typeof err === 'string') ? err : ((err &amp;&amp; err.message) || 'checkTokenFail')
+                })
             // console.log('b', b)
 
             //ip, 對齊sso慣例x-forwarded-for取第1個, fallback到req remoteAddress, 取不到則略過
@@ -1145,8 +1128,13 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             //referer
             let referer = get(headers, 'referer', '')
 
-            //info
-            srLog.info({ event: 'verifyConn', ok: b, apiType, ip, origin, referer })
+            //info, 失敗時 msg 為 err key(cannotFindUserFromToken / cannotGetUserFromPerm / userNoPermission 等), 供資安稽核與統計
+            if (b) {
+                srLog.info({ event: 'verifyConn', ok: b, apiType, ip, origin, referer })
+            }
+            else {
+                srLog.error({ event: 'verifyConn-error', ok: b, apiType, ip, origin, referer, msg })
+            }
 
             return b
         },
@@ -1173,15 +1161,14 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
             getWebInfor,
 
-            // getTargetsList,
-            // getPemisList,
-            // getGrupsList,
-            // getUsersList,
-
             updateTargets: pc.updateTargets,
             updatePemis: pc.updatePemis,
             updateGrups: pc.updateGrups,
-            updateUsers: pc.updateUsers,
+            //updateUsers, modeEditUsers='for:grups' 時 API 與 UI 一致只採納既有使用者之 cgrups 變更, 身分欄/新增/刪除/順序以資料庫為準
+            updateUsers: (userId, rows) => {
+                let opt = (modeEditUsers === 'for:grups') ? { pickKeysOnly: ['cgrups'] } : {}
+                return pc.updateUsers(userId, rows, opt)
+            },
 
             getStaEvent: async (userId, timeLength, timeInterval) => {
                 try {
@@ -1208,7 +1195,10 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             },
 
         },
-        fnTableTags: 'tableTags-web-perm.json',
+        //fpTableTags: 各資料表時間戳檔案(供前端判定是否需重新同步)。
+        //w-serv-hapi 1.0.87 起之正式名稱; 舊名 fnTableTags 於該版之前傳下去等同未給(w-serv-webdata 只讀 fpTableTags),
+        //故 1.0.86 及之前實際寫的是預設之 ./tableTags.json, 升版後改用本檔名。
+        fpTableTags: 'tableTags-web-perm.json',
     })
 
 
@@ -1231,7 +1221,7 @@ export default WWebPerm
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Sun Sep 06 2026 01:04:48 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Sun Sep 13 2026 12:02:03 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>

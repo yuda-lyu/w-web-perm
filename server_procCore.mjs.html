@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    
+    <meta charset="utf-8">
+    <title>server/procCore.mjs - Documentation</title>
+    
+    
+    <script src="scripts/prettify/prettify.js"></script>
+    <script src="scripts/prettify/lang-css.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc.css">
+    <script src="scripts/nav.js" defer></script>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+<input type="checkbox" id="nav-trigger" class="nav-trigger" />
+<label for="nav-trigger" class="navicon-button x">
+  <div class="navicon"></div>
+</label>
+
+<label for="nav-trigger" class="overlay"></label>
+
+<nav >
+    
+    
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="WWebPerm.html">WWebPerm</a></li></ul><h3>Global</h3><ul><li><a href="global.html#fetchJson">fetchJson</a></li><li><a href="global.html#mergePickKeysOnly">mergePickKeysOnly</a></li></ul>
+    
+</nav>
+
+<div id="main">
+    
+    <h1 class="page-title">server/procCore.mjs</h1>
+    
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import get from 'lodash-es/get.js'
+import each from 'lodash-es/each.js'
+import map from 'lodash-es/map.js'
+import size from 'lodash-es/size.js'
+import sortBy from 'lodash-es/sortBy.js'
+import isestr from 'wsemi/src/isestr.mjs'
+import isearr from 'wsemi/src/isearr.mjs'
+import haskey from 'wsemi/src/haskey.mjs'
+import arrHas from 'wsemi/src/arrHas.mjs'
+import ltdtDiffByKey from 'wsemi/src/ltdtDiffByKey.mjs'
+import ltdtmapping from 'wsemi/src/ltdtmapping.mjs'
+import ds from '../src/schema/index.mjs'
+
+
+/**
+ * 僅採納既有列之指定欄位變更, 其餘欄位、新增列、缺列(刪除)與順序一律以資料庫現值為準
+ *
+ * 用於 modeEditUsers='for:grups': 使用者身分由外部單一登入系統同步, 本系統只擁有群組指派(cgrups), 故 API 層須與 UI 一致只接受 cgrups 變更
+ *
+ * @param {Array} ltdtDb 資料庫現有列(select 結果, 依 order 排序後為基底)
+ * @param {Array} rowsIn 前端/外部送入之整表列
+ * @param {String} keyDetect 對應列之鍵欄位(如 'id')
+ * @param {Array} pickKeys 允許採納之欄位名陣列(如 ['cgrups'])
+ * @returns {Array} 以資料庫列為基底、僅覆蓋 pickKeys 之新列陣列(順序同資料庫)
+ */
+function mergePickKeysOnly(ltdtDb, rowsIn, keyDetect, pickKeys) {
+    let kpIn = {}
+    each(rowsIn, (r) => {
+        let v = get(r, keyDetect, '')
+        if (isestr(v)) {
+            kpIn[v] = r
+        }
+    })
+    let ltdt = sortBy(ltdtDb, 'order')
+    ltdt = map(ltdt, (u) => {
+        let r = { ...u }
+        let v = get(u, keyDetect, '')
+        let rin = get(kpIn, v, null)
+        if (rin !== null) {
+            each(pickKeys, (k) => {
+                if (haskey(rin, k)) {
+                    r[k] = rin[k]
+                }
+            })
+        }
+        return r
+    })
+    return ltdt
+}
+
+
+function proc(woItems, procOrm, { srLog, kmx }) {
+
+
+    //updateTabItems
+    let updateTabItems = async (keyTable, userId, rows, keyDetect, opt = {}) => {
+        // console.log('updateTabItems', keyTable, userId, rows.length, keyDetect)
+
+        //pickKeysOnly, 僅採納既有列之指定欄位變更(見 mergePickKeysOnly), 未給則整表 diff 寫入
+        let pickKeysOnly = get(opt, 'pickKeysOnly', null)
+
+        //序列化同表之並行整表批次寫入: 防 lost update (同 keyTable 序列化, 不同表並行)
+        return await kmx('updateTabItems:' + keyTable, async () => {
+
+        //pickKeysOnly, 須於 mutex 內讀取資料庫為基底, 避免與並行寫入 race
+        if (isearr(pickKeysOnly)) {
+            let ltdtDb = await woItems[keyTable].select()
+            rows = mergePickKeysOnly(ltdtDb, rows, keyDetect, pickKeysOnly)
+            srLog.info({ event: 'updateTabItems-pickKeysOnly', keyTable, userId, pickKeysOnly })
+        }
+
+        //ltdtmapping
+        rows = ltdtmapping(rows, ds[keyTable].keys)
+        // console.log('ltdtmapping rows', rows)
+
+        //重給order
+        rows = map(rows, (r, k) => {
+            r.order = k + 1
+            return r
+        })
+
+        //ckKey, 回傳 err key (saveRowFieldInvalid / saveRowFieldDuplicate) 或 null; 動態細節 (row index/field/value) 改記 srLog, 不進使用者訊息
+        let ckKey = (rows, key) => {
+            let err = null
+
+            //check
+            let kp = {}
+            each(rows, (v, k) => {
+
+                //value
+                let value = get(v, key, '')
+
+                //check
+                if (!isestr(value)) {
+                    srLog.error({ event: 'updateTabItems-ckKey-error', keyTable, key, msg: 'saveRowFieldInvalid', row: k })
+                    err = `saveRowFieldInvalid`
+                    return false //跳出
+                }
+
+                //check
+                if (haskey(kp, value)) {
+                    srLog.error({ event: 'updateTabItems-ckKey-error', keyTable, key, msg: 'saveRowFieldDuplicate', row: k, value })
+                    err = `saveRowFieldDuplicate`
+                    return false //跳出
+                }
+
+                //kp
+                kp[value] = true
+
+            })
+
+            return err
+        }
+
+        //偵測未給予或重複
+        let err = null
+        if (true) {
+            if (arrHas(keyTable, ['targets'])) {
+                err = ckKey(rows, 'id')
+                if (err !== null) {
+                    return Promise.reject(err)
+                }
+            }
+            if (arrHas(keyTable, ['pemis', 'grups'])) { //users可重複name故不列入
+                err = ckKey(rows, 'name')
+                if (err !== null) {
+                    return Promise.reject(err)
+                }
+            }
+            if (arrHas(keyTable, ['users'])) {
+                err = ckKey(rows, 'email')
+                if (err !== null) {
+                    return Promise.reject(err)
+                }
+            }
+        }
+
+        //ltdtDiffByKey
+        let ltdtOld = await woItems[keyTable].select()
+        let ltdtNew = rows
+        let r = ltdtDiffByKey(ltdtOld, ltdtNew, keyDetect)
+        // console.log('ltdtDiffByKey r', r)
+
+        //del
+        if (size(r.del) > 0) {
+            await procOrm(userId, keyTable, 'del', r.del) //須使用procOrm才有辦法自動給予相關欄位
+            // .catch((err) => {
+            //     console.log('woItems[keyTable].del err', err)
+            // })
+        }
+
+        //add
+        if (size(r.add) > 0) {
+            await procOrm(userId, keyTable, 'insert', r.add) //須使用procOrm才有辦法自動給予相關欄位
+            // .catch((err) => {
+            //     console.log('woItems[keyTable].insert err', err)
+            // })
+        }
+
+        //diff
+        if (size(r.diff) > 0) {
+            await procOrm(userId, keyTable, 'save', r.diff) //須使用procOrm才有辦法自動給予相關欄位
+            // .catch((err) => {
+            //     console.log('woItems[keyTable].save err', err)
+            // })
+        }
+
+        return ltdtNew
+
+        })
+    }
+
+
+    //errLog: 失敗統一記 err key (updateTabItems reject 為 key 字串如 saveRowFieldInvalid; procOrm 失敗為 Error)
+    let errLog = (event, userId, err) => {
+        srLog.error({ event, userId, msg: (typeof err === 'string') ? err : ((err &amp;&amp; err.message) || event) })
+    }
+
+
+    //updateTargets
+    let updateTargets = async (userId, rows) => {
+        try {
+            await updateTabItems('targets', userId, rows, 'id')
+        }
+        catch (err) { errLog('updateTargets-error', userId, err); throw err }
+        srLog.info({ event: 'updateTargets-success', userId })
+        return 'saveTabItemsSuccess' //成功 msg key
+    }
+
+
+    //updatePemis
+    let updatePemis = async (userId, rows) => {
+        try {
+            await updateTabItems('pemis', userId, rows, 'name')
+        }
+        catch (err) { errLog('updatePemis-error', userId, err); throw err }
+        srLog.info({ event: 'updatePemis-success', userId })
+        return 'saveTabItemsSuccess' //成功 msg key
+    }
+
+
+    //updateGrups
+    let updateGrups = async (userId, rows) => {
+        try {
+            await updateTabItems('grups', userId, rows, 'name')
+        }
+        catch (err) { errLog('updateGrups-error', userId, err); throw err }
+        srLog.info({ event: 'updateGrups-success', userId })
+        return 'saveTabItemsSuccess' //成功 msg key
+    }
+
+
+    //updateUsers, opt.pickKeysOnly 給 ['cgrups'] 時僅採納既有使用者之群組指派變更(modeEditUsers='for:grups')
+    let updateUsers = async (userId, rows, opt = {}) => {
+        try {
+            await updateTabItems('users', userId, rows, 'id', opt)
+        }
+        catch (err) { errLog('updateUsers-error', userId, err); throw err }
+        srLog.info({ event: 'updateUsers-success', userId })
+        return 'saveTabItemsSuccess' //成功 msg key
+    }
+
+
+    let p = {
+        updateTargets,
+        updatePemis,
+        updateGrups,
+        updateUsers,
+    }
+
+
+    return p
+}
+
+
+export { mergePickKeysOnly }
+
+
+export default proc
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+    
+    
+</div>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Sun Sep 13 2026 12:02:03 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+</footer>
+
+<script>prettyPrint();</script>
+<script src="scripts/polyfill.js"></script>
+<script src="scripts/linenumber.js"></script>
+
+
+
+</body>
+</html>
