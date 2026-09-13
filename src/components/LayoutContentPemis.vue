@@ -301,6 +301,7 @@ export default {
 
             firstLoading: true,
             firstSetting: true,
+            systemProcing: false, //程式端載入/重載清單資料期間為 true, 用於排除非使用者操作之 rowsChange (見 $ui.markDataReload)
             showIsEditable: false,
             isEditable: false,
             isModified: false,
@@ -750,7 +751,7 @@ export default {
                         // console.log('rowsChange cloneDeep(vo.opt.rows)', cloneDeep(vo.opt.rows))
 
                         //check
-                        if (!vo.syncState || vo.firstLoading || vo.firstSetting) {
+                        if (!vo.syncState || vo.firstLoading || vo.firstSetting || vo.systemProcing) {
                             return
                         }
 
@@ -770,6 +771,9 @@ export default {
                 // console.log('opt', opt)
 
             }
+
+            //markDataReload, 重建 opt 屬程式端寫入, 其後非同步觸發之 rowsChange 不得視為使用者變更
+            vo.$ui.markDataReload(vo)
 
             //save
             vo.opt = opt

@@ -1,15 +1,16 @@
 //D 類查詢 API 契約測試共用設施。對應 spec/流程_查詢使用者權限.md、流程_查詢指定使用者權限.md、流程_外部應用同步權限資料.md。
 //
-//【關鍵】perm 的 4 個查詢 API 全是「裸 axios.get/post 打真實 HTTP URL」（src/getPerm.mjs / src/getPermUserInfor.mjs /
+//【關鍵】perm 的 4 個查詢 API 全是「裸 fetch(內建, 2026-09-07 起不再依賴 axios) 打真實 HTTP URL」（src/getPerm.mjs / src/getPermUserInfor.mjs /
 //src/perm.mjs / server/provideTabs.mjs），非 WServHapiClient/RPC。故契約測試直接 import 並呼叫 client SDK 函式，
-//url 給真實 http://127.0.0.1:11006/...，無需 sso 的 callFapi / force-exit hack（axios 無常駐連線、無 polling）。
+//url 給真實 http://127.0.0.1:11006/...，無需 sso 的 callFapi / force-exit hack（fetch 無常駐連線、無 polling）。
 //
 //服務啟動/重用、DB 種子、cleanup 全沿用 e2e-setup.mjs（§6.3 lifecycle 對稱：startServersOnce↔cleanup，
 //mocha root after hook + process 備援兩觸發來源）。API 測試只需 backend，故傳 backendOnly 省前端 webpack 首編。
 //
-//token 機制（srv.mjs:56-92）：getUserByToken 寫死兩個有效 token、verifyClientUser/verifyAppUser = isAdmin==='y'：
+//token 機制（srv.mjs getUserByToken）：寫死三個有效 token、verifyClientUser/verifyAppUser = isAdmin==='y'：
 //  'sys'                    → {id:'id-for-admin',  email:'admin@example.com',       isAdmin:'y'}（client+app 皆過）
-//  '{token-for-application}'→ {id:'id-for-application', email:'application@...',     isAdmin:'y'}（app 過；注意字面含大括號）
+//  '{token-for-application}'→ {id:'id-for-application', email:'application@...',     isAdmin:'y'}（app 過；不在 perm users 表 → client 通道拒；注意字面含大括號）
+//  '{token-for-peter}'      → {id:'id-for-peter',  email:'peter@example.com',       isAdmin:'n'}（在 perm users 表、有效、但 verifyClientUser 拒 → 供資料通道授權測試）
 //  其他                      → {}（→ 守門 reject 'can not find the user from token'）
 
 import { startServersOnce, cleanup, apiBaseUrl } from './e2e-setup.mjs'
@@ -23,7 +24,8 @@ export async function startApi() {
 
 //token 常數
 export const TOKEN_ADMIN = 'sys'                       // → id-for-admin（client 使用者，過 verifyClientUser）
-export const TOKEN_APP = '{token-for-application}'     // → id-for-application（app 使用者，過 verifyAppUser）
+export const TOKEN_APP = '{token-for-application}'     // → id-for-application（app 使用者，過 verifyAppUser；不在 perm users 表）
+export const TOKEN_PETER = '{token-for-peter}'         // → id-for-peter（在表、有效、isAdmin='n' → verifyClientUser 拒）
 export const TOKEN_BAD = 'nope-invalid'               // → getUserByToken 回 {} → 守門 reject
 
 //URL helper（含佔位符，供 client SDK 內部 replace；getPerm 用 token={token}、getPermUserInfor 用 token={sysToken}&userId={userId}）
@@ -48,7 +50,7 @@ export const SEED = {
 let _woItems = null
 export async function getWoItems() {
     if (!_woItems) {
-        const m = await import('../g_mOrm.mjs')
+        const m = await import('../../g_mOrm.mjs')
         _woItems = m.woItems
     }
     return _woItems

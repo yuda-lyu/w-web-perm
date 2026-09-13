@@ -9,7 +9,7 @@
 //save 結果（成功 / 失敗 / 空 / errInNames）皆走 $dg.showCheckYes 持久 modal。
 import fs from 'fs'
 import assert from 'assert'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, typeIntoCell, captureBaseSeed, resetDb } from './e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, typeIntoCell, captureBaseSeed, resetDb } from './tools/e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/pemis'
 const LANGS = ['eng', 'cht']

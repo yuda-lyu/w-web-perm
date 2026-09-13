@@ -3,7 +3,7 @@
 //
 //【與既有 api 查詢測之差異】perm 的 4 個寫入函式註冊於 WServHapiServer 的 kpFunExt（WWebPerm.mjs:1132-1135，
 //委派 pc.updateTargets 等，pc 為 procCore 實例，WWebPerm.mjs:300），走 w-converhp RPC 通道（POST
-//{apiBaseUrl}/api/main，body 為 obj2u8arr 編碼），非裸 axios 查詢 URL。故本檔仿
+//{apiBaseUrl}/api/main，body 為 obj2u8arr 編碼），非裸 fetch 查詢 URL。故本檔仿
 //w-web-sso/test/e2e-doubleclick.test.mjs 之 callRpc：用 Node 內建 fetch + wsemi 之 obj2u8arr/u8arr2obj 直打。
 //RPC 為 stateless POST（非常駐連線），無 sso 的 force-exit 顧慮；process 由 e2e-setup 的 mocha root after 殺 backend。
 //
@@ -21,7 +21,7 @@
 import assert from 'assert'
 import obj2u8arr from 'wsemi/src/obj2u8arr.mjs'
 import u8arr2obj from 'wsemi/src/u8arr2obj.mjs'
-import { startApi, apiBaseUrl, TOKEN_ADMIN, getWoItems } from './api-setup.mjs'
+import { startApi, apiBaseUrl, TOKEN_ADMIN, getWoItems } from './tools/api-setup.mjs'
 
 
 //4 個寫入 RPC 對照表：RPC 名 ↔ keyTable ↔ diff/去重 鍵

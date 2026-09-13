@@ -374,9 +374,9 @@ export default {
 
                 //kpHead
                 let kpHead = {
-                    'name': vo.$t('pemiName'),
-                    'mode': vo.$t('operGrupEnable'),
-                    'enable': vo.$t('operMode'),
+                    'name': vo.$t('grupName'), //本對話框列出的是權限群組（items 由 vo.grups 產生）
+                    'mode': vo.$t('operGrupMode'),
+                    'enable': vo.$t('operEnable'),
                 }
 
                 //opt

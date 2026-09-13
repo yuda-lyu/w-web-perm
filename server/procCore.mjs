@@ -2,7 +2,9 @@ import get from 'lodash-es/get.js'
 import each from 'lodash-es/each.js'
 import map from 'lodash-es/map.js'
 import size from 'lodash-es/size.js'
+import sortBy from 'lodash-es/sortBy.js'
 import isestr from 'wsemi/src/isestr.mjs'
+import isearr from 'wsemi/src/isearr.mjs'
 import haskey from 'wsemi/src/haskey.mjs'
 import arrHas from 'wsemi/src/arrHas.mjs'
 import ltdtDiffByKey from 'wsemi/src/ltdtDiffByKey.mjs'
@@ -10,15 +12,62 @@ import ltdtmapping from 'wsemi/src/ltdtmapping.mjs'
 import ds from '../src/schema/index.mjs'
 
 
+/**
+ * 僅採納既有列之指定欄位變更, 其餘欄位、新增列、缺列(刪除)與順序一律以資料庫現值為準
+ *
+ * 用於 modeEditUsers='for:grups': 使用者身分由外部單一登入系統同步, 本系統只擁有群組指派(cgrups), 故 API 層須與 UI 一致只接受 cgrups 變更
+ *
+ * @param {Array} ltdtDb 資料庫現有列(select 結果, 依 order 排序後為基底)
+ * @param {Array} rowsIn 前端/外部送入之整表列
+ * @param {String} keyDetect 對應列之鍵欄位(如 'id')
+ * @param {Array} pickKeys 允許採納之欄位名陣列(如 ['cgrups'])
+ * @returns {Array} 以資料庫列為基底、僅覆蓋 pickKeys 之新列陣列(順序同資料庫)
+ */
+function mergePickKeysOnly(ltdtDb, rowsIn, keyDetect, pickKeys) {
+    let kpIn = {}
+    each(rowsIn, (r) => {
+        let v = get(r, keyDetect, '')
+        if (isestr(v)) {
+            kpIn[v] = r
+        }
+    })
+    let ltdt = sortBy(ltdtDb, 'order')
+    ltdt = map(ltdt, (u) => {
+        let r = { ...u }
+        let v = get(u, keyDetect, '')
+        let rin = get(kpIn, v, null)
+        if (rin !== null) {
+            each(pickKeys, (k) => {
+                if (haskey(rin, k)) {
+                    r[k] = rin[k]
+                }
+            })
+        }
+        return r
+    })
+    return ltdt
+}
+
+
 function proc(woItems, procOrm, { srLog, kmx }) {
 
 
     //updateTabItems
-    let updateTabItems = async (keyTable, userId, rows, keyDetect) => {
+    let updateTabItems = async (keyTable, userId, rows, keyDetect, opt = {}) => {
         // console.log('updateTabItems', keyTable, userId, rows.length, keyDetect)
+
+        //pickKeysOnly, 僅採納既有列之指定欄位變更(見 mergePickKeysOnly), 未給則整表 diff 寫入
+        let pickKeysOnly = get(opt, 'pickKeysOnly', null)
 
         //序列化同表之並行整表批次寫入: 防 lost update (同 keyTable 序列化, 不同表並行)
         return await kmx('updateTabItems:' + keyTable, async () => {
+
+        //pickKeysOnly, 須於 mutex 內讀取資料庫為基底, 避免與並行寫入 race
+        if (isearr(pickKeysOnly)) {
+            let ltdtDb = await woItems[keyTable].select()
+            rows = mergePickKeysOnly(ltdtDb, rows, keyDetect, pickKeysOnly)
+            srLog.info({ event: 'updateTabItems-pickKeysOnly', keyTable, userId, pickKeysOnly })
+        }
 
         //ltdtmapping
         rows = ltdtmapping(rows, ds[keyTable].keys)
@@ -161,10 +210,10 @@ function proc(woItems, procOrm, { srLog, kmx }) {
     }
 
 
-    //updateUsers
-    let updateUsers = async (userId, rows) => {
+    //updateUsers, opt.pickKeysOnly 給 ['cgrups'] 時僅採納既有使用者之群組指派變更(modeEditUsers='for:grups')
+    let updateUsers = async (userId, rows, opt = {}) => {
         try {
-            await updateTabItems('users', userId, rows, 'id')
+            await updateTabItems('users', userId, rows, 'id', opt)
         }
         catch (err) { errLog('updateUsers-error', userId, err); throw err }
         srLog.info({ event: 'updateUsers-success', userId })
@@ -182,6 +231,9 @@ function proc(woItems, procOrm, { srLog, kmx }) {
 
     return p
 }
+
+
+export { mergePickKeysOnly }
 
 
 export default proc

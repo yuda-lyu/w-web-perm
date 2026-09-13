@@ -240,9 +240,26 @@ function getIcon(icon) {
 }
 
 
+//markDataReload, 標記接下來由程式端資料載入/重載(初始載入、store 推播、isEditable/語系切換等 genOpt 重建 opt)所觸發之 rowsChange 非使用者變更
+//why: WTable 之 rowsChange 於 Vue 更新 + aggrid 渲染後才非同步觸發, 早於此之 firstLoading/firstSetting 旗標於觸發當下可能已失效
+//(儲存成功後伺服器推播更新列 → changeParams 重算 → genOpt 重建 opt → rowsChange 再把 isModified 設回 true, 儲存鈕殘留即為此例),
+//故須於寫入資料當下標記, 待渲染完成後解除. 對齊 w-web-sso LayoutContentUsers.vue 之 markDataReload.
+//用法: 元件 data() 宣告 systemProcing:false; genOpt 內於 vo.opt = opt 前呼叫 vo.$ui.markDataReload(vo); rowsChange 守門加 vo.systemProcing.
+function markDataReload(vm) {
+    vm.systemProcing = true
+    vm.$nextTick(() => {
+        setTimeout(() => {
+            vm.systemProcing = false
+        }, 1)
+    })
+}
+
+
 let mUI = {
 
     setVo,
+
+    markDataReload,
 
     updateConnState,
     updateLoading,

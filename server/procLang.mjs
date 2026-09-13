@@ -111,15 +111,15 @@ let kpLang = {
         eng: `Reverse all`,
         cht: `全反選使用`,
     },
-    operMode: {
+    operEnable: { //關聯表 enable 欄表頭（是否使用）
         eng: `Enable`,
         cht: `是否使用`,
     },
-    operPemiEnable: {
+    operPemiMode: { //關聯表 mode 欄表頭（權限之 OR/AND 合併模式）
         eng: `Operator`,
         cht: `合併權限模式`,
     },
-    operGrupEnable: {
+    operGrupMode: { //關聯表 mode 欄表頭（權限群組之 OR/AND 合併模式）
         eng: `Operator`,
         cht: `合併權限群組模式`,
     },

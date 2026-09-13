@@ -11,7 +11,7 @@
 //  → pm2resolve 包成 {state:'error', msg:...}（HTTP 200）→ client 見 state!=='success' → reject 'can not get user data by url[...]'。
 
 import assert from 'assert'
-import { startApi, cleanup, apiBaseUrl, TOKEN_ADMIN, TOKEN_BAD, urlGetPerm, SEED, getWoItems } from './api-setup.mjs'
+import { startApi, cleanup, apiBaseUrl, TOKEN_ADMIN, TOKEN_BAD, urlGetPerm, SEED, getWoItems } from './tools/api-setup.mjs'
 import getPerm from '../src/getPerm.mjs'
 import perm from '../src/perm.mjs'
 
@@ -137,7 +137,7 @@ describe('api-getPerm', function() {
     it('API-getPerm-002-perm-factory-accessors', async function() {
         let p = perm()
 
-        //url 已帶妥 token=sys（非佔位符）；perm.conn 走 axios → pmInvResolve → 取 {user, rules}
+        //url 已帶妥 token=sys（非佔位符）；perm.conn 走內建 fetch(fetchJson) → pmInvResolve → 取 {user, rules}
         await p.conn(`${apiBaseUrl}/api/getPerm?token=sys`)
 
         //getUser / getRules accessors

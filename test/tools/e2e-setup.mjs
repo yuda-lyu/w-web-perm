@@ -24,8 +24,9 @@ if ((process.argv.includes('--baseline') || process.env.E2E_REGEN === '1') && (p
     throw new Error('拒絕在診斷 env (E2E_BARE / E2E_DIAG) 下寫入正式 baseline')
 }
 
-const __dir = dirname(fileURLToPath(import.meta.url))
-const projRoot = join(__dir, '..')
+const __dir = dirname(fileURLToPath(import.meta.url)) //= test/tools
+const fdTest = join(__dir, '..') //= test
+const projRoot = join(__dir, '..', '..') //= 專案根
 
 const BACKEND_PORT = 11006
 //perm e2e 用獨立的 8090（避開常駐於 8080 的其他專案 dev server），以 --port 顯式指定確保確定性
@@ -134,7 +135,7 @@ let tmpSettingsFiles = []
 export function genTempSettings(overrides = {}) {
     const base = JSON5.parse(fs.readFileSync(join(projRoot, 'settings.json'), 'utf8'))
     const merged = { ...base, ...overrides }
-    const tmpDir = join(__dir, '_tmp')
+    const tmpDir = join(fdTest, '_tmp')
     if (!fs.existsSync(tmpDir)) { fs.mkdirSync(tmpDir, { recursive: true }) }
     const p = join(tmpDir, `settings-e2e-${process.pid}-${tmpSettingsSeq++}.json`)
     fs.writeFileSync(p, JSON.stringify(merged, null, 2))
@@ -147,7 +148,7 @@ function cleanupTempSettings() {
     }
     tmpSettingsFiles = []
     try {
-        const tmpDir = join(__dir, '_tmp')
+        const tmpDir = join(fdTest, '_tmp')
         if (fs.existsSync(tmpDir) && fs.readdirSync(tmpDir).length === 0) { fs.rmdirSync(tmpDir) }
     }
     catch (e) {}
@@ -155,7 +156,10 @@ function cleanupTempSettings() {
 
 //以指定 settings 重啟 backend（殺現有 backend → node srv.mjs <pathSettings> 重啟並等 ready）。
 //用法：before restartBackend(genTempSettings({ language })), after restartBackend('./settings.json') 還原預設。
-export async function restartBackend(pathSettings = './settings.json') {
+//opts.reseed=true：port 釋放後、spawn 前重跑 hermetic base seed（刪 ./db 重建），供「測試把資料弄到 UI/RPC 無法還原之狀態」
+//（如 admin 自己 isActive='n' 後所有通道皆拒）的 api 測試還原用；seed 須在後端開 lmdb 前完成，故只能在此時機做。
+export async function restartBackend(pathSettings = './settings.json', opts = {}) {
+    const { reseed = false } = opts
     //殺 spawned 中 name==='backend' 者
     for (const s of spawned) {
         if (s.name === 'backend') {
@@ -183,6 +187,9 @@ export async function restartBackend(pathSettings = './settings.json') {
         }
         const t0 = Date.now()
         while (Date.now() - t0 < 5000) { if (!(await httpOk(`${apiBaseUrl}/`))) { break } await new Promise((r) => setTimeout(r, 200)) }
+    }
+    if (reseed) {
+        await seedDb()
     }
     spawnSrv('backend', 'node', ['srv.mjs', pathSettings])
     await waitPort(`${apiBaseUrl}/`, `backend ${BACKEND_PORT}(restart)`, 60000)
@@ -434,6 +441,47 @@ export async function dismissResultModal(page) {
         return !(document.body.innerText || '').includes(vo.$t('systemMessage'))
     }, { timeout: 10000 })
     await page.waitForTimeout(600) //modal 退場 + grid 回穩
+}
+
+//—— Ve* 對話框（VeCgrups / VeCpemis / VeCrules / VeGrupBlngUsers / VePemiBlngGrups）互動原語共用層 ——
+//收斂自 e2e-rela-user-grup / e2e-rela-grup-pemi / e2e-rela-pemi-rule 三檔各自一份之同名 helper（既有三份留待另案改 import；
+//新 case 一律自此 import，不再複製）。Save 鈕 = WButtonCircle icon=mdiCheckCircle（僅 isEditable && isModified 才渲染）；
+//Close 鈕 = mdiClose 恆渲染；皆為 div[role="button"] 內 svg path，以 mdi path 定位。
+export const DLG_MDI = {
+    save: 'M12 2C6.5 2 2 6.5 2 12S6.5 22 12 22 22 17.5 22 12 17.5 2 12 2M10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z',
+    close: 'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z',
+}
+export function dlgBtn(page, path) {
+    return page.locator(`div[role="button"]:has(svg path[d="${path}"])`)
+}
+//等對話框內 ag-grid 列就緒（標題已偵測後再等表格列出現）
+export async function waitDialogGrid(page) {
+    await waitUntilExist(page, '對話框內 ag-grid 列', () => document.querySelectorAll('.ag-row').length > 0, { timeout: 15000 })
+    await page.waitForTimeout(800)
+}
+//翻轉對話框內某列 enable checkbox（觸發 toggleItemEnableByName → isModified=true → Save 鈕現身）
+export async function toggleDialogEnable(page, rowIndex) {
+    await page.locator(`.ag-row[row-index="${rowIndex}"] .ag-cell[col-id="enable"] input[type="checkbox"]`).first().click()
+    await page.waitForTimeout(800)
+}
+//切對話框內某列 mode 下拉為指定值
+export async function setDialogMode(page, rowIndex, mode) {
+    await page.locator(`.ag-row[row-index="${rowIndex}"] .ag-cell[col-id="mode"] select`).first().selectOption(mode)
+    await page.waitForTimeout(800)
+}
+export async function clickDialogSave(page) {
+    await dlgBtn(page, DLG_MDI.save).first().click()
+}
+export async function clickDialogClose(page) {
+    await dlgBtn(page, DLG_MDI.close).first().click()
+}
+//等對話框關閉（Save resolve / Close reject 後 bShow=false），以標題 i18n 鍵之文字消失偵測
+export async function waitDialogClosed(page, titleKey) {
+    await waitUntilExist(page, '對話框關閉', (k) => {
+        const vo = window.$vo
+        return !(document.body.innerText || '').includes(vo.$t(k))
+    }, { timeout: 15000, arg: titleKey })
+    await page.waitForTimeout(800)
 }
 
 //等待 DOM 條件（每步驟先偵測再操作，取代 fixed sleep）。

@@ -1,10 +1,10 @@
-import axios from 'axios'
 import get from 'lodash-es/get.js'
 import each from 'lodash-es/each.js'
 import isestr from 'wsemi/src/isestr.mjs'
 import isfun from 'wsemi/src/isfun.mjs'
 import genPm from 'wsemi/src/genPm.mjs'
 import pmInvResolve from 'wsemi/src/pmInvResolve.mjs'
+import fetchJson from './fetchJson.mjs'
 
 
 function perm() {
@@ -38,9 +38,10 @@ function perm() {
         //pm
         let pm = genPm()
 
-        //get
-        let pms = axios.get(url)
-        pms = pmInvResolve(pms, { thenExtractData: true })
+        //get, 內建 fetch(不依賴 axios): fetchJson 直接 resolve JSON envelope, 故 pmInvResolve 不再需 thenExtractData(原為取 axios res.data)
+        //失敗時 permError / reject 收到 { kind: 'request'|'parse', status, message }(原為 AxiosError), 或後端 envelope 之 msg
+        let pms = fetchJson(url)
+        pms = pmInvResolve(pms)
         pms
             .then((res) => {
                 // console.log('perm.getPerm then', res)

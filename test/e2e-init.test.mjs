@@ -22,7 +22,7 @@
 import assert from 'assert'
 import fs from 'fs'
 import path from 'path'
-import { cleanup, launchBrowser, captureStableWithBox, apiBaseUrl, genTempSettings, restartBackend, assertBaselineMatch } from './e2e-setup.mjs'
+import { cleanup, launchBrowser, captureStableWithBox, apiBaseUrl, genTempSettings, restartBackend, assertBaselineMatch } from './tools/e2e-setup.mjs'
 
 
 const baselineDir = './test/pics/init'

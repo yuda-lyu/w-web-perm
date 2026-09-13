@@ -113,7 +113,7 @@
 
                 </template>
 
-                <template v-if="isEditable">
+                <template v-if="isEditableIdentity">
 
                     <WButtonCircle
                         :paddingStyle="{v:6,h:6}"
@@ -133,7 +133,7 @@
 
                 </template>
 
-                <template v-if="isEditable && hasItemCheckOne">
+                <template v-if="isEditableIdentity && hasItemCheckOne">
 
                     <WButtonCircle
                         :paddingStyle="{v:6,h:6}"
@@ -153,7 +153,7 @@
 
                 </template>
 
-                <template v-if="isEditable && hasItemsCheck">
+                <template v-if="isEditableIdentity && hasItemsCheck">
 
                     <WButtonCircle
                         :paddingStyle="{v:6,h:6}"
@@ -229,8 +229,8 @@
                                 <button style="width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" @click="$dg.showVeCgrupsById(props.row.id)">{{ getCgrupsText(props.value) }}</button>
                             </div>
                         </template>
-                        <input v-else-if="props.key==='isAdmin'" type="checkbox" :checked="props.value === 'y'" @click="toggleItemIsAdminById(props.row.id)" :disabled="!isEditable" />
-                        <input v-else-if="props.key==='isActive'" type="checkbox" :checked="props.value === 'y'" @click="toggleItemIsActiveById(props.row.id)" :disabled="!isEditable" />
+                        <input v-else-if="props.key==='isAdmin'" type="checkbox" :checked="props.value === 'y'" @click="toggleItemIsAdminById(props.row.id)" :disabled="!isEditableIdentity" />
+                        <input v-else-if="props.key==='isActive'" type="checkbox" :checked="props.value === 'y'" @click="toggleItemIsActiveById(props.row.id)" :disabled="!isEditableIdentity" />
                         <span v-else>{{ props.value }}</span>
                     </template>
                 </WAggridVue>
@@ -305,8 +305,10 @@ export default {
 
             firstLoading: true,
             firstSetting: true,
+            systemProcing: false, //程式端載入/重載清單資料期間為 true, 用於排除非使用者操作之 rowsChange (見 $ui.markDataReload)
             showIsEditable: false,
             isEditable: false,
+            modeEditUsers: '', //settings.modeEditUsers 原值: 'y' 全可編 / 'n' 全唯讀 / 'for:grups' 僅可編使用者所屬群組(身分欄與新增複製刪除鎖定)
             isModified: false,
 
             tabKeys: [
@@ -377,7 +379,8 @@ export default {
             let showModeEditUsers = get(vo, 'webInfor.showModeEditUsers', '')
             vo.showIsEditable = showModeEditUsers === 'y'
             let modeEditUsers = get(vo, 'webInfor.modeEditUsers', '')
-            vo.isEditable = modeEditUsers === 'y'
+            vo.modeEditUsers = modeEditUsers
+            vo.isEditable = modeEditUsers === 'y' || modeEditUsers === 'for:grups' //for:grups 仍進編輯模式, 但身分欄位由 isEditableIdentity 鎖定
 
             vo.widthUsersName = get(vo, 'webInfor.widthUsersName', '')
             vo.widthUsersEmail = get(vo, 'webInfor.widthUsersEmail', '')
@@ -393,6 +396,13 @@ export default {
 
     },
     computed: {
+
+        //isEditableIdentity, 使用者身分(name/email/description/from/isAdmin/isActive/排序)與新增複製刪除是否可編;
+        //modeEditUsers='for:grups'(使用者來自外部單一登入系統之部署, 身分由該系統同步)時鎖定, 僅群組指派(VeCgrups)依 isEditable
+        isEditableIdentity: function() {
+            let vo = this
+            return vo.isEditable && vo.modeEditUsers !== 'for:grups'
+        },
 
         syncState: function() {
             let vo = this
@@ -664,7 +674,7 @@ export default {
                 let kpCellEditable = {}
                 let kpRowDrag = {}
                 let kpHeadCheckBox = {}
-                if (vo.isEditable) {
+                if (vo.isEditableIdentity) { //身分欄位編輯/拖曳排序/列勾選(供複製刪除)皆屬身分編修, for:grups 時鎖定
                     kpCellEditable = {
                         'name': true,
                         'email': true,
@@ -746,7 +756,7 @@ export default {
                         // console.log('rowsChange cloneDeep(vo.opt.rows)', cloneDeep(vo.opt.rows))
 
                         //check
-                        if (!vo.syncState || vo.firstLoading || vo.firstSetting) {
+                        if (!vo.syncState || vo.firstLoading || vo.firstSetting || vo.systemProcing) {
                             return
                         }
 
@@ -766,6 +776,9 @@ export default {
                 // console.log('opt', opt)
 
             }
+
+            //markDataReload, 重建 opt 屬程式端寫入, 其後非同步觸發之 rowsChange 不得視為使用者變更
+            vo.$ui.markDataReload(vo)
 
             //save
             vo.opt = opt

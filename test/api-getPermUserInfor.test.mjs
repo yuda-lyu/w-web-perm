@@ -1,9 +1,9 @@
 //API 契約測試：getPermUserInfor app SDK（對應 spec/流程_查詢指定使用者權限.md）。
-//唯讀查詢，裸 axios 打真實 HTTP（非 RPC）。client SDK 失敗 reject 純字串（非 Error）。
+//唯讀查詢，裸 fetch(內建) 打真實 HTTP（非 RPC）。client SDK 失敗 reject 純字串（非 Error）。
 //cleanup 由 e2e-setup.mjs 的 mocha root after hook 自動觸發，本檔不寫 after(cleanup)。
 
 import assert from 'assert'
-import { startApi, apiBaseUrl, TOKEN_APP, TOKEN_BAD, urlGetPermUserInfor, SEED } from './api-setup.mjs'
+import { startApi, apiBaseUrl, TOKEN_APP, TOKEN_BAD, urlGetPermUserInfor, SEED } from './tools/api-setup.mjs'
 import getPermUserInfor from '../src/getPermUserInfor.mjs'
 
 

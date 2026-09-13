@@ -1,8 +1,8 @@
-import axios from 'axios'
 import get from 'lodash-es/get.js'
 import genPm from 'wsemi/src/genPm.mjs'
 import haskey from 'wsemi/src/haskey.mjs'
 import ltdtpick from 'wsemi/src/ltdtpick.mjs'
+import fetchJson from '../src/fetchJson.mjs'
 
 
 //kpKs
@@ -90,16 +90,15 @@ async function provideTabs(url, keyTable, from, rows) {
     }
     // console.log('rin', rin)
 
-    //axios
-    await axios({
-        method: 'post',
-        url,
+    //post, 內建 fetch(不依賴 axios); fetchJson 直接 resolve JSON envelope(原 axios 之 res.data),
+    //網路錯誤 / 非 2xx / 非 JSON 回應 reject { kind, status, message }(原為 AxiosError)
+    await fetchJson(url, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json; charset=utf-8' },
-        data: rin,
+        body: JSON.stringify(rin),
     })
-        .then((res) => {
-            // console.log('then', res)
-            let data = get(res, 'data')
+        .then((data) => {
+            // console.log('then', data)
             let state = get(data, 'state')
             let msg = get(data, 'msg', '')
             if (state === 'success') {

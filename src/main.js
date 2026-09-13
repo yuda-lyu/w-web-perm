@@ -37,7 +37,7 @@ Vue.directive('domresize', domResize())
 //WServHapiClient
 // let bFirstSync = false //不需要bFirstSync, 由getWebInfor結束代表第1次完成同步
 WServHapiClient({
-    showLog: false,
+    useShowLog: false,
     url: window.location.origin + window.location.pathname,
     useWaitToken: true,
     apiName: 'api',

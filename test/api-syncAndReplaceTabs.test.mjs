@@ -1,7 +1,7 @@
 //syncAndReplaceTabs API 契約測試。對應 spec/流程_外部應用同步權限資料.md。
 //
 //端點：POST /syncAndReplaceTabs?keyTable={keyTable}&token={token}（根路徑、無 /api 前綴，WWebPerm.mjs:1056 自訂 route）。
-//以裸 axios.post 打真實 HTTP，res.data 即後端 pmConvertResolve 包裝的 { state, msg } envelope（HTTP 200；
+//以內建 fetch 直打真實 HTTP，回應 JSON 即後端 pmConvertResolve 包裝的 { state, msg } envelope（HTTP 200；
 //reject → {state:'error', msg:<純字串>}，resolve → {state:'success', msg:<insert 結果>}）。
 //本 API **會寫 DB**（全量取代：同 from 先 delAll 再 insert）。
 //
@@ -24,15 +24,19 @@
 //  （非 funNew），故 payload 的 id(pk) 原樣保留。
 
 import assert from 'assert'
-import axios from 'axios'
-import { startApi, urlSync, TOKEN_APP, TOKEN_BAD, SEED, getWoItems } from './api-setup.mjs'
+import { startApi, urlSync, TOKEN_APP, TOKEN_BAD, SEED, getWoItems } from './tools/api-setup.mjs'
 
 
-//postSync：裸 axios.post 該 keyTable + token，回 res.data（{state, msg} envelope）。
+//postSync：以 node 內建 fetch 直打該 keyTable + token（本套件 2026-09-07 起不再依賴 axios），回 {state, msg} envelope。
+//body 為物件時 JSON 化（對齊原 axios 自動 stringify）；字串則原樣送出（供 text/plain 非物件 payload 案例）。
 let postSync = async (keyTable, token, body, contentType = 'application/json; charset=utf-8') => {
     let url = urlSync.replace('{keyTable}', keyTable).replace('{token}', token)
-    let res = await axios.post(url, body, { headers: { 'Content-Type': contentType } })
-    return res.data
+    let res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': contentType },
+        body: (typeof body === 'string') ? body : JSON.stringify(body),
+    })
+    return await res.json()
 }
 
 

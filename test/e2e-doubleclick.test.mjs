@@ -19,7 +19,7 @@
 import assert from 'assert'
 import obj2u8arr from 'wsemi/src/obj2u8arr.mjs'
 import u8arr2obj from 'wsemi/src/u8arr2obj.mjs'
-import { startServersOnce, cleanup, apiBaseUrl } from './e2e-setup.mjs'
+import { startServersOnce, cleanup, apiBaseUrl } from './tools/e2e-setup.mjs'
 
 
 const TOKEN_ADMIN = 'sys'

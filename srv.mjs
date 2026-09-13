@@ -47,6 +47,14 @@ let getUserByToken = async (token) => {
             isAdmin: 'y',
         }
     }
+    if (token === '{token-for-peter}') { //測試用: 在 perm users 表內、有效、但非系統管理者之瀏覽使用者(供 api 測試驗證 verifyClientUser 對資料通道亦生效)
+        return {
+            id: 'id-for-peter',
+            name: 'peter',
+            email: 'peter@example.com',
+            isAdmin: 'n',
+        }
+    }
     console.log('invalid token', token)
     return {}
 }

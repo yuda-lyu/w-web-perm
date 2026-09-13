@@ -17,14 +17,15 @@ import { dirname, join } from 'path'
 import fs from 'fs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const projRoot = join(__dirname, '..')
+const fdTest = join(__dirname, '..') //= test
+const projRoot = join(__dirname, '..', '..') //= 專案根
 const isWin = process.platform === 'win32'
 const BACKEND_PORT = 11006
 const FRONTEND_PORT = 8090
 
 //動態列舉全部 e2e 檔(pattern 白名單, 全域 §14.3): 新增之 e2e-*.test.mjs 自動納入, 不因寫死清單而被靜默漏跑。
 //e2e-doubleclick(API-level, ADR-017)亦以隔離模式跑——只多一次後端重啟成本, 換取零遺漏。
-const E2E_FILES = fs.readdirSync(__dirname)
+const E2E_FILES = fs.readdirSync(fdTest)
     .filter((f) => /^e2e-.*\.test\.mjs$/.test(f))
     .sort()
 

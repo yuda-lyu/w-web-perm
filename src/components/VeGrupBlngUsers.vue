@@ -412,8 +412,8 @@ export default {
                 let kpHead = {
                     'name': vo.$t('userName'),
                     'grupsNames': vo.$t('belongGrupsNames'),
-                    'mode': vo.$t('operGrupEnable'),
-                    'enable': vo.$t('operMode'),
+                    'mode': vo.$t('operGrupMode'),
+                    'enable': vo.$t('operEnable'),
                 }
 
                 //opt

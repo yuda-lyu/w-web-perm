@@ -1,9 +1,9 @@
-import axios from 'axios'
 import get from 'lodash-es/get.js'
 import isestr from 'wsemi/src/isestr.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import isfun from 'wsemi/src/isfun.mjs'
 import ispm from 'wsemi/src/ispm.mjs'
+import fetchJson from './fetchJson.mjs'
 
 
 async function getPerm(url, tokenTar, opt = {}) {
@@ -28,19 +28,19 @@ async function getPerm(url, tokenTar, opt = {}) {
     url = url.replaceAll('{token}', tokenTar)
     // console.log('getPerm: url', url)
 
-    //get
-    let res = await axios.get(url)
+    //get, 內建 fetch(不依賴 axios); 網路錯誤或非 2xx → cannotGetUserByUrl, 回應非 JSON → cannotGetUserDataByUrl(對齊 axios 時期語意)
+    let data = await fetchJson(url)
         .catch((err) => {
-            errTemp = err.toString()
+            errTemp = err
         })
 
     //check
     if (errTemp !== null) {
+        if (get(errTemp, 'kind') === 'parse') {
+            return Promise.reject('cannotGetUserDataByUrl') //取得使用者資訊失敗
+        }
         return Promise.reject('cannotGetUserByUrl') //由SSO取得使用者資訊錯誤
     }
-
-    //data
-    let data = get(res, 'data')
 
     //state
     let state = get(data, 'state', '')

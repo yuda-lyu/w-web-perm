@@ -5,7 +5,7 @@
 //act 走 user-facing input；assert = 語意斷言 + pixel baseline（§6.2 / §6.3）。
 import fs from 'fs'
 import assert from 'assert'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, waitUntilExist, assertBaselineMatch, typeIntoCell, captureBaseSeed, resetDb } from './e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, assertBaselineMatch, typeIntoCell, captureBaseSeed, resetDb, restartBackend, genTempSettings, toggleDialogEnable, clickDialogSave, waitDialogGrid, waitDialogClosed } from './tools/e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/users'
 const LANGS = ['eng', 'cht']
@@ -339,6 +339,67 @@ const CASES = [
             assert.equal(n, 4, 'DB 仍為 4 筆 base seed')
         },
     },
+    {
+        //E2E-012：settings.modeEditUsers='for:grups'（使用者身分由外部單一登入系統同步之部署）→ 進頁即編輯模式但僅能調整群組指派。
+        //6 步 user path：①部署方已設 for:grups，管理員登入後點「使用者」 ②看到工具列只有編輯開關與欄位挑選（無新增鈕）、
+        //  身分儲存格不可編、isAdmin/isActive 勾選 disabled ③點 peter 列「權限群組」按鈕開對話框（可編） ④勾選 權限群組M2 是否使用 →
+        //  點對話框儲存 → 回填、peter 列顯示 2 群組、工具列出現儲存鈕 ⑤點儲存 → 看到「儲存成功」 ⑥DB peter.cgrups 含 M2、name/email 不變。
+        //settings 由框架依 c.settings 於開 browser 前 restartBackend 注入、case 結束後還原 './settings.json'。
+        name: 'E2E-012-for-grups-mode',
+        settings: { modeEditUsers: 'for:grups' },
+        run: async (page) => {
+            await gotoUsers(page)
+            const s1 = await captureStableWithBox(page, SEL_TOOLBAR) //結果: 進頁即編輯模式, 工具列只有編輯開關與欄位挑選、無新增鈕(框住整條工具列)
+            const s2 = await captureStableWithBox(page, '.ag-row[row-index="0"] .ag-cell[col-id="cgrups"] button') //點擊前: peter 列「權限群組」按鈕(框住整顆按鈕)
+            await page.locator('.ag-row[row-index="0"] .ag-cell[col-id="cgrups"] button').first().click()
+            await waitUntilExist(page, 'VeCgrups 對話框標題', () => (document.body.innerText || '').includes(window.$vo.$t('userEditCgrups')), { timeout: 15000 })
+            await waitDialogGrid(page)
+            const s3 = await captureStableWithBox(page, SEL_MODAL) //結果: 群組對話框開啟, 為可編輯版(標題「編輯使用權限群組」)(框住整個對話框)
+            await toggleDialogEnable(page, 1) //勾選 權限群組M2 是否使用（對話框內列＝全部 grups 依 order：row1=M2）
+            const s4 = await captureStableWithBox(page, dialogRowBoxSel(1)) //結果: M2 列已勾選、對話框儲存鈕現身(框住對話框內 M2 列)
+            await clickDialogSave(page)
+            await waitDialogClosed(page, 'userEditCgrups')
+            const s5 = await captureStableWithBox(page, rowBoxSel(0)) //結果: 對話框關閉, peter 列「權限群組」文字回填為 2 群組(框住 peter 列)
+            const s6 = await captureStableWithBox(page, `div[role="button"]:has(svg path[d="${MDI.upload}"])`) //點擊前: 工具列出現「儲存變更」鈕(框住整顆儲存鈕)
+            await saveAndWaitModal(page)
+            const s7 = await captureStableWithBox(page, SEL_MODAL) //結果: 儲存成功結果 modal(框住 modal)
+            return [
+                { name: 'E2E-012-1-toolbar-for-grups', buf: s1 },
+                { name: 'E2E-012-2-click-cgrups', buf: s2 },
+                { name: 'E2E-012-3-dialog-open', buf: s3 },
+                { name: 'E2E-012-4-row-toggled', buf: s4 },
+                { name: 'E2E-012-5-cgrups-filled', buf: s5 },
+                { name: 'E2E-012-6-click-save', buf: s6 },
+                { name: 'E2E-012-7-save-ok', buf: s7 },
+            ]
+        },
+        semantic: async (page) => {
+            //spec: 「新增 / 複製 / 刪除鈕不出現」
+            assert.equal(await iconBtn(page, MDI.plus).count(), 0, 'for:grups 下工具列不得有新增鈕')
+            //spec: 「儲存成功」
+            await assertModalMsg(page, 'userSaveUsersSuccess')
+            //spec: 「後端 updateUsers 於 for:grups 亦只採納既有使用者之 cgrups 變更」→ DB(store 同步) peter.cgrups 含 M2, 身分欄不變
+            const peter = await page.evaluate(() => (window.$vo.$store.state.users || []).find((u) => u.id === 'id-for-peter'))
+            assert.ok(peter, 'store 應有 peter')
+            assert.ok(String(peter.cgrups).includes('權限群組M2'), `peter.cgrups 應含 權限群組M2, 實得 ${peter.cgrups}`)
+            assert.equal(peter.name, 'peter')
+            assert.equal(peter.email, 'peter@example.com')
+            //spec: 「isAdmin / isActive 勾選 disabled」（關閉 modal 後檢查主表）
+            const okText = await page.evaluate(() => window.$vo.$t('ok'))
+            await page.getByText(okText, { exact: true }).first().click()
+            await page.waitForTimeout(800)
+            const allDisabled = await page.evaluate(() => {
+                const chks = [...document.querySelectorAll('.ag-row .ag-cell[col-id="isAdmin"] input[type="checkbox"], .ag-row .ag-cell[col-id="isActive"] input[type="checkbox"]')]
+                return chks.length > 0 && chks.every((c) => c.disabled)
+            })
+            assert.ok(allDisabled, 'for:grups 下 isAdmin / isActive 勾選應皆 disabled')
+            //spec: 「name / email / description / from 儲存格唯讀」→ 真滑鼠雙擊 name 儲存格不得出現編輯器
+            await page.locator('.ag-row[row-index="0"] .ag-cell[col-id="name"]').first().dblclick()
+            await page.waitForTimeout(800)
+            const editorCnt = await page.locator('.ag-row[row-index="0"] .ag-cell[col-id="name"] input').count()
+            assert.equal(editorCnt, 0, 'for:grups 下雙擊 name 儲存格不得進入編輯')
+        },
+    },
 ]
 
 //手術式重產（§6.3）：--names a,b,c 只產指定 case；--langs eng,cht 只產指定語系。截圖「前」就 gate（省截圖成本）。
@@ -366,16 +427,23 @@ async function generateBaseline() {
             //的 cold/warm 差異；對齊 sso e2e-adduser 之 per-case chromium.launch，確保 gen 與 mocha 收斂同態）
             const browser = await launchBrowser()
             await resetDb(browser, 'users', BASE_SEED) //throwaway page 還原 DB 為 4 筆 base seed，關閉後再開 case page
-            const page = await openApp(browser)
-            await setLang(page, lang) //eng 也切（symmetric）：補等同 cht setLang 的 re-render+settle 時間，治 eng-vs-cht layout 收斂不對稱（sso 殷鑑）
-            //run 回傳「單張 Buffer」或「多階段 [{name, buf}]」；統一正規化為陣列後逐張寫入
-            let shots = await c.run(page, lang)
-            if (Buffer.isBuffer(shots)) shots = [{ name: c.name, buf: shots }]
-            for (const s of shots) {
-                fs.writeFileSync(picPath(lang, s.name), s.buf)
-                console.log('wrote', picPath(lang, s.name), s.buf.length, 'bytes')
+            //c.settings：需特殊 settings 之 case（如 E2E-012 for:grups）於開 case page 前換後端設定，結束後還原（與 mocha 分支同管線）
+            if (c.settings) await restartBackend(genTempSettings(c.settings))
+            try {
+                const page = await openApp(browser)
+                await setLang(page, lang) //eng 也切（symmetric）：補等同 cht setLang 的 re-render+settle 時間，治 eng-vs-cht layout 收斂不對稱（sso 殷鑑）
+                //run 回傳「單張 Buffer」或「多階段 [{name, buf}]」；統一正規化為陣列後逐張寫入
+                let shots = await c.run(page, lang)
+                if (Buffer.isBuffer(shots)) shots = [{ name: c.name, buf: shots }]
+                for (const s of shots) {
+                    fs.writeFileSync(picPath(lang, s.name), s.buf)
+                    console.log('wrote', picPath(lang, s.name), s.buf.length, 'bytes')
+                }
             }
-            await browser.close()
+            finally {
+                await browser.close()
+                if (c.settings) await restartBackend('./settings.json')
+            }
         }
     }
     cleanup()
@@ -404,15 +472,22 @@ else {
             })
             afterEach(async function() { if (browser) { await browser.close(); browser = null } })
             for (const c of CASES) {
-                it(c.name, async () => {
-                    const page = await openApp(browser)
-                    await setLang(page, lang) //eng 也切（symmetric，治 eng marathon flake）
-                    let shots = await c.run(page, lang)
-                    if (c.semantic) await c.semantic(page)
-                    //run 回傳「單張 Buffer」或「多階段 [{name, buf}]」；統一正規化為陣列後逐張比對
-                    if (Buffer.isBuffer(shots)) shots = [{ name: c.name, buf: shots }]
-                    for (const s of shots) {
-                        assertBaselineMatch(s.buf, picPath(lang, s.name), `users-${lang}-${s.name}`)
+                it(c.name, async function() {
+                    //c.settings：需特殊 settings 之 case 於開 case page 前換後端設定，結束後 finally 還原（與 regen 分支同管線）
+                    if (c.settings) { this.timeout(240000); await restartBackend(genTempSettings(c.settings)) }
+                    try {
+                        const page = await openApp(browser)
+                        await setLang(page, lang) //eng 也切（symmetric，治 eng marathon flake）
+                        let shots = await c.run(page, lang)
+                        if (c.semantic) await c.semantic(page)
+                        //run 回傳「單張 Buffer」或「多階段 [{name, buf}]」；統一正規化為陣列後逐張比對
+                        if (Buffer.isBuffer(shots)) shots = [{ name: c.name, buf: shots }]
+                        for (const s of shots) {
+                            assertBaselineMatch(s.buf, picPath(lang, s.name), `users-${lang}-${s.name}`)
+                        }
+                    }
+                    finally {
+                        if (c.settings) await restartBackend('./settings.json')
                     }
                 })
             }
