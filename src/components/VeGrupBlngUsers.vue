@@ -152,10 +152,19 @@
                                         </div>
                                     </span>
                                 </template>
-                                <select v-else-if="props.key==='mode'" @change="showVeGrupBlngUsersToggleItemModeByName(props.row.name, $event.target.value)" :disabled="!isEditable">
-                                    <option value="OR" :selected="props.row.mode === 'OR'">OR</option>
-                                    <option value="AND" :selected="props.row.mode === 'AND'">AND</option>
-                                </select>
+                                <WTextSelect
+                                    v-else-if="props.key==='mode'"
+                                    :style="`width:${modeSelectWidth}px;`"
+                                    :items="modeItems"
+                                    :value="props.row.mode"
+                                    :editable="isEditable"
+                                    :paddingStyle="{v:0,h:10}"
+                                    :shadow="false"
+                                    :itemPaddingStyle="{v:8,h:10}"
+                                    :placementDistX="-10"
+                                    :labelContent="'modeSelect'"
+                                    @input="(item)=>{showVeGrupBlngUsersToggleItemModeByName(props.row.name, item)}"
+                                ></WTextSelect>
                                 <input v-else-if="props.key==='enable'" type="checkbox" :checked="props.value === 'y'" @click="showVeGrupBlngUsersToggleItemEnableByName(props.row.name)" :disabled="!isEditable" />
                                 <span v-else>{{ props.value }}</span>
                             </template>
@@ -198,6 +207,7 @@ import isestr from 'wsemi/src/isestr.mjs'
 import WDialog from 'w-component-vue/src/components/WDialog.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
 import WAggridVue from 'w-aggrid-vue/src/components/WAggridVue.vue'
+import WTextSelect from 'w-component-vue/src/components/WTextSelect.vue'
 
 
 export default {
@@ -205,6 +215,7 @@ export default {
         WDialog,
         WButtonCircle,
         WAggridVue,
+        WTextSelect,
     },
     props: {
     },
@@ -232,6 +243,10 @@ export default {
             firstSetting: true,
             isEditable: false,
             isModified: false,
+
+            //mode 欄之自製下拉(WTextSelect, 取代原生 select 以免彈出清單之 highlight 色由 OS 決定)
+            modeItems: ['OR', 'AND'],
+            modeSelectWidth: 72, //= 最長項 'AND' 文字實寬 + 左右內距 10×2 + 展開箭頭 18 + 邊框 1×2, 實測後定值(見 CLAUDE_experience.md)
 
             grup: null,
 

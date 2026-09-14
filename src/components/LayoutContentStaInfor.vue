@@ -13,8 +13,8 @@
 
             <div style="padding:20px 30px;">
 
-                <!-- 頁面標題 -->
-                <div class="mb-8">
+                <!-- 頁面標題: 收合導覽(drawer=false)時, 內容區左上角有「顯示選單」圓鈕, 標題須加左內距讓位(對稱四個資料頁之 padding-left:20px) -->
+                <div class="mb-8" :style="drawer ? '' : 'padding-left:20px;'">
                     <div style="font-size:1.5rem; font-weight:600;">{{$t('mmStaInfor')}}</div>
                 </div>
 

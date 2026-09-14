@@ -20,7 +20,7 @@
 import fs from 'fs'
 import assert from 'assert'
 import JSON5 from 'json5'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal, captureBaseSeed, resetDb } from './tools/e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal, captureBaseSeed, resetDb, setDialogMode } from './tools/e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/rela-user-grup'
 const LANGS = ['eng', 'cht']
@@ -92,11 +92,8 @@ async function toggleDialogEnable(page, rowIndex) {
     await page.locator(`.ag-row[row-index="${rowIndex}"] .ag-cell[col-id="enable"] input[type="checkbox"]`).first().click()
     await page.waitForTimeout(800) //revRows / refresh settle
 }
-//切對話框內某列 mode 下拉為指定值（觸發 showVe*ToggleItemModeByName → isModified=true）。
-async function setDialogMode(page, rowIndex, mode) {
-    await page.locator(`.ag-row[row-index="${rowIndex}"] .ag-cell[col-id="mode"] select`).first().selectOption(mode)
-    await page.waitForTimeout(800)
-}
+//setDialogMode（切對話框內某列 mode 下拉；觸發 showVe*ToggleItemModeByName → isModified=true）收斂進 e2e-setup.mjs 共用：
+//mode 欄已改自製下拉 WTextSelect（2026-09-14），須「點觸發 → 點清單項」兩步真點擊，本檔不再自留副本。
 //點對話框 Save 鈕（需 isModified=true 才渲染；呼叫前須已 toggle 過）。
 async function clickDialogSave(page) {
     await dlgBtn(page, DLG_MDI.save).first().click()

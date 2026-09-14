@@ -464,9 +464,19 @@ export async function toggleDialogEnable(page, rowIndex) {
     await page.locator(`.ag-row[row-index="${rowIndex}"] .ag-cell[col-id="enable"] input[type="checkbox"]`).first().click()
     await page.waitForTimeout(800)
 }
-//切對話框內某列 mode 下拉為指定值
+//切對話框內某列 mode 下拉為指定值（'OR' / 'AND'）。
+//mode 欄為自製下拉 WTextSelect（2026-09-14 取代原生 select, 見建議書 §2 / 全域 §10.6.3）：
+//  · 觸發區 = WTextSuggestCore select 模式之文字 div（帶靜態屬性 _tabindex="0", WTextSuggestCore.vue:26-31）；
+//    不可用 `div[style*="cursor:pointer"]`（Vue 會把 style 正規化成 `cursor: pointer`, 含空白）。
+//  · 清單 teleport 至 body 之 `.WPopperFix[wtlp="modeSelect"]`（labelContent 由四個對話框統一給 'modeSelect'），
+//    項目為 `div[tabindex="0"]`, 以精確文字點選；選後 popup 自關（WTextSuggestCore clickItem → showPanel=false）。
+//  · 唯讀（editable=false）時點擊不彈出, 呼叫端不應在唯讀對話框呼叫本函式。
 export async function setDialogMode(page, rowIndex, mode) {
-    await page.locator(`.ag-row[row-index="${rowIndex}"] .ag-cell[col-id="mode"] select`).first().selectOption(mode)
+    await page.locator(`.ag-row[row-index="${rowIndex}"] .ag-cell[col-id="mode"] div[_tabindex="0"]`).first().click()
+    const popup = page.locator('.WPopperFix[wtlp="modeSelect"]:visible')
+    await popup.first().waitFor({ state: 'visible', timeout: 10000 })
+    await popup.locator('div[tabindex="0"]').filter({ hasText: new RegExp(`^\\s*${mode}\\s*$`) }).first().click()
+    await popup.first().waitFor({ state: 'hidden', timeout: 10000 })
     await page.waitForTimeout(800)
 }
 export async function clickDialogSave(page) {

@@ -1,6 +1,6 @@
 {
   "name": "w-web-perm",
-  "version": "1.0.80",
+  "version": "1.0.81",
   "main": "dist/w-web-perm.umd.js",
   "dependencies": {
     "json5": "^2.2.3",
