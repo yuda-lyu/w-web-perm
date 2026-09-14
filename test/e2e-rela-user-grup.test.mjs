@@ -20,7 +20,7 @@
 import fs from 'fs'
 import assert from 'assert'
 import JSON5 from 'json5'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal, captureBaseSeed, resetDb, setDialogMode } from './tools/e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal, captureBaseSeed, resetDb, setDialogModeWithShots, dialogEnableCheckboxSel } from './tools/e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/rela-user-grup'
 const LANGS = ['eng', 'cht']
@@ -210,18 +210,27 @@ const CASES = [
             const s1 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-002-1-source-row：開窗前來源列（peter，row 0）
             await openCgrupsDialog(page, 0) //row 0 = peter
             const s2 = await captureStableWithBox(page, SEL_MODAL) //E2E-002-2-dialog-open：VeCgrups 對話框初始態（第一個 toggle 前）
-            //對話框內列＝全部 grups（依 order）：row0=M1, row1=M2, row2=M3, row3=M4
+            //對話框內列＝全部 grups（依 order）：row0=M1, row1=M2, row2=M3, row3=M4。以下每步兩張（點擊前框要點、點擊後框反應元素）
+            const s3 = await captureStableWithBox(page, dialogEnableCheckboxSel(1)) //E2E-002-3-click-enable：點擊前框住 權限群組M2 列之 enable checkbox
             await toggleDialogEnable(page, 1) //勾選 權限群組M2 enable（y）→ isModified=true → Save 鈕現身
-            await setDialogMode(page, 1, 'AND') //將 權限群組M2 mode 切為 AND
-            const s3 = await captureStableWithBox(page, dialogRowBoxSel(1)) //E2E-002-3-row-toggled：對話框內 row1（M2）toggle+mode 後
+            const s4 = await captureStableWithBox(page, dialogRowBoxSel(1)) //E2E-002-4-enable-checked：勾選後框住該列（checkbox 已勾、Save 鈕現身）
+            const m = await setDialogModeWithShots(page, 1, 'AND') //E2E-002-5/6/7：點下拉前框觸發區 → 清單展開框整份清單 → 點「AND」前框該項目；選取後清單關閉
+            const s8 = await captureStableWithBox(page, dialogRowBoxSel(1)) //E2E-002-8-row-toggled：切 AND 後框住該列（mode 顯示 AND）
+            const s9 = await captureStableWithBox(page, dlgBtn(page, DLG_MDI.save)) //E2E-002-9-click-save：點擊前框住對話框 Save 鈕
             await clickDialogSave(page) //resolve cgrups 字串回填使用者列，對話框關閉
             await waitDialogClosed(page, 'userEditCgrups')
-            const s4 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-002-4-cgrups-saved：對話框已關閉，peter 列 cgrups 欄文字已由 1→2 群組回填
+            const s10 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-002-10-cgrups-saved：對話框已關閉，peter 列 cgrups 欄文字已由 1→2 群組回填
             return [
                 { name: 'E2E-002-1-source-row', buf: s1 },
                 { name: 'E2E-002-2-dialog-open', buf: s2 },
-                { name: 'E2E-002-3-row-toggled', buf: s3 },
-                { name: 'E2E-002-4-cgrups-saved', buf: s4 },
+                { name: 'E2E-002-3-click-enable', buf: s3 },
+                { name: 'E2E-002-4-enable-checked', buf: s4 },
+                { name: 'E2E-002-5-click-mode', buf: m.clickMode },
+                { name: 'E2E-002-6-list-open', buf: m.listOpen },
+                { name: 'E2E-002-7-click-and', buf: m.clickItem },
+                { name: 'E2E-002-8-row-toggled', buf: s8 },
+                { name: 'E2E-002-9-click-save', buf: s9 },
+                { name: 'E2E-002-10-cgrups-saved', buf: s10 },
             ]
         },
         semantic: async (page) => {
@@ -307,20 +316,30 @@ const CASES = [
             const s1 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-005-1-source-row：開窗前來源列（權限群組M1，row 0）
             await openBelongDialog(page, 0) //row 0 = 權限群組M1
             const s2 = await captureStableWithBox(page, SEL_MODAL) //E2E-005-2-dialog-open：VeGrupBlngUsers 對話框初始態（第一個 toggle 前）
+            //以下每步兩張（點擊前框要點、點擊後框反應元素）
+            const s3 = await captureStableWithBox(page, dialogEnableCheckboxSel(1)) //E2E-005-3-click-enable：點擊前框住 mary 列之 enable checkbox
             await toggleDialogEnable(page, 1) //勾選 mary enable（y）→ 歸屬 M1 → isModified=true → Save 鈕現身
-            await setDialogMode(page, 1, 'AND') //切 mary 對 M1 之 mode 為 AND
-            const s3 = await captureStableWithBox(page, dialogRowBoxSel(1)) //E2E-005-3-row-toggled：對話框內 row1（mary）toggle+mode 後、Save 前
+            const s4 = await captureStableWithBox(page, dialogRowBoxSel(1)) //E2E-005-4-enable-checked：勾選後框住該列（checkbox 已勾、所屬群組徽章含 M1）
+            const m = await setDialogModeWithShots(page, 1, 'AND') //E2E-005-5/6/7：點下拉前框觸發區 → 清單展開框整份清單 → 點「AND」前框該項目；選取後清單關閉
+            const s8 = await captureStableWithBox(page, dialogRowBoxSel(1)) //E2E-005-8-row-toggled：切 AND 後框住該列（mode 顯示 AND、徽章 AND M1）
+            const s9 = await captureStableWithBox(page, dlgBtn(page, DLG_MDI.save)) //E2E-005-9-click-save：點擊前框住對話框 Save 鈕
             await saveBelongAndWaitModal(page) //updateUsers 寫 DB → 成功 modal
-            const s4 = await captureStableWithBox(page, SEL_MODAL) //E2E-005-4-belong-saved：對話框 Save 後成功結果 modal
+            const s10 = await captureStableWithBox(page, SEL_MODAL) //E2E-005-10-belong-saved：對話框 Save 後成功結果 modal
             await assertModalMsg(page, 'userSaveUsersSuccess') //關 modal 前斷言成功訊息（dismiss 後文字消失，故移此處）
             await dismissResultModal(page)
-            const s5 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-005-5-data-changed：關 modal 後、群組頁 M1 列「管控所屬使用者」已含 mary
+            const s11 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-005-11-data-changed：關 modal 後、群組頁 M1 列「管控所屬使用者」已含 mary
             return [
                 { name: 'E2E-005-1-source-row', buf: s1 },
                 { name: 'E2E-005-2-dialog-open', buf: s2 },
-                { name: 'E2E-005-3-row-toggled', buf: s3 },
-                { name: 'E2E-005-4-belong-saved', buf: s4 },
-                { name: 'E2E-005-5-data-changed', buf: s5 },
+                { name: 'E2E-005-3-click-enable', buf: s3 },
+                { name: 'E2E-005-4-enable-checked', buf: s4 },
+                { name: 'E2E-005-5-click-mode', buf: m.clickMode },
+                { name: 'E2E-005-6-list-open', buf: m.listOpen },
+                { name: 'E2E-005-7-click-and', buf: m.clickItem },
+                { name: 'E2E-005-8-row-toggled', buf: s8 },
+                { name: 'E2E-005-9-click-save', buf: s9 },
+                { name: 'E2E-005-10-belong-saved', buf: s10 },
+                { name: 'E2E-005-11-data-changed', buf: s11 },
             ]
         },
         semantic: async (page) => {

@@ -36,10 +36,46 @@
                                         <input id="staShowTotal" type="checkbox" v-model="showTotal" @change="updateChartsDebounce" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
                                         <label for="staShowTotal" class="ml-2 text-sm font-medium text-gray-900">{{$t('staTotal')}}</label>
                                     </div>
-                                    <select v-model="timeInterval" @change="changeTimeInterval" class="border rounded px-2 py-1 text-sm">
-                                        <option value="hr">{{$t('staTimeHr')}}</option>
-                                        <option value="day">{{$t('staTimeDay')}}</option>
-                                    </select>
+                                    <!-- 時間分組下拉改自製 WTextSelect 取代原生 <select>(全域 §10.6-3: 原生下拉彈出清單之選中/hover 色由 OS 決定, CSS 不可控, 與本頁主題不一致; 同 w-web-sso LayoutContentStaInfor / w-web-api LayoutContentStats, 三專案統一).
+                                         色票沿用本頁既有 Tailwind 類別實值: 邊線 border #e5e7eb、底 bg-white #ffffff、文字同鄰接勾選框標籤 text-gray-900 #111827、
+                                         項目 hover 底 gray-100 #f3f4f6、焦點邊線同勾選框 focus:ring-blue-500 #3b82f6、展開圖標同副標 text-gray-500 #6b7280、圓角 rounded 4; 字級 text-sm 0.875rem; 內距同原 px-2 py-1.
+                                         寬度依當前語系最長選項文字計算(computed timeIntervalSelWidth, 同原生 select 依最長選項定寬, §10.6-5); id 供 e2e 定位, labelContent 供 e2e 定位 teleport 至 body 之清單.
+                                         清單對齊(§10.6-6): w-component-vue 2.5.14 實測(tmp/probe-stasel.mjs, 2026-09-14)清單左緣錨定「觸發區文字左緣」(外框左緣 + 邊框 1 + 內距 8), 故 placementDistX=-9 把清單左緣拉回外框左緣,
+                                         再以項目左內距 9 使項目文字與觸發區文字左緣貼齊(同 w-web-api 之 -9; sso 之 0 為其自量, 兩者差異未究). 清單寬固定同觸發區. -->
+                                    <WTextSelect
+                                        id="staTimeIntervalSel"
+                                        :style="`width:${timeIntervalSelWidth}px;`"
+                                        :items="timeIntervalOptions"
+                                        :value="timeInterval"
+                                        :shadow="false"
+                                        :borderRadius="4"
+                                        :paddingStyle="{ v: 4, h: 8 }"
+                                        :backgroundColor="'#ffffff'"
+                                        :backgroundColorHover="'#ffffff'"
+                                        :backgroundColorFocus="'#ffffff'"
+                                        :borderColor="'#e5e7eb'"
+                                        :borderColorHover="'#e5e7eb'"
+                                        :borderColorFocus="'#3b82f6'"
+                                        :textColor="'#111827'"
+                                        :textFontSize="'0.875rem'"
+                                        :itemTextFontSize="'0.875rem'"
+                                        :itemTextColor="'#111827'"
+                                        :itemTextColorHover="'#111827'"
+                                        :itemBackgroundColor="'#ffffff'"
+                                        :itemBackgroundColorHover="'#f3f4f6'"
+                                        :itemPaddingStyle="{ v: 6, h: 9 }"
+                                        :placementDistX="-9"
+                                        :autoFitMinWidth="false"
+                                        :autoFitMaxWidth="false"
+                                        :minWidth="timeIntervalSelWidth"
+                                        :maxWidth="timeIntervalSelWidth"
+                                        :expansionIconColor="'#6b7280'"
+                                        :labelContent="'staTimeIntervalSel'"
+                                        @input="onInputTimeInterval"
+                                    >
+                                        <template v-slot:select="props">{{getTimeIntervalText(props.item)}}</template>
+                                        <template v-slot:item="props">{{getTimeIntervalText(props.item)}}</template>
+                                    </WTextSelect>
                                 </div>
 
                             </div>
@@ -148,10 +184,16 @@ import sortBy from 'lodash-es/sortBy.js'
 import reverse from 'lodash-es/reverse.js'
 import debounce from 'wsemi/src/debounce.mjs'
 import isearr from 'wsemi/src/isearr.mjs'
+import isestr from 'wsemi/src/isestr.mjs'
 import WEchartsVue from 'w-echarts-vue/src/components/WEchartsVue.vue'
 import { mdiChartBoxOutline, mdiTableLarge } from '@mdi/js/mdi.js'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
 import WIconLoading from 'w-component-vue/src/components/WIconLoading.vue'
+import WTextSelect from 'w-component-vue/src/components/WTextSelect.vue'
+
+
+//時間分組下拉之結構寬度(px): 左右內距 8+8、左右邊框 1+1、展開圖標 18、圖標與文字間隙 2 (同 w-web-sso LayoutContentStaInfor / w-web-api LayoutContentStats 之 SEL_STRUCT_WIDTH)
+let SEL_STRUCT_WIDTH = 8 + 8 + 1 + 1 + 18 + 2
 
 
 export default {
@@ -159,6 +201,7 @@ export default {
         WEchartsVue,
         WIcon,
         WIconLoading,
+        WTextSelect,
     },
     props: {
         drawer: {
@@ -183,6 +226,8 @@ export default {
 
             timeLength: 7,
             timeInterval: 'hr',
+            timeIntervalOptions: ['hr', 'day'], //時間分組下拉之選項鍵, 顯示文字經 getTimeIntervalText 走 i18n(staTimeHr / staTimeDay)
+            fontSel: '', //時間分組下拉觸發區之實際字型(mounted 自 computed style 取得), 供 timeIntervalSelWidth 量文字實寬
 
             showTotal: false,
 
@@ -199,6 +244,11 @@ export default {
 
         let vo = this
 
+        //時間分組下拉觸發區字型: 字級 0.875rem(同原 text-sm)× 根字級, 字族/字重承襲本頁; 供 timeIntervalSelWidth 以 canvas 量最長選項文字實寬(同 sso)
+        let cs = getComputedStyle(vo.$el)
+        let rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+        vo.fontSel = `${cs.fontWeight} ${rootPx * 0.875}px ${cs.fontFamily}`
+
         //errMsg
         vo.errMsg = ''
 
@@ -211,6 +261,20 @@ export default {
 
     },
     computed: {
+
+        //時間分組下拉觸發區寬度(全域 §10.6-5: 固定尺寸須計算): 當前語系「最長選項文字」實寬(canvas measureText, 字型同觸發區)+ 結構寬 SEL_STRUCT_WIDTH;
+        //語系切換即重算($t 為響應式). why 不寫死: 原生 select 依最長選項自動定寬, 自製下拉須重現, 否則另一語系右側大片留白.
+        timeIntervalSelWidth: function() {
+            let vo = this
+            let texts = vo.timeIntervalOptions.map((k) => vo.getTimeIntervalText(k))
+            let wText = 0
+            if (isestr(vo.fontSel)) {
+                let c = document.createElement('canvas').getContext('2d')
+                c.font = vo.fontSel
+                wText = Math.max(...texts.map((t) => c.measureText(t).width))
+            }
+            return Math.ceil(wText + SEL_STRUCT_WIDTH)
+        },
 
         lang: function() {
             let vo = this
@@ -433,6 +497,20 @@ export default {
                 return 0
             }
             return num.toLocaleString()
+        },
+
+        getTimeIntervalText: function(k) {
+            let vo = this
+            return k === 'day' ? vo.$t('staTimeDay') : vo.$t('staTimeHr')
+        },
+
+        onInputTimeInterval: function(v) {
+            let vo = this
+            if (v === vo.timeInterval) {
+                return //重選同值不重取
+            }
+            vo.timeInterval = v
+            vo.changeTimeInterval()
         },
 
         changeTimeInterval: function() {

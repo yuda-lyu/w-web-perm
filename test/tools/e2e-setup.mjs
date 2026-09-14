@@ -472,12 +472,40 @@ export async function toggleDialogEnable(page, rowIndex) {
 //    項目為 `div[tabindex="0"]`, 以精確文字點選；選後 popup 自關（WTextSuggestCore clickItem → showPanel=false）。
 //  · 唯讀（editable=false）時點擊不彈出, 呼叫端不應在唯讀對話框呼叫本函式。
 export async function setDialogMode(page, rowIndex, mode) {
-    await page.locator(`.ag-row[row-index="${rowIndex}"] .ag-cell[col-id="mode"] div[_tabindex="0"]`).first().click()
+    await pickWTextSelect(page, `.ag-row[row-index="${rowIndex}"] .ag-cell[col-id="mode"]`, 'modeSelect', mode)
+    await page.waitForTimeout(800)
+}
+//對話框內某列 enable checkbox 之 selector（供「點擊前框住 checkbox」截圖；enable 欄只存在於關聯對話框，主表無此欄故不需 scope 到 modal）
+export function dialogEnableCheckboxSel(rowIndex) {
+    return `.ag-row[row-index="${rowIndex}"] .ag-cell[col-id="enable"] input[type="checkbox"]`
+}
+//對話框 mode 下拉之「每步兩張」截圖版（供多階段 case 用）：點下拉前框住觸發區整顆 → 清單展開框住整份清單 → 點項目前框住該項目整顆 → 選取並等清單關閉。
+//回傳三張 { clickMode, listOpen, clickItem }；「選取後」之列態由呼叫端以 dialogRowBoxSel(rowIndex) 另拍。
+export async function setDialogModeWithShots(page, rowIndex, mode) {
+    const cell = `.ag-row[row-index="${rowIndex}"] .ag-cell[col-id="mode"]`
+    const clickMode = await captureStableWithBox(page, `${cell} div[style*="opacity"]`) //觸發區 pill（WShellEllipse 外框）
+    await page.locator(`${cell} div[_tabindex="0"]`).first().click()
     const popup = page.locator('.WPopperFix[wtlp="modeSelect"]:visible')
     await popup.first().waitFor({ state: 'visible', timeout: 10000 })
-    await popup.locator('div[tabindex="0"]').filter({ hasText: new RegExp(`^\\s*${mode}\\s*$`) }).first().click()
+    await page.waitForTimeout(400)
+    const listOpen = await captureStableWithBox(page, popup)
+    const item = popup.locator('div[tabindex="0"]').filter({ hasText: new RegExp(`^\\s*${mode}\\s*$`) }).first()
+    const clickItem = await captureStableWithBox(page, item)
+    await item.click()
     await popup.first().waitFor({ state: 'hidden', timeout: 10000 })
     await page.waitForTimeout(800)
+    return { clickMode, listOpen, clickItem }
+}
+//通用：以真點擊操作 WTextSelect（w-component-vue）——點觸發區文字 → 等 teleport 至 body 之清單可見 → 點指定文字之項目 → 等清單關閉。
+//  containerSel：含該 WTextSelect 之容器 selector（觸發區為其內 div[_tabindex="0"]）；wtlp：該元件之 labelContent；itemText：項目顯示文字（精確比對, 前後空白忽略）。
+//  各站點：對話框 mode 欄 wtlp='modeSelect'（setDialogMode）、統計頁時間分組 '#staTimeIntervalSel' / wtlp='staTimeIntervalSel'（e2e-stainfor）。
+export async function pickWTextSelect(page, containerSel, wtlp, itemText) {
+    await page.locator(`${containerSel} div[_tabindex="0"]`).first().click()
+    const popup = page.locator(`.WPopperFix[wtlp="${wtlp}"]:visible`)
+    await popup.first().waitFor({ state: 'visible', timeout: 10000 })
+    const esc = String(itemText).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    await popup.locator('div[tabindex="0"]').filter({ hasText: new RegExp(`^\\s*${esc}\\s*$`) }).first().click()
+    await popup.first().waitFor({ state: 'hidden', timeout: 10000 })
 }
 export async function clickDialogSave(page) {
     await dlgBtn(page, DLG_MDI.save).first().click()

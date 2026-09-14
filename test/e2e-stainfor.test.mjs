@@ -6,11 +6,12 @@
 //  - 驗證（mocha）：npx mocha test/e2e-stainfor.test.mjs --reporter list （pixelmatch 反鋸齒感知 + maxDiffPixels 容差比對，非 byte-exact）
 //  --names <eng-E2E-001-event-all,...> 進行手術式 baseline 重產
 //
-//標準圖存放：test/pics/stainfor/stainfor-{lang}-{name}.png（4 cases × 2 lang = 8 baselines）
+//標準圖存放：test/pics/stainfor/stainfor-{lang}-{name}.png（5 cases；E2E-001~004 各 1 張、E2E-005 4 張 → 每語系 8 張、共 16 baselines）
 //  E2E-001-event-all:      進頁預設 → 圖表每個事件各一條折線（5 條）。
 //  E2E-002-event-selected: 點圖例關掉其餘 3 事件 → 僅該 2 條折線可見（圖例切換為事件篩選之唯一入口）。
 //  E2E-003-event-total:    勾「全部加總」→ 圖表加入 Total 加總線（Total + 5 事件 = 6 條系列）。
 //  E2E-004-event-table:    事件統計表 → 5 列、依最近1日降序、表頭含各時間窗欄位。
+//  E2E-005-interval-day:   時間分組下拉（自製 WTextSelect）切「每日」→ 每步兩張（點下拉前 / 清單展開 / 點「每日」前 / 選後圖表 7 桶）。
 //
 //確定性來源：後端 staEventMock=true → getStaEvent 回固定資料集（48 桶、固定起點 2025-01-01、固定 sin 計數、5 個 event）。
 //  event 名（mock）：verifyConn, updateTargets-success, checkUser-error, api/getPerm-success, getWebInfor-success
@@ -103,6 +104,26 @@ async function keepOnlyEventsByLegend(page, keepEvents, allEvents) {
 async function checkShowTotal(page) {
     await page.locator('#staShowTotal').check()
     await page.waitForTimeout(5000) //等 debounce(300) + optEvent 重算 + echarts 重繪 settle
+}
+
+//時間分組下拉（自製 WTextSelect，LayoutContentStaInfor.vue id="staTimeIntervalSel"，清單 teleport 至 body 之 .WPopperFix[wtlp="staTimeIntervalSel"]）
+const SEL_INTERVAL = '#staTimeIntervalSel'
+
+//—— E2E-005 時間分組切每日 語意斷言 ——
+//驗：觸發區顯示「每日」；圖表 x 軸為 7 個每日分桶（mock day）且首桶為日期格式 YYYY-MM-DD；清單已關閉。
+async function assertIntervalDaySpec(page, lang) {
+    const dayText = await page.evaluate(() => window.$vo.$t('staTimeDay'))
+    const trig = await page.evaluate((s) => { const e = document.querySelector(`${s} div[_tabindex="0"]`); return e ? (e.textContent || '').trim() : null }, SEL_INTERVAL)
+    assert.equal(trig, dayText, `(E2E-005/${lang}) 觸發區應顯示「${dayText}」，實得「${trig}」`)
+    const ax = await page.evaluate(() => {
+        const find = (vm) => { if (!vm) return null; if (vm.chart && typeof vm.chart.getOption === 'function') return vm; for (const c of (vm.$children || [])) { const r = find(c); if (r) return r } return null }
+        const vm = find(window.$vo); const o = vm && vm.chart.getOption()
+        return o && o.xAxis && o.xAxis[0] ? { n: o.xAxis[0].data.length, first: String(o.xAxis[0].data[0]) } : null
+    })
+    assert.ok(ax && ax.n === 7, `(E2E-005/${lang}) 每日分組之 x 軸應為 7 桶，實得 ${JSON.stringify(ax)}`)
+    assert.ok(/^\d{2}\/\d{2}$/.test(ax.first), `(E2E-005/${lang}) 每日分桶軸標籤應為 MM/DD（LayoutContentStaInfor.vue formatX），實得 ${ax.first}`)
+    const popOpen = await page.locator('.WPopperFix[wtlp="staTimeIntervalSel"]:visible').count()
+    assert.equal(popOpen, 0, `(E2E-005/${lang}) 選取後清單應關閉`)
 }
 
 //定位事件展示區卡片（含 staEventTitle 標題之 .bg-white 卡片），供紅框標注。
@@ -308,6 +329,42 @@ const CASES = [
         },
         semantic: async (page, lang) => { await assertTableSpec(page, lang) },
     },
+    {
+        //E2E-005：時間分組下拉（自製 WTextSelect）切「每日」→ 圖表改以每日分桶重取重繪（mock day = 7 桶）。
+        //多階段（每步兩張）：點下拉前框住觸發區 → 清單展開框住整份清單 → 點「每日」前框住該項目 → 選後框住事件頻率卡片。
+        name: 'E2E-005-interval-day',
+        run: async (browser, lang) => {
+            const page = await openApp(browser)
+            await setLang(page, lang)
+            await gotoStaInfor(page)
+            const dayText = await page.evaluate(() => window.$vo.$t('staTimeDay'))
+            const title = await page.evaluate(() => window.$vo.$t('staEventTitle'))
+            const s1 = await captureStableWithBox(page, SEL_INTERVAL) //E2E-005-1-click-interval：點擊前框住時間分組觸發區整顆
+            await page.locator(`${SEL_INTERVAL} div[_tabindex="0"]`).first().click()
+            const popup = page.locator(`.WPopperFix[wtlp="staTimeIntervalSel"]:visible`)
+            await popup.first().waitFor({ state: 'visible', timeout: 10000 })
+            await page.waitForTimeout(500)
+            const s2 = await captureStableWithBox(page, popup) //E2E-005-2-list-open：清單展開，框住整份清單（每小時 / 每日）
+            const dayItem = popup.locator('div[tabindex="0"]').filter({ hasText: dayText }).first()
+            const s3 = await captureStableWithBox(page, dayItem) //E2E-005-3-click-day：點擊前框住「每日」項目整顆
+            await dayItem.click()
+            await popup.first().waitFor({ state: 'hidden', timeout: 10000 })
+            await waitUntilExist(page, '每日分桶圖表（xAxis 7 桶）', () => {
+                const find = (vm) => { if (!vm) return null; if (vm.chart && typeof vm.chart.getOption === 'function') return vm; for (const c of (vm.$children || [])) { const r = find(c); if (r) return r } return null }
+                const vm = find(window.$vo); const o = vm && vm.chart.getOption()
+                return !!(o && o.xAxis && o.xAxis[0] && o.xAxis[0].data && o.xAxis[0].data.length === 7)
+            }, { timeout: 30000 })
+            await page.waitForTimeout(5000) //echarts 重繪 + resize debounce settle（對齊 checkShowTotal）
+            const s4 = await captureStableWithBox(page, eventCardLoc(page, title)) //E2E-005-4-day-selected：選後框住事件頻率卡片（觸發區顯示「每日」、圖為 7 個每日分桶）
+            return { shots: [
+                { name: 'E2E-005-1-click-interval', buf: s1 },
+                { name: 'E2E-005-2-list-open', buf: s2 },
+                { name: 'E2E-005-3-click-day', buf: s3 },
+                { name: 'E2E-005-4-day-selected', buf: s4 },
+            ], page }
+        },
+        semantic: async (page, lang) => { await assertIntervalDaySpec(page, lang) },
+    },
 ]
 
 //手術式重產（§6.3）：--names a,b,c 只產指定 case；--langs eng,cht 只產指定語系。截圖「前」就 gate（省截圖成本）。
@@ -335,9 +392,13 @@ async function generateBaseline() {
                 if (onlyNames && !nameMatch(onlyNames, c.name)) continue //§6.3 手術式：截圖前 gate
                 //per-case fresh browser（每 case 全新進程，消 GPU/font/CSS cache 跨 case 累積差異；對齊其他 perm e2e）
                 const browser = await launchBrowser()
-                const { buf } = await c.run(browser, lang)
-                fs.writeFileSync(picPath(lang, c.name), buf)
-                console.log('wrote', picPath(lang, c.name), buf.length, 'bytes')
+                const r = await c.run(browser, lang)
+                //run 回傳「單張 { buf, page }」或「多階段 { shots:[{name,buf}], page }」；統一正規化為陣列後逐張寫入
+                const shots = r.shots || [{ name: c.name, buf: r.buf }]
+                for (const s of shots) {
+                    fs.writeFileSync(picPath(lang, s.name), s.buf)
+                    console.log('wrote', picPath(lang, s.name), s.buf.length, 'bytes')
+                }
                 await browser.close()
             }
         }
@@ -374,9 +435,12 @@ else {
                     //per-case fresh browser（每 case 全新進程，對齊其他 perm e2e）
                     const browser = await launchBrowser()
                     try {
-                        const { buf, page } = await c.run(browser, lang)
-                        if (c.semantic) await c.semantic(page, lang)
-                        assertBaselineMatch(buf, picPath(lang, c.name), `stainfor-${lang}-${c.name}`)
+                        const r = await c.run(browser, lang)
+                        if (c.semantic) await c.semantic(r.page, lang)
+                        const shots = r.shots || [{ name: c.name, buf: r.buf }]
+                        for (const s of shots) {
+                            assertBaselineMatch(s.buf, picPath(lang, s.name), `stainfor-${lang}-${s.name}`)
+                        }
                     }
                     finally {
                         await browser.close()

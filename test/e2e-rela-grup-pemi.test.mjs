@@ -22,7 +22,7 @@
 import fs from 'fs'
 import assert from 'assert'
 import JSON5 from 'json5'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal, captureBaseSeed, resetDb, setDialogMode } from './tools/e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal, captureBaseSeed, resetDb, setDialogModeWithShots, dialogEnableCheckboxSel } from './tools/e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/rela-grup-pemi'
 const LANGS = ['eng', 'cht']
@@ -214,22 +214,36 @@ const CASES = [
             const s1 = await captureStableWithBox(page, rowBoxSel(0)) //階段1：來源列（點 cpemis 按鈕前）
             await openCpemisDialog(page, 0) //row 0 = 權限群組M1
             const s2 = await captureStableWithBox(page, SEL_MODAL) //階段2：對話框初始態（toggleDialogEnable 前）
+            //以下每步兩張（點擊前框要點、點擊後框反應元素）
+            const s3 = await captureStableWithBox(page, dialogEnableCheckboxSel(2)) //階段3 click-enable：點擊前框住 權限P3 列之 enable checkbox
             await toggleDialogEnable(page, 2) //勾選 權限P3 enable（y）→ isModified=true → Save 鈕現身
-            await setDialogMode(page, 2, 'AND') //將 權限P3 mode 切為 AND
-            const s3 = await captureStableWithBox(page, dialogRowBoxSel(2)) //階段3：對話框內被切的 row2（權限P3），toggle+mode 後 Save 前
+            const s4 = await captureStableWithBox(page, dialogRowBoxSel(2)) //階段4 enable-checked：勾選後框住該列（checkbox 已勾、Save 鈕現身）
+            const m = await setDialogModeWithShots(page, 2, 'AND') //階段5/6/7：點下拉前框觸發區 → 清單展開框整份清單 → 點「AND」前框該項目；選取後清單關閉
+            const s8 = await captureStableWithBox(page, dialogRowBoxSel(2)) //階段8 row-toggled：切 AND 後框住該列（mode 顯示 AND）
+            const s9 = await captureStableWithBox(page, pathBtn(page, DLG_MDI.save)) //階段9 click-save：點擊前框住對話框 Save 鈕
             await clickDialogSave(page) //resolve cpemis 字串回填群組列、isModified=true，對話框關閉
             await waitDialogClosed(page, 'grupEditCpemis')
+            const s10 = await captureStableWithBox(page, rowBoxSel(0)) //階段10 cpemis-filled：對話框已關閉，M1 列 cpemis 摘要已回填（『使用 3 項權限』）、頁面儲存鈕現身
+            const s11 = await captureStableWithBox(page, pathBtn(page, TOOLBAR_MDI.upload)) //階段11 click-page-save：點擊前框住群組頁工具列存檔鈕
             await saveGrupsAndWaitModal(page) //群組頁工具列存檔 → updateGrups 寫 DB → 成功 modal
-            const s4 = await captureStableWithBox(page, SEL_MODAL) //階段4：群組頁存檔成功結果 modal
+            const s12 = await captureStableWithBox(page, SEL_MODAL) //階段12：群組頁存檔成功結果 modal
             await assertModalMsg(page, 'grupSaveGrupsSuccess') //關 modal 前斷言成功訊息（dismiss 後文字消失，故移此處）
             await dismissResultModal(page)
-            const s5 = await captureStableWithBox(page, rowBoxSel(0)) //階段5 data-changed：關 modal 後、主清單 M1 列摘要已變更（由『使用 2 項權限』→『使用 3 項權限』）
+            const s13 = await captureStableWithBox(page, rowBoxSel(0)) //階段13 data-changed：關 modal 後、主清單 M1 列摘要維持『使用 3 項權限』且儲存鈕消失
             return [
                 { name: 'E2E-002-1-source-row', buf: s1 },
                 { name: 'E2E-002-2-dialog-open', buf: s2 },
-                { name: 'E2E-002-3-row-toggled', buf: s3 },
-                { name: 'E2E-002-4-cpemis-save-ok', buf: s4 },
-                { name: 'E2E-002-5-data-changed', buf: s5 },
+                { name: 'E2E-002-3-click-enable', buf: s3 },
+                { name: 'E2E-002-4-enable-checked', buf: s4 },
+                { name: 'E2E-002-5-click-mode', buf: m.clickMode },
+                { name: 'E2E-002-6-list-open', buf: m.listOpen },
+                { name: 'E2E-002-7-click-and', buf: m.clickItem },
+                { name: 'E2E-002-8-row-toggled', buf: s8 },
+                { name: 'E2E-002-9-click-save', buf: s9 },
+                { name: 'E2E-002-10-cpemis-filled', buf: s10 },
+                { name: 'E2E-002-11-click-page-save', buf: s11 },
+                { name: 'E2E-002-12-cpemis-save-ok', buf: s12 },
+                { name: 'E2E-002-13-data-changed', buf: s13 },
             ]
         },
         semantic: async (page) => {
@@ -289,20 +303,30 @@ const CASES = [
             const s1 = await captureStableWithBox(page, rowBoxSel(0)) //階段1：來源列（點 belongGrups 按鈕前）
             await openBelongDialog(page, 0) //row 0 = 權限P1
             const s2 = await captureStableWithBox(page, SEL_MODAL) //階段2：對話框初始態（toggleDialogEnable 前）
+            //以下每步兩張（點擊前框要點、點擊後框反應元素）
+            const s3 = await captureStableWithBox(page, dialogEnableCheckboxSel(1)) //階段3 click-enable：點擊前框住 權限群組M2 列之 enable checkbox
             await toggleDialogEnable(page, 1) //勾選 權限群組M2 enable（y）→ 將 P1 掛入 M2 → isModified=true → Save 鈕現身
-            await setDialogMode(page, 1, 'AND') //切 M2 對 P1 之 mode 為 AND
-            const s3 = await captureStableWithBox(page, dialogRowBoxSel(1)) //階段3：對話框內被切的 row1（權限群組M2），toggle+mode 後 Save 前
+            const s4 = await captureStableWithBox(page, dialogRowBoxSel(1)) //階段4 enable-checked：勾選後框住該列（checkbox 已勾、徽章含 P1）
+            const m = await setDialogModeWithShots(page, 1, 'AND') //階段5/6/7：點下拉前框觸發區 → 清單展開框整份清單 → 點「AND」前框該項目；選取後清單關閉
+            const s8 = await captureStableWithBox(page, dialogRowBoxSel(1)) //階段8 row-toggled：切 AND 後框住該列（mode 顯示 AND、徽章 AND P1）
+            const s9 = await captureStableWithBox(page, pathBtn(page, DLG_MDI.save)) //階段9 click-save：點擊前框住對話框 Save 鈕
             await saveBelongAndWaitModal(page) //updateGrups 寫 DB → 成功 modal
-            const s4 = await captureStableWithBox(page, SEL_MODAL) //階段4：對話框 Save 後成功結果 modal
+            const s10 = await captureStableWithBox(page, SEL_MODAL) //階段10：對話框 Save 後成功結果 modal
             await assertModalMsg(page, 'grupSaveGrupsSuccess') //關 modal 前斷言成功訊息（dismiss 後文字消失，故移此處）
             await dismissResultModal(page)
-            const s5 = await captureStableWithBox(page, rowBoxSel(0)) //階段5 data-changed：關 modal 後、權限頁 P1 列摘要已變更（所屬群組含 M2）
+            const s11 = await captureStableWithBox(page, rowBoxSel(0)) //階段11 data-changed：關 modal 後、權限頁 P1 列摘要已變更（所屬群組含 M2）
             return [
                 { name: 'E2E-004-1-source-row', buf: s1 },
                 { name: 'E2E-004-2-dialog-open', buf: s2 },
-                { name: 'E2E-004-3-row-toggled', buf: s3 },
-                { name: 'E2E-004-4-blnggrups-save-ok', buf: s4 },
-                { name: 'E2E-004-5-data-changed', buf: s5 },
+                { name: 'E2E-004-3-click-enable', buf: s3 },
+                { name: 'E2E-004-4-enable-checked', buf: s4 },
+                { name: 'E2E-004-5-click-mode', buf: m.clickMode },
+                { name: 'E2E-004-6-list-open', buf: m.listOpen },
+                { name: 'E2E-004-7-click-and', buf: m.clickItem },
+                { name: 'E2E-004-8-row-toggled', buf: s8 },
+                { name: 'E2E-004-9-click-save', buf: s9 },
+                { name: 'E2E-004-10-blnggrups-save-ok', buf: s10 },
+                { name: 'E2E-004-11-data-changed', buf: s11 },
             ]
         },
         semantic: async (page) => {
