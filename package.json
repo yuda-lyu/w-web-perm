@@ -1,18 +1,18 @@
 {
   "name": "w-web-perm",
-  "version": "1.0.81",
+  "version": "1.0.82",
   "main": "dist/w-web-perm.umd.js",
   "dependencies": {
     "json5": "^2.2.3",
     "w-aggrid-vue": "^2.0.86",
-    "w-component-vue": "^2.5.13",
+    "w-component-vue": "^2.5.14",
     "w-data-collector": "^1.0.37",
     "w-echarts-vue": "^1.0.11",
     "w-serv-hapi": "^1.0.88",
     "w-serv-orm": "^1.0.54",
     "w-syslog": "^1.0.26",
     "w-ui-loginout": "^1.0.25",
-    "wsemi": "^1.8.92"
+    "wsemi": "^1.8.94"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^5.0.8",

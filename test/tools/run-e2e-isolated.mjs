@@ -9,7 +9,7 @@
 //機制：每檔前只殺後端(11006)、保留前端(8090, 無狀態且啟動慢)。新 mocha 進程 startedBackend=false → seedDb+spawn
 //  全新後端；startedFrontend 段偵測 8090 已起 → reuse。
 //
-//用法：node test/run-e2e-isolated.mjs   (exit 0=全綠；非 0=有失敗檔)
+//用法：node test/tools/run-e2e-isolated.mjs   (exit 0=全綠；非 0=有失敗檔)
 
 import { spawn, spawnSync, execSync } from 'child_process'
 import { fileURLToPath } from 'url'

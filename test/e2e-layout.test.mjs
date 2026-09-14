@@ -35,9 +35,9 @@ const SEL_DRAWER_PANEL = '[ev-stable]'                   //WDrawer 平移面板 
 const SEL_STA_TITLE = 'div[style*="font-size: 1.5rem"]'  //統計頁標題「統計資訊」（LayoutContentStaInfor.vue:19；Vue 2 會把靜態 style 正規化成含空白之 `font-size: 1.5rem`）
 
 //等導覽區收合／展開落定——採「使用者可觀察之幾何」：目標圓鈕已出現 + 面板與內容區 rect 連續 3 次取樣不變。
-//不用 WDrawer 根節點 [state]（hidden/opened）：實測（tmp/probe-state.mjs, 2026-09-14）同頁先 page.screenshot 再收合時，
-//v-domstable（wsemi domIsStable：getAnimations().finished + rect 比對）會停在未穩定、[state] 卡在 hiding/opening 直到
-//WDrawer 之 200s 兜底逾時，視覺早已落定；屬截圖手段造成之測試端現象，非產品缺陷（記於 CLAUDE_experience.md）。
+//不用 WDrawer 根節點 [state]（hidden/opened）：w-component-vue 2.5.13 於負載高時 [state] 偶發卡在 hiding/opening 直到 200s 兜底
+//（wsemi domIsStable core() 丟棄 await 前的動畫、v-domstable 只在翻轉時 emit），2.5.14 + wsemi 1.8.94 已修（transitionend 為主訊號、兜底 1.3s）；
+//幾何訊號為使用者可觀察之終態，故沿用。根因史見 CLAUDE_experience.md。
 async function waitDrawerSettled(page, collapsed) {
     await iconBtn(page, collapsed ? MDI.show : MDI.hide).first().waitFor({ state: 'visible', timeout: 15000 })
     const snap = () => page.evaluate((sel) => {
