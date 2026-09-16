@@ -742,7 +742,7 @@ export default {
                         'belongGrups': false,
                         'crules': false,
                     },
-                    kpHeadFocusHighlight: { //雖然效果不完全, 但因按鈕與cell有padding可被點擊, 故還是需要開啟
+                    kpHeadFocusHighlight: { //本欄內容為開窗按鈕(cell 之 padding 亦可被點), 焦點框徒增干擾故關閉; w-aggrid-vue 2.0.87 起規則含 :focus-within, 按鈕取得焦點(如鍵盤 Tab)時亦不顯示焦點框——2.0.86 只擋 :focus, 按鈕聚焦仍現藍框, 即本註解原載「效果不完全」之由, 2026-09-16 實測已修
                         'belongGrups': false,
                         'crules': false,
                     },

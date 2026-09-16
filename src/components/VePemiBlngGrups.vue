@@ -465,7 +465,7 @@ export default {
                     // kpHeadCheckBox: {
                     //     'name': true,
                     // },
-                    kpHeadFocusHighlight: { //雖然效果不完全, 但因按鈕與cell有padding可被點擊, 故還是需要開啟
+                    kpHeadFocusHighlight: { //本欄內容為唯讀徽章(無可聚焦元素), 焦點框徒增干擾故關閉; 與三個清單頁之按鈕欄同一慣例, 該處另受 w-aggrid-vue 2.0.87 之 :focus-within 修正(本欄不可聚焦, 不受影響)
                         'pemisNames': false,
                     },
                     rowsChange: (rs) => {
