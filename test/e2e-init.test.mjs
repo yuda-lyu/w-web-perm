@@ -9,11 +9,12 @@
 //
 // 三個必守陷阱（對齊 SSO e2e-initlang）:
 //   1. 打後端 dist（apiBaseUrl 11006）, 不是 dev server（8090 不做注入 → 永遠 eng）。
-//   2. 必須有 dist/index.tmp 不可變模板（{language} 被取代後即消失）; 本檔 setup 由 dist/index.html 還原重建。
+//   2. 必須有 dist/index.tmp 不可變模板（{language} 被取代後即消失）; 它受版控、由業主發布管線產生（script.txt:
+//      npm run build → node toolg/genEntry.mjs）, 本檔 setup **只驗證其佔位符齊全, 絕不改寫**——測試不得寫入受版控之建置產物。
 //   3. URL 不可帶 ?lang=（URL 語系優先序最高會蓋掉 server 注入值）。
 //
 // 使用方式:
-//   1. 先 npm run build 產 dist。
+//   1. 先依 script.txt 執行 npm run build 與 node toolg/genEntry.mjs 產 dist/index.tmp（或 git checkout -- dist/index.tmp）。
 //   2. 產標準圖: node test/e2e-init.test.mjs --baseline [--names E2E-001,...] [--langs eng,cht]（手術式重產，§6.3）
 //   3. 跑測試:   npx mocha test/e2e-init.test.mjs --timeout 120000 --reporter list （pixelmatch 反鋸齒感知 + maxDiffPixels 容差比對，非 byte-exact）
 //
@@ -41,17 +42,23 @@ const expectedText = {
 function bp(lang, name) { return path.join(baselineDir, `init-${lang}-${name}.png`) }
 
 
-//確保 dist/index.tmp 不可變模板存在: 由 dist/index.html 以正規式把已注入的 language 值還原為 {language} 佔位符。
-//冪等 — 不論 dist/index.html 目前是 'eng' / 'cht' / '{language}' 皆還原成模板。（陷阱 2）
+//驗證 dist/index.tmp 不可變模板存在且三種佔位符齊全（陷阱 2）；不齊即拋錯, **絕不改寫該檔**。
+//  why：index.tmp 受版控, 為業主發布管線之產物（script.txt: npm run build → toolg/genEntry.mjs 把 /mperm/ 改成 {sfd}/ 並刪 index.html）;
+//  dist/index.html 則是後端啟動時由模板代換出的執行期產物（server/WWebPerm.mjs:710-737, {sfd}/{urlRedirect}/{language} 皆已被代換）。
+//  本函式 2026-06-22 進版之原版「由 index.html 回寫 index.tmp」只還原 {language}, {urlRedirect} 被寫死成設定值、六個 {sfd}
+//  全數消失（subfolder 為 '' 時輸出之 "/js/…" 與模板之 "{sfd}/js/…" 同形, 無從反推）, 每跑一次 e2e-init 即污染一次版控檔;
+//  2026-09-07 與 2026-09-16 兩度實機踩到（後者由雙獨立審計同時查出）, 歷史 commit 逐一核對幸未帶進版控。
+//  修法不是「補還原規則」而是「測試不得寫入受版控之建置產物」：缺檔或缺佔位符一律拋錯, 交由人以管線重產或 git checkout 還原。
 function ensureIndexTmpl() {
-    const distHtml = './dist/index.html'
     const distTmp = './dist/index.tmp'
-    if (!fs.existsSync(distHtml)) {
-        throw new Error('dist/index.html 不存在 — 請先 npm run build 產 dist')
+    if (!fs.existsSync(distTmp)) {
+        throw new Error('dist/index.tmp 不存在 — 請依 script.txt 執行 npm run build 與 node toolg/genEntry.mjs, 或 git checkout -- dist/index.tmp')
     }
-    let c = fs.readFileSync(distHtml, 'utf8')
-    c = c.replace(/language: '[^']*'/, "language: '{language}'")
-    fs.writeFileSync(distTmp, c, 'utf8')
+    const t = fs.readFileSync(distTmp, 'utf8')
+    const missing = ['{sfd}', '{urlRedirect}', '{language}'].filter((k) => !t.includes(k))
+    if (missing.length > 0) {
+        throw new Error(`dist/index.tmp 缺佔位符 ${missing.join(', ')}（模板已被改寫）— 請 git checkout -- dist/index.tmp 或依 script.txt 重產; 本測試不代為改寫受版控之模板`)
+    }
 }
 
 

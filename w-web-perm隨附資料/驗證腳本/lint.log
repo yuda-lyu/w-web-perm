@@ -1,0 +1,23 @@
+[run_in] cwd=./tmp/wwp_build cmd=node C:/prrdd/最終處置計畫資料庫系統/rddmanager/node_modules/@vue/cli-service/bin/vue-cli-service.js lint --no-fix src/components/ModeSelectChip.vue src/components/RelationChip.vue src/components/RelationChips.vue src/components/VeGrupBlngUsers.vue src/components/VePemiBlngGrups.vue src/components/VeCgrups.vue src/components/VeCpemis.vue src/components/VeCrules.vue src/components/LayoutContentGrups.vue src/components/LayoutContentPemis.vue src/App.vue
+(node:26496) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+C:\prrdd\最終處置計畫資料庫系統\rddmanager\tmp\wwp_build\src\components\LayoutContentGrups.vue
+  1224:33  error  Statement inside of curly braces should be on next line                                                        brace-style
+  1224:49  error  Closing curly brace should be on the same line as opening curly brace or on the line after the previous block  brace-style
+
+C:\prrdd\最終處置計畫資料庫系統\rddmanager\tmp\wwp_build\src\components\LayoutContentPemis.vue
+  1226:33  error  Statement inside of curly braces should be on next line                                                        brace-style
+  1226:49  error  Closing curly brace should be on the same line as opening curly brace or on the line after the previous block  brace-style
+
+C:\prrdd\最終處置計畫資料庫系統\rddmanager\tmp\wwp_build\src\components\VeGrupBlngUsers.vue
+  956:29  error  Statement inside of curly braces should be on next line                                                        brace-style
+  956:45  error  Closing curly brace should be on the same line as opening curly brace or on the line after the previous block  brace-style
+
+C:\prrdd\最終處置計畫資料庫系統\rddmanager\tmp\wwp_build\src\components\VePemiBlngGrups.vue
+  956:29  error  Statement inside of curly braces should be on next line                                                        brace-style
+  956:45  error  Closing curly brace should be on the same line as opening curly brace or on the line after the previous block  brace-style
+
+✖ 8 problems (8 errors, 0 warnings)
+  8 errors and 0 warnings potentially fixable with the `--fix` option.
+

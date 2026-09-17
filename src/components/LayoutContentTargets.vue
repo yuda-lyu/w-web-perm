@@ -678,8 +678,8 @@ export default {
             let cmp = get(vo, '$refs.rftable')
             // console.log('cmp', cmp)
 
-            //showKeys
-            cmp.showKeys(vo.tabKeysShow)
+            //showKeys, applyOrder:false 僅切換顯示與隱藏、維持目前欄序; 理由同 LayoutContentUsers 該處註解
+            cmp.showKeys(vo.tabKeysShow, { applyOrder: false })
             // console.log('tabKeysShow', vo.tabKeysShow)
 
         },

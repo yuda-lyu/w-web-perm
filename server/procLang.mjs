@@ -262,9 +262,9 @@ let kpLang = {
         eng: `Use users`,
         cht: `管控所屬使用者`,
     },
-    belongGrups: {
+    belongGrups: { //與 belongUsers(管控所屬使用者)同類之反向參照欄, 中文補「管控」以對稱(2026-09-16 業主指正)
         eng: `Use groups`,
-        cht: `所屬權限群組`,
+        cht: `管控所屬權限群組`,
     },
     //目前無引用,保留供日後使用(見 spec/設計要點與取捨.md ADR-014)
     // belongPemis: {
@@ -278,6 +278,14 @@ let kpLang = {
     belongPemisNames: {
         eng: `Use permissions`,
         cht: `所屬權限名稱`,
+    },
+    chipsShowAll: { //關聯 chip 列表(RelationChips)之「展開全部」鈕提示
+        eng: `Show all`,
+        cht: `展開全部`,
+    },
+    chipsPopupTitle: { //關聯 chip 列表之展開浮層標題, {title} 為欄名(belongGrupsNames/belongPemisNames), {n} 為數量
+        eng: `{title} ({n} in total)`,
+        cht: `{title}：共 {n} 項`,
     },
 
     isAdmin: {
@@ -507,8 +515,8 @@ let kpLang = {
         eng: `Permission groups`,
         cht: `展示所屬權限群組`,
     },
-    pemiBlngRnderNoGrup: {
-        eng: `No users`,
+    pemiBlngRnderNoGrup: { //權限頁 belongGrups 欄之空狀態; eng 原誤植為 `No users`(與本欄語意不符, 2026-09-16 雙獨立審計查出), 隨 A3 同欄改字一併訂正
+        eng: `No permission groups`,
         cht: `無所屬權限群組`,
     },
     pemiBlngRnderGrups: {

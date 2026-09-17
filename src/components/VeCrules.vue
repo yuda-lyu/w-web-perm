@@ -383,7 +383,11 @@ export default {
                     defHeadFilter: true,
                     defCellAlignH: 'left',
                     kpCellEditable: {
-                        'id': vo.isEditable,
+                        //id 一律唯讀: 列固定為「全部既有管控對象」(由 $store.state.targets 映出, 無新增/刪除列),
+                        //  就地改 id 無任何正當用途; 且 doSave 以列上之 id 當鍵寫出 crules(kpRule[id]=enable),
+                        //  改 id 即寫出對不到任何 target 之鍵 → 規則靜默失效、DB 留下垃圾鍵。
+                        //  與 VeCgrups/VeCpemis/VeGrupBlngUsers/VePemiBlngGrups 同類(§2.1 第 4 條 對稱性: 兄弟元素逐一比對)。
+                        'id': false,
                         'enable': false,
                     },
                     kpHeadWidth: {
@@ -401,6 +405,9 @@ export default {
                     },
                     kpHeadCheckBox: {
                         'id': true,
+                    },
+                    kpHeadFocusHighlight: { //本欄儲存格內有自己的控制項(勾選框), 焦點框徒增干擾故關閉, 與其餘關聯對話框一致
+                        'enable': false,
                     },
                     rowsChange: (rs) => {
                         // console.log('rowsChange', rs)

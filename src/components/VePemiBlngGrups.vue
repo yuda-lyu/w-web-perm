@@ -140,31 +140,15 @@
                             :opt="opt"
                         >
                             <template v-slot:cell-render="props">
-                                <template v-if="props.key==='pemisNames'">
-                                    <span v-for="(item, idx) in props.row.pemis" :key="idx" style="display:inline-block; line-height:20px; height:20px;">
-                                        <div style="display:flex;">
-                                            <div :style="'padding:0px 5px; border-top-left-radius:4px; border-bottom-left-radius:4px; ' + (item.enable === 'y' ? 'border-left:1px solid #ac2451; border-right:1px solid #9e2149; border-top:1px solid #ac2451; border-bottom:1px solid #ac2451; background:#be295a; color:#fff;' : 'border-left:1px solid #aaaaaa; border-right:1px solid #aaaaaa; border-top:1px solid #aaaaaa; border-bottom:1px solid #aaaaaa; background:#ffffff; color:#555;')">
-                                                {{ item.mode }}
-                                            </div>
-                                            <div :style="'padding:0px 5px; border-top-right-radius:4px; border-bottom-right-radius:4px; ' + (item.enable === 'y' ? '_border-left:1px solid #ac2451; border-right:1px solid #ac2451; border-top:1px solid #ac2451; border-bottom:1px solid #ac2451; background:#d22f64; color:#fff;' : '_border-left:1px solid #aaaaaa; border-right:1px solid #aaaaaa; border-top:1px solid #aaaaaa; border-bottom:1px solid #aaaaaa; background:#eeeeee; color:#555;')">
-                                                {{ item.name }}
-                                            </div>
-                                        </div>
-                                    </span>
-                                </template>
-                                <WTextSelect
-                                    v-else-if="props.key==='mode'"
-                                    :style="`width:${modeSelectWidth}px;`"
-                                    :items="modeItems"
-                                    :value="props.row.mode"
+                                <RelationChips
+                                    v-if="props.key==='pemisNames'"
+                                    :items="props.row.pemis"
                                     :editable="isEditable"
-                                    :paddingStyle="{v:0,h:10}"
-                                    :shadow="false"
-                                    :itemPaddingStyle="{v:8,h:10}"
-                                    :placementDistX="-10"
+                                    :popupTitle="$t('belongPemisNames')"
+                                    :tooltipAll="$t('chipsShowAll')"
                                     :labelContent="'modeSelect'"
                                     @input="(item)=>{showVePemiBlngGrupsToggleItemModeByName(props.row.name, item)}"
-                                ></WTextSelect>
+                                ></RelationChips>
                                 <input v-else-if="props.key==='enable'" type="checkbox" :checked="props.value === 'y'" @click="showVePemiBlngGrupsToggleItemEnableByName(props.row.name)" :disabled="!isEditable" />
                                 <span v-else>{{ props.value }}</span>
                             </template>
@@ -207,7 +191,7 @@ import isestr from 'wsemi/src/isestr.mjs'
 import WDialog from 'w-component-vue/src/components/WDialog.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
 import WAggridVue from 'w-aggrid-vue/src/components/WAggridVue.vue'
-import WTextSelect from 'w-component-vue/src/components/WTextSelect.vue'
+import RelationChips from './RelationChips.vue'
 
 
 export default {
@@ -215,7 +199,7 @@ export default {
         WDialog,
         WButtonCircle,
         WAggridVue,
-        WTextSelect,
+        RelationChips,
     },
     props: {
     },
@@ -243,10 +227,6 @@ export default {
             firstSetting: true,
             isEditable: false,
             isModified: false,
-
-            //mode 欄之自製下拉(WTextSelect, 取代原生 select 以免彈出清單之 highlight 色由 OS 決定)
-            modeItems: ['OR', 'AND'],
-            modeSelectWidth: 72, //= 最長項 'AND' 文字實寬 + 左右內距 10×2 + 展開箭頭 18 + 邊框 1×2, 實測後定值(見 CLAUDE_experience.md)
 
             pemi: null,
 
@@ -414,21 +394,19 @@ export default {
             let opt = null
             if (size(vo.items) > 0) {
 
-                //ks
+                //ks, 本列自己可改的(是否使用)在左, 由其他權限帶來的(所屬權限名稱)在右; 合併模式併入 pemisNames 欄之本項 chip(RelationChips), 不再獨立成欄
                 let ks = [
                     'name',
-                    'pemisNames',
-                    'mode',
                     'enable',
+                    'pemisNames',
                 ]
                 // console.log('ks', ks)
 
                 //kpHead
                 let kpHead = {
                     'name': vo.$t('grupName'),
-                    'pemisNames': vo.$t('belongPemisNames'),
-                    'mode': vo.$t('operPemiMode'),
                     'enable': vo.$t('operEnable'),
+                    'pemisNames': vo.$t('belongPemisNames'),
                 }
 
                 //opt
@@ -442,12 +420,11 @@ export default {
                     defHeadFilter: true,
                     defCellAlignH: 'left',
                     kpCellEditable: {
-                        'name': vo.isEditable,
-                        'mode': false,
+                        //name 一律唯讀: 理由同 VeGrupBlngUsers——doSave 只回寫 cpemis、不讀列上之 name, 改名會被靜默丟棄。
+                        'name': false,
                         'enable': false,
                     },
                     kpHeadWidth: {
-                        'mode': 100,
                         'enable': 100,
                     },
                     // kpRowDrag: {
@@ -459,14 +436,14 @@ export default {
                     kpHeadFilterType: {
                         'name': 'text',
                         'pemisNames': 'text',
-                        'mode': 'text',
                         'enable': 'text',
                     },
                     // kpHeadCheckBox: {
                     //     'name': true,
                     // },
-                    kpHeadFocusHighlight: { //本欄內容為唯讀徽章(無可聚焦元素), 焦點框徒增干擾故關閉; 與三個清單頁之按鈕欄同一慣例, 該處另受 w-aggrid-vue 2.0.87 之 :focus-within 修正(本欄不可聚焦, 不受影響)
+                    kpHeadFocusHighlight: { //兩欄之儲存格內皆有自己的控制項(chip 之模式下拉、勾選框), 焦點框徒增干擾故關閉; 控制項取得焦點時之焦點框由 w-aggrid-vue 2.0.87 之 :focus-within 規則一併擋下
                         'pemisNames': false,
+                        'enable': false,
                     },
                     rowsChange: (rs) => {
                         // console.log('rowsChange', rs)
@@ -982,13 +959,14 @@ export default {
                     await vo.$dg.showCheckYes(`${vo.$t('grupSaveGrupsFail')}: ${vo.$tErr(err)}`)
                 })
             if (!okSave) {
-                return
+                return false //回報失敗: 呼叫端 doSave 據此不關閉對話框, 保留未存變更供修正後重按儲存
             }
 
             //alert（showCheckYes 前關 loading，避免 modal 等待期間 loading 疊在底下）
             vo.$ui.updateLoading(false)
             await vo.$dg.showCheckYes(vo.$t('grupSaveGrupsSuccess'), { type: 'success' })
 
+            return true
         },
 
         clickBtns: function(msg) {
@@ -1089,14 +1067,22 @@ export default {
                 //     return
                 // }
 
-                //saveGrups
-                await vo.saveGrups(grupsNew)
+                //saveGrups, 失敗時回 false: 失敗提示已由 saveGrups 顯示, 此處不關閉對話框(保留未存變更供重按儲存)
+                let okSave = await vo.saveGrups(grupsNew)
+                if (!okSave) {
+                    return false
+                }
 
             }
 
             //core
             core()
                 .then((rows) => {
+
+                    //存檔失敗: 不 resolve、不關窗(規格「若寫入失敗…對話框不關閉，可修正後重按儲存」; 舊版於此無條件關窗, 2026-09-17 審計查出)
+                    if (rows === false) {
+                        return
+                    }
 
                     //resolve
                     vo.pm.resolve(rows)

@@ -18,7 +18,7 @@
 import fs from 'fs'
 import assert from 'assert'
 import JSON5 from 'json5'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal, captureBaseSeed, resetDb } from './tools/e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal, captureBaseSeed, resetDb, clickNavItem } from './tools/e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/rela-pemi-rule'
 const LANGS = ['eng', 'cht']
@@ -42,7 +42,7 @@ async function setLang(page, lang) {
 //導航至權限頁（user-facing：點左側「權限」導覽），等 ag-grid 載入。
 async function gotoPemis(page) {
     const pemisLabel = await page.evaluate(() => window.$vo.$t('mmPemis'))
-    await page.getByText(pemisLabel, { exact: true }).first().click()
+    await clickNavItem(page, pemisLabel) //限定導覽面板內（見 e2e-setup clickNavItem 註解）
     await waitUntilExist(page, '權限 ag-grid 列', () => document.querySelectorAll('.ag-row').length > 0, { timeout: 20000 })
     await page.waitForTimeout(500)
 }

@@ -9,7 +9,7 @@
 //save 結果（成功 / 失敗 / 空 / errInNames）皆走 $dg.showCheckYes 持久 modal。
 import fs from 'fs'
 import assert from 'assert'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, typeIntoCell, captureBaseSeed, resetDb } from './tools/e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, typeIntoCell, captureBaseSeed, resetDb, clickNavItem } from './tools/e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/pemis'
 const LANGS = ['eng', 'cht']
@@ -35,7 +35,7 @@ async function setLang(page, lang) {
 //openApp 已等到 csLogin+webInfor，故此處 $t 譯文已就緒（lang-aware 取標籤）
 async function gotoPemis(page) {
     const pemisLabel = await page.evaluate(() => window.$vo.$t('mmPemis'))
-    await page.getByText(pemisLabel, { exact: true }).first().click()
+    await clickNavItem(page, pemisLabel) //限定導覽面板內：欄序改版後「管控使用權限」表頭之 eng 文字與「管理權限」選單同字
     await waitUntilExist(page, '權限 ag-grid 列', () => document.querySelectorAll('.ag-row').length > 0, { timeout: 20000 })
     await page.waitForTimeout(500)
 }
@@ -117,6 +117,19 @@ const CASES = [
             const txt = await page.evaluate(() => document.body.innerText)
             assert.ok(txt.includes('權限P1'), '應顯示 base seed pemi 名稱 權限P1')
             assert.ok(txt.includes('權限P2') && txt.includes('權限P4'), '應顯示多筆 base seed pemis')
+            //對應 spec 語意（A1/A2/A3 欄序與欄名）：可見欄位順序須為「使用欄在所屬欄之前」。
+            //以 ag-grid 表頭之 col-id 讀實際顯示序（本頁無對話框開啟，故不需另行 scope）
+            const heads = await page.evaluate(() => [...document.querySelectorAll('.ag-header-cell[col-id]')].map((e) => e.getAttribute('col-id')))
+            const ks = heads.filter((k) => ["name","description","crules","belongGrups"].includes(k))
+            assert.deepEqual(ks, ["name","description","crules","belongGrups"],
+                `主表可見欄序應為 ${["name","description","crules","belongGrups"].join(' / ')}（實得 ${JSON.stringify(ks)}）`)
+            //對應 spec 語意（A3 欄名）：該欄中文表頭為「管控所屬權限群組」
+            const hdr = await page.evaluate((k) => {
+                const c = document.querySelector(`.ag-header-cell[col-id="${k}"]`)
+                return c ? (c.textContent || '').trim() : null
+            }, 'belongGrups')
+            const want = await page.evaluate((k) => window.$vo.$t(k), 'belongGrups')
+            assert.ok(hdr && hdr.includes(want), `${'belongGrups'} 欄表頭應為語系鍵之文字「${want}」（實得「${hdr}」）`)
         },
     },
     {

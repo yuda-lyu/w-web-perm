@@ -1,0 +1,14 @@
+diff --git a/../rddmanager_2_perm/node_modules/w-web-perm/src/components/VeCrules.vue "b/./w-web-perm\351\232\250\351\231\204\350\263\207\346\226\231/src/components/VeCrules.vue"
+index a456c45..deb9b64 100644
+--- a/../rddmanager_2_perm/node_modules/w-web-perm/src/components/VeCrules.vue
++++ "b/./w-web-perm\351\232\250\351\231\204\350\263\207\346\226\231/src/components/VeCrules.vue"
+@@ -402,6 +402,9 @@ export default {
+                     kpHeadCheckBox: {
+                         'id': true,
+                     },
++                    kpHeadFocusHighlight: { //儲存格內已有自己的控制項(勾選框), 不再疊儲存格焦點框, 與其餘關聯對話框一致
++                        'enable': false,
++                    },
+                     rowsChange: (rs) => {
+                         // console.log('rowsChange', rs)
+                         // console.log('rowsChange cloneDeep(vo.opt.rows)', cloneDeep(vo.opt.rows))

@@ -14,7 +14,7 @@
 //  入口 B（E2E-003~004）VePemiBlngGrups（權限視角）：自權限頁某列 belongGrups 按鈕開啟，列＝全部 grups。
 //    對話框 Save 於對話框內**自行** $fapi.updateGrups 即時寫 DB ＋ showCheckYes 結果 modal（grupSaveGrupsSuccess）；
 //    斷言＝DB 被勾選群組 grups.cpemis（$store.state.grups）含本權限鍵 ＋ 結果 modal。
-//  唯讀（E2E-005）：清單頁未開編輯模式（isEditable=false）即開對話框，標題為檢視版、無 Save 鈕、下拉 / checkbox 皆 disabled。
+//  唯讀（E2E-005）：清單頁未開編輯模式（isEditable=false）即開對話框，標題為檢視版、無 Save 鈕、模式控制項不可編輯、checkbox 皆 disabled。
 //
 //base seed（g_initialTestData → src/schema/tables/*）：
 //  grups(order0-3): 權限群組M1(cpemis P1=OR/y,P2=OR/y), M2(P2=OR/y,P3=OR/y), M3(P2=OR/y,P3=AND/y), M4(P3=OR/y,P4=OR/y)
@@ -22,7 +22,7 @@
 import fs from 'fs'
 import assert from 'assert'
 import JSON5 from 'json5'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal, captureBaseSeed, resetDb, setDialogModeWithShots, dialogEnableCheckboxSel } from './tools/e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal, captureBaseSeed, resetDb, setDialogModeWithShots, dialogEnableCheckboxSel, clickNavItem, openChipsAllWithShots, dialogChipsVisibleTargets, readDialogChipsRow, resizeWindowForChips, setChipsAllModeWithShots } from './tools/e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/rela-grup-pemi'
 const LANGS = ['eng', 'cht']
@@ -46,7 +46,7 @@ async function setLang(page, lang) {
 //導航至群組頁（user-facing：點左側「權限群組」導覽），等 ag-grid 載入。
 async function gotoGrups(page) {
     const grupsLabel = await page.evaluate(() => window.$vo.$t('mmGrups'))
-    await page.getByText(grupsLabel, { exact: true }).first().click()
+    await clickNavItem(page, grupsLabel) //限定導覽面板內（見 e2e-setup clickNavItem 註解）
     await waitUntilExist(page, '群組 ag-grid 列', () => document.querySelectorAll('.ag-row').length > 0, { timeout: 20000 })
     await page.waitForTimeout(500)
 }
@@ -54,7 +54,7 @@ async function gotoGrups(page) {
 //導航至權限頁（user-facing：點左側「權限」導覽），等 ag-grid 載入。
 async function gotoPemis(page) {
     const pemisLabel = await page.evaluate(() => window.$vo.$t('mmPemis'))
-    await page.getByText(pemisLabel, { exact: true }).first().click()
+    await clickNavItem(page, pemisLabel) //限定導覽面板內：自群組頁切換時, 該頁「管控使用權限」表頭之 eng 文字與本選單同字, 全頁定位會誤點表頭
     await waitUntilExist(page, '權限 ag-grid 列', () => document.querySelectorAll('.ag-row').length > 0, { timeout: 20000 })
     await page.waitForTimeout(500)
 }
@@ -92,7 +92,7 @@ async function toggleDialogEnable(page, rowIndex) {
     await page.locator(`.ag-row[row-index="${rowIndex}"] .ag-cell[col-id="enable"] input[type="checkbox"]`).first().click()
     await page.waitForTimeout(800) //revRows / refresh settle
 }
-//setDialogMode（切對話框內某列 mode 下拉；觸發 toggleItemModeByName → isModified=true）收斂進 e2e-setup.mjs 共用：
+//setDialogModeWithShots（切對話框內某列之模式控制項；觸發 toggleItemModeByName → isModified=true）收斂進 e2e-setup.mjs 共用：
 //mode 欄已改自製下拉 WTextSelect（2026-09-14），須「點觸發 → 點清單項」兩步真點擊，本檔不再自留副本。
 //點對話框 Save 鈕（需 isModified=true 才渲染；呼叫前須已 toggle 過）。
 async function clickDialogSave(page) {
@@ -200,6 +200,40 @@ const CASES = [
             assert.ok(txt.includes(label), `VeCpemis 對話框標題應顯示（${label}）`)
             //對話框以全部 pemis 為列，故應見全部 4 個權限名
             assert.ok(txt.includes('權限P1') && txt.includes('權限P4'), '對話框應逐權限列出 base seed pemis')
+
+            //對應 spec E2E-001 驗證1（B6，本次唯一之行為變更）：編輯模式下，未勾選列之模式控制項 editable=false
+            //（透明度 0.6、無展開箭頭、點擊不展開）；已勾選列則可展開。唯讀案例（isEditable=false）全列皆淡化，
+            //不論 `&& props.row.enable === 'y'` 在不在都會通過，故本條必須在「編輯模式」下驗才有守門力。
+            const ed = await page.evaluate(() => {
+                const rows = [...document.querySelectorAll('.ag-row[row-index]')]
+                const out = []
+                for (const r of rows) {
+                    const cell = r.querySelector('.ag-cell[col-id="mode"]')
+                    const chk = r.querySelector('.ag-cell[col-id="enable"] input[type="checkbox"]')
+                    if (!cell || !chk) continue
+                    const shell = cell.querySelector('[style*="opacity"]')
+                    out.push({
+                        idx: r.getAttribute('row-index'),
+                        checked: chk.checked,
+                        opacity: shell ? Number(getComputedStyle(shell).opacity) : null,
+                        nArrow: cell.querySelectorAll('svg').length,
+                    })
+                }
+                return out
+            })
+            const onRows = ed.filter((v) => v.checked)
+            const offRows = ed.filter((v) => !v.checked)
+            assert.ok(onRows.length > 0 && offRows.length > 0, `VeCpemis 應同時有已勾選與未勾選之列（實得 ${JSON.stringify(ed)}）`)
+            assert.ok(offRows.every((v) => Math.abs(v.opacity - 0.6) < 0.01), `未勾選列之模式控制項應淡化為 0.6（實得 ${JSON.stringify(offRows)}）`)
+            assert.ok(offRows.every((v) => v.nArrow === 0), `未勾選列之模式控制項不應渲染展開箭頭（實得 ${JSON.stringify(offRows)}）`)
+            //對照組：已勾選列不淡化且渲染展開箭頭。理由同 e2e-rela-user-grup 該處註解（`_tabindex` 為惰性屬性, 不可用以判別可編輯性）。
+            assert.ok(onRows.every((v) => Math.abs(v.opacity - 1) < 0.01), `已勾選列之模式控制項不應淡化（實得 ${JSON.stringify(onRows)}）`)
+            assert.ok(onRows.every((v) => v.nArrow === 1), `已勾選列之模式控制項應渲染展開箭頭（實得 ${JSON.stringify(onRows)}）`)
+            //點未勾選列之模式控制項不應展開清單
+            await page.locator(`.ag-row[row-index="${offRows[0].idx}"] .ag-cell[col-id="mode"] [style*="opacity"]`).first().click()
+            await page.waitForTimeout(500)
+            const nPopOff = await page.locator('.WPopperFix[wtlp="modeSelect"]:visible').count()
+            assert.equal(nPopOff, 0, `編輯模式下點未勾選列之模式控制項不應展開清單（實得 ${nPopOff}）`)
         },
     },
     {
@@ -290,6 +324,37 @@ const CASES = [
             assert.ok(txt.includes('權限P1'), '對話框頂部應顯示當前權限名 權限P1')
             //列＝全部 grups，應見 M1/M2/M3/M4
             assert.ok(txt.includes('權限群組M1') && txt.includes('權限群組M4'), '對話框應逐群組列出 base seed grups')
+            //spec 語意（與使用者群組關聯 E2E-004 對稱）：表頭三欄（name / enable / pemisNames，無獨立 mode 欄）。
+            //須 scope 到對話框（SEL_MODAL）：背景主表之表頭同在 DOM，全頁查詢會把主表欄位一併算入
+            const heads = await page.evaluate((sel) => {
+                const modal = document.querySelector(sel)
+                if (!modal) return null
+                return [...modal.querySelectorAll('.ag-header-cell[col-id]')].map((e) => e.getAttribute('col-id'))
+            }, SEL_MODAL)
+            assert.deepEqual(heads, ['name', 'enable', 'pemisNames'],
+                `所屬對話框欄序應為 name / enable / pemisNames 且無 mode 欄（實得 ${JSON.stringify(heads)}）`)
+            //spec 語意：本項標籤置首且為醒目色；base seed 各群組各使用 2 項權限，1440 寬下 2 顆皆放得下，故 4 列皆無「+N」溢出指示
+            const chip = await page.evaluate((sel) => {
+                const modal = document.querySelector(sel)
+                if (!modal) return null
+                const cells = [...modal.querySelectorAll('.ag-cell[col-id="pemisNames"]')]
+                const firsts = cells.map((c) => c.querySelector('div[title][style*="align-items: stretch"]')).filter(Boolean)
+                const cur = firsts.find((e) => e.querySelector('div[_tabindex="0"]'))
+                const nBtnAll = modal.querySelectorAll('.ag-cell[col-id="pemisNames"] div[title][style*="cursor: pointer"]').length
+                return {
+                    nCell: cells.length,
+                    nChip: firsts.length,
+                    nBtnAll,
+                    cur: cur ? cur.getAttribute('title') : null,
+                    curBg: cur && cur.children[1] ? getComputedStyle(cur.children[1]).backgroundColor : null,
+                }
+            }, SEL_MODAL)
+            assert.ok(chip && chip.nChip === chip.nCell && chip.nCell > 0, `每列皆應有關聯標籤（實得 ${JSON.stringify(chip)}）`)
+            assert.equal(chip.cur, '權限P1', `已掛本權限之列其第 1 顆標籤應為本權限（實得 ${chip && chip.cur}）`)
+            assert.equal(chip.curBg, 'rgb(210, 47, 100)', `本項標籤名稱段應為醒目色 #d22f64（實得 ${chip && chip.curBg}）`)
+            //spec E2E-003 驗證1：base seed 每個群組皆使用 2 項權限（M1:P1,P2 / M2:P2,P3 / M3:P2,P3 / M4:P3,P4），實測標籤總寬 165～192px、儲存格可用 295px,
+            //  全部放得下 → 4 列皆不出現「+N」。此即業主 2026-09-17 指出「已全部看得到卻出現展開鈕」之守門（舊版以標籤數 ≥ 2 為條件, 4 列皆出鈕）
+            assert.equal(chip.nBtnAll, 0, `1440 寬下各列 2 顆皆放得下，不應出現「+N」溢出指示（實得 ${chip.nBtnAll} / ${chip.nCell} 列）`)
         },
     },
     {
@@ -306,9 +371,10 @@ const CASES = [
             //以下每步兩張（點擊前框要點、點擊後框反應元素）
             const s3 = await captureStableWithBox(page, dialogEnableCheckboxSel(1)) //階段3 click-enable：點擊前框住 權限群組M2 列之 enable checkbox
             await toggleDialogEnable(page, 1) //勾選 權限群組M2 enable（y）→ 將 P1 掛入 M2 → isModified=true → Save 鈕現身
-            const s4 = await captureStableWithBox(page, dialogRowBoxSel(1)) //階段4 enable-checked：勾選後框住該列（checkbox 已勾、徽章含 P1）
-            const m = await setDialogModeWithShots(page, 1, 'AND') //階段5/6/7：點下拉前框觸發區 → 清單展開框整份清單 → 點「AND」前框該項目；選取後清單關閉
-            const s8 = await captureStableWithBox(page, dialogRowBoxSel(1)) //階段8 row-toggled：切 AND 後框住該列（mode 顯示 AND、徽章 AND P1）
+            const s4 = await captureStableWithBox(page, dialogRowBoxSel(1)) //階段4 enable-checked：勾選後框住該列（checkbox 已勾、代表 P1 之醒目標籤已插入為第 1 顆）
+            //模式併入本項標籤左段（2026-09-16 起所屬對話框無獨立 mode 欄），故傳 colId:'pemisNames'
+            const m = await setDialogModeWithShots(page, 1, 'AND', { colId: 'pemisNames' }) //階段5/6/7：點標籤前框整顆本項標籤 → 清單展開框整份清單 → 點「AND」前框該項目
+            const s8 = await captureStableWithBox(page, dialogRowBoxSel(1)) //階段8 row-toggled：切 AND 後框住該列（第 1 顆標籤之模式段顯示 AND）
             const s9 = await captureStableWithBox(page, pathBtn(page, DLG_MDI.save)) //階段9 click-save：點擊前框住對話框 Save 鈕
             await saveBelongAndWaitModal(page) //updateGrups 寫 DB → 成功 modal
             const s10 = await captureStableWithBox(page, SEL_MODAL) //階段10：對話框 Save 後成功結果 modal
@@ -342,7 +408,7 @@ const CASES = [
     //—————————————— 唯讀檢視（isEditable=false 守門，與可編輯案例共覆蓋兩分支）——————————————
 
     {
-        //E2E-005：群組頁關閉編輯模式後開 VeCpemis → 檢視版標題（grupEditCpemisForDisplay）、無 Save 鈕、下拉 / checkbox 皆 disabled。
+        //E2E-005：群組頁關閉編輯模式後開 VeCpemis → 檢視版標題（grupEditCpemisForDisplay）、無 Save 鈕、模式控制項為不可編輯態（淡化 0.6、無箭頭、點擊不展開）、checkbox 皆 disabled。
         name: 'E2E-005-readonly-view',
         run: async (page) => {
             await gotoGrups(page)
@@ -370,19 +436,33 @@ const CASES = [
             //無對話框 Save 鈕（mdiCheckCircle）
             const saveCnt = await pathBtn(page, DLG_MDI.save).count()
             assert.equal(saveCnt, 0, '唯讀檢視不應出現對話框 Save 鈕')
-            //對話框內 select / checkbox 皆 disabled
-            const allDisabled = await page.evaluate(() => {
-                const sels = [...document.querySelectorAll('.ag-cell[col-id="mode"] select')]
+            //對應 spec E2E-005 驗證1：模式控制項為不可編輯態（透明度 0.6、無展開箭頭、點擊不展開）、checkbox 皆 disabled（VeCpemis.vue:134,138）
+            const ro = await page.evaluate(() => {
                 const chks = [...document.querySelectorAll('.ag-cell[col-id="enable"] input[type="checkbox"]')]
-                const els = [...sels, ...chks]
-                return els.length > 0 && els.every((e) => e.disabled === true)
+                const shells = [...document.querySelectorAll('.ag-cell[col-id="mode"] [style*="opacity"]')]
+                const arrows = [...document.querySelectorAll('.ag-cell[col-id="mode"] svg')]
+                return {
+                    allChkDisabled: chks.length > 0 && chks.every((e) => e.disabled === true),
+                    nShell: shells.length,
+                    allFaded: shells.length > 0 && shells.every((e) => Math.abs(Number(getComputedStyle(e).opacity) - 0.6) < 0.01),
+                    nArrow: arrows.length,
+                }
             })
-            assert.ok(allDisabled, '唯讀檢視之 mode 下拉與 enable checkbox 應皆 disabled')
+            assert.ok(ro.allChkDisabled, '唯讀檢視之 enable checkbox 應皆 disabled')
+            assert.ok(ro.allFaded, `唯讀檢視之模式控制項應淡化為 0.6（實得 ${ro.nShell} 顆）`)
+            assert.equal(ro.nArrow, 0, `唯讀檢視之模式控制項不應渲染展開箭頭（實得 ${ro.nArrow} 個）`)
+            //不加 .catch 吞掉點擊失敗：點不到時「沒有清單」會空過, 斷言即失去守門力
+            await page.locator('.ag-cell[col-id="mode"] [style*="opacity"]').first().click()
+            await page.waitForTimeout(500)
+            const nPop = await page.locator('.WPopperFix[wtlp="modeSelect"]:visible').count()
+            assert.equal(nPop, 0, '唯讀檢視點模式控制項不應展開清單')
         },
     },
     {
-        //E2E-006：權限頁關閉編輯模式後開 VePemiBlngGrups（入口 B）→ 檢視版標題（pemiBlngEditGrupsForDisplay）、無 Save 鈕、下拉 / checkbox 皆 disabled。
-        //對應 spec 流程_群組權限關聯.md E2E-006（補權限頁入口唯讀；E2E-005 已涵蓋群組頁入口 VeCpemis 唯讀）。單階段截圖：唯讀檢視對話框開啟態。
+        //E2E-006：權限頁關閉編輯模式後開 VePemiBlngGrups（入口 B）→ 檢視版標題（pemiBlngEditGrupsForDisplay）、無 Save 鈕、標籤模式段為純文字（本對話框自 2026-09-16 起無獨立 mode 欄）、checkbox 皆 disabled。
+        //對應 spec 流程_群組權限關聯.md E2E-006（補權限頁入口唯讀；E2E-005 已涵蓋群組頁入口 VeCpemis 唯讀）。
+        //多階段（2026-09-17 起）：①1440 寬唯讀對話框 → ②縮為 440 後 M1 列收合（唯讀態本項模式段為純文字較窄, 2026-09-17 以 2px 步距實測 ≤464 才收合、480 仍放得下, eng/cht 相同） → ③點擊前框「+1」→ ④浮層展開（兩顆皆無展開箭頭）。
+        //  浮層與收合之語意斷言放在 run() 內（過程中觀察, 且 regen 端只跑 run()）。
         name: 'E2E-006-readonly-view',
         run: async (page) => {
             await gotoPemis(page)
@@ -394,7 +474,42 @@ const CASES = [
                 return (document.body.innerText || '').includes(vo.$t('pemiBlngEditGrupsForDisplay'))
             }, { timeout: 15000 })
             await waitDialogGrid(page)
-            return await captureStableWithBox(page, SEL_MODAL) //VePemiBlngGrups 唯讀檢視對話框開啟態
+            const s1 = await captureStableWithBox(page, SEL_MODAL) //E2E-006-1-readonly-view：唯讀檢視對話框（1440 寬），框住整個對話框
+            //spec E2E-006 驗證1：1440 寬下 4 列皆無「+N」
+            const nInd = await page.evaluate((sel) => document.querySelectorAll(`${sel} .ag-cell[col-id="pemisNames"] div[title][style*="cursor: pointer"]`).length, SEL_MODAL)
+            assert.equal(nInd, 0, `唯讀 1440 寬下各列 2 顆皆放得下，不應出現「+N」（實得 ${nInd}）`)
+            //縮為 440：無點擊目標故無點擊前之圖
+            await resizeWindowForChips(page, 440, 0, 'pemisNames', true)
+            const r2 = await readDialogChipsRow(page, 0, 'pemisNames')
+            assert.deepEqual(r2.titles, ['權限P1'], `440 寬下 M1 列應只見 1 顆（實得 ${JSON.stringify(r2.titles)}）`)
+            assert.equal(r2.ind, '+1', `440 寬下指示應為「+1」（實得 ${r2.ind}）`)
+            const s2 = await captureStableWithBox(page, await dialogChipsVisibleTargets(page, 0, 'pemisNames')) //E2E-006-2-row-collapsed：框住可見之標籤與「+1」之聯集
+            const c = await openChipsAllWithShots(page, 0, 'pemisNames') //E2E-006-3-click-more / E2E-006-4-popup-open
+            //回歸守門：點「+1」之 hover 重繪不得使被收合之標籤重新顯示
+            const r4 = await readDialogChipsRow(page, 0, 'pemisNames')
+            assert.deepEqual(r4.titles, ['權限P1'], `開浮層後儲存格內仍應只見 1 顆（實得 ${JSON.stringify(r4.titles)}）`)
+            //spec E2E-006 驗證1：浮層內 2 顆皆無展開箭頭（唯讀態浮層不可改），點首顆模式段不出現模式清單
+            assert.ok(c.info, '浮層應可量得內容')
+            assert.deepEqual(c.info.titles, ['權限P1', '權限P2'], `唯讀浮層應列出全部 2 顆（實得 ${JSON.stringify(c.info.titles)}）`)
+            assert.deepEqual(c.info.editable, [false, false], `唯讀浮層內標籤皆不可改（實得 ${JSON.stringify(c.info.editable)}）`)
+            const popRo = page.locator('.WPopperFix[wtlp="relationChipsAll"]:visible').first()
+            const modeSegRo = popRo.locator('div[title][style*="align-items: stretch"]').first().locator('xpath=./div[1]')
+            const s5 = await captureStableWithBox(page, modeSegRo) //E2E-006-5-click-mode：點擊前框住浮層內首顆標籤之模式段整顆（純文字、無箭頭）
+            await modeSegRo.click()
+            await page.waitForTimeout(600)
+            const nList = await page.locator('.WPopperFix[wtlp="modeSelect"]:visible').count()
+            assert.equal(nList, 0, `唯讀浮層內點模式段不應出現模式清單（實得 ${nList}）`)
+            assert.equal(await page.locator('.WPopperFix[wtlp="relationChipsAll"]:visible').count(), 1, '唯讀浮層內點模式段後浮層應仍開著')
+            assert.equal(await pathBtn(page, DLG_MDI.save).count(), 0, '唯讀浮層內點模式段後對話框仍不應出現 Save 鈕')
+            const s6 = await captureStableWithBox(page, popRo) //E2E-006-6-popup-unchanged：點擊後框住整個浮層（未出現模式清單，浮層維持原樣）
+            return [
+                { name: 'E2E-006-1-readonly-view', buf: s1 },
+                { name: 'E2E-006-2-row-collapsed', buf: s2 },
+                { name: 'E2E-006-3-click-more', buf: c.clickBtn },
+                { name: 'E2E-006-4-popup-open', buf: c.popupOpen },
+                { name: 'E2E-006-5-click-mode', buf: s5 },
+                { name: 'E2E-006-6-popup-unchanged', buf: s6 },
+            ]
         },
         semantic: async (page) => {
             //對應 spec E2E-006 驗證1：標題為檢視版鍵（pemiBlngEditGrupsForDisplay，eng/cht 皆與編輯版相異）。
@@ -406,14 +521,98 @@ const CASES = [
             //對應 spec E2E-006 驗證1：無對話框 Save 鈕（hasSaveBtn=isEditable && isModified，isEditable=false 恆不渲染）。
             const saveCnt = await pathBtn(page, DLG_MDI.save).count()
             assert.equal(saveCnt, 0, '唯讀檢視不應出現對話框 Save 鈕')
-            //對應 spec E2E-006 驗證1：mode 下拉與 enable checkbox 皆 disabled（VePemiBlngGrups.vue:155,159）。
-            const allDisabled = await page.evaluate(() => {
-                const sels = [...document.querySelectorAll('.ag-cell[col-id="mode"] select')]
+            //對應 spec E2E-006 驗證1：標籤之模式段為純文字（無下拉觸發區）、enable checkbox 皆 disabled（VePemiBlngGrups.vue:152、RelationChip.vue:15）
+            const ro = await page.evaluate(() => {
                 const chks = [...document.querySelectorAll('.ag-cell[col-id="enable"] input[type="checkbox"]')]
-                const els = [...sels, ...chks]
-                return els.length > 0 && els.every((e) => e.disabled === true)
+                const trigs = [...document.querySelectorAll('.ag-cell[col-id="pemisNames"] div[_tabindex="0"]')]
+                return { allChkDisabled: chks.length > 0 && chks.every((e) => e.disabled === true), nTrig: trigs.length }
             })
-            assert.ok(allDisabled, '唯讀檢視之 mode 下拉與 enable checkbox 應皆 disabled')
+            assert.equal(ro.nTrig, 0, `唯讀檢視之標籤模式段應為純文字、無下拉觸發區（實得 ${ro.nTrig} 個）`)
+            assert.ok(ro.allChkDisabled, '唯讀檢視之 enable checkbox 應皆 disabled')
+            //正向斷言（避免「標籤根本沒渲染」時負向斷言恆真）：至少一顆本項標籤存在、其模式段為 OR/AND 純文字
+            const pos = await page.evaluate(() => {
+                const chips = [...document.querySelectorAll('.ag-cell[col-id="pemisNames"] div[title][style*="align-items: stretch"]')]
+                return chips.map((e) => ({ title: e.getAttribute('title'), mode: (e.children[0].textContent || '').trim() }))
+            })
+            assert.ok(pos.length > 0, `唯讀檢視仍應渲染關聯標籤（實得 ${pos.length} 顆）`)
+            assert.ok(pos.some((v) => v.title === '權限P1'), `應含代表本項之標籤 權限P1（實得 ${JSON.stringify(pos.slice(0, 4))}）`)
+            assert.ok(pos.every((v) => v.mode === 'OR' || v.mode === 'AND'), `各標籤模式段應為 OR / AND 純文字（實得 ${JSON.stringify(pos.slice(0, 4))}）`)
+            //（收合、浮層與浮層內唯讀之斷言已於 run() 內過程中完成）
+        },
+    },
+    {
+        //E2E-007：窄視窗下 M1 列標籤收合為「本項 P1 + +1」→ 點「+1」開浮層 → 於浮層內改本項模式為 AND → 拉回寬視窗後指示消失。
+        //對應 spec 流程_群組權限關聯.md E2E-007；與 流程_使用者群組關聯.md E2E-009 對稱。
+        //6 步真實路徑：①權限頁 P1 列 ②點 belongGrups 按鈕開對話框（M1 列已含本項 P1 與 P2 兩顆）③縮小瀏覽器視窗（標籤列收合）
+        //  ④點「+1」開浮層 ⑤於浮層內點本項模式段選 AND ⑥浮層關閉、該列本項顯示 AND、對話框出現 Save 鈕；拉回寬視窗兩顆完整；未按 Save, DB 不變
+        //視窗寬 480：2026-09-17 以 2px 步距實測 M1 列於視窗寬 ≤530 時收合（530 時儲存格寬 211），eng/cht 相同。
+        //編輯模式：settings.json 之 modeEditPemis='y', 進頁即編輯模式；openBelongDialog 以編輯版標題 pemiBlngEditGrups 為就緒訊號, 等同守門。
+        name: 'E2E-007-chips-collapse-edit',
+        run: async (page) => {
+            await gotoPemis(page)
+            const s1 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-007-1-source-row：開窗前來源列（權限P1，row 0）
+            await openBelongDialog(page, 0)
+            const s2 = await captureStableWithBox(page, SEL_MODAL) //E2E-007-2-dialog-open：對話框初始態（1440 寬，4 列皆無「+」按鈕）
+            const nInd = await page.evaluate((sel) => document.querySelectorAll(`${sel} .ag-cell[col-id="pemisNames"] div[title][style*="cursor: pointer"]`).length, SEL_MODAL)
+            assert.equal(nInd, 0, `1440 寬下 4 列皆不應出現「+N」（實得 ${nInd}）`)
+            const r1 = await readDialogChipsRow(page, 0, 'pemisNames')
+            assert.deepEqual(r1.titles, ['權限P1', '權限P2'], `1440 寬下 M1 列應可見 2 顆且本項排第 1 顆（實得 ${JSON.stringify(r1.titles)}）`)
+
+            //③縮小視窗：無點擊目標故無點擊前之圖
+            await resizeWindowForChips(page, 480, 0, 'pemisNames', true)
+            const r3 = await readDialogChipsRow(page, 0, 'pemisNames')
+            const showAll = await page.evaluate(() => window.$vo.$t('chipsShowAll'))
+            assert.deepEqual(r3.titles, ['權限P1'], `480 寬下 M1 列應只見本項 1 顆（實得 ${JSON.stringify(r3.titles)}）`)
+            assert.equal(r3.ind, '+1', `480 寬下指示應為「+1」（實得 ${r3.ind}）`)
+            assert.equal(r3.indTitle, showAll, `指示之停留提示應為 chipsShowAll（實得 ${r3.indTitle}）`)
+            const s3 = await captureStableWithBox(page, await dialogChipsVisibleTargets(page, 0, 'pemisNames')) //E2E-007-3-row-collapsed：框住可見之醒目 P1 標籤與「+1」之聯集
+
+            //④開浮層
+            const c = await openChipsAllWithShots(page, 0, 'pemisNames') //E2E-007-4-click-more / E2E-007-5-popup-open
+            //回歸守門：點「+1」時 hover 態改變使標籤列重繪, 被收合之標籤不得因重繪而重新顯示（理由同 e2e-rela-user-grup E2E-009 該處註解）
+            const r5 = await readDialogChipsRow(page, 0, 'pemisNames')
+            assert.deepEqual(r5.titles, ['權限P1'], `開浮層後儲存格內仍應只見本項 1 顆（實得 ${JSON.stringify(r5.titles)}）`)
+            const titleTpl = await page.evaluate(() => window.$vo.$t('chipsPopupTitle').replace('{title}', window.$vo.$t('belongPemisNames')).replace('{n}', 2))
+            assert.ok(c.info, '浮層應可量得內容')
+            assert.equal(c.info.title, titleTpl, `浮層標題應為 chipsPopupTitle 代入欄名與數量（實得 ${c.info.title}）`)
+            assert.deepEqual(c.info.titles, ['權限P1', '權限P2'], `浮層應列出全部 2 顆且本項排第 1 顆（實得 ${JSON.stringify(c.info.titles)}）`)
+            assert.deepEqual(c.info.editable, [true, false], `浮層內本項應可改（帶展開箭頭）、他項唯讀（實得 ${JSON.stringify(c.info.editable)}）`)
+            assert.equal(c.info.firstNameBg, 'rgb(210, 47, 100)', `浮層首顆名稱段應為醒目色 #d22f64（實得 ${c.info.firstNameBg}）`)
+
+            //⑤於浮層內改模式
+            const pm = await setChipsAllModeWithShots(page, 'AND') //E2E-007-6-click-mode / 7-list-open / 8-click-and
+            assert.ok(pm.z.list > pm.z.popup, `模式清單應疊在浮層之上（實得 ${JSON.stringify(pm.z)}）`)
+            const r9 = await readDialogChipsRow(page, 0, 'pemisNames')
+            assert.deepEqual(r9.titles, ['權限P1'], `選取後 480 寬下仍應只見本項 1 顆（實得 ${JSON.stringify(r9.titles)}）`)
+            assert.equal(r9.modes[0], 'AND', `選取後本項標籤模式段應顯示 AND（實得 ${r9.modes[0]}）`)
+            assert.equal(r9.ind, '+1', `選取後仍應接「+1」（實得 ${r9.ind}）`)
+            assert.equal(await pathBtn(page, DLG_MDI.save).count(), 1, '於浮層內改模式後對話框應出現 Save 鈕（已有未存變更）')
+            const s9 = await captureStableWithBox(page, await dialogChipsVisibleTargets(page, 0, 'pemisNames')) //E2E-007-9-row-toggled：框住可見之醒目標籤（AND）與「+1」之聯集
+
+            //⑥拉回寬視窗
+            await resizeWindowForChips(page, 1440, 0, 'pemisNames', false)
+            const r10 = await readDialogChipsRow(page, 0, 'pemisNames')
+            assert.deepEqual(r10.titles, ['權限P1', '權限P2'], `拉回 1440 後 M1 列應可見 2 顆（實得 ${JSON.stringify(r10.titles)}）`)
+            assert.equal(r10.modes[0], 'AND', `拉回後本項仍為 AND（實得 ${r10.modes[0]}）`)
+            const s10 = await captureStableWithBox(page, await dialogChipsVisibleTargets(page, 0, 'pemisNames')) //E2E-007-10-row-expanded：框住兩顆標籤之聯集（「+1」已消失）
+            return [
+                { name: 'E2E-007-1-source-row', buf: s1 },
+                { name: 'E2E-007-2-dialog-open', buf: s2 },
+                { name: 'E2E-007-3-row-collapsed', buf: s3 },
+                { name: 'E2E-007-4-click-more', buf: c.clickBtn },
+                { name: 'E2E-007-5-popup-open', buf: c.popupOpen },
+                { name: 'E2E-007-6-click-mode', buf: pm.clickMode },
+                { name: 'E2E-007-7-list-open', buf: pm.listOpen },
+                { name: 'E2E-007-8-click-and', buf: pm.clickItem },
+                { name: 'E2E-007-9-row-toggled', buf: s9 },
+                { name: 'E2E-007-10-row-expanded', buf: s10 },
+            ]
+        },
+        semantic: async (page) => {
+            //spec E2E-007 清理：未按 Save, DB 不變——M1.cpemis 之 權限P1 維持 base seed 之 OR
+            const cp = await readDbGrupCpemis(page, '權限群組M1')
+            assert.ok(cp && typeof cp === 'object' && cp['權限P1'], 'M1.cpemis 應含 權限P1')
+            assert.equal(cp['權限P1'].mode, 'OR', `E2E-007 未按 Save, M1.cpemis 之 權限P1 mode 應維持 OR（實得 ${cp['權限P1'].mode}）`)
         },
     },
 ]

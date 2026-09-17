@@ -1,0 +1,124 @@
+--- /dev/null	2026-09-15 21:52:30.000000000 +0800
++++ "./w-web-perm�\232��\231\204�\207�\226\231/src/components/ModeSelectChip.vue"	2026-09-15 21:52:29.942414300 +0800
+@@ -0,0 +1,121 @@
++<template>
++    <div
++        :style="`display:inline-block; vertical-align:middle; line-height:20px; border-radius:${attached?'4px 0 0 4px':'4px'}; overflow:hidden;`"
++    >
++        <WTextSelect
++            :style="`width:${width}px;`"
++            :items="items"
++            :value="value"
++            :editable="editable"
++            :paddingStyle="{v:0,h:5}"
++            :borderRadius="0"
++            :shadow="false"
++            :textFontSize="'12px'"
++            :textColor="useTextColor"
++            :backgroundColor="useBackgroundColor"
++            :backgroundColorHover="useBackgroundColorHover"
++            :backgroundColorFocus="useBackgroundColorHover"
++            :borderColor="useBorderColor"
++            :borderColorHover="useBorderColorHover"
++            :borderColorFocus="useBorderColorHover"
++            :showExpansionIcon="editable"
++            :expansionIconSize="14"
++            :expansionIconColor="useIconColor"
++            :itemPaddingStyle="{v:6,h:10}"
++            :itemTextFontSize="'12px'"
++            :minWidth="width"
++            :placementDistX="placementDistX"
++            :labelContent="labelContent"
++            @input="(item)=>{$emit('input',item)}"
++        ></WTextSelect>
++    </div>
++</template>
++
++<script>
++import WTextSelect from 'w-component-vue/src/components/WTextSelect.vue'
++
++
++//合併模式(OR/AND)控制項, 外觀為關聯 chip 之模式段(方角 4px、高 22px、字 12px), 內核仍為 WTextSelect(選項清單 Teleport 至 body, 屬性 wtlp 為 labelContent)
++//  - 獨立使用(VeCgrups/VeCpemis 之「合併…模式」欄): attached=false, 四角圓角
++//  - 嵌於本項 chip 之左段(VeGrupBlngUsers/VePemiBlngGrups): attached=true, 只有左側圓角, 右側與名稱段相接
++//  - 尺寸: 寬 56 = 最長項 'AND' 於 12px 之墨跡 27 + 左右內距 5×2 + 展開箭頭 14 + 箭頭前間隙 2 + 邊框 1×2 (取整), 固定寬使 OR/AND 切換時不跳動;
++//          高 22 = line-height 20 + 上下邊框 1×2, 落在 ag-grid balham 之 27px 儲存格內不被裁切
++//  - 唯讀(editable=false): 沿用 WShellEllipse 之透明度 0.6 與無手指游標, 並不渲染展開箭頭
++//  - 清單浮層: minWidth 給整顆寬度使清單不窄於控制項(WPopup 之 autoFitMinWidth 只量觸發文字區, 會比外框窄), placementDistX 使清單左緣對齊外框左緣
++export default {
++    components: {
++        WTextSelect,
++    },
++    props: {
++        value: {
++            type: String,
++            default: 'OR',
++        },
++        editable: {
++            type: Boolean,
++            default: true,
++        },
++        highlight: { //true 為本項(醒目色, 與 chip 醒目態同色), false 為一般(白底灰邊)
++            type: Boolean,
++            default: false,
++        },
++        attached: { //true 為嵌於 chip 左段(右側無圓角)
++            type: Boolean,
++            default: false,
++        },
++        width: {
++            type: Number,
++            default: 56,
++        },
++        placementDistX: { //清單浮層錨定於觸發文字, 往左退回內距 5 與邊框 1 使清單左緣對齊控制項外框左緣
++            type: Number,
++            default: -6,
++        },
++        labelContent: {
++            type: String,
++            default: 'modeSelect',
++        },
++    },
++    data: function() {
++        return {
++            items: ['OR', 'AND'],
++        }
++    },
++    computed: {
++
++        useTextColor: function() {
++            let vo = this
++            return vo.highlight ? '#fff' : '#555'
++        },
++
++        useIconColor: function() {
++            let vo = this
++            return vo.highlight ? '#fff' : '#777'
++        },
++
++        useBackgroundColor: function() {
++            let vo = this
++            return vo.highlight ? '#be295a' : '#fff'
++        },
++
++        useBackgroundColorHover: function() { //同色系加深, 不翻轉
++            let vo = this
++            return vo.highlight ? '#ac2451' : '#f5f5f5'
++        },
++
++        useBorderColor: function() {
++            let vo = this
++            return vo.highlight ? '#ac2451' : '#aaa'
++        },
++
++        useBorderColorHover: function() {
++            let vo = this
++            return vo.highlight ? '#9e2149' : '#888'
++        },
++
++    },
++}
++</script>
++
++<style scoped>
++</style>

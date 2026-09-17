@@ -1,0 +1,19 @@
+diff --git a/../rddmanager_2_perm/node_modules/w-web-perm/src/App.vue "b/./w-web-perm\351\232\250\351\231\204\350\263\207\346\226\231/src/App.vue"
+index 55ec0af..315c79e 100644
+--- a/../rddmanager_2_perm/node_modules/w-web-perm/src/App.vue
++++ "b/./w-web-perm\351\232\250\351\231\204\350\263\207\346\226\231/src/App.vue"
+@@ -175,6 +175,14 @@ button {
+     font-family: inherit;
+ }
+ 
++/* 關聯對話框之儲存格內有自己的控制項(模式下拉、勾選框、chip 下拉)時, 各 Ve*.vue 以 kpHeadFocusHighlight=false 讓 w-aggrid-vue 加 no-border,
++   但 w-aggrid-vue 2.0.86 之覆寫只寫 :focus(WAggridVue.vue:2874), 焦點落在儲存格之子元素時 ag-grid 31 以 :focus-within 畫框(ag-grid.css:6230),
++   故此處補 :focus-within; 待 w-aggrid-vue 修正(見 建議w-aggrid-vue修正.md)後可移除 */
++.CompCssWAggridVue .no-border.ag-cell:focus-within {
++    border-color: transparent !important;
++    outline: none;
++}
++
+ .fade-enter-active {
+   animation: go 1s;
+ }

@@ -21,7 +21,7 @@
 //  因 mock 圖表確定性穩定 → 直接 pixel baseline，不需 driveActivity / overlayRegions 貼圖。
 import fs from 'fs'
 import assert from 'assert'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, waitUntilExist, genTempSettings, restartBackend, assertBaselineMatch } from './tools/e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, waitUntilExist, genTempSettings, restartBackend, assertBaselineMatch, clickNavItem } from './tools/e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/stainfor'
 const LANGS = ['eng', 'cht']
@@ -47,7 +47,7 @@ async function setLang(page, lang) {
 //openApp 已等到 csLogin+webInfor，故此處 $t 譯文已就緒（lang-aware 取標籤）。
 async function gotoStaInfor(page) {
     const staLabel = await page.evaluate(() => window.$vo.$t('mmStaInfor'))
-    await page.getByText(staLabel, { exact: true }).first().click()
+    await clickNavItem(page, staLabel) //限定導覽面板內（見 e2e-setup clickNavItem 註解）
     //等事件展示區標題 + 圖表 canvas 渲染（mock 後端確定有資料 → optEvent 非 null → WEchartsVue 掛 canvas）
     await waitUntilExist(page, '統計事件圖表 canvas', () => document.querySelector('canvas') !== null, { timeout: 30000 })
     //echarts 初始化 + resize debounce 充分 settle（給足 6-8s，圖表大量繪製）

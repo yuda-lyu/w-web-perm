@@ -128,19 +128,18 @@
                         >
                             <template v-slot:cell-render="props">
                                 <span v-if="props.key==='name'">{{ props.value }}</span>
-                                <WTextSelect
+                                <!-- flex 置中容器: 22px 控制項以行內排版放入 27px 儲存格會偏下(上 4.77／下 0.23), 包一層 height:100% 之 flex 容器即上下各 2.5(同 w-aggrid-vue 範例 AppSlotCellRenderAlign.vue) -->
+                                <div
+                                    style="display:flex; align-items:center; height:100%;"
                                     v-else-if="props.key==='mode'"
-                                    :style="`width:${modeSelectWidth}px;`"
-                                    :items="modeItems"
-                                    :value="props.row.mode"
-                                    :editable="isEditable"
-                                    :paddingStyle="{v:0,h:10}"
-                                    :shadow="false"
-                                    :itemPaddingStyle="{v:8,h:10}"
-                                    :placementDistX="-10"
-                                    :labelContent="'modeSelect'"
-                                    @input="(item)=>{showVeCgrupsToggleItemModeByName(props.row.name, item)}"
-                                ></WTextSelect>
+                                >
+                                    <ModeSelectChip
+                                        :value="props.row.mode"
+                                        :editable="isEditable && props.row.enable === 'y'"
+                                        :labelContent="'modeSelect'"
+                                        @input="(item)=>{showVeCgrupsToggleItemModeByName(props.row.name, item)}"
+                                    ></ModeSelectChip>
+                                </div>
                                 <input v-else-if="props.key==='enable'" type="checkbox" :checked="props.value === 'y'" @click="showVeCgrupsToggleItemEnableByName(props.row.name)" :disabled="!isEditable" />
                                 <span v-else>{{ props.value }}</span>
                             </template>
@@ -180,7 +179,7 @@ import isestr from 'wsemi/src/isestr.mjs'
 import WDialog from 'w-component-vue/src/components/WDialog.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
 import WAggridVue from 'w-aggrid-vue/src/components/WAggridVue.vue'
-import WTextSelect from 'w-component-vue/src/components/WTextSelect.vue'
+import ModeSelectChip from './ModeSelectChip.vue'
 
 
 export default {
@@ -188,7 +187,7 @@ export default {
         WDialog,
         WButtonCircle,
         WAggridVue,
-        WTextSelect,
+        ModeSelectChip,
     },
     props: {
     },
@@ -216,10 +215,6 @@ export default {
             firstSetting: true,
             isEditable: false,
             isModified: false,
-
-            //mode 欄之自製下拉(WTextSelect, 取代原生 select 以免彈出清單之 highlight 色由 OS 決定)
-            modeItems: ['OR', 'AND'],
-            modeSelectWidth: 72, //= 最長項 'AND' 文字實寬 + 左右內距 10×2 + 展開箭頭 18 + 邊框 1×2, 實測後定值(見 CLAUDE_experience.md)
 
             user: null,
 
@@ -405,12 +400,16 @@ export default {
                     defHeadFilter: true,
                     defCellAlignH: 'left',
                     kpCellEditable: {
-                        'name': vo.isEditable,
+                        //name 一律唯讀: 本對話框之列固定為「全部既有權限群組」(genItems 產生, 無新增/刪除列),
+                        //  就地改名無任何正當用途; 且 doSave 以列上之 name 當鍵寫出 cgrups(kpGrup[name]={mode,isActive}),
+                        //  改名即寫出對不到任何群組之鍵 → 關聯靜默失效、DB 留下垃圾鍵, 屬「儲存成功但實況不符」。
+                        //  2026-09-16 雙獨立審計提出、經追 doSave 控制流證實(全域 §4 規則 6)。
+                        'name': false,
                         'mode': false,
                         'enable': false,
                     },
                     kpHeadWidth: {
-                        'mode': 100,
+                        'mode': 90, //ModeSelectChip 寬 56 + 儲存格內距 11×2 = 78, 留餘裕
                         'enable': 100,
                     },
                     // kpRowDrag: {
@@ -426,6 +425,10 @@ export default {
                     },
                     kpHeadCheckBox: {
                         'name': true,
+                    },
+                    kpHeadFocusHighlight: { //兩欄之儲存格內皆有自己的控制項(模式下拉、勾選框), 焦點框徒增干擾故關閉; 控制項取得焦點時之焦點框由 w-aggrid-vue 2.0.87 之 :focus-within 規則一併擋下
+                        'mode': false,
+                        'enable': false,
                     },
                     rowsChange: (rs) => {
                         // console.log('rowsChange', rs)

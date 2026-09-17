@@ -1,0 +1,390 @@
+{
+  "A1.管理權限群組欄序": {
+    "ok": true,
+    "detail": [
+      "名稱",
+      "說明",
+      "管控使用權限",
+      "管控所屬使用者"
+    ]
+  },
+  "A2A3.管理權限欄序與欄名": {
+    "ok": true,
+    "detail": [
+      "名稱",
+      "說明",
+      "管控對象",
+      "管控所屬權限群組"
+    ]
+  },
+  "B.對話框欄序": {
+    "ok": true,
+    "detail": [
+      "權限群組名稱",
+      "是否使用",
+      "所屬權限名稱"
+    ]
+  },
+  "B.本項chip排第1": {
+    "ok": true,
+    "detail": {
+      "first": "知識管理系統_操作編輯_權限",
+      "n": 94
+    }
+  },
+  "B.chip間距4px": {
+    "ok": true,
+    "detail": [
+      4,
+      4,
+      4,
+      4,
+      4
+    ]
+  },
+  "B.chip高22": {
+    "ok": true,
+    "detail": {
+      "chipH": [
+        22,
+        22,
+        22
+      ],
+      "innerH": [
+        22,
+        22
+      ]
+    }
+  },
+  "B.展開鈕在最左且帶數量": {
+    "ok": true,
+    "detail": {
+      "btnAllText": "94",
+      "nChips": 94,
+      "btnAllRect": {
+        "x": 892,
+        "y": 299,
+        "w": 44.9,
+        "h": 22,
+        "r": 936.9,
+        "btm": 321
+      }
+    }
+  },
+  "B.模式控制項22x56且在儲存格內": {
+    "ok": true,
+    "detail": {
+      "root": {
+        "x": 940.9,
+        "y": 297.8,
+        "w": 56,
+        "h": 22,
+        "r": 996.9,
+        "btm": 319.8
+      },
+      "shell": {
+        "x": 940.9,
+        "y": 297.8,
+        "w": 56,
+        "h": 22,
+        "r": 996.9,
+        "btm": 319.8
+      },
+      "cell": {
+        "x": 880,
+        "y": 293,
+        "w": 319,
+        "h": 27,
+        "r": 1199,
+        "btm": 320
+      },
+      "shellStyle": {
+        "border-radius": "0px",
+        "border": "1px solid rgb(172, 36, 81)",
+        "background-color": "rgb(190, 41, 90)",
+        "opacity": "1"
+      },
+      "rootStyle": {
+        "border-radius": "4px 0px 0px 4px",
+        "overflow": "hidden"
+      },
+      "txt": "OR",
+      "cellClass": "ag-cell-value ag-cell ag-cell-not-inline-editing ag-cell-normal-height ag-column-last no-border"
+    }
+  },
+  "B.未勾選列無模式控制項": {
+    "ok": true,
+    "detail": {
+      "row1HasMode": 0
+    }
+  },
+  "B.hover無儲存格焦點框": {
+    "ok": true,
+    "detail": {
+      "shellHover": {
+        "background-color": "rgb(172, 36, 81)",
+        "border": "1px solid rgb(158, 33, 73)",
+        "cursor": "default"
+      },
+      "cellClass": "ag-cell-value ag-cell ag-cell-not-inline-editing ag-cell-normal-height ag-column-last no-border",
+      "cellBorder": "1px solid rgba(0, 0, 0, 0)"
+    }
+  },
+  "B.清單依序OR、AND": {
+    "ok": true,
+    "detail": [
+      [
+        "OR",
+        28
+      ],
+      [
+        "AND",
+        28
+      ]
+    ]
+  },
+  "B.清單左緣對齊控制項": {
+    "ok": true,
+    "detail": {
+      "popupX": 941,
+      "triggerX": 940.9
+    }
+  },
+  "B.清單不窄於控制項": {
+    "ok": true,
+    "detail": {
+      "popupW": 56,
+      "triggerW": 56
+    }
+  },
+  "B.點擊後無儲存格藍框": {
+    "ok": true,
+    "detail": {
+      "cellBorder": "1px solid rgba(0, 0, 0, 0)",
+      "cellClass": "ag-cell-value ag-cell ag-cell-not-inline-editing ag-cell-normal-height ag-column-last no-border ag-cell-focus"
+    }
+  },
+  "B.點AND後本項chip顯示AND且清單收起": {
+    "ok": true,
+    "detail": {
+      "txt": "AND",
+      "open": false,
+      "hasSave": false
+    }
+  },
+  "B.展開全部浮層列出94顆且本項第1": {
+    "ok": true,
+    "detail": {
+      "popup": {
+        "x": 892,
+        "y": 327,
+        "w": 560,
+        "h": 488,
+        "r": 1452,
+        "btm": 815
+      },
+      "n": 94,
+      "first": "知識管理系統_操作編輯_權限",
+      "firstMode": "AND",
+      "title": "所屬權限名稱：共 94 項",
+      "wrap": {
+        "flex-wrap": "wrap",
+        "gap": "4px 6px"
+      }
+    }
+  },
+  "B.勾選後本項chip成第1顆且帶下拉": {
+    "ok": true,
+    "detail": {
+      "first": "知識管理系統_操作編輯_權限",
+      "hasMode": true,
+      "n": 4,
+      "firstBg": "rgb(190, 41, 90)"
+    }
+  },
+  "C.欄序不變": {
+    "ok": true,
+    "detail": [
+      "權限名稱",
+      "合併權限模式",
+      "是否使用"
+    ]
+  },
+  "C.控制項22x56且在儲存格內": {
+    "ok": true,
+    "detail": [
+      [
+        false,
+        22,
+        56
+      ],
+      [
+        false,
+        22,
+        56
+      ],
+      [
+        true,
+        22,
+        56
+      ],
+      [
+        true,
+        22,
+        56
+      ],
+      [
+        true,
+        22,
+        56
+      ],
+      [
+        false,
+        22,
+        56
+      ],
+      [
+        false,
+        22,
+        56
+      ],
+      [
+        false,
+        22,
+        56
+      ]
+    ]
+  },
+  "C.已勾選列可操作(不透明、有箭頭)": {
+    "ok": true,
+    "detail": [
+      [
+        "OR",
+        "1",
+        true
+      ],
+      [
+        "OR",
+        "1",
+        true
+      ],
+      [
+        "OR",
+        "1",
+        true
+      ]
+    ]
+  },
+  "C.未勾選列淡化無箭頭": {
+    "ok": true,
+    "detail": [
+      [
+        "OR",
+        "0.6",
+        false
+      ],
+      [
+        "OR",
+        "0.6",
+        false
+      ],
+      [
+        "OR",
+        "0.6",
+        false
+      ]
+    ]
+  },
+  "C.已勾選列點開清單": {
+    "ok": true,
+    "detail": {
+      "popup": {
+        "x": 822,
+        "y": 296,
+        "w": 56,
+        "h": 56,
+        "r": 878,
+        "btm": 352
+      },
+      "items": [
+        "OR",
+        "AND"
+      ]
+    }
+  },
+  "C.未勾選列點擊不展開": {
+    "ok": true,
+    "detail": {
+      "disOpen": false
+    }
+  },
+  "D.編輯所屬使用者之欄序與本項chip": {
+    "ok": true,
+    "detail": {
+      "heads": [
+        "使用者名稱",
+        "是否使用",
+        "所屬權限群組名稱"
+      ],
+      "nRows": 15,
+      "first": "L0公開頁面閱覽_權限群組",
+      "hasMode": 1,
+      "n": 1,
+      "gaps": []
+    }
+  },
+  "E.編輯使用權限群組控制項在儲存格內": {
+    "ok": true,
+    "detail": {
+      "heads": [
+        "權限群組名稱",
+        "合併權限群組模式",
+        "是否使用"
+      ],
+      "enabledRowTxt": "OR",
+      "shell": {
+        "x": 822,
+        "y": 243.8,
+        "w": 56,
+        "h": 22,
+        "r": 878,
+        "btm": 265.8
+      },
+      "cell": {
+        "x": 810,
+        "y": 239,
+        "w": 184,
+        "h": 27,
+        "r": 994,
+        "btm": 266
+      },
+      "root": {
+        "x": 822,
+        "y": 243.8,
+        "w": 56,
+        "h": 22,
+        "r": 878,
+        "btm": 265.8
+      }
+    }
+  },
+  "F.唯讀態本項chip為純文字段(無下拉、無箭頭)且勾選框disabled": {
+    "ok": true,
+    "detail": {
+      "first": "知識管理系統_操作編輯_權限",
+      "hasMode": 0,
+      "segText": "OR",
+      "segBg": "rgb(190, 41, 90)",
+      "segCursor": "default",
+      "hasSvg": false,
+      "chkDisabled": true,
+      "btnAllText": "94"
+    }
+  },
+  "F.唯讀態展開全部仍可看": {
+    "ok": true,
+    "detail": {
+      "n": 94
+    }
+  }
+}

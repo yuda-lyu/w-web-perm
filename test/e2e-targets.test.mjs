@@ -7,7 +7,7 @@
 //checkbox 與警告 icon 皆在 col-id="id"；save 結果走 $dg.showCheckYes 持久 modal。
 import fs from 'fs'
 import assert from 'assert'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, typeIntoCell, captureBaseSeed, resetDb } from './tools/e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, typeIntoCell, captureBaseSeed, resetDb, clickNavItem } from './tools/e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/targets'
 const LANGS = ['eng', 'cht']
@@ -33,7 +33,7 @@ async function setLang(page, lang) {
 //openApp 已等到 csLogin+webInfor，故此處 $t 譯文已就緒（lang-aware 取標籤）
 async function gotoTargets(page) {
     const targetsLabel = await page.evaluate(() => window.$vo.$t('mmTargets'))
-    await page.getByText(targetsLabel, { exact: true }).first().click()
+    await clickNavItem(page, targetsLabel) //限定導覽面板內（見 e2e-setup clickNavItem 註解）
     await waitUntilExist(page, '標的 ag-grid 列', () => document.querySelectorAll('.ag-row').length > 0, { timeout: 20000 })
     await page.waitForTimeout(500)
 }

@@ -6,7 +6,7 @@
 //統計頁為預設頁且圖表隨 log 變動 → 每 case 以 settings:{ staEventMock:true } 換後端（同 e2e-stainfor / e2e-users E2E-012 之 c.settings 管線）。
 import fs from 'fs'
 import assert from 'assert'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, waitUntilExist, assertBaselineMatch, restartBackend, genTempSettings } from './tools/e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, waitUntilExist, assertBaselineMatch, restartBackend, genTempSettings, clickNavItem } from './tools/e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/layout'
 const LANGS = ['eng', 'cht']
@@ -70,7 +70,7 @@ async function clickShow(page) {
 //導航至指定頁籤（user-facing：點左側導覽項）；統計頁等圖表 canvas（mock 後端確定有資料），資料頁等 ag-grid 列。
 async function gotoPage(page, key) {
     const label = await page.evaluate((k) => window.$vo.$t(k), key)
-    await page.getByText(label, { exact: true }).first().click()
+    await clickNavItem(page, label) //限定導覽面板內（見 e2e-setup clickNavItem 註解）；本檔呼叫時導覽皆為展開態
     if (key === 'mmStaInfor') {
         await waitUntilExist(page, '統計事件圖表 canvas', () => document.querySelector('canvas') !== null, { timeout: 30000 })
         await page.waitForTimeout(7000) //echarts 初始化 + resize debounce settle（對齊 e2e-stainfor gotoStaInfor）

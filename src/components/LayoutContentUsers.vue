@@ -804,8 +804,10 @@ export default {
             let cmp = get(vo, '$refs.rftable')
             // console.log('cmp', cmp)
 
-            //showKeys
-            cmp.showKeys(vo.tabKeysShow)
+            //showKeys, applyOrder:false 僅切換顯示與隱藏、維持目前欄序(w-aggrid-vue 2.0.88 起提供)
+            //  why: tabKeysShow 為 WInputCheckbox 之 v-model, 重新勾選之項一律被 push 到陣列尾端(WInputCheckbox.vue:379-381),
+            //  若沿用預設 applyOrder:true, 欄序會跟著點擊序走, 使用者隱藏再顯示某欄即跑到最右; 初始欄序由 opt.keys 決定, 本函式只在勾選時呼叫, 故不受影響
+            cmp.showKeys(vo.tabKeysShow, { applyOrder: false })
             // console.log('tabKeysShow', vo.tabKeysShow)
 
         },

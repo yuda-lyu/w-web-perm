@@ -5,7 +5,7 @@
 //act 走 user-facing input；assert = 語意斷言 + pixel baseline（§6.2 / §6.3）。
 import fs from 'fs'
 import assert from 'assert'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, assertBaselineMatch, typeIntoCell, captureBaseSeed, resetDb, restartBackend, genTempSettings, toggleDialogEnable, clickDialogSave, waitDialogGrid, waitDialogClosed } from './tools/e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, assertBaselineMatch, typeIntoCell, captureBaseSeed, resetDb, restartBackend, genTempSettings, toggleDialogEnable, clickDialogSave, waitDialogGrid, waitDialogClosed, clickNavItem } from './tools/e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/users'
 const LANGS = ['eng', 'cht']
@@ -33,7 +33,7 @@ async function setLang(page, lang) {
 //openApp 已等到 csLogin+webInfor，故此處 $t 譯文已就緒（lang-aware 取標籤）
 async function gotoUsers(page) {
     const usersLabel = await page.evaluate(() => window.$vo.$t('mmUsers'))
-    await page.getByText(usersLabel, { exact: true }).first().click()
+    await clickNavItem(page, usersLabel) //限定導覽面板內（見 e2e-setup clickNavItem 註解）
     await waitUntilExist(page, '使用者 ag-grid 列', () => document.querySelectorAll('.ag-row').length > 0, { timeout: 20000 })
     await page.waitForTimeout(500)
 }

@@ -63,14 +63,37 @@ async function waitPort(url, label, timeoutMs = 180000) {
     throw new Error(`等待 ${label} (${url}) 逾時 ${timeoutMs}ms`)
 }
 
+//刪 ./db 並回驗真的沒了（全域 §12.6：Windows 對 lmdb 之 memory-mapped 檔, rm 可能因殘留行程持有映射而失敗；
+//  且行程死亡後 OS 釋放檔案 handle 有延遲, 故重試數次而非一次定生死）。
+//  刪不掉時「拋錯」而非退化：genTestData 為 upsert 不清表, 在髒 DB 上 seed 會產出非 hermetic 之 base seed,
+//  據此產製的標準圖等於把污染狀態凍結為真理（§16.2 第 4 條）——大聲失敗遠優於安靜產出不可信的圖。
+//  2026-09-16 實機兩度踩到：restartBackend 只以「監聽中」之 PID 殺後端, 卡住/未監聽之舊 srv.mjs 續持有 lmdb,
+//  seedDb 靜默退化為 upsert, 使 captureBaseSeed 取到被前置探測污染之 users 表。
+//  strict=false 之唯一正當場景：api 測試之 after-hook 還原（restartBackend）。該情境下持有 lmdb 映射的是
+//  mocha 進程自己——api-setup 之 getWoItems 會 import g_mOrm.mjs 開 lmdb 做唯讀斷言（見 api-setup.mjs:48-49），
+//  同進程內無法解除映射, 故刪除必然失敗；但該處只需把 admin 的 isActive 還原, upsert 即足夠, 且不產製標準圖。
+function wipeDbVerified(strict = true) {
+    const dbDir = join(projRoot, 'db')
+    let lastErr = null
+    for (let i = 0; i < 6; i++) {
+        try { fs.rmSync(dbDir, { recursive: true, force: true }) }
+        catch (e) { lastErr = e }
+        if (!fs.existsSync(dbDir)) return
+        execSync(isWin ? 'ping -n 2 127.0.0.1 >nul' : 'sleep 1', { stdio: 'ignore' })
+    }
+    const msg = `無法刪除 ./db（仍有行程持有 lmdb 映射）: ${lastErr ? lastErr.message : '目錄仍存在'}`
+    if (strict) throw new Error(`seedDb: ${msg}；續行將產出非 hermetic 之 base seed, 故中止`)
+    console.log(`警告: seedDb ${msg}；本次改在既有 DB 上 upsert（僅限 api after-hook 還原, 不得用於產製標準圖）`)
+}
+
 //種子 DB（base seed：peter/mary/john/admin + grups/pemis/targets）。g_initialTestData 刪舊重建，
 //須在後端開啟 lmdb 之前完成。偵測 stdout 'finish.' 即視為完成並結束該子進程（避免 lmdb 卡 event loop）。
-function seedDb() {
+function seedDb(opts = {}) {
+    const { strict = true } = opts
     return new Promise((resolve, reject) => {
         //先刪 ./db（lmdb）再重建，確保 hermetic base seed（genTestData 為 upsert 不清表）。
-        //僅在 backend 未啟動時呼叫 seedDb，故無進程持有 lmdb，刪除安全。
-        try { fs.rmSync(join(projRoot, 'db'), { recursive: true, force: true }) }
-        catch (e) { console.log('警告: 無法刪除 ./db（可能被占用），改在既有 DB 上 seed:', e.message) }
+        try { wipeDbVerified(strict) }
+        catch (e) { reject(e); return }
         const child = spawn('node', ['g_initialTestData.mjs'], { cwd: projRoot, stdio: ['ignore', 'pipe', 'pipe'] })
         let done = false
         const finish = () => { if (done) return; done = true; try { child.kill() } catch (e) {} ; resolve() }
@@ -188,8 +211,16 @@ export async function restartBackend(pathSettings = './settings.json', opts = {}
         const t0 = Date.now()
         while (Date.now() - t0 < 5000) { if (!(await httpOk(`${apiBaseUrl}/`))) { break } await new Promise((r) => setTimeout(r, 200)) }
     }
+    //reseed 前另以 CommandLine 比對殺盡所有 srv.mjs：上面兩段只涵蓋「spawned 記錄到的」與「當下在監聽的」，
+    //  卡住/未監聽之舊實例會漏殺而續持有 lmdb 映射, 使 seedDb 刪不掉 ./db（全域 §12.6）。
+    if (reseed && isWin) {
+        try { execSync('powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \\"name=\'node.exe\'\\" | Where-Object { $_.CommandLine -match \'srv\\.mjs\' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"', { stdio: 'ignore' }) }
+        catch (e) {}
+    }
     if (reseed) {
-        await seedDb()
+        //strict:false——本路徑為 api 測試之 after-hook 還原, 持有 lmdb 者為 mocha 進程自身（見 wipeDbVerified 註解）,
+        //  刪除必然失敗且 upsert 已足夠；不得把此寬鬆度帶到會產製標準圖的 startServersOnce 路徑。
+        await seedDb({ strict: false })
     }
     spawnSrv('backend', 'node', ['srv.mjs', pathSettings])
     await waitPort(`${apiBaseUrl}/`, `backend ${BACKEND_PORT}(restart)`, 60000)
@@ -464,6 +495,14 @@ export async function toggleDialogEnable(page, rowIndex) {
     await page.locator(`.ag-row[row-index="${rowIndex}"] .ag-cell[col-id="enable"] input[type="checkbox"]`).first().click()
     await page.waitForTimeout(800)
 }
+//點左側導覽項（selector 限定於導覽面板內）。
+//why scope：主表欄序於 2026-09-16 對調後,「管控使用權限」欄表頭進入 DOM, 其 eng 文字 `Permissions` 與選單「管理權限」(mmPemis) 相同,
+//  全頁 page.getByText(label,{exact:true}).first() 會誤點表頭（實測自群組頁切權限頁失敗, tmp/probe-relachip.mjs）。
+//  `[ev-stable]` 為 WDrawer 平移面板（v-domstable 指令所加之屬性）, 導覽項皆在其內；導覽收合時該面板 display:none, 呼叫端須先展開。
+export const SEL_NAV = '[ev-stable]'
+export async function clickNavItem(page, labelText) {
+    await page.locator(SEL_NAV).getByText(labelText, { exact: true }).first().click()
+}
 //切對話框內某列 mode 下拉為指定值（'OR' / 'AND'）。
 //mode 欄為自製下拉 WTextSelect（2026-09-14 取代原生 select, 見建議書 §2 / 全域 §10.6.3）：
 //  · 觸發區 = WTextSuggestCore select 模式之文字 div（帶靜態屬性 _tabindex="0", WTextSuggestCore.vue:26-31）；
@@ -479,11 +518,66 @@ export async function setDialogMode(page, rowIndex, mode) {
 export function dialogEnableCheckboxSel(rowIndex) {
     return `.ag-row[row-index="${rowIndex}"] .ag-cell[col-id="enable"] input[type="checkbox"]`
 }
-//對話框 mode 下拉之「每步兩張」截圖版（供多階段 case 用）：點下拉前框住觸發區整顆 → 清單展開框住整份清單 → 點項目前框住該項目整顆 → 選取並等清單關閉。
-//回傳三張 { clickMode, listOpen, clickItem }；「選取後」之列態由呼叫端以 dialogRowBoxSel(rowIndex) 另拍。
-export async function setDialogModeWithShots(page, rowIndex, mode) {
-    const cell = `.ag-row[row-index="${rowIndex}"] .ag-cell[col-id="mode"]`
-    const clickMode = await captureStableWithBox(page, `${cell} div[style*="opacity"]`) //觸發區 pill（WShellEllipse 外框）
+//對話框內關聯標籤（RelationChip）之根元素 selector：有 title、inline-flex 且 align-items:stretch；
+//溢出指示「+K」雖也帶 title 但為 align-items:center + cursor:pointer, 故不會被選到。
+//  注意：收合時未顯示之標籤仍在 DOM（v-show, display:none），此 selector 會一併命中；要「可見者」請用 dialogChipsVisibleTargets。
+export function dialogChipSel(rowIndex, colId) {
+    return `.ag-row[row-index="${rowIndex}"] .ag-cell[col-id="${colId}"] div[title][style*="align-items: stretch"]`
+}
+//對話框內溢出指示「+K」之 selector（2026-09-17 起：只在該列標籤依實測寬度放不下時渲染, 與標籤數無關）
+//  量測用之隱藏指示（RelationChips 之 indicatorMeasure）無 title 屬性, 不會被選到。
+export function dialogChipsAllBtnSel(rowIndex, colId) {
+    return `.ag-row[row-index="${rowIndex}"] .ag-cell[col-id="${colId}"] div[title][style*="cursor: pointer"]`
+}
+//某列標籤欄「可見之標籤 ∪ 溢出指示」之框選目標（Locator 陣列；未顯示者 boundingBox 為 null, captureStableWithBox 自動略過）
+//  用於「收合／展開後框住該列標籤列之實際內容」：框實際可見之標籤與指示, 不框儲存格右側空白（全域技能 §7.3 第 2 條）
+export async function dialogChipsVisibleTargets(page, rowIndex, colId) {
+    const n = await page.locator(dialogChipSel(rowIndex, colId)).count()
+    const t = []
+    for (let i = 0; i < n; i++) t.push(page.locator(dialogChipSel(rowIndex, colId)).nth(i))
+    //指示只在放不下時才渲染（v-if）；不存在時不可放入框選目標, 否則量測等待逾時
+    if (await page.locator(dialogChipsAllBtnSel(rowIndex, colId)).count() > 0) t.push(page.locator(dialogChipsAllBtnSel(rowIndex, colId)).first())
+    return t
+}
+//讀某列標籤欄之收合狀態：可見標籤之 title 陣列、可見指示之文字（無則 null）、各可見標籤模式段是否帶展開箭頭
+export async function readDialogChipsRow(page, rowIndex, colId) {
+    return page.evaluate(([cs, is]) => {
+        const vis = (e) => getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 0
+        const chips = [...document.querySelectorAll(cs)].filter(vis)
+        const ind = [...document.querySelectorAll(is)].filter(vis)[0]
+        return {
+            titles: chips.map((e) => e.getAttribute('title')),
+            modes: chips.map((e) => (e.children[0].textContent || '').trim()),
+            editable: chips.map((e) => !!e.children[0].querySelector('svg')),
+            ind: ind ? (ind.textContent || '').trim() : null,
+            indTitle: ind ? ind.getAttribute('title') : null,
+        }
+    }, [dialogChipSel(rowIndex, colId), dialogChipsAllBtnSel(rowIndex, colId)])
+}
+//改變瀏覽器視窗寬度並等標籤列重算完成：以「目標列之溢出指示出現／消失」為就緒訊號（RelationChips 以 v-domresize 重算）
+//  why 以視窗寬度而非拖曳欄寬：關聯對話框表格為 autoFitColumn, 最後一欄拖曳表頭把手不生效（2026-09-17 實測儲存格寬維持 319）,
+//  使用者實際遇到之變窄路徑為視窗變小 → 對話框與表格隨之自動調整欄寬。
+export async function resizeWindowForChips(page, width, rowIndex, colId, expectIndicator) {
+    await page.setViewportSize({ width, height: 900 })
+    await waitUntilExist(page, `標籤列重算（視窗 ${width}, 預期指示${expectIndicator ? '出現' : '消失'}）`, ([sel, exp]) => {
+        const el = [...document.querySelectorAll(sel)].find((e) => getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 0)
+        return exp ? !!el : !el
+    }, { timeout: 15000, arg: [dialogChipsAllBtnSel(rowIndex, colId), expectIndicator] })
+    await page.waitForTimeout(800) //對話框與表格版面 settle
+}
+//對話框合併模式控制項之「每步兩張」截圖版（供多階段 case 用）：點下拉前框住控制項（或本項標籤）→ 清單展開框住整份清單 → 點項目前框住該項目整顆 → 選取並等清單關閉。
+//  opt.colId：控制項所在欄。'mode'（預設）為兩個「使用」對話框之獨立模式欄；
+//    兩個「所屬」對話框（2026-09-16 起）無獨立 mode 欄, 模式併入標籤欄之本項標籤左段, 呼叫端須傳 'grupsNames' / 'pemisNames'。
+//  回傳三張 { clickMode, listOpen, clickItem }；「選取後」之列態由呼叫端以 dialogRowBoxSel(rowIndex) 另拍。
+export async function setDialogModeWithShots(page, rowIndex, mode, opt = {}) {
+    const { colId = 'mode' } = opt
+    const cell = `.ag-row[row-index="${rowIndex}"] .ag-cell[col-id="${colId}"]`
+    //點擊前之框選目標一律為「模式控制項整顆」（56×22）：獨立欄框其外框；標籤欄框本項標籤之左段（模式段, ModeSelectChip 根元素）。
+    //  why 框模式段而非整顆標籤：①慣例為「點擊前框要點」, 實際可點者只有模式段（名稱段無 handler）；
+    //  ②與兩個「使用」對話框之 E2E-002 ⑤「框住該列之模式控制項整顆」對稱, 同一元件同一框法。
+    //  施工單 S3(:77 框模式段) 與 S4(:92 框整顆) 互相矛盾, 依上述二理由取 S3, spec 之括號描述不動。
+    const target = colId === 'mode' ? `${cell} div[style*="opacity"]` : `${dialogChipSel(rowIndex, colId)} > div:first-child`
+    const clickMode = await captureStableWithBox(page, target)
     await page.locator(`${cell} div[_tabindex="0"]`).first().click()
     const popup = page.locator('.WPopperFix[wtlp="modeSelect"]:visible')
     await popup.first().waitFor({ state: 'visible', timeout: 10000 })
@@ -495,6 +589,68 @@ export async function setDialogModeWithShots(page, rowIndex, mode) {
     await popup.first().waitFor({ state: 'hidden', timeout: 10000 })
     await page.waitForTimeout(800)
     return { clickMode, listOpen, clickItem }
+}
+//對話框內溢出指示「+K」之「每步兩張」截圖版：點擊前框住「+K」整顆 → 展開後框住整個浮層；**浮層保持開啟**交還呼叫端。
+//  浮層 teleport 至 body 之 `.WPopperFix[wtlp="relationChipsAll"]`（RelationChips 之 labelContentAll）。
+//  回傳 { clickBtn, popupOpen, info }；info 於浮層開啟時量得（供呼叫端語意斷言）：
+//    nChip=浮層內標籤數、title=浮層首行標題文字、titles=各標籤名、editable=各標籤模式段是否帶展開箭頭、firstNameBg=首顆名稱段底色
+//  2026-09-17 起不再由本函式關閉浮層：浮層之後續操作（於浮層內改模式）或案例結束即為終點；
+//    舊版以點對話框標頭關閉之分支已無呼叫端而移除。
+export async function openChipsAllWithShots(page, rowIndex, colId) {
+    const btn = page.locator(dialogChipsAllBtnSel(rowIndex, colId)).first()
+    const clickBtn = await captureStableWithBox(page, btn)
+    await btn.click()
+    const popup = page.locator('.WPopperFix[wtlp="relationChipsAll"]:visible')
+    await popup.first().waitFor({ state: 'visible', timeout: 10000 })
+    await page.waitForTimeout(500)
+    const popupOpen = await captureStableWithBox(page, popup)
+    const info = await page.evaluate(() => {
+        //可見性不可用 offsetParent：WPopperFix 為 position:fixed, offsetParent 恆為 null（2026-09-16 實機踩到）。改以面積判定。
+        const p = [...document.querySelectorAll('.WPopperFix[wtlp="relationChipsAll"]')]
+            .find((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 })
+        if (!p) return null
+        const chips = [...p.querySelectorAll('div[title][style*="align-items: stretch"]')]
+        const f = chips[0]
+        return {
+            nChip: chips.length,
+            //標題為標籤容器之前一個兄弟元素（RelationChips 浮層內容：標題 div + 標籤 flex-wrap div）；
+            //不可用 textContent 取首行——模板空白是否保留換行隨編譯而異，實測會把標籤文字併入
+            title: f && f.parentElement.previousElementSibling ? (f.parentElement.previousElementSibling.textContent || '').trim() : null,
+            titles: chips.map((e) => e.getAttribute('title')),
+            editable: chips.map((e) => !!e.children[0].querySelector('svg')),
+            firstNameBg: f && f.children[1] ? getComputedStyle(f.children[1]).backgroundColor : null,
+        }
+    })
+    return { clickBtn, popupOpen, info }
+}
+//於已開啟之「展開全部」浮層內, 改首顆（本項）標籤之合併模式——「每步兩張」截圖版：
+//  點模式段前框住浮層內首顆標籤之模式段整顆 → 清單展開框住整份清單（疊在浮層之上）→ 點項目前框住該項目整顆 → 選取並等清單與浮層皆關閉。
+//  選取後呼叫端之 *ToggleItemModeByName → revRows 重繪列, 浮層隨儲存格元件卸載而關閉, 故以「浮層與清單皆不可見」為完成訊號。
+//  回傳 { clickMode, listOpen, clickItem, z }；z＝{ list, popup } 為清單與浮層之 z-index（供「清單疊在浮層之上」斷言）。
+export async function setChipsAllModeWithShots(page, mode) {
+    const popup = page.locator('.WPopperFix[wtlp="relationChipsAll"]:visible').first()
+    const chip0 = popup.locator('div[title][style*="align-items: stretch"]').first()
+    const modeSeg = chip0.locator('xpath=./div[1]')
+    const clickMode = await captureStableWithBox(page, modeSeg)
+    await chip0.locator('div[_tabindex="0"]').first().click()
+    const list = page.locator('.WPopperFix[wtlp="modeSelect"]:visible')
+    await list.first().waitFor({ state: 'visible', timeout: 10000 })
+    await page.waitForTimeout(400)
+    //點清單前確認浮層仍開著（清單位於浮層範圍外時, 開清單之點擊不得被判為「點浮層外」）
+    const popupStill = await page.locator('.WPopperFix[wtlp="relationChipsAll"]:visible').count()
+    if (popupStill !== 1) throw new Error(`setChipsAllModeWithShots: 開啟模式清單後浮層應仍開著（實得可見浮層 ${popupStill}）`)
+    const z = await page.evaluate(() => {
+        const zi = (sel) => { const e = [...document.querySelectorAll(sel)].find((x) => x.getBoundingClientRect().width > 0); return e ? Number(getComputedStyle(e).zIndex) : null }
+        return { list: zi('.WPopperFix[wtlp="modeSelect"]'), popup: zi('.WPopperFix[wtlp="relationChipsAll"]') }
+    })
+    const listOpen = await captureStableWithBox(page, list)
+    const item = list.locator('div[tabindex="0"]').filter({ hasText: new RegExp(`^\\s*${mode}\\s*$`) }).first()
+    const clickItem = await captureStableWithBox(page, item)
+    await item.click()
+    await list.first().waitFor({ state: 'hidden', timeout: 10000 })
+    await page.locator('.WPopperFix[wtlp="relationChipsAll"]:visible').first().waitFor({ state: 'hidden', timeout: 10000 })
+    await page.waitForTimeout(800)
+    return { clickMode, listOpen, clickItem, z }
 }
 //通用：以真點擊操作 WTextSelect（w-component-vue）——點觸發區文字 → 等 teleport 至 body 之清單可見 → 點指定文字之項目 → 等清單關閉。
 //  containerSel：含該 WTextSelect 之容器 selector（觸發區為其內 div[_tabindex="0"]）；wtlp：該元件之 labelContent；itemText：項目顯示文字（精確比對, 前後空白忽略）。
