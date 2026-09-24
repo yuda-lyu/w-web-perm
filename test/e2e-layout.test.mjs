@@ -23,7 +23,7 @@ async function setLang(page, lang) {
     await page.waitForTimeout(600)
 }
 
-//—— 圓鈕定位：WButtonCircle 無 title/aria 且本二鈕 tooltip 已停用（LayoutContent.vue:56,112），以 mdi path 定位 ——
+//—— 圓鈕定位：WButtonCircle 無 title/aria 且本二鈕 tooltip 已停用（LayoutContent.vue:59,114），以 mdi path 定位 ——
 const MDI = {
     hide: 'M7,12L12,7V10H16V14H12V17L7,12M21,16.5C21,16.88 20.79,17.21 20.47,17.38L12.57,21.82C12.41,21.94 12.21,22 12,22C11.79,22 11.59,21.94 11.43,21.82L3.53,17.38C3.21,17.21 3,16.88 3,16.5V7.5C3,7.12 3.21,6.79 3.53,6.62L11.43,2.18C11.59,2.06 11.79,2 12,2C12.21,2 12.41,2.06 12.57,2.18L20.47,6.62C20.79,6.79 21,7.12 21,7.5V16.5M12,4.15L5,8.09V15.91L12,19.85L19,15.91V8.09L12,4.15Z', //mdiArrowLeftBoldHexagonOutline（隱藏選單）
     show: 'M17,12L12,17V14H8V10H12V7L17,12M21,16.5C21,16.88 20.79,17.21 20.47,17.38L12.57,21.82C12.41,21.94 12.21,22 12,22C11.79,22 11.59,21.94 11.43,21.82L3.53,17.38C3.21,17.21 3,16.88 3,16.5V7.5C3,7.12 3.21,6.79 3.53,6.62L11.43,2.18C11.59,2.06 11.79,2 12,2C12.21,2 12.41,2.06 12.57,2.18L20.47,6.62C20.79,6.79 21,7.12 21,7.5V16.5M12,4.15L5,8.09V15.91L12,19.85L19,15.91V8.09L12,4.15Z', //mdiArrowRightBoldHexagonOutline（顯示選單）
@@ -163,6 +163,61 @@ const CASES = [
             for (const lb of labels) assert.ok(txt.includes(lb), `導覽區應列出頁籤「${lb}」`)
             const staL = await titleLeft(page, labels[0])
             assert.equal(staL, 230, `統計頁標題左緣應回到 230（實得 ${staL}）`)
+        },
+    },
+    {
+        //E2E-003：視窗縮為 400 → 導覽自動收合；拉回 1440 → 導覽自動展開並恢復並排（spec E2E-003）。
+        //6 步真實路徑：①登入停在統計頁 ②等導覽展開落定 ③縮窄視窗（使用者拖視窗邊界；無 DOM 點擊目標，以 setViewportSize 模擬）
+        //  ④導覽收合、「顯示選單」圓鈕出現 ⑤拉寬視窗 ⑥導覽展開並排、標題回位、無灰色遮罩；不寫入任何資料
+        //語意斷言放在 run() 內：兩個寬度下之狀態皆為過程中之觀察，且 regen 端只跑 run()，寫檔前即守門
+        //（修復前拉回後導覽區浮在內容上並覆蓋遮罩、標題左緣 30，此處即紅；修復見 LayoutContent.vue autoSwitchToFix）。
+        name: 'E2E-003-resize-narrow-wide',
+        settings: { staEventMock: true },
+        run: async (page) => {
+            await gotoPage(page, 'mmStaInfor')
+            await waitDrawerSettled(page, false) //縮窄前先等展開落定：元件庫於導覽區掛載後約 250ms 內之收合會被掛載展開覆蓋（spec〈已知落差〉）
+            const staLabel = await page.evaluate(() => window.$vo.$t('mmStaInfor'))
+            assert.equal(await titleLeft(page, staLabel), 230, '縮窄前統計頁標題左緣應為 230（導覽區並排）')
+
+            //③縮窄：無點擊目標故無點擊前之圖
+            await page.setViewportSize({ width: 400, height: 900 })
+            await waitDrawerSettled(page, true)
+            //spec E2E-003 驗證 1：「顯示選單」存在、「隱藏選單」消失；統計頁標題左緣 ≥ 圓鈕右緣
+            assert.equal(await iconBtn(page, MDI.show).count(), 1, '縮窄後應有「顯示選單」圓鈕')
+            assert.equal(await iconBtn(page, MDI.hide).count(), 0, '縮窄後不應有「隱藏選單」圓鈕')
+            const btnR = await showBtnRight(page)
+            const l1 = await titleLeft(page, staLabel)
+            assert.ok(btnR !== null && l1 !== null && l1 >= btnR, `縮窄後統計頁標題左緣（${l1}）應 ≥「顯示選單」圓鈕右緣（${btnR}）`)
+            const s1 = await captureStableWithBox(page, SEL_STA_TITLE) //E2E-003-1-narrowed：縮為 400 後框住統計頁標題「統計資訊」整行（其左側為「顯示選單」圓鈕）
+
+            //⑤拉寬
+            await page.setViewportSize({ width: 1440, height: 900 })
+            await waitDrawerSettled(page, false)
+            //spec E2E-003 驗證 2：導覽面板 x=0 寬 200；「隱藏選單」存在、「顯示選單」消失；標題回到 230；標題位置之最上層元素為標題本身（未被遮罩覆蓋）
+            const panel = await page.evaluate((sel) => {
+                const e = document.querySelector(sel)
+                if (!e) return null
+                const b = e.getBoundingClientRect()
+                return { x: Math.round(b.left), w: Math.round(b.width), disp: getComputedStyle(e).display }
+            }, SEL_DRAWER_PANEL)
+            assert.ok(panel && panel.disp !== 'none' && panel.x === 0 && panel.w === 200, `拉回後導覽面板應可見且 x=0 寬 200（實得 ${JSON.stringify(panel)}）`)
+            assert.equal(await iconBtn(page, MDI.hide).count(), 1, '拉回後應有「隱藏選單」圓鈕')
+            assert.equal(await iconBtn(page, MDI.show).count(), 0, '拉回後不應有「顯示選單」圓鈕')
+            const l2 = await titleLeft(page, staLabel)
+            assert.equal(l2, 230, `拉回後統計頁標題左緣應回到 230（實得 ${l2}；導覽區若浮在內容上則為 30）`)
+            const onTop = await page.evaluate((sel) => {
+                const t = document.querySelector(sel)
+                if (!t) return null
+                const b = t.getBoundingClientRect()
+                const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2)
+                return !!hit && (hit === t || t.contains(hit))
+            }, SEL_STA_TITLE)
+            assert.equal(onTop, true, '拉回後統計頁標題應為其位置之最上層元素（未被灰色遮罩覆蓋）')
+            const s2 = await captureStableWithBox(page, SEL_DRAWER_PANEL) //E2E-003-2-widened：拉回 1440 後框住整個左側導覽區面板含五個頁籤
+            return [
+                { name: 'E2E-003-1-narrowed', buf: s1 },
+                { name: 'E2E-003-2-widened', buf: s2 },
+            ]
         },
     },
 ]

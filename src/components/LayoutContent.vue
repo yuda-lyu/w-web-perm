@@ -18,6 +18,7 @@
                 :autoSwitchToHide="true"
                 :autoSwitchToShow="true"
                 :autoSwitchToFloat="true"
+                :autoSwitchToFix="true"
                 :switchWidth="drawerWidth*2.3"
             >
 
