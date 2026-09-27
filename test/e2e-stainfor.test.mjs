@@ -116,6 +116,14 @@ function langSelLoc(page) {
     return page.locator('[data-fmid="app-topbar"] div[ev-resize]').filter({ has: page.locator('div[_tabindex="0"]') }).first()
 }
 
+//紅框上緣不得蓋到正上方之元素：紅框自目標外擴 6px（captureStableWithBox），語系清單緊接下拉下方（間距約 1px），
+//照原矩形框會使框帶壓到下拉上之目前語系文字；此時把目標上緣內縮，使框之外緣落在 above 下方（框帶收在清單上內距內，不蓋清單文字）。
+function frameBelow(rect, above) {
+    const minY = above.y + above.height + 7 //框外緣 = rect.y - 6，須 ≥ above 底緣 + 1
+    if (rect.y >= minY) return rect
+    return { x: rect.x, y: minY, width: rect.width, height: rect.height - (minY - rect.y) }
+}
+
 //勾選「全部加總」（user-facing：勾 #staShowTotal checkbox）→ 等圖表重繪 settle。勾選後圖表加入 Total 加總線。
 async function checkShowTotal(page) {
     await page.locator('#staShowTotal').check()
@@ -527,9 +535,10 @@ const CASES = [
             const popup = page.locator('.WPopperFix:visible')
             await popup.first().waitFor({ state: 'visible', timeout: 10000 })
             await page.waitForTimeout(500)
-            const s4 = await captureStableWithBox(page, popup.first()) //E2E-008-4-lang-list：清單展開，框住整份語系清單
+            const selBox = await langSelLoc(page).boundingBox()
+            const s4 = await captureStableWithBox(page, frameBelow(await popup.first().boundingBox(), selBox)) //E2E-008-4-lang-list：清單展開，框住整份語系清單（框之上緣收在清單內側，不蓋到下拉上之目前語系）
             const item = popup.locator('div[tabindex="0"]').filter({ hasText: LANG_TEXT[other] }).first()
-            const s5 = await captureStableWithBox(page, item) //E2E-008-5-click-lang-item：點擊前框住另一語系項目整顆
+            const s5 = await captureStableWithBox(page, frameBelow(await item.boundingBox(), selBox)) //E2E-008-5-click-lang-item：點擊前框住另一語系項目整顆（該項為清單第一項時同上收邊）
 
             //⑤點另一語系 → ⑥圖例依新語系之加總名稱重新判定
             await item.click()
