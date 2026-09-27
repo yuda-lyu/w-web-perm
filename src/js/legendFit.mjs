@@ -1,0 +1,153 @@
+//圖例排版: 供事件發生頻率圖(LayoutContentStaInfor)使用. 一般式(plain, 可換行)圖例放得下時維持現狀, 放不下(會壓到最上方刻度與繪圖區)時改捲動式(scroll, 單列+翻頁)
+//判定以「離屏量測實例」計算一般式圖例於指定寬度之實際排版, 為寬度與名稱集合之純函數:
+//  不讀可見圖之顯示列表(echarts resize 不 flush zrender, resize 後讀到的是上一個寬度之圖例, echarts.js:964-1012);
+//  不在可見圖上試排(類型改變即重建圖例模型, 捲動式頁次會歸零, 帶回頁次則每次滑動 800ms)
+//本檔無外部相依, 日後可原樣移入 w-echarts-vue(src/js/)
+
+
+//GRID_TOP: 繪圖區頂(px), 同 echarts 6.1.0 預設(GridModel.js:84 top:65), 於 option 明寫以防預設變動
+let GRID_TOP = 65
+
+//LEGEND_MAX_BOTTOM: 一般式圖例底緣上限(px). 最上方 y 軸刻度文字以繪圖區頂為中線(字高 12 → 半高 6), 再留白 2 → 65-6-2=57
+//  實測(echarts 6.1.0, 列距 21): 1 列底 18、2 列底 39(安全)、3 列底 60(擦到刻度)、4 列底 81(壓進繪圖區)
+let LEGEND_MAX_BOTTOM = GRID_TOP - 6 - 2
+
+
+/**
+ * 產生圖例設定(單一來源), genOpt 與執行期切換類型共用
+ *
+ * 切換類型(plain↔scroll)時 echarts 以新傳入之選項重建圖例模型(Global.js:322-344), 未帶之設定一律回到預設, 故每次都須帶齊
+ *
+ * @param {String} [type='plain'] 輸入圖例類型字串, 'plain'或'scroll', 預設'plain'
+ * @returns {Object} 回傳echarts之legend設定物件
+ */
+function genLegend(type = 'plain') {
+    let legend = {
+        show: true,
+        top: 0, //須明給: echarts 6 起 legend 預設由 top:0 改為 bottom, 不給會落到底部壓住 x 軸時間標籤; 切換類型時亦須帶(類型改變即重建圖例模型)
+        type,
+    }
+    if (type === 'scroll') {
+        legend.tooltip = { show: true } //捲動式僅出現於窄版, 單一項目可能寬於可視窗而被裁, 滑過顯示全名(靜止畫面不變)
+    }
+    return legend
+}
+
+
+/**
+ * 依量測結果決定圖例類型
+ *
+ * @param {Object|null} m 輸入量測結果物件{rows,bottom}, 量測失敗為null
+ * @returns {String} 回傳'plain'或'scroll', 量測失敗回'scroll'(單列, 不會重疊)
+ */
+function decideLegendType(m) {
+    if (!m || typeof m.bottom !== 'number') {
+        return 'scroll'
+    }
+    return m.bottom <= LEGEND_MAX_BOTTOM ? 'plain' : 'scroll'
+}
+
+
+/**
+ * 建立離屏量測器: 以未掛入DOM之echarts實例, 計算一般式圖例於指定寬度之排版
+ *
+ * 量測實例僅含圖例、隱藏之座標軸與同名空系列, 故顯示列表中「文字等於系列名」之元素即圖例項目(不會與軸刻度文字撞名)
+ *
+ * @param {Object} echarts 輸入echarts命名空間物件, 須與圖表同一份(例如w-echarts-vue之iniEcharts()), 字型與版面規則方能一致
+ * @returns {Object} 回傳物件, 含measure(names,width,height)與dispose(); measure回傳{rows,bottom}(bottom為圖例底緣距圖表頂之px), 量不到回null
+ */
+function createLegendMeasurer(echarts) {
+    let el = null
+    let chart = null
+
+    let measure = (names, width, height = 300) => {
+
+        //check
+        if (!Array.isArray(names) || names.length === 0) {
+            return null
+        }
+        if (!(width > 0) || !(height > 0)) {
+            return null
+        }
+
+        //uniq
+        let uniq = []
+        for (let name of names) {
+            if (uniq.indexOf(name) < 0) {
+                uniq.push(name)
+            }
+        }
+
+        try {
+
+            //chart, 首次建立後重用
+            if (!chart) {
+                el = document.createElement('div')
+                chart = echarts.init(el, null, { width, height })
+            }
+            else {
+                chart.resize({ width, height })
+            }
+
+            //setOption, 同步排版(notMerge整體置換)
+            chart.setOption({
+                animation: false,
+                legend: genLegend('plain'),
+                xAxis: { type: 'category', show: false, data: [] },
+                yAxis: { type: 'value', show: false },
+                series: uniq.map((name) => {
+                    return { name, type: 'line', data: [] }
+                }),
+            }, { notMerge: true })
+
+            //圖例項目: 顯示列表中文字等於系列名者, 以其頂緣去重計列數、取最大底緣
+            let tops = []
+            let bottom = 0
+            let n = 0
+            for (let e of chart.getZr().storage.getDisplayList(true)) {
+                let t = e.style && e.style.text
+                if (!t || uniq.indexOf(t) < 0 || typeof e.transformCoordToGlobal !== 'function') {
+                    continue
+                }
+                let r = e.getBoundingRect()
+                let top = e.transformCoordToGlobal(r.x, r.y)[1]
+                let btm = e.transformCoordToGlobal(r.x, r.y + r.height)[1]
+                let tr = Math.round(top)
+                if (tops.indexOf(tr) < 0) {
+                    tops.push(tr)
+                }
+                bottom = Math.max(bottom, btm)
+                n++
+            }
+
+            //check, 找到之圖例文字數須等於系列名數, 否則視為量測失敗
+            if (n !== uniq.length) {
+                return null
+            }
+
+            return { rows: tops.length, bottom }
+        }
+        catch (err) {
+            return null
+        }
+    }
+
+    let dispose = () => {
+        if (chart) {
+            chart.dispose()
+        }
+        chart = null
+        el = null
+    }
+
+    return { measure, dispose }
+}
+
+
+export {
+    GRID_TOP,
+    LEGEND_MAX_BOTTOM,
+    genLegend,
+    decideLegendType,
+    createLegendMeasurer
+}

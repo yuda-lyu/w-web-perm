@@ -6,13 +6,23 @@ import staEvent from './staLogs/staEvent.callWorker.mjs'
 import staEventTable from './staLogs/staEventTable.callWorker.mjs'
 
 
+//mock 之事件名單：
+//  true（預設 5 種）：既有 e2e 標準圖所用；
+//  'many'（13 種）：本系統實際會記錄之事件名（取自本機 log），供圖例列數跨門檻之 e2e（1440 寬時一般式 2 列，勾全部加總並切中文為 3 列）
+let MOCK_EVENTS = ['verifyConn', 'updateTargets-success', 'checkUser-error', 'api/getPerm-success', 'getWebInfor-success']
+let MOCK_EVENTS_MANY = ['api/getPermUserInfor-success', 'api/getUserByToken-success', 'getStaEvent-success', 'getStaEventTable-success', 'getTokenUser-error', 'getWebInfor-success', 'updateGrups-success', 'updatePemis-success', 'updateTabItems-pickKeysOnly', 'updateTargets-success', 'updateUsers-success', 'verifyConn', 'verifyConn-error']
+function getMockEvents(mock) {
+    return mock === 'many' ? MOCK_EVENTS_MANY : MOCK_EVENTS
+}
+
+
 //mock 確定性資料集（供 e2e 統計圖穩定用）：固定起點時間 + 固定 sin 計數，不依 now / log → 每次完全相同。
-//觸發：opt.mock=true（由 settings.json staEventMock 經 srv.mjs → WWebPerm 傳入）。非 mock 時走真實 staEvent。
-function genMockStaEvent(timeInterval = 'hr') {
+//觸發：opt.mock 為 true 或 'many'（由 settings.json staEventMock 經 srv.mjs → WWebPerm 傳入）。非 mock 時走真實 staEvent。
+function genMockStaEvent(timeInterval = 'hr', mock = true) {
     let fmt = timeInterval === 'day' ? 'YYYY-MM-DD' : 'YYYY-MM-DDTHH'
     let unit = timeInterval === 'hr' ? 'hour' : 'day'
     let nBuckets = timeInterval === 'hr' ? 48 : 7
-    let events = ['verifyConn', 'updateTargets-success', 'checkUser-error', 'api/getPerm-success', 'getWebInfor-success']
+    let events = getMockEvents(mock)
     let base = ot('2025-01-01T00:00:00') //固定起點，不依 now
     let rs = []
     for (let i = 0; i < nBuckets; i++) {
@@ -30,15 +40,23 @@ function genMockStaEvent(timeInterval = 'hr') {
 
 
 //mock 確定性資料集（供 e2e 統計表穩定用）：固定窗計數，不依 now / log → 每次完全相同。
-//5 個 event 與 genMockStaEvent 同名單；各事件滿足 last1Day>last8Hour>last4Hour>last1Hour，且各事件 last1Day 互不相同（排序明確、上多下少）。
-function genMockStaEventTable() {
-    let rs = [
-        { event: 'verifyConn', last1Day: 240, last8Hour: 90, last4Hour: 50, last1Hour: 15 },
-        { event: 'updateTargets-success', last1Day: 180, last8Hour: 70, last4Hour: 38, last1Hour: 11 },
-        { event: 'checkUser-error', last1Day: 120, last8Hour: 45, last4Hour: 24, last1Hour: 7 },
-        { event: 'api/getPerm-success', last1Day: 90, last8Hour: 33, last4Hour: 18, last1Hour: 5 },
-        { event: 'getWebInfor-success', last1Day: 60, last8Hour: 22, last4Hour: 12, last1Hour: 3 },
-    ]
+//事件名單與 genMockStaEvent 相同；各事件滿足 last1Day>last8Hour>last4Hour>last1Hour，且各事件 last1Day 互不相同（排序明確、上多下少）。
+function genMockStaEventTable(mock = true) {
+    if (mock !== 'many') {
+        let rs = [
+            { event: 'verifyConn', last1Day: 240, last8Hour: 90, last4Hour: 50, last1Hour: 15 },
+            { event: 'updateTargets-success', last1Day: 180, last8Hour: 70, last4Hour: 38, last1Hour: 11 },
+            { event: 'checkUser-error', last1Day: 120, last8Hour: 45, last4Hour: 24, last1Hour: 7 },
+            { event: 'api/getPerm-success', last1Day: 90, last8Hour: 33, last4Hour: 18, last1Hour: 5 },
+            { event: 'getWebInfor-success', last1Day: 60, last8Hour: 22, last4Hour: 12, last1Hour: 3 },
+        ]
+        return rs
+    }
+    //'many': 依名單順序遞減, last1Day 自 400 起每事件少 20（互不相同）
+    let rs = MOCK_EVENTS_MANY.map((event, k) => {
+        let last1Day = 400 - k * 20
+        return { event, last1Day, last8Hour: Math.round(last1Day * 0.4), last4Hour: Math.round(last1Day * 0.2), last1Hour: Math.round(last1Day * 0.05) }
+    })
     return rs
 }
 
@@ -66,7 +84,7 @@ function proc(opt = {}) {
 
         //mock 模式回固定確定性資料集
         if (mock) {
-            return genMockStaEvent(timeInterval)
+            return genMockStaEvent(timeInterval, mock)
         }
 
         //staEvent
@@ -98,7 +116,7 @@ function proc(opt = {}) {
 
         //mock 模式回固定確定性資料集
         if (mock) {
-            return genMockStaEventTable()
+            return genMockStaEventTable(mock)
         }
 
         //staEventTable

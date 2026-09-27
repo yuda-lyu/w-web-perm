@@ -31,6 +31,8 @@ import procCore from './procCore.mjs'
 import procLang from './procLang.mjs'
 import srLogInit from './srLog.mjs'
 import procStaInfor from './procStaInfor.mjs'
+import { maskTok, maskQuery, maskUrl } from './maskLog.mjs'
+import wrapInjected from './wrapInjected.mjs'
 
 
 /**
@@ -40,9 +42,9 @@ import procStaInfor from './procStaInfor.mjs'
  * @param {Function} WOrm 輸入資料庫ORM函數
  * @param {String} url 輸入資料庫連線字串，例如w-orm-lmdb為'./db'，或w-orm-mongodb為'mongodb://username:password@$127.0.0.1:27017'
  * @param {String} db 輸入資料庫名稱字串
- * @param {Function} getUserByToken 輸入處理函數，函數會傳入使用者token，通過此函數處理後並回傳使用者資訊物件，並至少須提供'id'、'email'、'name'、'isAdmin'欄位，且'isAdmin'限輸入'y'或'n'。注意: token 回傳之'isAdmin'僅供識別，權限系統一律以自身users表該使用者之'isAdmin'欄位值為權威，不會被 token 宣稱之值複寫
- * @param {Function} verifyClientUser 輸入驗證瀏覽使用者身份之處理函數，函數會傳入使用者資訊物件(perm users 表之列)與來源字串from，通過此函數識別後回傳布林值(可為Promise)，允許使用者回傳true，反之回傳false。from 值域: 'getUserByToken'(登入)、'getPerm'(api/getPerm)、以及資料通道之 apiType 'main'(RPC 與 ORM 執行)、'upload-controller'、'upload-slice'、'download-get-filename'、'download-get-file'、'download'；資料通道與登入採同一授權強度(反查 perm users 且 isActive='y' 後再經本函數)
- * @param {Function} verifyAppUser 輸入驗證應用程序使用者身份之處理函數，函數會傳入使用者資訊物件，通過此函數識別後回傳布林值，允許使用者回傳true，反之回傳false
+ * @param {Function} getUserByToken 輸入處理函數，函數會傳入使用者token，通過此函數處理後並回傳使用者資訊物件，並至少須提供'id'、'email'、'name'、'isAdmin'欄位，且'isAdmin'限輸入'y'或'n'。注意: token 回傳之'isAdmin'僅供識別，權限系統一律以自身users表該使用者之'isAdmin'欄位值為權威，不會被 token 宣稱之值複寫。函數拋錯或reject時視同查無使用者(回自家錯誤key，錯誤原文不回前端、不入log，只於srLog記warn)
+ * @param {Function} verifyClientUser 輸入驗證瀏覽使用者身份之處理函數，函數會傳入使用者資訊物件(perm users 表之列)與來源字串from，通過此函數識別後回傳布林值(可為Promise)，允許使用者回傳true，反之回傳false。from 值域: 'getUserByToken'(登入)、'getPerm'(api/getPerm)、以及資料通道之 apiType 'main'(RPC 與 ORM 執行)、'upload-controller'、'upload-slice'、'download-get-filename'、'download-get-file'、'download'；資料通道與登入採同一授權強度(反查 perm users 且 isActive='y' 後再經本函數)；函數拋錯或reject時視同回傳false
+ * @param {Function} verifyAppUser 輸入驗證應用程序使用者身份之處理函數，函數會傳入使用者資訊物件，通過此函數識別後回傳布林值，允許使用者回傳true，反之回傳false；函數拋錯或reject時視同回傳false
  * @param {Object} [opt={}] 輸入設定物件，預設{}
  * @param {Integer} [opt.serverPort=11006] 輸入伺服器通訊port，預設11006
  * @param {Boolean} [opt.useCheckUser=false] 輸入是否檢查使用者資訊布林值，預設false
@@ -110,7 +112,7 @@ import procStaInfor from './procStaInfor.mjs'
  *             isAdmin: 'y',
  *         }
  *     }
- *     console.log('invalid token', token)
+ *     console.log('invalid token') //勿印權杖值
  *     console.log('於生產環境時得加入SSO等驗證token機制')
  *     return {}
  * }
@@ -274,6 +276,27 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     let srLog = srLogInit(opt)
 
 
+    //注入函數一律經包裝(W 契約, spec/設計要點與取捨.md ADR-023), 以包裝版取代三個參數
+    //why: 注入函數拋錯或 reject 時原會被 await 原樣上拋, 其原文經 pm2resolve 回前端、經 verifyConn 之 msg 入 srLog、經 error 事件印出;
+    //部署方常以 w-web-sso 對外 helper(≤1.1.4)包裝 getUserByToken, 其 reject 字串含已代入系統介接權杖與使用者權杖之完整網址.
+    //包裝後失敗視同否定結果(getUserByToken → null 等同查無, verify* → false 等同無權限), 走各呼叫點既有分支回自家 key;
+    //上游原文不回前端、不入 log, 只於此記 warn(白名單 key, 或型別與 Error.name). 同一次失敗 log 2~3 筆: 此處 warn(因) + 呼叫點 error(果).
+    //以下取代後, 本函數內除此三行外不得再直接使用原始參數(盤點見 CLAUDE_rulebook.md「權杖不外洩」, 測試 unit-wrapInjected WRAP-SITE-*)
+    let logInjectFail = (name) => {
+        return (d) => {
+            srLog.warn({ event: `inject-${name}-fail`, ...d })
+        }
+    }
+    getUserByToken = wrapInjected(getUserByToken, { failValue: null, onFail: logInjectFail('getUserByToken') })
+    verifyClientUser = wrapInjected(verifyClientUser, { failValue: false, onFail: logInjectFail('verifyClientUser') })
+    verifyAppUser = wrapInjected(verifyAppUser, { failValue: false, onFail: logInjectFail('verifyAppUser') })
+    //getUserById: 第四個注入函數(選填; useCheckUser=true 時由 WServOrm 於 execute 內呼叫, 原 reject 原文經 pm2resolve 回前端), 有給才包裝;
+    //失敗 → null 等同查無, 由 WServOrm 既有之查無分支拒絕(fail-closed). 須於 WServOrm 建構前取代(建構時即取走此函數)
+    if (isfun(getUserById)) {
+        getUserById = wrapInjected(getUserById, { failValue: null, onFail: logInjectFail('getUserById') })
+    }
+
+
     //WServOrm
     let optWServOrm = {
         useCheckUser,
@@ -396,7 +419,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
         //check
         if (!iseobj(userSelf)) {
-            console.log(`token`, token)
+            console.log(`token`, maskTok(token))
             srLog.error({ event: 'getTokenUser-error', msg: 'cannotFindUserFromToken' })
             return Promise.reject(`cannotFindUserFromToken`)
         }
@@ -478,7 +501,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
         //check
         if (!iseobj(user)) {
-            console.log(`token`, token)
+            console.log(`token`, maskTok(token))
             srLog.error({ event: 'getAndVerifyAppUser-error', msg: 'cannotFindUserFromToken' })
             return Promise.reject(`cannotFindUserFromToken`)
         }
@@ -750,8 +773,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                     //check
                     if (!isestr(token)) {
-                        console.log('req.query', get(req, 'query'))
-                        console.log('token', token)
+                        console.log('req.query', maskQuery(get(req, 'query')))
+                        console.log('token', maskTok(token))
                         console.log('[API]getUserByToken/check token: invalid token')
                         srLog.error({ event: 'api/getUserByToken-error', msg: 'tokenNoPermission' })
                         return Promise.reject(`tokenNoPermission`)
@@ -763,7 +786,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                     //check
                     if (!iseobj(user)) {
-                        console.log('token', token)
+                        console.log('token', maskTok(token))
                         console.log('[API]getUserByToken/check user: invalid user')
                         srLog.error({ event: 'api/getUserByToken-error', msg: 'tokenNoPermission' })
                         return Promise.reject(`tokenNoPermission`)
@@ -800,8 +823,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                     //check
                     if (!isestr(token)) {
-                        console.log('req.query', get(req, 'query'))
-                        console.log('token', token)
+                        console.log('req.query', maskQuery(get(req, 'query')))
+                        console.log('token', maskTok(token))
                         console.log('[API]getPerm/check token: invalid token')
                         srLog.error({ event: 'api/getPerm-error', msg: 'tokenNoPermission' })
                         return Promise.reject(`tokenNoPermission`)
@@ -813,7 +836,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                     //check
                     if (!iseobj(userSelf)) {
-                        console.log('token', token)
+                        console.log('token', maskTok(token))
                         console.log('[API]getPerm/check userSelf: invalid userSelf')
                         srLog.error({ event: 'api/getPerm-error', msg: 'tokenNoPermission' })
                         return Promise.reject(`tokenNoPermission`)
@@ -825,7 +848,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                     //check
                     if (!isestr(userIdSelf)) {
-                        console.log('token', token)
+                        console.log('token', maskTok(token))
                         console.log('userSelf', userSelf)
                         console.log('[API]getPerm/check userIdSelf: invalid userIdSelf')
                         srLog.error({ event: 'api/getPerm-error', msg: 'tokenNoPermission' })
@@ -838,7 +861,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                     //check
                     if (!iseobj(userWithRulesSelf)) {
-                        console.log('token', token)
+                        console.log('token', maskTok(token))
                         console.log('userSelf', userSelf)
                         console.log('userIdSelf', userIdSelf)
                         console.log('[API]getPerm/check userWithRulesSelf: invalid userWithRulesSelf')
@@ -877,7 +900,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                     //check
                     if (!isestr(tokenSelf)) {
-                        console.log('req.query', get(req, 'query'))
+                        console.log('req.query', maskQuery(get(req, 'query')))
                         console.log('[API]getPermUserInfor/check tokenSelf: invalid tokenSelf')
                         srLog.error({ event: 'api/getPermUserInfor-error', msg: 'tokenNoPermission' })
                         return Promise.reject(`tokenNoPermission`)
@@ -889,8 +912,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                     //check
                     if (!iseobj(userSelf)) {
-                        console.log('req.query', get(req, 'query'))
-                        console.log('tokenSelf', tokenSelf)
+                        console.log('req.query', maskQuery(get(req, 'query')))
+                        console.log('tokenSelf', maskTok(tokenSelf))
                         console.log('[API]getPermUserInfor/check userSelf: invalid userSelf')
                         srLog.error({ event: 'api/getPermUserInfor-error', msg: 'tokenNoPermission' })
                         return Promise.reject(`tokenNoPermission`)
@@ -902,8 +925,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                     //check
                     if (!isestr(userIdFind)) {
-                        console.log('req.query', get(req, 'query'))
-                        console.log('tokenSelf', tokenSelf)
+                        console.log('req.query', maskQuery(get(req, 'query')))
+                        console.log('tokenSelf', maskTok(tokenSelf))
                         console.log('[API]getPermUserInfor/check userIdFind: invalid userIdFind')
                         srLog.error({ event: 'api/getPermUserInfor-error', msg: 'tokenNoPermission' })
                         return Promise.reject(`tokenNoPermission`)
@@ -952,8 +975,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                     //check
                     if (!isestr(token)) {
-                        console.log('req.query', get(req, 'query'))
-                        console.log('token', token)
+                        console.log('req.query', maskQuery(get(req, 'query')))
+                        console.log('token', maskTok(token))
                         console.log('[API]syncAndReplaceTabs/check token: invalid token')
                         srLog.error({ event: 'api/syncAndReplaceTabs-error', msg: 'tokenNoPermission' })
                         return Promise.reject(`tokenNoPermission`)
@@ -964,7 +987,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                     //check
                     if (!isestr(keyTable)) {
-                        console.log('req.query', get(req, 'query'))
+                        console.log('req.query', maskQuery(get(req, 'query')))
                         console.log('keyTable', keyTable)
                         console.log('[API]syncAndReplaceTabs/check keyTable: invalid keyTable')
                         srLog.error({ event: 'api/syncAndReplaceTabs-error', msg: 'tokenNoPermission' })
@@ -984,7 +1007,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                     //check user
                     if (!iseobj(user)) {
-                        console.log('token', token)
+                        console.log('token', maskTok(token))
                         console.log('[API]syncAndReplaceTabs/check user: invalid user')
                         srLog.error({ event: 'api/syncAndReplaceTabs-error', msg: 'tokenNoPermission' })
                         return Promise.reject(`tokenNoPermission`)
@@ -995,7 +1018,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                     //check userId
                     if (!isestr(userId)) {
-                        console.log('token', token)
+                        console.log('token', maskTok(token))
                         console.log('user', user)
                         console.log('[API]syncAndReplaceTabs/check userId: invalid userId')
                         srLog.error({ event: 'api/syncAndReplaceTabs-error', msg: 'tokenNoPermission' })
@@ -1052,7 +1075,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             //check
             if (!isestr(token)) {
                 console.log('apiType', apiType)
-                console.log('authorization', authorization)
+                console.log('authorization', maskTok(authorization))
                 console.log('invalid token')
                 return false
             }
@@ -1078,8 +1101,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             //origin
             let origin = get(headers, 'origin', '')
 
-            //referer
-            let referer = get(headers, 'referer', '')
+            //referer, 只記 origin + pathname(ADR-023): 前端以 ?token= 開站(w-ui-loginout 讀完不清網址), 同源請求之 Referer 預設帶完整網址, 原樣記錄即把使用者權杖寫入 srLog
+            let referer = maskUrl(get(headers, 'referer', ''))
 
             //info, 失敗時 msg 為 err key(cannotFindUserFromToken / cannotGetUserFromPerm / userNoPermission 等), 供資安稽核與統計
             if (b) {
@@ -1096,7 +1119,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             let user = await getUserByToken(token)
             let userId = get(user, 'id', '')
             if (!isestr(userId)) {
-                console.log('token', token)
+                console.log('token', maskTok(token))
                 console.log('userId', userId)
                 srLog.error({ event: 'getUserIdByToken-error', msg: 'cannotFindUserId' })
                 return Promise.reject(`cannotFindUserId`)

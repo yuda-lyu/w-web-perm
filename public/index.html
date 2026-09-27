@@ -4,6 +4,8 @@
         <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
         <meta http-equiv="X-UA-Compatible" content="ie=edge">
+        <!-- referrer: 本站以 ?token= 開啟(w-ui-loginout 讀完不清網址), 瀏覽器預設會把含權杖之完整網址放進同源請求之 Referer, 進而寫入後端 log 與反向代理 access log; strict-origin 使請求只帶 origin(見 spec/設計要點與取捨.md ADR-023) -->
+        <meta name="referrer" content="strict-origin">
         <title></title>
 
         <!-- mdi font -->

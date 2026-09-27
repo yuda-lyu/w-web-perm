@@ -11,11 +11,21 @@
 //  'sys'                    → {id:'id-for-admin',  email:'admin@example.com',       isAdmin:'y'}（client+app 皆過）
 //  '{token-for-application}'→ {id:'id-for-application', email:'application@...',     isAdmin:'y'}（app 過；不在 perm users 表 → client 通道拒；注意字面含大括號）
 //  '{token-for-peter}'      → {id:'id-for-peter',  email:'peter@example.com',       isAdmin:'n'}（在 perm users 表、有效、但 verifyClientUser 拒 → 供資料通道授權測試）
-//  其他                      → {}（→ 守門 reject 'can not find the user from token'）
+//  '{token-for-reject}'     → reject 舊版 w-web-sso helper 形狀之字串（含合成秘密 SYNTH-SYS-SECRET-FOR-TEST 與所送權杖；非 production 才有, 見 ADR-023）
+//  '{token-for-verify-throw}'→ {id:'id-for-verify-throw', ...}, verifyClientUser / verifyAppUser 對其 throw Error('SYNTH-VERIFY-SECRET-FOR-TEST')（同上）
+//  其他                      → {}（→ 守門 reject 'cannotFindUserFromToken'）
 
+import fs from 'fs'
+import path from 'path'
+import JSON5 from 'json5'
+import { fileURLToPath } from 'url'
+import obj2u8arr from 'wsemi/src/obj2u8arr.mjs'
+import u8arr2obj from 'wsemi/src/u8arr2obj.mjs'
 import { startServersOnce, cleanup, apiBaseUrl } from './e2e-setup.mjs'
 
 export { startServersOnce, cleanup, apiBaseUrl }
+
+const projRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..') //= 專案根(後端 cwd)
 
 //API 契約測試啟動：只起 backend（11006），省前端 webpack。suite before 呼叫。
 export async function startApi() {
@@ -27,6 +37,8 @@ export const TOKEN_ADMIN = 'sys'                       // → id-for-admin（cli
 export const TOKEN_APP = '{token-for-application}'     // → id-for-application（app 使用者，過 verifyAppUser；不在 perm users 表）
 export const TOKEN_PETER = '{token-for-peter}'         // → id-for-peter（在表、有效、isAdmin='n' → verifyClientUser 拒）
 export const TOKEN_BAD = 'nope-invalid'               // → getUserByToken 回 {} → 守門 reject
+export const TOKEN_REJECT = '{token-for-reject}' // → getUserByToken reject 上游原文(含合成秘密)；W 契約視同查無
+export const TOKEN_VERIFY_THROW = '{token-for-verify-throw}' // → verifyClientUser / verifyAppUser 拋錯；W 契約視同無權限
 
 //URL helper（含佔位符，供 client SDK 內部 replace；getPerm 用 token={token}、getPermUserInfor 用 token={sysToken}&userId={userId}）
 export const urlGetPerm = `${apiBaseUrl}/api/getPerm?token={token}`
@@ -54,4 +66,75 @@ export async function getWoItems() {
         _woItems = m.woItems
     }
     return _woItems
+}
+
+//callRpc：直打資料通道 POST /api/main（w-converhp 協定, obj2u8arr 編碼）；傳輸層拒絕時回 { ok:false, msg:'permission denied' }。
+//  opt.sysToken：本體 __sysToken__（預設同 Authorization 之 token；供 getUserIdByToken 路徑另給）；opt.headers：附加標頭（如 Referer）。
+//  回 { ok, state, msg, output, raw }，raw 為回應位元組之 utf8 文字（供權杖外洩掃描）。
+//  註：api-verifyConn-auth / api-updateTabs / api-updateUsers-forGrups / e2e-doubleclick 各有一份既有之近似實作，尚未改用本函式（見 CLAUDE_rulebook.md 已知缺口）。
+export async function callRpc(funcName, args, token, opt = {}) {
+    const sysToken = ('sysToken' in opt) ? opt.sysToken : token
+    const payload = { func: funcName, input: { __sysInputArgs__: args, __sysToken__: sysToken } }
+    const r = await fetch(`${apiBaseUrl}/api/main`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/octet-stream', ...(opt.headers || {}) },
+        body: Buffer.from(obj2u8arr(payload)),
+    })
+    const u8a = new Uint8Array(await r.arrayBuffer())
+    const raw = Buffer.from(u8a).toString('utf8')
+    const respObj = u8arr2obj(u8a)
+    if (respObj && typeof respObj === 'object') {
+        if ('error' in respObj) {
+            return { ok: false, state: 'error', msg: String(respObj.error), raw }
+        }
+        if ('success' in respObj) {
+            //kpFunExt 回傳包成 { state, msg }; msg 為回傳值本體(getWebInfor 為物件, updateXxx 為 key 字串)
+            const out = respObj.success?.output
+            if (out && typeof out === 'object' && 'state' in out) {
+                return { ok: out.state === 'success', state: out.state, msg: typeof out.msg === 'string' ? out.msg : JSON.stringify(out.msg), output: out.msg, raw }
+            }
+            return { ok: true, state: 'success', output: out, raw }
+        }
+    }
+    return { ok: false, state: 'error', msg: `unparseable response: ${JSON.stringify(respObj)}`, raw }
+}
+
+//readSrLogSince：讀本專案後端 srLog 中 time ≥ t0 之各行（已 JSON.parse；解析失敗之行略過；_raw 為原始行文字）。
+//  目錄＝settings.json 之 logFd（相對專案根＝後端 cwd；未給同 server/srLog.mjs 預設 './logs'）；只讀 mtime ≥ t0 − 2s 之檔。
+//  srLog 經 pino transport 非同步落檔，呼叫端須以哨兵事件等待（見 api-tokenSafety），不得讀到空集合即斷言「無外洩」。
+export function readSrLogSince(t0) {
+    let st = {}
+    try {
+        st = JSON5.parse(fs.readFileSync(path.join(projRoot, 'settings.json'), 'utf8'))
+    }
+    catch (e) {}
+    const fd = (typeof st.logFd === 'string' && st.logFd !== '') ? st.logFd : './logs'
+    const dir = path.resolve(projRoot, fd)
+    const out = []
+    if (!fs.existsSync(dir)) {
+        return out
+    }
+    for (const fn of fs.readdirSync(dir)) {
+        const fp = path.join(dir, fn)
+        const s = fs.statSync(fp)
+        if (!s.isFile() || s.mtimeMs < t0 - 2000) {
+            continue
+        }
+        for (const ln of fs.readFileSync(fp, 'utf8').split(/\r?\n/)) {
+            if (!ln) {
+                continue
+            }
+            let o = null
+            try {
+                o = JSON.parse(ln)
+            }
+            catch (e) {
+                continue
+            }
+            if (o && typeof o.time === 'number' && o.time >= t0) {
+                out.push({ ...o, _raw: ln })
+            }
+        }
+    }
+    return out
 }

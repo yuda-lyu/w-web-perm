@@ -1,31 +1,39 @@
 //後台「統計資訊」事件展示區 e2e。對應統計頁 src/components/LayoutContentStaInfor.vue 之事件發生頻率卡片。
-//act 走 user-facing input（點左側「統計資訊」選單 / 點圖表圖例切換事件 / 勾「全部加總」checkbox）；assert = 語意斷言 + pixel baseline（§6.2 / §6.3）。
+//act 走 user-facing input（點左側「統計資訊」選單 / 點圖表圖例切換事件與翻頁 / 勾「全部加總」checkbox / 點導覽區圓鈕 / 點頂列語系下拉 / 改視窗寬）；
+//assert = 語意斷言 + pixel baseline（§6.2 / §6.3）。
 //
 //雙模式：
-//  - 產 baseline：node test/e2e-stainfor.test.mjs --baseline （寫 test/pics/stainfor/）
+//  - 產 baseline：node test/e2e-stainfor.test.mjs --baseline [--names E2E-006,...] [--langs eng,cht]（寫 test/pics/stainfor/）
 //  - 驗證（mocha）：npx mocha test/e2e-stainfor.test.mjs --reporter list （pixelmatch 反鋸齒感知 + maxDiffPixels 容差比對，非 byte-exact）
-//  --names <eng-E2E-001-event-all,...> 進行手術式 baseline 重產
 //
-//標準圖存放：test/pics/stainfor/stainfor-{lang}-{name}.png（5 cases；E2E-001~004 各 1 張、E2E-005 4 張 → 每語系 8 張、共 16 baselines）
+//標準圖存放：test/pics/stainfor/stainfor-{lang}-{name}.png（8 cases；E2E-001~004 各 1 張、E2E-005 4 張、E2E-006 6 張、E2E-007 4 張、E2E-008 6 張
+//  → 每語系 24 張、共 48 baselines）
 //  E2E-001-event-all:      進頁預設 → 圖表每個事件各一條折線（5 條）。
 //  E2E-002-event-selected: 點圖例關掉其餘 3 事件 → 僅該 2 條折線可見（圖例切換為事件篩選之唯一入口）。
 //  E2E-003-event-total:    勾「全部加總」→ 圖表加入 Total 加總線（Total + 5 事件 = 6 條系列）。
 //  E2E-004-event-table:    事件統計表 → 5 列、依最近1日降序、表頭含各時間窗欄位。
 //  E2E-005-interval-day:   時間分組下拉（自製 WTextSelect）切「每日」→ 每步兩張（點下拉前 / 清單展開 / 點「每日」前 / 選後圖表 7 桶）。
+//  E2E-006-legend-scroll-page:  窄視窗圖例改單列捲動式 → 翻下一頁 → 點該頁事件隱藏 → 再縮窄仍停留原頁 → 拉寬恢復一般式且仍隱藏。
+//  E2E-007-legend-menu-toggle:  視窗 700 時點「隱藏選單」圖加寬、圖例恢復一般式 → 點「顯示選單」圖變窄、圖例改回捲動式。
+//  E2E-008-legend-long-names:   13 個長名稱事件 → 勾全部加總 → 經頂列語系下拉切換語系；加總名稱長度隨語系不同，放得下與否跟著改變。
+//圖例排版規則（一般式放得下維持、否則改捲動式；不壓最上方刻度）見 spec/流程_統計資訊事件展示.md〈補充〉與 spec/設計要點與取捨.md ADR-024；
+//E2E-006~008 之語意斷言皆在 run() 內（regen 端只跑 run()，寫檔前即守門），每個觀察點皆驗 assertStaLegendLayout 不變條件。
 //
 //確定性來源：後端 staEventMock=true → getStaEvent 回固定資料集（48 桶、固定起點 2025-01-01、固定 sin 計數、5 個 event）。
 //  event 名（mock）：verifyConn, updateTargets-success, checkUser-error, api/getPerm-success, getWebInfor-success
+//  staEventMock='many'（僅 E2E-008，以 c.settings 換後端）→ 同形資料集改 13 個 event（server/procStaInfor.mjs MOCK_EVENTS_MANY）。
 //  元件 allEvents 為 union 後排序 → 圖表系列與圖例顯示順序固定。
-//  before(整體) restartBackend(genTempSettings({ staEventMock: true })) 啟動 mock 後端；
+//  before(整體) restartBackend(genTempSettings(MOCK_SETTINGS)) 啟動 mock 後端；帶 c.settings 之 case 前後換後端再還原 MOCK_SETTINGS；
 //  after(整體) restartBackend('./settings.json') 還原預設後端。
 //  因 mock 圖表確定性穩定 → 直接 pixel baseline，不需 driveActivity / overlayRegions 貼圖。
 import fs from 'fs'
 import assert from 'assert'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, waitUntilExist, genTempSettings, restartBackend, assertBaselineMatch, clickNavItem } from './tools/e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, waitUntilExist, genTempSettings, restartBackend, assertBaselineMatch, clickNavItem, navBtn, waitNavSettled, readStaLegend, waitStaLegendSettled, assertStaLegendLayout, clickStaLegendItem, clickStaLegendPager } from './tools/e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/stainfor'
 const LANGS = ['eng', 'cht']
 const isBaseline = process.argv.includes('--baseline')
+const MOCK_SETTINGS = { staEventMock: true } //本檔預設後端（mock 5 事件）；case 帶 settings 者前後切換再還原為此
 
 //mock 5 個 event；E2E-002 只保留此 2 個（以圖例關掉其餘 3 個），驗單一事件趨勢辨認功能。
 const KEEP_EVENTS = ['verifyConn', 'checkUser-error']
@@ -54,50 +62,58 @@ async function gotoStaInfor(page) {
     await page.waitForTimeout(7000)
 }
 
-//—— echarts 圖例（畫在 canvas 內、無 DOM 節點）之定位與點擊 ——
-//圖例是事件顯示切換之唯一入口，DOM 選不到 → 由圖表實例之 zrender 顯示列表取出各圖例文字的視窗座標，
-//再以真滑鼠點擊該座標（L2 絕對座標，屬 selector 不可得時之合法層級），非 dispatchAction 之程式直呼。
-const EVAL_LEGEND_INFO = `(() => {
-    const findVm = (vm) => {
-        if (!vm) return null
-        if (vm.chart && typeof vm.chart.getOption === 'function') return vm
-        for (const c of (vm.$children || [])) { const r = findVm(c); if (r) return r }
-        return null
-    }
-    const vm = findVm(window.$vo)
-    if (!vm) return null
-    const inst = vm.chart
-    const box = inst.getDom().getBoundingClientRect()
-    const items = []
-    for (const el of inst.getZr().storage.getDisplayList()) {
-        const t = el.style && el.style.text
-        if (!t) continue
-        if (typeof el.transformCoordToGlobal !== 'function') continue
-        const r = el.getBoundingRect()
-        const g = el.transformCoordToGlobal(r.x + r.width / 2, r.y + r.height / 2)
-        items.push({ text: t, x: box.left + g[0], y: box.top + g[1] })
-    }
-    const opt = inst.getOption()
-    return { items, selected: (opt.legend && opt.legend[0]) ? opt.legend[0].selected : null }
-})()`
-
-//取圖例狀態：{ items:[{text,x,y}], selected:{事件名:是否顯示} }；selected 為 {} 表全部顯示（尚未切換過）。
-async function getLegendInfo(page) {
-    return await page.evaluate(EVAL_LEGEND_INFO)
-}
+//—— echarts 圖例（畫在 canvas 內、無 DOM 節點）之讀取與點擊：共用 e2e-setup 之 readStaLegend / clickStaLegendItem / clickStaLegendPager ——
+//（由 zrender 顯示列表取視窗座標後真滑鼠點擊，L2；捲動式時只點可視窗內之項目）
 
 //以圖例關掉不在 keepEvents 內的事件（user-facing：真滑鼠點該圖例文字）→ 等重繪 settle。
 async function keepOnlyEventsByLegend(page, keepEvents, allEvents) {
     for (const ev of allEvents) {
         if (keepEvents.includes(ev)) continue
-        const info = await getLegendInfo(page) //每次點擊後圖例不位移，仍逐次重取以免受重繪影響
-        const it = (info && info.items || []).find((o) => o.text === ev)
-        assert.ok(it, `圖例應可定位到事件「${ev}」`)
-        await page.mouse.click(it.x, it.y)
-        await page.waitForTimeout(1200) //等圖例切換動畫與折線移除重繪
+        await clickStaLegendItem(page, ev) //每次點擊前重取座標，點後離開圖例
     }
-    await page.mouse.move(0, 0) //離開圖例, 消 hover 高亮
     await page.waitForTimeout(3000)
+}
+
+//讀圖例並驗排版不變條件（每個觀察點皆驗，見 e2e-setup assertStaLegendLayout）；expectType 為該點依 spec 應為之類型。
+async function legendAt(page, tag, expectType) {
+    const s = await waitStaLegendSettled(page)
+    assertStaLegendLayout(s, tag)
+    if (expectType) assert.equal(s.type, expectType, `${tag}：圖例應為${expectType === 'scroll' ? '捲動式' : '一般式'}（圖寬 ${s.chartW}），實得 ${s.type}`)
+    return s
+}
+
+//改視窗寬（使用者拖曳視窗邊界；無 DOM 點擊目標，以 setViewportSize 模擬）→ 等導覽區與圖例落定。
+//視窗寬 < 460 時導覽區自動收合（LayoutContent.vue WDrawer switchWidth），collapsed 為該寬度下之預期收合態。
+async function resizeTo(page, width, collapsed) {
+    await page.setViewportSize({ width, height: 900 })
+    await waitNavSettled(page, collapsed)
+}
+
+//等事件圖重建完成（勾選加總、切換語系後 debounce 300ms 重算圖表設定）：系列數＝count，且首條系列名＝head（null 表不檢查）。
+async function waitSeries(page, label, count, head) {
+    await waitUntilExist(page, label, (a) => {
+        const find = (vm) => {
+            if (!vm) return null
+            if (vm.optEvent !== undefined && vm.legendType !== undefined) return vm
+            for (const c of (vm.$children || [])) {
+                const r = find(c)
+                if (r) return r
+            }
+            return null
+        }
+        const vm = find(window.$vo)
+        const ss = vm && vm.optEvent && vm.optEvent.series
+        return !!ss && ss.length === a.count && (a.head === null || ss[0].name === a.head)
+    }, { timeout: 30000, arg: { count, head } })
+}
+
+//「全部加總」系列名（server/procLang.mjs staTotal）：長度隨語系不同，E2E-008 之圖例放得下與否跟著改變
+const TOTAL_NAME = { eng: 'Total', cht: '全部加總' }
+//頂列語系下拉之顯示文字（Layout.vue getLangText）
+const LANG_TEXT = { eng: 'English', cht: '中文' }
+//頂列語系下拉整顆（寬版時位於頂列右側；WTextSelect 根節點＝頂列內帶 v-domresize 且含觸發區者，寬 100、含外框與展開箭頭）
+function langSelLoc(page) {
+    return page.locator('[data-fmid="app-topbar"] div[ev-resize]').filter({ has: page.locator('div[_tabindex="0"]') }).first()
 }
 
 //勾選「全部加總」（user-facing：勾 #staShowTotal checkbox）→ 等圖表重繪 settle。勾選後圖表加入 Total 加總線。
@@ -209,7 +225,7 @@ async function assertSpecForCase(page, lang, name) {
     }
     else if (name === 'E2E-002-event-selected') {
         //以圖例關掉其餘 3 事件 → 圖例顯示中者恰為 KEEP_EVENTS，被關掉者為不顯示
-        const info = await getLegendInfo(page)
+        const info = await readStaLegend(page)
         const selected = info && info.selected
         assert.ok(selected && Object.keys(selected).length > 0, `(${name}/${lang}) 應取得圖例切換狀態，實得 ${JSON.stringify(selected)}`)
         for (const ev of KEEP_EVENTS) {
@@ -365,6 +381,176 @@ const CASES = [
         },
         semantic: async (page, lang) => { await assertIntervalDaySpec(page, lang) },
     },
+    {
+        //E2E-006：窄視窗之捲動式圖例 → 翻下一頁 → 點該頁事件隱藏 → 再縮窄仍停留原頁 → 拉寬恢復一般式且事件仍隱藏。
+        //6 步真實路徑：①登入點「統計資訊」（1440 並排）②縮窄視窗至 430（導覽區自動收合、圖寬 330：一般式需 3 列會壓到刻度 → 改單列捲動式）
+        //  ③點圖例右側「下一頁」箭頭 ④點該頁第一個事件（隱藏其折線）⑤再縮至 420 ⑥拉回 1440；不寫入任何資料
+        name: 'E2E-006-legend-scroll-page',
+        run: async (browser, lang) => {
+            const page = await openApp(browser)
+            await setLang(page, lang)
+            await gotoStaInfor(page)
+            const title = await page.evaluate(() => window.$vo.$t('staEventTitle'))
+
+            //②縮窄：無點擊目標故無點擊前之圖
+            await resizeTo(page, 430, true)
+            let s = await legendAt(page, '縮至 430', 'scroll')
+            assert.equal(s.chartW, 330, `縮至 430 後圖寬應為 330（導覽區收合），實得 ${s.chartW}`)
+            assert.ok(s.pager.next && s.pager.next.active, `捲動式應顯示可點之「下一頁」箭頭，實得 ${JSON.stringify(s.pager)}`)
+            assert.ok(s.pager.prev && !s.pager.prev.active, `首頁時「上一頁」箭頭應為停用態，實得 ${JSON.stringify(s.pager)}`)
+            assert.ok(/^1\/\d+$/.test(s.pager.text || ''), `頁次應為 1/N，實得 ${s.pager.text}`)
+            const nPage = Number(s.pager.text.split('/')[1])
+            assert.ok(nPage >= 2, `5 個事件於圖寬 330 應分成 ≥ 2 頁，實得 ${nPage}`)
+            const firstP1 = s.items.find((o) => o.inWindow).name
+            const s1 = await captureStableWithBox(page, s.legendRect) //E2E-006-1-narrowed：縮為 430 後框住圖例列（可視之事件、翻頁箭頭與頁次）
+            const s2 = await captureStableWithBox(page, s.pager.next.rect) //E2E-006-2-click-next：點擊前框住「下一頁」箭頭
+
+            //③翻下一頁
+            await clickStaLegendPager(page, 'next')
+            s = await legendAt(page, '翻下一頁', 'scroll')
+            assert.equal(s.pager.text, `2/${nPage}`, `翻頁後頁次應為 2/${nPage}，實得 ${s.pager.text}`)
+            assert.ok(s.pager.prev && s.pager.prev.active, '第 2 頁時「上一頁」箭頭應可點')
+            const inWin = s.items.filter((o) => o.inWindow)
+            assert.ok(inWin.length >= 1 && inWin[0].name !== firstP1, `翻頁後可視之事件應換成下一批，實得 ${JSON.stringify(inWin.map((o) => o.name))}（第 1 頁首項 ${firstP1}）`)
+            const target = inWin[0]
+            const s3 = await captureStableWithBox(page, s.legendRect) //E2E-006-3-next-page：框住圖例列（第 2 頁之事件與頁次 2/N）
+            const s4 = await captureStableWithBox(page, target.whole) //E2E-006-4-click-event：點擊前框住該頁第一個事件整顆（圖示與名稱）
+
+            //④點該頁第一個事件
+            await clickStaLegendItem(page, target.name)
+            s = await legendAt(page, '點事件', 'scroll')
+            assert.deepEqual(s.hidden, [target.name], `點擊之事件應被隱藏，實得 ${JSON.stringify(s.hidden)}`)
+            assert.equal(s.pager.text, `2/${nPage}`, `點事件後應仍停留第 2 頁，實得 ${s.pager.text}`)
+            await page.waitForTimeout(2000) //折線移除之重繪動畫
+            const s5 = await captureStableWithBox(page, eventCardLoc(page, title)) //E2E-006-5-event-hidden：框住事件發生頻率卡片（該事件折線已移除、圖例名稱轉灰）
+
+            //⑤再縮至 420：仍停留原頁（剛隱藏之事件仍在可視範圍）
+            const idx = s.scrollDataIndex
+            await resizeTo(page, 420, true)
+            s = await legendAt(page, '再縮至 420', 'scroll')
+            assert.equal(s.scrollDataIndex, idx, `再縮窄後應停留原頁（scrollDataIndex ${idx}），實得 ${s.scrollDataIndex}`)
+            const t420 = s.items.find((o) => o.name === target.name)
+            assert.ok(t420 && t420.inWindow, `再縮窄後剛隱藏之事件應仍在可視範圍，實得 ${JSON.stringify(s.items.map((o) => [o.name, o.inWindow]))}`)
+            assert.deepEqual(s.hidden, [target.name], `再縮窄後事件應仍隱藏，實得 ${JSON.stringify(s.hidden)}`)
+
+            //⑥拉回 1440：恢復一般式，已隱藏之事件仍隱藏
+            await resizeTo(page, 1440, false)
+            s = await legendAt(page, '拉回 1440', 'plain')
+            assert.equal(s.chartW, 1140, `拉回 1440 後圖寬應為 1140（導覽區展開並排），實得 ${s.chartW}`)
+            assert.deepEqual(s.hidden, [target.name], `拉回後已隱藏之事件應仍隱藏，實得 ${JSON.stringify(s.hidden)}`)
+            const s6 = await captureStableWithBox(page, s.legendRect) //E2E-006-6-widened：框住圖例列（一般式列出全部事件，已隱藏者名稱為灰）
+            return {
+                shots: [
+                    { name: 'E2E-006-1-narrowed', buf: s1 },
+                    { name: 'E2E-006-2-click-next', buf: s2 },
+                    { name: 'E2E-006-3-next-page', buf: s3 },
+                    { name: 'E2E-006-4-click-event', buf: s4 },
+                    { name: 'E2E-006-5-event-hidden', buf: s5 },
+                    { name: 'E2E-006-6-widened', buf: s6 },
+                ],
+                page,
+            }
+        },
+    },
+    {
+        //E2E-007：視窗 700（導覽區並排、圖寬 400 → 捲動式）→ 點「隱藏選單」圖加寬至 600、圖例恢復一般式 → 點「顯示選單」圖回 400、圖例改回捲動式。
+        //6 步真實路徑：①登入點「統計資訊」②視窗縮為 700 ③點「隱藏選單」④圖隨內容區加寬、圖例恢復一般式 ⑤點「顯示選單」⑥圖變窄、圖例改回捲動式；不寫入任何資料
+        //（2026-09-24 前事件圖之 autoresize 若以模板字面值傳入，收合導覽區時圖不會跟著改寬；本案例守住「圖寬＝容器寬」）
+        name: 'E2E-007-legend-menu-toggle',
+        run: async (browser, lang) => {
+            const page = await openApp(browser)
+            await setLang(page, lang)
+            await gotoStaInfor(page)
+            const title = await page.evaluate(() => window.$vo.$t('staEventTitle'))
+
+            //②視窗縮為 700（仍 ≥ 460，導覽區維持並排）
+            await resizeTo(page, 700, false)
+            let s = await legendAt(page, '視窗 700', 'scroll')
+            assert.equal(s.chartW, 400, `視窗 700 導覽區並排時圖寬應為 400，實得 ${s.chartW}`)
+            const s1 = await captureStableWithBox(page, navBtn(page, 'hide')) //E2E-007-1-click-hide：點擊前框住「隱藏選單」整顆圓鈕
+
+            //③點「隱藏選單」
+            await navBtn(page, 'hide').first().click()
+            await waitNavSettled(page, true)
+            s = await legendAt(page, '隱藏選單後', 'plain')
+            assert.equal(s.chartW, 600, `隱藏選單後圖寬應加寬為 600，實得 ${s.chartW}`)
+            const s2 = await captureStableWithBox(page, eventCardLoc(page, title)) //E2E-007-2-menu-hidden：框住事件發生頻率卡片（圖隨內容區加寬、圖例恢復一般式完整列出）
+            const s3 = await captureStableWithBox(page, navBtn(page, 'show')) //E2E-007-3-click-show：點擊前框住「顯示選單」整顆圓鈕
+
+            //⑤點「顯示選單」
+            await navBtn(page, 'show').first().click()
+            await waitNavSettled(page, false)
+            s = await legendAt(page, '顯示選單後', 'scroll')
+            assert.equal(s.chartW, 400, `顯示選單後圖寬應回到 400，實得 ${s.chartW}`)
+            const s4 = await captureStableWithBox(page, eventCardLoc(page, title)) //E2E-007-4-menu-shown：框住事件發生頻率卡片（圖隨內容區變窄、圖例改回單列捲動式）
+            return {
+                shots: [
+                    { name: 'E2E-007-1-click-hide', buf: s1 },
+                    { name: 'E2E-007-2-menu-hidden', buf: s2 },
+                    { name: 'E2E-007-3-click-show', buf: s3 },
+                    { name: 'E2E-007-4-menu-shown', buf: s4 },
+                ],
+                page,
+            }
+        },
+    },
+    {
+        //E2E-008：13 個長名稱事件（staEventMock='many'）於 1440（圖寬 1140）→ 勾「全部加總」→ 經頂列語系下拉切到另一語系。
+        //加總系列名 eng「Total」、cht「全部加總」較寬：一般式恰好放得下兩列之最小圖寬，eng 為 1130、cht 為 1150（2026-09-25 逐 1px 實測，echarts 6.1.0／Windows 預設字型），
+        //故 1140 時 eng 為一般式、cht 為捲動式；切換語系後跟著改變。
+        //6 步真實路徑：①登入點「統計資訊」②看圖例（13 事件、一般式兩列）③勾「全部加總」④點頂列語系下拉 ⑤點另一語系 ⑥圖例依新語系之加總名稱重新判定；不寫入任何資料
+        name: 'E2E-008-legend-long-names',
+        settings: { staEventMock: 'many' },
+        run: async (browser, lang) => {
+            const other = lang === 'eng' ? 'cht' : 'eng'
+            const typeWithTotal = { eng: 'plain', cht: 'scroll' }
+            const page = await openApp(browser)
+            await setLang(page, lang)
+            await gotoStaInfor(page)
+
+            //②13 事件：一般式兩列
+            await waitSeries(page, '13 事件之圖表', 13, null)
+            let s = await legendAt(page, '進頁 13 事件', 'plain')
+            assert.equal(s.rows, 2, `13 事件於圖寬 ${s.chartW} 應為一般式兩列，實得 ${s.rows} 列`)
+            const s1 = await captureStableWithBox(page, ['#staShowTotal', 'label[for="staShowTotal"]']) //E2E-008-1-check-total：點擊前框住「全部加總」勾選框與文字
+
+            //③勾「全部加總」
+            await page.locator('#staShowTotal').check()
+            await waitSeries(page, '加入加總線之圖表', 14, TOTAL_NAME[lang])
+            s = await legendAt(page, '勾全部加總', typeWithTotal[lang])
+            if (s.type === 'plain') assert.equal(s.rows, 2, `加入加總後一般式應仍為兩列，實得 ${s.rows} 列`)
+            const s2 = await captureStableWithBox(page, s.legendRect) //E2E-008-2-total-shown：框住圖例（加總名稱加在最前；eng 仍兩列一般式、cht 改單列捲動式）
+
+            //④點頂列語系下拉
+            const s3 = await captureStableWithBox(page, langSelLoc(page)) //E2E-008-3-click-lang：點擊前框住頂列語系下拉整顆
+            await page.locator('[data-fmid="app-topbar"] div[_tabindex="0"]').filter({ hasText: LANG_TEXT[lang] }).first().click()
+            const popup = page.locator('.WPopperFix:visible')
+            await popup.first().waitFor({ state: 'visible', timeout: 10000 })
+            await page.waitForTimeout(500)
+            const s4 = await captureStableWithBox(page, popup.first()) //E2E-008-4-lang-list：清單展開，框住整份語系清單
+            const item = popup.locator('div[tabindex="0"]').filter({ hasText: LANG_TEXT[other] }).first()
+            const s5 = await captureStableWithBox(page, item) //E2E-008-5-click-lang-item：點擊前框住另一語系項目整顆
+
+            //⑤點另一語系 → ⑥圖例依新語系之加總名稱重新判定
+            await item.click()
+            await popup.first().waitFor({ state: 'hidden', timeout: 10000 })
+            await waitSeries(page, '切換語系後之圖表', 14, TOTAL_NAME[other])
+            s = await legendAt(page, '切換語系後', typeWithTotal[other])
+            if (s.type === 'plain') assert.equal(s.rows, 2, `切換語系後一般式應為兩列，實得 ${s.rows} 列`)
+            const s6 = await captureStableWithBox(page, s.legendRect) //E2E-008-6-lang-switched：框住圖例（切到 cht 改單列捲動式、切到 eng 恢復兩列一般式）
+            return {
+                shots: [
+                    { name: 'E2E-008-1-check-total', buf: s1 },
+                    { name: 'E2E-008-2-total-shown', buf: s2 },
+                    { name: 'E2E-008-3-click-lang', buf: s3 },
+                    { name: 'E2E-008-4-lang-list', buf: s4 },
+                    { name: 'E2E-008-5-click-lang-item', buf: s5 },
+                    { name: 'E2E-008-6-lang-switched', buf: s6 },
+                ],
+                page,
+            }
+        },
+    },
 ]
 
 //手術式重產（§6.3）：--names a,b,c 只產指定 case；--langs eng,cht 只產指定語系。截圖「前」就 gate（省截圖成本）。
@@ -382,7 +568,7 @@ async function generateBaseline() {
     const onlyLangs = argList('--langs')
     await startServersOnce()
     //啟動 mock 後端（確定性事件資料集）
-    await restartBackend(genTempSettings({ staEventMock: true }))
+    await restartBackend(genTempSettings(MOCK_SETTINGS))
     fs.mkdirSync(PICS_DIR, { recursive: true })
     process.env.E2E_STRICT_CAPTURE = '1' //regen 端：captureStable 未 settle 即 throw，拒絕寫入未穩定畫面
     try {
@@ -390,16 +576,22 @@ async function generateBaseline() {
             if (onlyLangs && !nameMatch(onlyLangs, lang)) continue //§6.3 手術式：跳過未指定語系
             for (const c of CASES) {
                 if (onlyNames && !nameMatch(onlyNames, c.name)) continue //§6.3 手術式：截圖前 gate
+                if (c.settings) await restartBackend(genTempSettings(c.settings)) //case 專用後端設定（同 mocha 端）
                 //per-case fresh browser（每 case 全新進程，消 GPU/font/CSS cache 跨 case 累積差異；對齊其他 perm e2e）
                 const browser = await launchBrowser()
-                const r = await c.run(browser, lang)
-                //run 回傳「單張 { buf, page }」或「多階段 { shots:[{name,buf}], page }」；統一正規化為陣列後逐張寫入
-                const shots = r.shots || [{ name: c.name, buf: r.buf }]
-                for (const s of shots) {
-                    fs.writeFileSync(picPath(lang, s.name), s.buf)
-                    console.log('wrote', picPath(lang, s.name), s.buf.length, 'bytes')
+                try {
+                    const r = await c.run(browser, lang)
+                    //run 回傳「單張 { buf, page }」或「多階段 { shots:[{name,buf}], page }」；統一正規化為陣列後逐張寫入
+                    const shots = r.shots || [{ name: c.name, buf: r.buf }]
+                    for (const s of shots) {
+                        fs.writeFileSync(picPath(lang, s.name), s.buf)
+                        console.log('wrote', picPath(lang, s.name), s.buf.length, 'bytes')
+                    }
                 }
-                await browser.close()
+                finally {
+                    await browser.close()
+                    if (c.settings) await restartBackend(genTempSettings(MOCK_SETTINGS)) //還原本檔預設 mock 後端
+                }
             }
         }
     }
@@ -422,7 +614,7 @@ else {
                 this.timeout(200000)
                 await startServersOnce()
                 //啟動 mock 後端（確定性事件資料集）。before 對整 describe 一次，after 還原。
-                await restartBackend(genTempSettings({ staEventMock: true }))
+                await restartBackend(genTempSettings(MOCK_SETTINGS))
             })
             after(async function() {
                 this.timeout(60000)
@@ -431,7 +623,8 @@ else {
             })
             for (const c of CASES) {
                 it(c.name, async function() {
-                    this.timeout(240000)
+                    this.timeout(c.settings ? 360000 : 240000)
+                    if (c.settings) await restartBackend(genTempSettings(c.settings)) //case 專用後端設定（同 regen 端）
                     //per-case fresh browser（每 case 全新進程，對齊其他 perm e2e）
                     const browser = await launchBrowser()
                     try {
@@ -444,6 +637,7 @@ else {
                     }
                     finally {
                         await browser.close()
+                        if (c.settings) await restartBackend(genTempSettings(MOCK_SETTINGS)) //還原本檔預設 mock 後端
                     }
                 })
             }

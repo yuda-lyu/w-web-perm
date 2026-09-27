@@ -6,7 +6,7 @@
 //統計頁為預設頁且圖表隨 log 變動 → 每 case 以 settings:{ staEventMock:true } 換後端（同 e2e-stainfor / e2e-users E2E-012 之 c.settings 管線）。
 import fs from 'fs'
 import assert from 'assert'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, waitUntilExist, assertBaselineMatch, restartBackend, genTempSettings, clickNavItem } from './tools/e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, waitUntilExist, assertBaselineMatch, restartBackend, genTempSettings, clickNavItem, SEL_NAV, navBtn, waitNavSettled, waitStaLegendSettled, assertStaLegendLayout } from './tools/e2e-setup.mjs'
 
 const PICS_DIR = './test/pics/layout'
 const LANGS = ['eng', 'cht']
@@ -23,48 +23,17 @@ async function setLang(page, lang) {
     await page.waitForTimeout(600)
 }
 
-//—— 圓鈕定位：WButtonCircle 無 title/aria 且本二鈕 tooltip 已停用（LayoutContent.vue:59,114），以 mdi path 定位 ——
-const MDI = {
-    hide: 'M7,12L12,7V10H16V14H12V17L7,12M21,16.5C21,16.88 20.79,17.21 20.47,17.38L12.57,21.82C12.41,21.94 12.21,22 12,22C11.79,22 11.59,21.94 11.43,21.82L3.53,17.38C3.21,17.21 3,16.88 3,16.5V7.5C3,7.12 3.21,6.79 3.53,6.62L11.43,2.18C11.59,2.06 11.79,2 12,2C12.21,2 12.41,2.06 12.57,2.18L20.47,6.62C20.79,6.79 21,7.12 21,7.5V16.5M12,4.15L5,8.09V15.91L12,19.85L19,15.91V8.09L12,4.15Z', //mdiArrowLeftBoldHexagonOutline（隱藏選單）
-    show: 'M17,12L12,17V14H8V10H12V7L17,12M21,16.5C21,16.88 20.79,17.21 20.47,17.38L12.57,21.82C12.41,21.94 12.21,22 12,22C11.79,22 11.59,21.94 11.43,21.82L3.53,17.38C3.21,17.21 3,16.88 3,16.5V7.5C3,7.12 3.21,6.79 3.53,6.62L11.43,2.18C11.59,2.06 11.79,2 12,2C12.21,2 12.41,2.06 12.57,2.18L20.47,6.62C20.79,6.79 21,7.12 21,7.5V16.5M12,4.15L5,8.09V15.91L12,19.85L19,15.91V8.09L12,4.15Z', //mdiArrowRightBoldHexagonOutline（顯示選單）
-}
-function iconBtn(page, path) {
-    return page.locator(`div[role="button"]:has(svg path[d="${path}"])`)
-}
-const SEL_DRAWER_PANEL = '[ev-stable]'                   //WDrawer 平移面板 divDrawer（帶 v-domstable 之 ev-stable 屬性；展開時 x=0 寬 200、收合後 display:none）
+//—— 「隱藏選單」／「顯示選單」圓鈕定位（navBtn，以 mdi path）與收合／展開落定等待（waitNavSettled，使用者可觀察之幾何）見 e2e-setup ——
+const SEL_DRAWER_PANEL = SEL_NAV //WDrawer 平移面板 divDrawer（帶 v-domstable 之 ev-stable 屬性；展開時 x=0 寬 200、收合後 display:none）
 const SEL_STA_TITLE = 'div[style*="font-size: 1.5rem"]'  //統計頁標題「統計資訊」（LayoutContentStaInfor.vue:19；Vue 2 會把靜態 style 正規化成含空白之 `font-size: 1.5rem`）
 
-//等導覽區收合／展開落定——採「使用者可觀察之幾何」：目標圓鈕已出現 + 面板與內容區 rect 連續 3 次取樣不變。
-//不用 WDrawer 根節點 [state]（hidden/opened）：w-component-vue 2.5.13 於負載高時 [state] 偶發卡在 hiding/opening 直到 200s 兜底
-//（wsemi domIsStable core() 丟棄 await 前的動畫、v-domstable 只在翻轉時 emit），2.5.14 + wsemi 1.8.94 已修（transitionend 為主訊號、兜底 1.3s）；
-//幾何訊號為使用者可觀察之終態，故沿用。根因史見 CLAUDE_experience.md。
-async function waitDrawerSettled(page, collapsed) {
-    await iconBtn(page, collapsed ? MDI.show : MDI.hide).first().waitFor({ state: 'visible', timeout: 15000 })
-    const snap = () => page.evaluate((sel) => {
-        const r = (e) => { if (!e) return null; const b = e.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height)] }
-        const panel = document.querySelector(sel)
-        const content = document.querySelector('canvas') || document.querySelector('.ag-root-wrapper')
-        return JSON.stringify({ panel: r(panel), panelDisp: panel ? getComputedStyle(panel).display : null, content: r(content) })
-    }, SEL_DRAWER_PANEL)
-    const t0 = Date.now()
-    let last = null; let same = 0
-    while (Date.now() - t0 < 15000) {
-        const cur = await snap()
-        const o = JSON.parse(cur)
-        const atRest = collapsed ? (o.panelDisp === 'none' || (o.panel && o.panel[2] === 0)) : (o.panel && o.panel[0] === 0 && o.panel[2] > 0 && o.panelDisp !== 'none')
-        if (atRest && cur === last) { if (++same >= 3) { await page.waitForTimeout(300); return } }
-        else { same = 0; last = cur }
-        await page.waitForTimeout(200)
-    }
-    throw new Error(`導覽區${collapsed ? '收合' : '展開'}未於 15s 內落定（last=${last}）`)
-}
 async function clickHide(page) {
-    await iconBtn(page, MDI.hide).first().click()
-    await waitDrawerSettled(page, true)
+    await navBtn(page, 'hide').first().click()
+    await waitNavSettled(page, true)
 }
 async function clickShow(page) {
-    await iconBtn(page, MDI.show).first().click()
-    await waitDrawerSettled(page, false)
+    await navBtn(page, 'show').first().click()
+    await waitNavSettled(page, false)
 }
 
 //導航至指定頁籤（user-facing：點左側導覽項）；統計頁等圖表 canvas（mock 後端確定有資料），資料頁等 ag-grid 列。
@@ -96,7 +65,7 @@ async function titleLeft(page, label) {
 }
 //「顯示選單」圓鈕右緣（收合態才存在）
 async function showBtnRight(page) {
-    const bb = await iconBtn(page, MDI.show).first().boundingBox()
+    const bb = await navBtn(page, 'show').first().boundingBox()
     return bb ? Math.round(bb.x + bb.width) : null
 }
 
@@ -108,7 +77,7 @@ const CASES = [
         settings: { staEventMock: true },
         run: async (page) => {
             await gotoPage(page, 'mmStaInfor')
-            const s1 = await captureStableWithBox(page, iconBtn(page, MDI.hide)) //E2E-001-1-click-hide：點擊前框住「隱藏選單」整顆圓鈕
+            const s1 = await captureStableWithBox(page, navBtn(page, 'hide')) //E2E-001-1-click-hide：點擊前框住「隱藏選單」整顆圓鈕
             await clickHide(page)
             const s2 = await captureStableWithBox(page, SEL_STA_TITLE) //E2E-001-2-hidden：收合後框住統計頁標題整行（其左側為「顯示選單」圓鈕，不重疊）
             return [
@@ -118,8 +87,8 @@ const CASES = [
         },
         semantic: async (page) => {
             //spec 語意 1：「顯示選單」存在、「隱藏選單」消失；統計頁標題左緣 ≥ 圓鈕右緣
-            assert.equal(await iconBtn(page, MDI.show).count(), 1, '收合後應有「顯示選單」圓鈕')
-            assert.equal(await iconBtn(page, MDI.hide).count(), 0, '收合後不應有「隱藏選單」圓鈕')
+            assert.equal(await navBtn(page, 'show').count(), 1, '收合後應有「顯示選單」圓鈕')
+            assert.equal(await navBtn(page, 'hide').count(), 0, '收合後不應有「隱藏選單」圓鈕')
             const staLabel = await page.evaluate(() => window.$vo.$t('mmStaInfor'))
             const btnR = await showBtnRight(page)
             const staL = await titleLeft(page, staLabel)
@@ -144,7 +113,7 @@ const CASES = [
         run: async (page) => {
             await gotoPage(page, 'mmStaInfor')
             await clickHide(page)
-            const s1 = await captureStableWithBox(page, iconBtn(page, MDI.show)) //E2E-002-1-click-show：點擊前框住「顯示選單」整顆圓鈕
+            const s1 = await captureStableWithBox(page, navBtn(page, 'show')) //E2E-002-1-click-show：點擊前框住「顯示選單」整顆圓鈕
             await clickShow(page)
             const s2 = await captureStableWithBox(page, SEL_DRAWER_PANEL) //E2E-002-2-shown：展開後框住整個左側導覽區面板（含五頁籤）
             return [
@@ -156,8 +125,8 @@ const CASES = [
             //spec 語意：導覽面板可見且貼齊左緣（x=0、寬 200）；「隱藏選單」存在、「顯示選單」消失；五頁籤文字皆在；統計頁標題左緣回到 230（1440×900 實測）
             const panel = await page.evaluate((sel) => { const e = document.querySelector(sel); if (!e) return null; const b = e.getBoundingClientRect(); return { x: Math.round(b.left), w: Math.round(b.width), disp: getComputedStyle(e).display } }, SEL_DRAWER_PANEL)
             assert.ok(panel && panel.disp !== 'none' && panel.x === 0 && panel.w === 200, `導覽面板應可見且 x=0 寬 200（實得 ${JSON.stringify(panel)}）`)
-            assert.equal(await iconBtn(page, MDI.hide).count(), 1, '展開後應有「隱藏選單」圓鈕')
-            assert.equal(await iconBtn(page, MDI.show).count(), 0, '展開後不應有「顯示選單」圓鈕')
+            assert.equal(await navBtn(page, 'hide').count(), 1, '展開後應有「隱藏選單」圓鈕')
+            assert.equal(await navBtn(page, 'show').count(), 0, '展開後不應有「顯示選單」圓鈕')
             const labels = await page.evaluate((ks) => ks.map((k) => window.$vo.$t(k)), PAGE_KEYS)
             const txt = await page.evaluate(() => document.body.innerText)
             for (const lb of labels) assert.ok(txt.includes(lb), `導覽區應列出頁籤「${lb}」`)
@@ -171,28 +140,34 @@ const CASES = [
         //  ④導覽收合、「顯示選單」圓鈕出現 ⑤拉寬視窗 ⑥導覽展開並排、標題回位、無灰色遮罩；不寫入任何資料
         //語意斷言放在 run() 內：兩個寬度下之狀態皆為過程中之觀察，且 regen 端只跑 run()，寫檔前即守門
         //（修復前拉回後導覽區浮在內容上並覆蓋遮罩、標題左緣 30，此處即紅；修復見 LayoutContent.vue autoSwitchToFix）。
+        //統計頁事件圖隨內容區改寬：縮窄後圖例改單列捲動式、拉回後恢復一般式，兩處皆驗圖寬＝容器寬且圖例不壓最上方刻度
+        //（2026-09-24 前 400 寬時一般式圖例 3 列壓到刻度，見 spec/流程_統計資訊事件展示.md〈已知落差〉）。
         name: 'E2E-003-resize-narrow-wide',
         settings: { staEventMock: true },
         run: async (page) => {
             await gotoPage(page, 'mmStaInfor')
-            await waitDrawerSettled(page, false) //縮窄前先等展開落定：元件庫於導覽區掛載後約 250ms 內之收合會被掛載展開覆蓋（spec〈已知落差〉）
+            await waitNavSettled(page, false) //縮窄前先等展開落定：元件庫於導覽區掛載後約 250ms 內之收合會被掛載展開覆蓋（spec〈已知落差〉）
             const staLabel = await page.evaluate(() => window.$vo.$t('mmStaInfor'))
             assert.equal(await titleLeft(page, staLabel), 230, '縮窄前統計頁標題左緣應為 230（導覽區並排）')
 
             //③縮窄：無點擊目標故無點擊前之圖
             await page.setViewportSize({ width: 400, height: 900 })
-            await waitDrawerSettled(page, true)
+            await waitNavSettled(page, true)
             //spec E2E-003 驗證 1：「顯示選單」存在、「隱藏選單」消失；統計頁標題左緣 ≥ 圓鈕右緣
-            assert.equal(await iconBtn(page, MDI.show).count(), 1, '縮窄後應有「顯示選單」圓鈕')
-            assert.equal(await iconBtn(page, MDI.hide).count(), 0, '縮窄後不應有「隱藏選單」圓鈕')
+            assert.equal(await navBtn(page, 'show').count(), 1, '縮窄後應有「顯示選單」圓鈕')
+            assert.equal(await navBtn(page, 'hide').count(), 0, '縮窄後不應有「隱藏選單」圓鈕')
             const btnR = await showBtnRight(page)
             const l1 = await titleLeft(page, staLabel)
             assert.ok(btnR !== null && l1 !== null && l1 >= btnR, `縮窄後統計頁標題左緣（${l1}）應 ≥「顯示選單」圓鈕右緣（${btnR}）`)
+            //spec E2E-003 驗證 1（事件圖）：圖寬＝容器寬；圖例改單列捲動式並留在圖頂、不壓最上方刻度
+            const lg1 = await waitStaLegendSettled(page)
+            assertStaLegendLayout(lg1, '縮窄後事件圖')
+            assert.equal(lg1.type, 'scroll', `縮窄後（圖寬 ${lg1.chartW}）事件圖例應為捲動式`)
             const s1 = await captureStableWithBox(page, SEL_STA_TITLE) //E2E-003-1-narrowed：縮為 400 後框住統計頁標題「統計資訊」整行（其左側為「顯示選單」圓鈕）
 
             //⑤拉寬
             await page.setViewportSize({ width: 1440, height: 900 })
-            await waitDrawerSettled(page, false)
+            await waitNavSettled(page, false)
             //spec E2E-003 驗證 2：導覽面板 x=0 寬 200；「隱藏選單」存在、「顯示選單」消失；標題回到 230；標題位置之最上層元素為標題本身（未被遮罩覆蓋）
             const panel = await page.evaluate((sel) => {
                 const e = document.querySelector(sel)
@@ -201,8 +176,8 @@ const CASES = [
                 return { x: Math.round(b.left), w: Math.round(b.width), disp: getComputedStyle(e).display }
             }, SEL_DRAWER_PANEL)
             assert.ok(panel && panel.disp !== 'none' && panel.x === 0 && panel.w === 200, `拉回後導覽面板應可見且 x=0 寬 200（實得 ${JSON.stringify(panel)}）`)
-            assert.equal(await iconBtn(page, MDI.hide).count(), 1, '拉回後應有「隱藏選單」圓鈕')
-            assert.equal(await iconBtn(page, MDI.show).count(), 0, '拉回後不應有「顯示選單」圓鈕')
+            assert.equal(await navBtn(page, 'hide').count(), 1, '拉回後應有「隱藏選單」圓鈕')
+            assert.equal(await navBtn(page, 'show').count(), 0, '拉回後不應有「顯示選單」圓鈕')
             const l2 = await titleLeft(page, staLabel)
             assert.equal(l2, 230, `拉回後統計頁標題左緣應回到 230（實得 ${l2}；導覽區若浮在內容上則為 30）`)
             const onTop = await page.evaluate((sel) => {
@@ -213,6 +188,10 @@ const CASES = [
                 return !!hit && (hit === t || t.contains(hit))
             }, SEL_STA_TITLE)
             assert.equal(onTop, true, '拉回後統計頁標題應為其位置之最上層元素（未被灰色遮罩覆蓋）')
+            //spec E2E-003 驗證 2（事件圖）：圖寬＝容器寬；圖例恢復一般式、留在圖頂、不壓最上方刻度
+            const lg2 = await waitStaLegendSettled(page)
+            assertStaLegendLayout(lg2, '拉回後事件圖')
+            assert.equal(lg2.type, 'plain', `拉回後（圖寬 ${lg2.chartW}）事件圖例應恢復一般式`)
             const s2 = await captureStableWithBox(page, SEL_DRAWER_PANEL) //E2E-003-2-widened：拉回 1440 後框住整個左側導覽區面板含五個頁籤
             return [
                 { name: 'E2E-003-1-narrowed', buf: s1 },

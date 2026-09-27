@@ -2,7 +2,6 @@ import get from 'lodash-es/get.js'
 import isestr from 'wsemi/src/isestr.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import isfun from 'wsemi/src/isfun.mjs'
-import ispm from 'wsemi/src/ispm.mjs'
 import fetchJson from './fetchJson.mjs'
 
 
@@ -24,12 +23,14 @@ async function getPermUserInfor(url, tokenSelf, userIdTar, opt = {}) {
     //funConvertPerm
     let funConvertPerm = get(opt, 'funConvertPerm')
 
-    //url
-    if (url.indexOf('token={sysToken}') < 0 && url.indexOf('userId={userId}') < 0) {
+    //url, 兩個佔位符缺一即拒(原為 &&: 只有兩者皆缺才拒, 缺一時仍送出請求; 對齊 w-web-sso ADR-056 修正紀錄)
+    if (url.indexOf('token={sysToken}') < 0 || url.indexOf('userId={userId}') < 0) {
         return Promise.reject('noTokenUserIdInUrl')
     }
-    url = url.replaceAll('{sysToken}', tokenSelf) //系統介接用permToken
-    url = url.replaceAll('{userId}', userIdTar)
+    //代入: 值經 encodeURIComponent 並以 split / join 取代(ADR-023); 不用 replaceAll——其取代字串會解讀 $` $& $' 等樣式(userIdTar 含 $` 時會把已代入之介接權杖複製進 userId),
+    //不編碼時 + 被伺服端解成空白、& 與 = 形成額外參數, 值內之 {userId} 字樣亦會被二次代入. 對 UUID、英數與 -_.~ 為恆等轉換
+    url = url.split('{sysToken}').join(encodeURIComponent(tokenSelf)) //系統介接用permToken
+    url = url.split('{userId}').join(encodeURIComponent(userIdTar))
     // console.log('getPermUserInfor: url', url)
 
     //get, 內建 fetch(不依賴 axios); 網路錯誤或非 2xx → cannotGetUserByUrl, 回應非 JSON → cannotGetUserDataByUrl(對齊 axios 時期語意)
@@ -69,10 +70,12 @@ async function getPermUserInfor(url, tokenSelf, userIdTar, opt = {}) {
     //check
     if (isfun(funConvertPerm)) {
 
-        //funConvertPerm
-        ur = funConvertPerm(ur)
-        if (ispm(ur)) {
-            ur = await ur
+        //funConvertPerm, 同步拋錯或 reject 一律 reject 'noUserDataAfterConvert'(部署方之錯誤原文不上拋, ADR-023)
+        try {
+            ur = await funConvertPerm(ur) //await 於 try 內: 同步拋錯、reject 與 thenable 之 reject 皆攔截; 非 Promise 之回傳原樣取得
+        }
+        catch (err) {
+            return Promise.reject('noUserDataAfterConvert')
         }
         // console.log('getPermUserInfor ur(funConvertPerm)', ur)
 

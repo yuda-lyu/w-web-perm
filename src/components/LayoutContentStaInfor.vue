@@ -80,9 +80,12 @@
 
                             </div>
 
+                            <!-- autoresize: 容器尺寸與圖不一致時 WEchartsVue(w-echarts-vue ≥1.0.15, 含圖剛建立之同一幀)先 resize 並 flush, 再呼叫 onResize(fitLegend) 重判圖例類型 -->
                             <WEchartsVue
+                                ref="chartEvent"
                                 style="width:100%; height:300px;"
                                 :options="optEvent"
+                                :autoresize="autoresizeEvent"
                                 v-if="optEvent"
                             ></WEchartsVue>
 
@@ -186,10 +189,16 @@ import debounce from 'wsemi/src/debounce.mjs'
 import isearr from 'wsemi/src/isearr.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import WEchartsVue from 'w-echarts-vue/src/components/WEchartsVue.vue'
+import iniEcharts from 'w-echarts-vue/src/js/iniEcharts.mjs'
 import { mdiChartBoxOutline, mdiTableLarge } from '@mdi/js/mdi.js'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
 import WIconLoading from 'w-component-vue/src/components/WIconLoading.vue'
 import WTextSelect from 'w-component-vue/src/components/WTextSelect.vue'
+import { GRID_TOP, genLegend, decideLegendType, createLegendMeasurer } from '../js/legendFit.mjs'
+
+
+//echarts, 與 WEchartsVue 同一份(iniEcharts 回傳同一命名空間), 供圖例離屏量測使用
+let echarts = iniEcharts()
 
 
 //時間分組下拉之結構寬度(px): 左右內距 8+8、左右邊框 1+1、展開圖標 18、圖標與文字間隙 2 (同 w-web-sso LayoutContentStaInfor / w-web-api LayoutContentStats 之 SEL_STRUCT_WIDTH)
@@ -235,6 +244,12 @@ export default {
 
             optEvent: null,
 
+            //事件圖例類型: 一般式放得下(不壓到最上方刻度)維持 plain, 否則 scroll(單列+翻頁); 由 fitLegend 依圖寬決定, genOpt 重建 option 時沿用. 不讀入模板, 改變不觸發重繪
+            legendType: 'plain',
+
+            //WEchartsVue 之 autoresize: 容器尺寸改變後先 chart.resize() 並 flush 再呼叫 onResize(見模板註解)
+            autoresizeEvent: { throttle: 100, onResize: this.fitLegend },
+
             eventTable: [],
 
         }
@@ -243,6 +258,9 @@ export default {
         // console.log('mounted')
 
         let vo = this
+
+        //legendMeasurer, 圖例離屏量測器(非響應式屬性), 於 beforeDestroy 釋放
+        vo.legendMeasurer = createLegendMeasurer(echarts)
 
         //時間分組下拉觸發區字型: 字級 0.875rem(同原 text-sm)× 根字級, 字族/字重承襲本頁; 供 timeIntervalSelWidth 以 canvas 量最長選項文字實寬(同 sso)
         let cs = getComputedStyle(vo.$el)
@@ -258,6 +276,18 @@ export default {
                 console.log(err)
                 vo.errMsg = vo.$t('getDataError')
             })
+
+    },
+    beforeDestroy: function() {
+        // console.log('beforeDestroy')
+
+        let vo = this
+
+        //dispose, 釋放圖例離屏量測實例
+        if (vo.legendMeasurer) {
+            vo.legendMeasurer.dispose()
+            vo.legendMeasurer = null
+        }
 
     },
     computed: {
@@ -348,7 +378,7 @@ export default {
                 return colors[k % colors.length]
             }
 
-            //getName: count 系列顯示為「全部」, 其餘 event 名照原字串
+            //getName: count 系列顯示為「全部加總」(staTotal; eng 為 Total), 其餘 event 名照原字串
             let getName = (valueKey) => {
                 if (valueKey === 'count') {
                     return vo.$t('staTotal')
@@ -392,13 +422,11 @@ export default {
                 grid: {
                     left: '3%',
                     right: '4%',
+                    top: GRID_TOP, //明寫(同 echarts 6.1.0 預設 65): 圖例判定之上緣幾何以此為準, 見 legendFit.mjs
                     bottom: '3%',
                     containLabel: true
                 },
-                legend: {
-                    show: true,
-                    top: 0, //須明給: echarts 6 起 legend 預設由 top:0 改為 bottom, 不給會落到底部壓住 x 軸時間標籤
-                },
+                legend: genLegend(vo.legendType), //一般式或捲動式依圖寬決定(fitLegend); 設定之單一來源見 legendFit.mjs genLegend
                 xAxis: [
                     {
                         type: 'category',
@@ -482,6 +510,47 @@ export default {
 
             //optEvent
             vo.optEvent = vo.genOpt(vo.$t('staEventTitle'), vo.freqEvent, ksEvent)
+
+            //fitLegend: option 更新後判定圖例類型. nextTick 時 WEchartsVue 已於同一輪 flush 內 setOption;
+            //圖剛建立與容器改寬落在同一幀者, 由 WEchartsVue 偵測到容器與圖尺寸不一致而 resize 後經 onResize 再判
+            vo.$nextTick(() => {
+                vo.fitLegend()
+            })
+
+        },
+
+        fitLegend: function() {
+            //依圖寬決定事件圖例類型: 一般式圖例放得下(底緣 ≤ LEGEND_MAX_BOTTOM)維持 plain, 否則 scroll; 規則與量測見 src/js/legendFit.mjs
+            //呼叫時機: updateCharts 之 option 更新後, 以及 autoresizeEvent.onResize(視窗縮放、導覽區收合展開、捲軸出現等容器寬度改變後)
+
+            let vo = this
+
+            //chart
+            let cmp = vo.$refs.chartEvent
+            let chart = (cmp && cmp.getChart) ? cmp.getChart() : null
+            if (!chart || !vo.optEvent || !vo.legendMeasurer) {
+                return
+            }
+
+            //check, 容器隱藏或寬 0 不判
+            let width = chart.getWidth()
+            if (!(width > 0)) {
+                return
+            }
+
+            //type, 以離屏量測計算一般式圖例於此寬之排版(為事件名稱與圖寬之純函數, 不依可見圖之繪製時序)
+            let names = map(get(vo, 'optEvent.series', []), 'name')
+            let type = decideLegendType(vo.legendMeasurer.measure(names, width, chart.getHeight()))
+            vo.legendType = type
+
+            //類型不變不動圖(捲動式之頁次得以保留)
+            let cur = get(chart.getOption(), 'legend.0', {})
+            if (cur.type === type) {
+                return
+            }
+
+            //切換類型: 帶完整圖例設定(否則重建模型後 top 遺失落到底部), 並帶入目前 selected 保留使用者隱藏之事件
+            chart.setOption({ legend: { ...genLegend(type), selected: cur.selected || {} } })
 
         },
 

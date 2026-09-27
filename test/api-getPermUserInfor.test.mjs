@@ -18,7 +18,7 @@ describe('api-getPermUserInfor', function() {
     it('API-getPermUserInfor-001-success', async () => {
 
         //對應 spec E2E-001：合法 app token 查詢既有 userId 回傳該使用者權限。
-        //注意用 TOKEN_APP（非 sys）；getPermUserInfor.mjs:31 以 tokenSelf 置換 {sysToken}。
+        //注意用 TOKEN_APP（非 sys）；getPermUserInfor.mjs:32 以 encodeURIComponent(tokenSelf) 代入 {sysToken}（伺服端解出原值）。
         let ur = await getPermUserInfor(urlGetPermUserInfor, TOKEN_APP, SEED.peterId)
 
         //對應 spec E2E-001 驗證 1：resolve 物件含 user 與 rules（getPermUserInfor.mjs:69,96 取 msg 物件）
@@ -40,32 +40,25 @@ describe('api-getPermUserInfor', function() {
 
     it('API-getPermUserInfor-002-missing-both-placeholders-reject', async () => {
 
-        //對應 spec E2E-002：url 同時缺 token={sysToken} 與 userId={userId} 佔位符 → 客戶端前置 reject。
-        //源碼 getPermUserInfor.mjs:28 條件為「兩佔位符皆缺（&&）」才 reject。
-        let urlNoPh = `${apiBaseUrl}/api/getPermUserInfor`
-        try {
-            await getPermUserInfor(urlNoPh, TOKEN_APP, SEED.peterId)
-            assert.fail('應 reject（url 缺兩個佔位符）')
+        //對應 spec E2E-002：url 缺 token={sysToken} 或 userId={userId} 任一佔位符 → 客戶端前置 reject。
+        //源碼 getPermUserInfor.mjs 之佔位符檢查為「缺一即拒（||）」（2026-09-25 起, ADR-023; 原為 &&: 兩者皆缺才拒,
+        //只缺一個時仍送出請求——本案原「對照子斷言」即凍結了該缺陷行為, 已改為缺一即拒之斷言）。
+        let urls = [
+            `${apiBaseUrl}/api/getPermUserInfor`, //兩者皆缺
+            `${apiBaseUrl}/api/getPermUserInfor?token={sysToken}`, //只缺 userId={userId}
+            `${apiBaseUrl}/api/getPermUserInfor?userId={userId}`, //只缺 token={sysToken}
+        ]
+        for (let url of urls) {
+            let rejMsg = null
+            try {
+                await getPermUserInfor(url, TOKEN_APP, SEED.peterId)
+            }
+            catch (e) {
+                rejMsg = e
+            }
+            //對應 spec E2E-002 驗證 1：reject 固定 err key（getPermUserInfor.mjs 佔位符檢查處），不打後端
+            assert.strict.equal(rejMsg, 'noTokenUserIdInUrl', `url 缺佔位符應 reject err key noTokenUserIdInUrl: ${url}`)
         }
-        catch (e) {
-            //對應 spec E2E-002 驗證 1：reject 固定字串（getPermUserInfor.mjs:29），不打後端
-            assert.strict.equal(e, 'noTokenUserIdInUrl', 'reject 應為 err key noTokenUserIdInUrl')
-        }
-
-        //對照子斷言：url 只缺 userId={userId} 但保留 token={sysToken} → && 為 false → 不走此 reject。
-        //（會往後送，{sysToken} 被置換、{userId} 不存在故 userId 不入 query；最終後端查詢結果不深究，
-        // 只驗「非上述缺佔位符 reject 字串」即可。）
-        let urlOnlyToken = `${apiBaseUrl}/api/getPermUserInfor?token={sysToken}`
-        let rejMsg = null
-        try {
-            await getPermUserInfor(urlOnlyToken, TOKEN_APP, SEED.peterId)
-            //可能 resolve（空權限/其他結果），不深究
-        }
-        catch (e) {
-            rejMsg = String(e)
-        }
-        //對應 spec E2E-002：保留 token 佔位符時不應走「缺佔位符」前置 reject
-        assert.strict.notEqual(rejMsg, 'noTokenUserIdInUrl', '保留 token 佔位符時不應走缺佔位符 reject')
     })
 
     it('API-getPermUserInfor-003-invalid-args-reject', async () => {
@@ -143,7 +136,7 @@ describe('api-getPermUserInfor', function() {
         assert.strict.equal(ur._wrapped, true, 'resolve 物件應含 funConvertPerm 注入的 _wrapped:true')
 
         //對應 spec E2E-006：funConvertPerm「支援同步或回傳 Promise」，此子斷言驗回 Promise 分支
-        //（getPermUserInfor.mjs:74-76 以 ispm 偵測並 await）→ 以 resolve 後物件 resolve。
+        //（getPermUserInfor.mjs:75 於 try 內 await, 同步值與 Promise 皆適用）→ 以 resolve 後物件 resolve。
         let urAsync = await getPermUserInfor(urlGetPermUserInfor, TOKEN_APP, SEED.peterId, {
             funConvertPerm: async (ur) => ({ ...ur, _async: true }),
         })

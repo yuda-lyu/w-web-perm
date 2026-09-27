@@ -2,6 +2,8 @@
     <div
         ref="root"
         :style="`position:relative; display:flex; align-items:center; gap:${gap}px; height:100%; min-width:0; overflow:hidden; white-space:nowrap;`"
+        v-domresize="{ event: 'resize', tolerancePixel: 0 }"
+        @domresize="relayout"
     >
 
         <!-- 儲存格內之標籤: 本項永遠第 1 顆(唯一可編輯者, 永不被收合); 只渲染放得下的前 nShow 顆 -->
@@ -84,6 +86,7 @@ import get from 'lodash-es/get.js'
 import size from 'lodash-es/size.js'
 import filter from 'lodash-es/filter.js'
 import sum from 'lodash-es/sum.js'
+import domResize from 'w-component-vue/src/js/domResize.mjs'
 import WPopup from 'w-component-vue/src/components/WPopup.vue'
 import RelationChip from './RelationChip.vue'
 
@@ -99,11 +102,13 @@ import RelationChip from './RelationChip.vue'
 //  - 浮層內本項標籤與儲存格內同樣可改模式(舊版浮層一律唯讀, 展開後反而不能改); 改動後由呼叫端 revRows 重繪列,
 //    本元件隨儲存格重建而卸載、浮層隨之關閉——該列唯一可改之項已改完, 關閉符合預期
 //  - 垂直置中: 根元素 flex 置中且 height:100%(其百分比高度之包含塊為 .ag-cell), 標籤與指示於 27px 儲存格內上下各 2.5
-//  - 尺寸監聽用原生 ResizeObserver, 不用元件庫之 v-domresize(wsemi domDetect): 後者每實例一個 20ms setInterval 輪詢 offsetWidth,
-//    且比較基準為「上一次取樣」, 連續 ≤1px 之變化永不觸發(2026-09-17 讀碼定案並實測: 視窗逐 1px 縮窄時表格欄寬始終不重算),
-//    每列一實例時輪詢成本隨可見列數累積; ResizeObserver 為事件驅動、任何寬度變化皆觸發。根元素寬由儲存格決定(overflow:hidden),
-//    子元素增減不改變根寬, 無 ResizeObserver 迴圈之虞; 回呼以 requestAnimationFrame 合併
+//  - 尺寸監聽: 元件庫之 v-domresize(w-component-vue 2.5.23 起轉發設定給 wsemi domDetect; domDetect 自 1.9.4 起以 ResizeObserver 偵測, 比較基準為上次發出時之尺寸,
+//    故逐 1px 之連續變化亦累積發出, 不再是每實例一個輪詢): event 為 'resize' 只聽根元素尺寸(同原生 ResizeObserver 之語意), tolerancePixel 為 0 使 1px 之變化亦發出;
+//    元素隱藏(尺寸 0)時不發出, 恢復顯示時發出, 發出為非同步(與 ResizeObserver 回呼脫勾)。根元素寬由儲存格決定(overflow:hidden), 子元素增減不改變根寬, relayout 不會使根寬再變
 export default {
+    directives: {
+        domresize: domResize(),
+    },
     components: {
         WPopup,
         RelationChip,
@@ -149,32 +154,7 @@ export default {
     mounted: function() {
         let vo = this
         vo.measure()
-
-        //ResizeObserver: 根元素寬度變化(儲存格欄寬改變、視窗變動致表格重算欄寬)即重算
-        if (typeof window !== 'undefined' && window.ResizeObserver) {
-            vo.ro = new window.ResizeObserver(() => {
-                if (vo.rafId) {
-                    return
-                }
-                vo.rafId = window.requestAnimationFrame(() => {
-                    vo.rafId = null
-                    vo.relayout()
-                })
-            })
-            vo.ro.observe(vo.$refs.root)
-        }
-
-    },
-    beforeDestroy: function() {
-        let vo = this
-        if (vo.ro) {
-            vo.ro.disconnect()
-            vo.ro = null
-        }
-        if (vo.rafId) {
-            window.cancelAnimationFrame(vo.rafId)
-            vo.rafId = null
-        }
+        //根元素寬度變化(儲存格欄寬改變、視窗變動致表格重算欄寬)由 v-domresize 觸發 relayout
     },
     watch: {
         items: {
@@ -305,7 +285,7 @@ export default {
                 //relayout
                 vo.measuring = false
                 if (!vo.measured) {
-                    //量不到(元素尚未顯示): 先全部顯示避免儲存格空白, 不在此重試(否則元素持續不可見時會每幀互相呼叫), 待元素顯示使根寬改變、ResizeObserver 觸發 relayout 時再量
+                    //量不到(元素尚未顯示): 先全部顯示避免儲存格空白, 不在此重試(否則元素持續不可見時會每幀互相呼叫), 待元素顯示使根寬改變、v-domresize 觸發 relayout 時再量
                     vo.nShow = vo.n
                     return
                 }

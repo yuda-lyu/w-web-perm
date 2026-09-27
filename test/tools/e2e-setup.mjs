@@ -14,7 +14,7 @@ import path from 'path'
 import sharp from 'sharp'
 import pixelmatch from 'pixelmatch'
 import { PNG } from 'pngjs'
-import { chromium } from 'playwright'
+import launchChromium from 'w-package-tools-e2e/src/launchChromium.mjs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 
@@ -27,6 +27,8 @@ if ((process.argv.includes('--baseline') || process.env.E2E_REGEN === '1') && (p
 const __dir = dirname(fileURLToPath(import.meta.url)) //= test/tools
 const fdTest = join(__dir, '..') //= test
 const projRoot = join(__dir, '..', '..') //= 專案根
+//本專案後端一律以絕對路徑啟動, 使行程命令列可辨識為本 repo 所屬(reseed 前只殺本 repo 之殘留後端, 見 killOwnSrvProcesses)
+const SRV_PATH = join(projRoot, 'srv.mjs')
 
 const BACKEND_PORT = 11006
 //perm e2e 用獨立的 8090（避開常駐於 8080 的其他專案 dev server），以 --port 顯式指定確保確定性
@@ -128,7 +130,7 @@ export async function startServersOnce(opts = {}) {
         const backendUp = await httpOk(`${apiBaseUrl}/`)
         if (!backendUp) {
             await seedDb()
-            spawnSrv('backend', 'node', ['srv.mjs'])
+            spawnSrv('backend', 'node', [SRV_PATH])
             await waitPort(`${apiBaseUrl}/`, 'backend 11006', 60000)
         }
     }
@@ -177,7 +179,35 @@ function cleanupTempSettings() {
     catch (e) {}
 }
 
-//以指定 settings 重啟 backend（殺現有 backend → node srv.mjs <pathSettings> 重啟並等 ready）。
+//殺本 repo 之殘留後端(Windows): 命令列含本 repo srv.mjs 絕對路徑之 node 行程, 連同子行程樹。
+//why: restartBackend 前兩段只涵蓋「spawned 記錄到的」與「當下監聽 11006 的」, 卡住/未監聽之舊實例會漏殺而續持有 lmdb 映射,
+//  使 seedDb 刪不掉 ./db(全域 §12.6); 但不得擴及他 repo——w-web-sso / w-web-api / w-web-task 之後端亦為 `node srv.mjs`,
+//  舊寫法以 CommandLine 含 `srv.mjs` 殺全機, 2026-09-25 曾殺掉 sso 11007 之後端(違反專案 CLAUDE.md「只重啟自己創建的 PID」)。
+//  故後端改以絕對路徑啟動(SRV_PATH), 此處只比對該路徑。路徑含非 ASCII(「開源」), 不放進命令列: PowerShell 以 UTF-8 輸出 JSON(-EncodedCommand 免跳脫), 在 node 端比對。
+//  以相對路徑手動啟動之本 repo 後端不在比對範圍; 其若監聽 11006 則由 restartBackend 之監聽者段處理, 否則 seedDb 刪不掉 ./db 時照常拋錯或警告。
+function killOwnSrvProcesses() {
+    if (!isWin) return []
+    const script = '[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-CimInstance Win32_Process -Filter "name=\'node.exe\'" | Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress'
+    let rows = []
+    try {
+        const out = execSync(`powershell -NoProfile -EncodedCommand ${Buffer.from(script, 'utf16le').toString('base64')}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+        rows = out ? [].concat(JSON.parse(out)) : []
+    }
+    catch (e) {
+        return []
+    }
+    const target = SRV_PATH.toLowerCase()
+    const pids = rows.filter((r) => r && typeof r.CommandLine === 'string' && r.CommandLine.toLowerCase().includes(target) && r.ProcessId !== process.pid).map((r) => r.ProcessId)
+    for (const pid of pids) {
+        try {
+            execSync(`taskkill /F /T /PID ${pid}`, { stdio: 'ignore' })
+        }
+        catch (e) {}
+    }
+    return pids
+}
+
+//以指定 settings 重啟 backend（殺現有 backend → node <SRV_PATH> <pathSettings> 重啟並等 ready）。
 //用法：before restartBackend(genTempSettings({ language })), after restartBackend('./settings.json') 還原預設。
 //opts.reseed=true：port 釋放後、spawn 前重跑 hermetic base seed（刪 ./db 重建），供「測試把資料弄到 UI/RPC 無法還原之狀態」
 //（如 admin 自己 isActive='n' 後所有通道皆拒）的 api 測試還原用；seed 須在後端開 lmdb 前完成，故只能在此時機做。
@@ -211,18 +241,14 @@ export async function restartBackend(pathSettings = './settings.json', opts = {}
         const t0 = Date.now()
         while (Date.now() - t0 < 5000) { if (!(await httpOk(`${apiBaseUrl}/`))) { break } await new Promise((r) => setTimeout(r, 200)) }
     }
-    //reseed 前另以 CommandLine 比對殺盡所有 srv.mjs：上面兩段只涵蓋「spawned 記錄到的」與「當下在監聽的」，
-    //  卡住/未監聽之舊實例會漏殺而續持有 lmdb 映射, 使 seedDb 刪不掉 ./db（全域 §12.6）。
-    if (reseed && isWin) {
-        try { execSync('powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \\"name=\'node.exe\'\\" | Where-Object { $_.CommandLine -match \'srv\\.mjs\' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"', { stdio: 'ignore' }) }
-        catch (e) {}
-    }
     if (reseed) {
+        //reseed 前另殺本 repo 之殘留後端(只比對本 repo srv.mjs 絕對路徑, 不及他 repo; 見 killOwnSrvProcesses)
+        killOwnSrvProcesses()
         //strict:false——本路徑為 api 測試之 after-hook 還原, 持有 lmdb 者為 mocha 進程自身（見 wipeDbVerified 註解）,
         //  刪除必然失敗且 upsert 已足夠；不得把此寬鬆度帶到會產製標準圖的 startServersOnce 路徑。
         await seedDb({ strict: false })
     }
-    spawnSrv('backend', 'node', ['srv.mjs', pathSettings])
+    spawnSrv('backend', 'node', [SRV_PATH, pathSettings])
     await waitPort(`${apiBaseUrl}/`, `backend ${BACKEND_PORT}(restart)`, 60000)
 }
 
@@ -258,7 +284,8 @@ const chromiumLaunchArgs = [
 ]
 
 export async function launchBrowser() {
-    return await chromium.launch({ headless: true, args: chromiumLaunchArgs })
+    //launchChromium, 缺Playwright指定版本之瀏覽器時首次啟動自動下載(與本機同版), 由w-package-tools-e2e提供
+    return await launchChromium({ headless: true, args: chromiumLaunchArgs })
 }
 
 //開乾淨頁（清 localStorage token 後以 ?token=sys 進入），回傳已可互動的 page。
@@ -388,22 +415,29 @@ export async function captureStable(page, opts = {}) {
 
 //整張全頁截圖 + 在「此 e2e 要比對/觀看的區塊」外圍畫紅框（#f26、5px）標注，讓報表/審查委員一眼看出本
 //case 主要觀看哪一區，截圖仍為完整畫面、保留 UI 脈絡，不裁切成小片。移植自 w-web-api test/e2e-setup.mjs。
-//target：CSS selector 字串 / 字串陣列 / Playwright Locator / 以上混合陣列（多個取聯集框成一個框）。
+//target：CSS selector 字串 / 字串陣列 / Playwright Locator / 視窗座標矩形 {x,y,width,height} / 以上混合陣列（多個取聯集框成一個框）。
 //  ——欄位列須依 label 文字定位時用 Locator（如 page.locator(...).filter({ hasText: '名稱' })）。
-//fold 以下的目標會先把第一個 scrollIntoView 捲進視窗再框（同組目標應在同一捲動位置）。
-//紅框為 DOM 注入（pointer-events:none、最高 z-index、不影響版面），captureStable 完成後即移除。
+//  ——canvas 內無 DOM 節點之目標（echarts 圖例項目、翻頁鈕）以矩形給定（見 readStaLegend 之 rect 欄位）。
+//fold 以下的目標會先把第一個 scrollIntoView 捲進視窗再框（同組目標應在同一捲動位置；矩形為已量得之視窗座標，不捲動）。
+//紅框於截圖後以 sharp 疊圖，不改動被測頁 DOM（理由見函式內註解）。
 export async function captureStableWithBox(page, target, opts = {}) {
     const items = Array.isArray(target) ? target : [target]
     const isLoc = (x) => x && typeof x === 'object' && typeof x.boundingBox === 'function'
+    const isRect = (x) => x && typeof x === 'object' && !isLoc(x) && ['x', 'y', 'width', 'height'].every((k) => typeof x[k] === 'number')
     //先把第一個目標捲進視窗（同組目標應在同一捲動位置）
-    const firstLoc = isLoc(items[0]) ? items[0].first() : page.locator(items[0]).first()
-    await firstLoc.scrollIntoViewIfNeeded({ timeout: 8000 }).catch(() => {})
+    if (!isRect(items[0])) {
+        const firstLoc = isLoc(items[0]) ? items[0].first() : page.locator(items[0]).first()
+        await firstLoc.scrollIntoViewIfNeeded({ timeout: 8000 }).catch(() => {})
+    }
     await page.waitForTimeout(300)
     await page.mouse.move(0, 0)
-    //取每個目標的 viewport rect（Locator → boundingBox；CSS 字串 → querySelector）
+    //取每個目標的 viewport rect（矩形 → 原樣；Locator → boundingBox；CSS 字串 → querySelector）
     const rects = []
     for (const it of items) {
-        if (isLoc(it)) {
+        if (isRect(it)) {
+            rects.push(it)
+        }
+        else if (isLoc(it)) {
             const bb = await it.first().boundingBox()
             if (bb) rects.push(bb)
         }
@@ -502,6 +536,53 @@ export async function toggleDialogEnable(page, rowIndex) {
 export const SEL_NAV = '[ev-stable]'
 export async function clickNavItem(page, labelText) {
     await page.locator(SEL_NAV).getByText(labelText, { exact: true }).first().click()
+}
+
+//導覽區「隱藏選單」／「顯示選單」圓鈕（LayoutContent.vue:59,114）：WButtonCircle 無 title/aria 且本二鈕 tooltip 已停用，以 mdi path 定位。
+//收斂自 e2e-layout 原本檔內之 MDI / iconBtn / waitDrawerSettled（e2e-stainfor 之導覽收合案例亦用）。
+export const NAV_MDI = {
+    hide: 'M7,12L12,7V10H16V14H12V17L7,12M21,16.5C21,16.88 20.79,17.21 20.47,17.38L12.57,21.82C12.41,21.94 12.21,22 12,22C11.79,22 11.59,21.94 11.43,21.82L3.53,17.38C3.21,17.21 3,16.88 3,16.5V7.5C3,7.12 3.21,6.79 3.53,6.62L11.43,2.18C11.59,2.06 11.79,2 12,2C12.21,2 12.41,2.06 12.57,2.18L20.47,6.62C20.79,6.79 21,7.12 21,7.5V16.5M12,4.15L5,8.09V15.91L12,19.85L19,15.91V8.09L12,4.15Z', //mdiArrowLeftBoldHexagonOutline（隱藏選單）
+    show: 'M17,12L12,17V14H8V10H12V7L17,12M21,16.5C21,16.88 20.79,17.21 20.47,17.38L12.57,21.82C12.41,21.94 12.21,22 12,22C11.79,22 11.59,21.94 11.43,21.82L3.53,17.38C3.21,17.21 3,16.88 3,16.5V7.5C3,7.12 3.21,6.79 3.53,6.62L11.43,2.18C11.59,2.06 11.79,2 12,2C12.21,2 12.41,2.06 12.57,2.18L20.47,6.62C20.79,6.79 21,7.12 21,7.5V16.5M12,4.15L5,8.09V15.91L12,19.85L19,15.91V8.09L12,4.15Z', //mdiArrowRightBoldHexagonOutline（顯示選單）
+}
+export function navBtn(page, which) {
+    return page.locator(`div[role="button"]:has(svg path[d="${NAV_MDI[which]}"])`)
+}
+//等導覽區收合／展開落定——採「使用者可觀察之幾何」：目標圓鈕已出現 + 面板與內容區 rect 連續 3 次取樣不變。
+//不用 WDrawer 根節點 [state]（hidden/opened）：w-component-vue 2.5.13 於負載高時 [state] 偶發卡在 hiding/opening 直到 200s 兜底
+//（wsemi domIsStable core() 丟棄 await 前的動畫、v-domstable 只在翻轉時 emit），2.5.14 + wsemi 1.8.94 已修（transitionend 為主訊號、兜底 1.3s）；
+//幾何訊號為使用者可觀察之終態，故沿用。根因史見 CLAUDE_experience.md。
+export async function waitNavSettled(page, collapsed) {
+    await navBtn(page, collapsed ? 'show' : 'hide').first().waitFor({ state: 'visible', timeout: 15000 })
+    const snap = () => page.evaluate((sel) => {
+        const r = (e) => {
+            if (!e) return null
+            const b = e.getBoundingClientRect()
+            return [Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height)]
+        }
+        const panel = document.querySelector(sel)
+        const content = document.querySelector('canvas') || document.querySelector('.ag-root-wrapper')
+        return JSON.stringify({ panel: r(panel), panelDisp: panel ? getComputedStyle(panel).display : null, content: r(content) })
+    }, SEL_NAV)
+    const t0 = Date.now()
+    let last = null
+    let same = 0
+    while (Date.now() - t0 < 15000) {
+        const cur = await snap()
+        const o = JSON.parse(cur)
+        const atRest = collapsed ? (o.panelDisp === 'none' || (o.panel && o.panel[2] === 0)) : (o.panel && o.panel[0] === 0 && o.panel[2] > 0 && o.panelDisp !== 'none')
+        if (atRest && cur === last) {
+            if (++same >= 3) {
+                await page.waitForTimeout(300)
+                return
+            }
+        }
+        else {
+            same = 0
+            last = cur
+        }
+        await page.waitForTimeout(200)
+    }
+    throw new Error(`導覽區${collapsed ? '收合' : '展開'}未於 15s 內落定（last=${last}）`)
 }
 //切對話框內某列 mode 下拉為指定值（'OR' / 'AND'）。
 //mode 欄為自製下拉 WTextSelect（2026-09-14 取代原生 select, 見建議書 §2 / 全域 §10.6.3）：
@@ -771,6 +852,155 @@ export async function getResolvedActiveTargets(page, userId) {
         if (!data || data.state !== 'success') throw new Error('getPermUserInfor 失敗: ' + JSON.stringify(data))
         return (data.msg.rules || []).filter((r) => r.isActive === 'y').map((r) => r.name).sort()
     }, userId)
+}
+
+//—— 統計頁「事件發生頻率」圖例共用 helper（e2e-stainfor、e2e-layout 共用；圖例畫在 canvas 內、無 DOM 節點）——
+//圖例是事件顯示切換之唯一入口；一般式放不下時改捲動式（單列＋翻頁鈕，src/js/legendFit.mjs）。DOM 選不到 →
+//由圖表實例之 zrender 顯示列表取各元素之視窗矩形，再以真滑鼠點擊（L2，selector 不可得時之合法層級），非 dispatchAction 程式直呼。
+//元素結構（echarts 6.1.0 / zrender 6，皆以公開之 parent / getClipPath / transformCoordToGlobal 讀取）：
+//  圖例文字＝TSpan（parent 為 ZRText，其 parent 為含圖示之項目群組）；翻頁鈕＝名為 pagePrev / pageNext 之 Path；
+//  頁次＝名為 pageText 之 ZRText（文字在其 TSpan）；捲動式之可視窗＝項目上層群組之 clipPath（ScrollableLegendView.js:213-225）。
+//  放得下時翻頁鈕仍在但設 invisible（同檔 :226-233），故以 invisible 判定是否顯示；窗外項目仍在顯示列表只是被裁掉，須以 inWindow 區分。
+//座標一律於 getDisplayList(true) 更新後讀取（echarts resize 不 flush，resize 後直接讀會拿到上一個寬度之排版）。
+const EVAL_STA_LEGEND = `(() => {
+    const find = (vm) => { if (!vm) return null; if (vm.optEvent !== undefined && vm.legendType !== undefined && vm.$refs && vm.$refs.chartEvent) return vm; for (const c of (vm.$children || [])) { const r = find(c); if (r) return r } return null }
+    const vm = find(window.$vo)
+    if (!vm || !vm.optEvent || !vm.$refs.chartEvent) return null
+    const chart = vm.$refs.chartEvent.getChart()
+    if (!chart) return null
+    const box = chart.getDom().getBoundingClientRect()
+    const names = (vm.optEvent.series || []).map((s) => s.name)
+    const view = (el, r) => {
+        const a = el.transformCoordToGlobal(r.x, r.y)
+        const b = el.transformCoordToGlobal(r.x + r.width, r.y + r.height)
+        return { x: box.left + Math.min(a[0], b[0]), y: box.top + Math.min(a[1], b[1]), width: Math.abs(b[0] - a[0]), height: Math.abs(b[1] - a[1]) }
+    }
+    const clipOf = (el) => {
+        for (let p = el; p; p = p.parent) {
+            const c = typeof p.getClipPath === 'function' ? p.getClipPath() : null
+            if (c) return view(c, c.getBoundingRect())
+        }
+        return null
+    }
+    const items = []
+    const pager = { prev: null, next: null, text: null, textRect: null }
+    for (const el of chart.getZr().storage.getDisplayList(true)) {
+        if (typeof el.transformCoordToGlobal !== 'function') continue
+        if (el.name === 'pagePrev' || el.name === 'pageNext') {
+            pager[el.name === 'pagePrev' ? 'prev' : 'next'] = el.invisible ? null : { rect: view(el, el.getBoundingRect()), active: el.cursor === 'pointer' }
+            continue
+        }
+        if (el.parent && el.parent.name === 'pageText') {
+            if (!el.invisible) { pager.text = el.style ? el.style.text : null; pager.textRect = view(el, el.getBoundingRect()) }
+            continue
+        }
+        const t = el.style && el.style.text
+        if (!t || !names.includes(t)) continue
+        const text = view(el, el.getBoundingRect())
+        const grp = el.parent && el.parent.parent
+        const whole = grp && typeof grp.getBoundingRect === 'function' ? view(grp, grp.getBoundingRect()) : text
+        const clip = clipOf(el)
+        const inWindow = !clip || (whole.x >= clip.x - 0.5 && whole.x + whole.width <= clip.x + clip.width + 0.5)
+        items.push({ name: t, text, whole, inWindow })
+    }
+    const tops = []
+    let top = Infinity
+    let bottom = -Infinity
+    for (const it of items) {
+        const a = it.text.y - box.top
+        if (!tops.includes(Math.round(a))) tops.push(Math.round(a))
+        top = Math.min(top, a)
+        bottom = Math.max(bottom, a + it.text.height)
+    }
+    const parts = items.filter((it) => it.inWindow).map((it) => it.whole)
+        .concat([pager.prev && pager.prev.rect, pager.textRect, pager.next && pager.next.rect].filter(Boolean))
+    const legendRect = parts.length === 0 ? null : (() => {
+        const x = Math.min(...parts.map((r) => r.x))
+        const y = Math.min(...parts.map((r) => r.y))
+        return { x, y, width: Math.max(...parts.map((r) => r.x + r.width)) - x, height: Math.max(...parts.map((r) => r.y + r.height)) - y }
+    })()
+    const lg = chart.getOption().legend[0] || {}
+    const selected = lg.selected || {}
+    return {
+        vw: window.innerWidth,
+        chartW: chart.getWidth(),
+        contW: chart.getDom().clientWidth,
+        type: lg.type,
+        legendType: vm.legendType,
+        names,
+        found: items.length,
+        rows: tops.length,
+        top: Math.round(top * 10) / 10,
+        bottom: Math.round(bottom * 10) / 10,
+        items,
+        pager,
+        scrollDataIndex: lg.scrollDataIndex,
+        selected,
+        hidden: names.filter((n) => selected[n] === false),
+        legendRect,
+    }
+})()`
+
+//讀統計圖圖例狀態：{ vw, chartW, contW, type（圖上）, legendType（元件判定）, names, found, rows, top/bottom（圖例文字相對圖頂之 px）,
+//  items:[{ name, text（文字矩形）, whole（含圖示之項目矩形）, inWindow }], pager:{ prev/next:{rect,active}|null, text, textRect },
+//  scrollDataIndex, selected, hidden（被隱藏之事件）, legendRect（可視項目＋翻頁鈕之聯集，供紅框框住圖例列）}；圖表未就緒回 null。
+export async function readStaLegend(page) {
+    return await page.evaluate(EVAL_STA_LEGEND)
+}
+
+//等圖例落定（連續 3 次取樣之狀態全同）：改寬、切類型、翻頁（平移動畫 800ms）、切換事件之後使用。
+export async function waitStaLegendSettled(page, opts = {}) {
+    const { timeout = 15000, interval = 250, n = 3 } = opts
+    const t0 = Date.now()
+    let prev = null
+    let same = 0
+    while (Date.now() - t0 < timeout) {
+        await page.waitForTimeout(interval)
+        const cur = JSON.stringify(await readStaLegend(page))
+        if (cur !== 'null' && cur === prev) {
+            if (++same >= n - 1) return JSON.parse(cur)
+        }
+        else {
+            same = 0
+            prev = cur
+        }
+    }
+    throw new Error(`統計圖圖例未於 ${timeout}ms 內落定（last=${prev}）`)
+}
+
+//圖例排版不變條件（spec/流程_統計資訊事件展示.md〈補充〉圖例排版規則）：圖寬＝容器寬；每個事件皆有圖例；圖例在圖頂（頂 ≤ 10）；
+//圖上類型＝元件判定；一般式時圖例底 ≤ 57（繪圖區頂 65、最上方刻度文字頂 59，再留白 2）；捲動式時單列且底 ≤ 57。違反即 throw 並列出全部違反項。
+export function assertStaLegendLayout(s, tag) {
+    if (!s) throw new Error(`${tag} 取不到統計圖圖例狀態`)
+    const bad = []
+    if (s.chartW !== s.contW) bad.push(`圖寬 ${s.chartW} ≠ 容器寬 ${s.contW}`)
+    if (s.found !== s.names.length) bad.push(`圖例項目數 ${s.found} ≠ 事件數 ${s.names.length}`)
+    if (!(s.top <= 10)) bad.push(`圖例頂 ${s.top} > 10（不在圖頂）`)
+    if (s.type !== s.legendType) bad.push(`圖上類型 ${s.type} ≠ 元件判定 ${s.legendType}`)
+    if (!(s.bottom <= 57)) bad.push(`圖例底 ${s.bottom} > 57（壓到最上方刻度或繪圖區）`)
+    if (s.type === 'scroll' && s.rows !== 1) bad.push(`捲動式應為單列，實得 ${s.rows} 列`)
+    if (bad.length > 0) throw new Error(`${tag} 圖例排版不符：${bad.join('；')}`)
+}
+
+//點圖例中某事件（切換顯示／隱藏）。只點可視窗內者：捲動式時窗外項目雖在顯示列表但被裁掉，點其座標會落在翻頁鈕或空白。
+export async function clickStaLegendItem(page, name) {
+    const s = await readStaLegend(page)
+    const it = s && s.items.find((o) => o.name === name && o.inWindow)
+    if (!it) throw new Error(`圖例中找不到可點之事件「${name}」（捲動式時須先翻到該頁）：${JSON.stringify(s && s.items.map((o) => [o.name, o.inWindow]))}`)
+    await page.mouse.click(it.text.x + it.text.width / 2, it.text.y + it.text.height / 2)
+    await page.waitForTimeout(1200) //圖例切換與折線移除重繪
+    await page.mouse.move(0, 0) //離開圖例，消 hover 高亮與全名提示
+}
+
+//點捲動式圖例之翻頁鈕（which：'next' | 'prev'）。停用態（已在首頁／末頁）或未顯示時 throw。
+export async function clickStaLegendPager(page, which) {
+    const s = await readStaLegend(page)
+    const b = s && s.pager && s.pager[which]
+    if (!b) throw new Error(`圖例翻頁鈕 ${which} 未顯示（非捲動式或一列放得下）`)
+    if (!b.active) throw new Error(`圖例翻頁鈕 ${which} 為停用態（已在首頁或末頁）`)
+    await page.mouse.click(b.rect.x + b.rect.width / 2, b.rect.y + b.rect.height / 2)
+    await page.waitForTimeout(1200) //平移動畫 800ms（echarts legend animationDurationUpdate）
+    await page.mouse.move(0, 0)
 }
 
 //baseline 比對 + fail 時保留證據到 ./testPending (不覆蓋), 供事後 pixel diff 定位 flake/破壞.

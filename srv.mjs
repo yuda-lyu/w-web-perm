@@ -55,7 +55,20 @@ let getUserByToken = async (token) => {
             isAdmin: 'n',
         }
     }
-    console.log('invalid token', token)
+    if (process.env.NODE_ENV !== 'production') { //測試用權杖(非 production 才有), 供 test/api-tokenSafety 驗證注入函數失敗時不外洩(W 契約, spec/設計要點與取捨.md ADR-023)
+        if (token === '{token-for-reject}') { //模擬部署方以舊版 w-web-sso helper(≤1.1.4)注入: 失敗時 reject 之字串含已代入系統介接權杖(合成秘密)與使用者權杖之完整網址
+            return Promise.reject(`can not get user data by url[http://127.0.0.1:11007/api/getSsoUserInfor?token=SYNTH-SYS-SECRET-FOR-TEST&key=token&value=${token}]`)
+        }
+        if (token === '{token-for-verify-throw}') { //回有效使用者, 但 verifyClientUser / verifyAppUser 對其拋錯(Error.message 為合成秘密), 模擬部署方驗證函數拋錯
+            return {
+                id: 'id-for-verify-throw',
+                name: 'verify-throw',
+                email: 'verify-throw@example.com',
+                isAdmin: 'y',
+            }
+        }
+    }
+    console.log('invalid token') //不印權杖值(ADR-023)
     return {}
 }
 
@@ -63,6 +76,9 @@ let verifyClientUser = (user, from) => {
     // console.log('verifyClientUser/user', user)
     // console.log('於生產環境時得加入限制瀏覽器使用者身份機制')
     // return false //測試無法登入
+    if (process.env.NODE_ENV !== 'production' && user.id === 'id-for-verify-throw') { //測試用: 見 getUserByToken 之 '{token-for-verify-throw}'
+        throw new Error('SYNTH-VERIFY-SECRET-FOR-TEST')
+    }
     return user.isAdmin === 'y' //測試僅系統管理者使用
 }
 
@@ -70,6 +86,9 @@ let verifyAppUser = (user, from) => {
     // console.log('verifyAppUser/user', user)
     // console.log('於生產環境時得加入限制應用程式使用者身份機制')
     // return false //測試無法登入
+    if (process.env.NODE_ENV !== 'production' && user.id === 'id-for-verify-throw') { //測試用: 見 getUserByToken 之 '{token-for-verify-throw}'
+        throw new Error('SYNTH-VERIFY-SECRET-FOR-TEST')
+    }
     return user.isAdmin === 'y' //測試僅系統管理者使用
 }
 

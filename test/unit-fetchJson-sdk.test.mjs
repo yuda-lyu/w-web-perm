@@ -98,11 +98,12 @@ describe('unit-fetchJson-sdk', function() {
         await assert.rejects(() => getPerm(`${base}/err?token={token}`, 'tk'), (e) => e === 'cannotGetUserDataByUrl')
     })
 
-    //getPermUserInfor: 同上, 且 {token-for-application} 之大括號須原樣送出(WHATWG URL query 不 percent-encode {})
+    //getPermUserInfor: 同上, 且 {token-for-application} 之大括號經 encodeURIComponent 代入(2026-09-25 起, ADR-023; 原為原樣送出), 伺服端解出之值不變
     it('FJ-011-getPermUserInfor-keys-and-brace-token', async function() {
         let ur = await getPermUserInfor(`${base}/ok?token={sysToken}&userId={userId}`, '{token-for-application}', 'id-x')
         assert.strict.equal(ur.user.id, 'u1')
-        assert.strict.ok(lastReq.url.includes('token={token-for-application}&userId=id-x'), `大括號 token 應原樣, 實得 ${lastReq.url}`)
+        assert.strict.ok(lastReq.url.includes('token=%7Btoken-for-application%7D&userId=id-x'), `大括號 token 應經編碼, 實得 ${lastReq.url}`)
+        assert.strict.equal(new URL(lastReq.url, 'http://x').searchParams.get('token'), '{token-for-application}', '伺服端解出之 token 應等於原值')
         await assert.rejects(() => getPermUserInfor(`${base}/http500?token={sysToken}&userId={userId}`, 't', 'u'), (e) => e === 'cannotGetUserByUrl')
         await assert.rejects(() => getPermUserInfor(`${base}/notjson?token={sysToken}&userId={userId}`, 't', 'u'), (e) => e === 'cannotGetUserDataByUrl')
         await assert.rejects(() => getPermUserInfor(`${base}/err?token={sysToken}&userId={userId}`, 't', 'u'), (e) => e === 'cannotGetUserDataByUrl')
