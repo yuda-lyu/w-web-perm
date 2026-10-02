@@ -3,8 +3,15 @@
 //assert = 語意斷言 + pixel baseline（§6.2 / §6.3）。
 //
 //雙模式：
-//  - 產 baseline：node test/e2e-stainfor.test.mjs --baseline [--names E2E-006,...] [--langs eng,cht]（寫 test/pics/stainfor/）
+//  - 產 baseline：node test/e2e-stainfor.test.mjs --baseline [--names <項,...>] [--langs eng,cht] [--write-mode missing|changed]（寫 test/pics/stainfor/）
 //  - 驗證（mocha）：npx mocha test/e2e-stainfor.test.mjs --reporter list （pixelmatch 反鋸齒感知 + maxDiffPixels 容差比對，非 byte-exact）
+//  手術式重產（截圖前篩選 createBaselineGate，規格見 test/tools/e2eLib.mjs 所指之 w-package-tools-e2e 之 README.md §2.2）：
+//    --names 每項可帶語系前綴（eng-/cht-），不帶則兩語系皆產；階段圖鍵（如 E2E-006-3-next-page）只寫該張，
+//    案例鍵或其編號前綴（如 E2E-006-legend-scroll-page、E2E-006）寫該案全部階段；不符任何鍵即報錯並列出可用鍵（於啟動服務之前）；
+//    --langs 須完全等於已宣告語系（eng / cht）；--write-mode missing 只寫缺少者、changed 只寫與現行標準圖差異超過容差者（預設全寫）；
+//    env E2E_BASELINE_OUT_DIR=<dir> 寫到暫存目錄（等價驗證用，不動 test/pics）。
+//  產製端與比對端呼叫同一案例管線（runBaselineCase）：（帶 c.settings 者）換後端 → fresh browser → run（openApp → setLang → 進統計頁 → 流程與截圖）
+//    → 語意斷言（兩端皆於寫檔／比對前執行，不過即一張都不寫）→ 寫檔／比對 → 關瀏覽器 →（帶 c.settings 者）還原 mock 後端。
 //
 //標準圖存放：test/pics/stainfor/stainfor-{lang}-{name}.png（8 cases；E2E-001~004 各 1 張、E2E-005 4 張、E2E-006 6 張、E2E-007 4 張、E2E-008 6 張
 //  → 每語系 24 張、共 48 baselines）
@@ -17,18 +24,21 @@
 //  E2E-007-legend-menu-toggle:  視窗 700 時點「隱藏選單」圖加寬、圖例恢復一般式 → 點「顯示選單」圖變窄、圖例改回捲動式。
 //  E2E-008-legend-long-names:   13 個長名稱事件 → 勾全部加總 → 經頂列語系下拉切換語系；加總名稱長度隨語系不同，放得下與否跟著改變。
 //圖例排版規則（一般式放得下維持、否則改捲動式；不壓最上方刻度）見 spec/流程_統計資訊事件展示.md〈補充〉與 spec/設計要點與取捨.md ADR-024；
-//E2E-006~008 之語意斷言皆在 run() 內（regen 端只跑 run()，寫檔前即守門），每個觀察點皆驗 assertStaLegendLayout 不變條件。
+//E2E-006~008 之語意斷言皆在 run() 內（各觀察點為流程中之暫時狀態，當下斷言；兩端皆於寫檔／比對前守門），每個觀察點皆驗 assertStaLegendLayout 不變條件。
 //
 //確定性來源：後端 staEventMock=true → getStaEvent 回固定資料集（48 桶、固定起點 2025-01-01、固定 sin 計數、5 個 event）。
 //  event 名（mock）：verifyConn, updateTargets-success, checkUser-error, api/getPerm-success, getWebInfor-success
 //  staEventMock='many'（僅 E2E-008，以 c.settings 換後端）→ 同形資料集改 13 個 event（server/procStaInfor.mjs MOCK_EVENTS_MANY）。
 //  元件 allEvents 為 union 後排序 → 圖表系列與圖例顯示順序固定。
-//  before(整體) restartBackend(genTempSettings(MOCK_SETTINGS)) 啟動 mock 後端；帶 c.settings 之 case 前後換後端再還原 MOCK_SETTINGS；
-//  after(整體) restartBackend('./settings.json') 還原預設後端。
+//  比對端每語系 describe 之 before restartBackend(genTempSettings(MOCK_SETTINGS)) 啟動 mock 後端、after restartBackend('./settings.json') 還原預設後端；
+//  產製端於每語系之案例迴圈前後做同一件事（同層級同順序）。帶 c.settings 之 case（E2E-008）前後換後端再還原 MOCK_SETTINGS（兩端同在 runCase）。
 //  因 mock 圖表確定性穩定 → 直接 pixel baseline，不需 driveActivity / overlayRegions 貼圖。
 import fs from 'fs'
 import assert from 'assert'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, waitUntilExist, genTempSettings, restartBackend, assertBaselineMatch, clickNavItem, navBtn, waitNavSettled, readStaLegend, waitStaLegendSettled, assertStaLegendLayout, clickStaLegendItem, clickStaLegendPager } from './tools/e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, setLang, captureStableWithBox, waitUntilExist, genTempSettings, restartBackend, assertBaselineMatch, clickNavItem, navBtn, waitNavSettled, readStaLegend, waitStaLegendSettled, assertStaLegendLayout, clickStaLegendItem, clickStaLegendPager } from './tools/e2e-setup.mjs'
+import { runBaselineCase, createBaselineGate, itemsUnionBox, inkRect, canvasInkRects } from './tools/e2eLib.mjs'
+//canvas 圖例之矩形(readStaLegend 回報之圖例列、翻頁箭頭、圖例項)緊貼墨跡, 直接框時紅框內緣距字僅約 1px(紅框壓字)
+//→ 一律經 w-package-tools-e2e inkRect 外擴 INK_PAD(4) 再交 captureStableWithBox(2026-09-28, 技能 §7.3-8)
 
 const PICS_DIR = './test/pics/stainfor'
 const LANGS = ['eng', 'cht']
@@ -42,14 +52,7 @@ const ALL_MOCK_EVENTS = ['api/getPerm-success', 'checkUser-error', 'getWebInfor-
 
 function picPath(lang, name) { return `${PICS_DIR}/stainfor-${lang}-${name}.png` }
 
-//設定語系（test setup 層，非 act-under-test；對齊雙語覆蓋維度）。
-//對齊其他 perm e2e：cht 走語系切換（等同 UI 語言選單的 $ui.setLang）；eng 為預設不切，但補等同 settle buffer。
-async function setLang(page, lang) {
-    if (lang !== 'eng') {
-        await page.evaluate((l) => { window.$vo.$ui.setLang(l, 'e2e-setLang') }, lang)
-    }
-    await page.waitForTimeout(600)
-}
+//設定語系 setLang（test setup 層，非 act-under-test；cht 走 $ui.setLang、eng 不切但補等量 settle）取自 e2e-setup（原本檔內版本與之逐字相同，已收斂）。
 
 //導航至統計資訊頁（user-facing：點左側「統計資訊」導覽），等事件圖表 canvas 出現。
 //openApp 已等到 csLogin+webInfor，故此處 $t 譯文已就緒（lang-aware 取標籤）。
@@ -116,18 +119,12 @@ function langSelLoc(page) {
     return page.locator('[data-fmid="app-topbar"] div[ev-resize]').filter({ has: page.locator('div[_tabindex="0"]') }).first()
 }
 
-//紅框上緣不得蓋到正上方之元素：紅框自目標外擴 6px（captureStableWithBox），語系清單緊接下拉下方（間距約 1px），
-//照原矩形框會使框帶壓到下拉上之目前語系文字；此時把目標上緣內縮，使框之外緣落在 above 下方（框帶收在清單上內距內，不蓋清單文字）。
-function frameBelow(rect, above) {
-    const minY = above.y + above.height + 7 //框外緣 = rect.y - 6，須 ≥ above 底緣 + 1
-    if (rect.y >= minY) return rect
-    return { x: rect.x, y: minY, width: rect.width, height: rect.height - (minY - rect.y) }
-}
-
-//勾選「全部加總」（user-facing：勾 #staShowTotal checkbox）→ 等圖表重繪 settle。勾選後圖表加入 Total 加總線。
-async function checkShowTotal(page) {
+//勾選「全部加總」（user-facing：勾 #staShowTotal checkbox）→ 等圖表重建（首條系列為加總線、系列數＝事件數＋1）。
+//原固定 5 秒（debounce 300ms＋重算＋重繪）為唯一同步，負載高時 debounce 延遲即截到未加總之圖；改與 E2E-008 同一偵測（waitSeries），
+//重繪動畫由 captureStable 之穩定判定收斂（2026-09-28）
+async function checkShowTotal(page, lang, nEvents) {
     await page.locator('#staShowTotal').check()
-    await page.waitForTimeout(5000) //等 debounce(300) + optEvent 重算 + echarts 重繪 settle
+    await waitSeries(page, '加入加總線之圖表', nEvents + 1, TOTAL_NAME[lang])
 }
 
 //時間分組下拉（自製 WTextSelect，LayoutContentStaInfor.vue id="staTimeIntervalSel"，清單 teleport 至 body 之 .WPopperFix[wtlp="staTimeIntervalSel"]）
@@ -288,11 +285,14 @@ async function assertTableSpec(page, lang) {
     }
 }
 
-//case 定義：run(browser,lang) 走流程並回傳 { buf, page }；mocha 模式再加語意斷言。
+//case 定義：run(browser,lang) 走流程並回傳單張 { buf, page } 或多階段 { shots:[{name,buf}], page }；stages 為該案產出之全部圖鍵
+//（與寫檔名、比對名一致，產出與宣告不符即報錯）；semantic(page,lang) 為截圖之後之語意斷言（產製端與比對端皆於寫檔／比對前執行）。
+//順序＝mocha it 順序＝產製順序。
 const CASES = [
     {
         //E2E-001：進統計資訊頁 → 每事件各一條折線（5 條）
         name: 'E2E-001-event-all',
+        stages: ['E2E-001-event-all'],
         run: async (browser, lang) => {
             const page = await openApp(browser)
             await setLang(page, lang)
@@ -306,6 +306,7 @@ const CASES = [
     {
         //E2E-002：以圖例關掉其餘事件、只留 2 個 → 僅 2 條折線（展示單一事件趨勢辨認）
         name: 'E2E-002-event-selected',
+        stages: ['E2E-002-event-selected'],
         run: async (browser, lang) => {
             const page = await openApp(browser)
             await setLang(page, lang)
@@ -320,11 +321,12 @@ const CASES = [
     {
         //E2E-003：勾「全部加總」→ 圖表加入 Total 加總線（Total + 5 事件）
         name: 'E2E-003-event-total',
+        stages: ['E2E-003-event-total'],
         run: async (browser, lang) => {
             const page = await openApp(browser)
             await setLang(page, lang)
             await gotoStaInfor(page)
-            await checkShowTotal(page)   //勾「全部加總」#staShowTotal
+            await checkShowTotal(page, lang, 5)   //勾「全部加總」#staShowTotal（5 個 mock event → 6 條系列）
             const title = await page.evaluate(() => window.$vo.$t('staEventTitle'))
             const buf = await captureStableWithBox(page, eventCardLoc(page, title)) //觀看區：事件發生頻率卡片（含 Total 線）
             return { buf, page }
@@ -334,6 +336,7 @@ const CASES = [
     {
         //E2E-004：事件統計表 → 5 列、依最近1日降序、表頭含各時間窗欄位
         name: 'E2E-004-event-table',
+        stages: ['E2E-004-event-table'],
         run: async (browser, lang) => {
             const page = await openApp(browser)
             await setLang(page, lang)
@@ -357,6 +360,7 @@ const CASES = [
         //E2E-005：時間分組下拉（自製 WTextSelect）切「每日」→ 圖表改以每日分桶重取重繪（mock day = 7 桶）。
         //多階段（每步兩張）：點下拉前框住觸發區 → 清單展開框住整份清單 → 點「每日」前框住該項目 → 選後框住事件頻率卡片。
         name: 'E2E-005-interval-day',
+        stages: ['E2E-005-1-click-interval', 'E2E-005-2-list-open', 'E2E-005-3-click-day', 'E2E-005-4-day-selected'],
         run: async (browser, lang) => {
             const page = await openApp(browser)
             await setLang(page, lang)
@@ -368,9 +372,10 @@ const CASES = [
             const popup = page.locator(`.WPopperFix[wtlp="staTimeIntervalSel"]:visible`)
             await popup.first().waitFor({ state: 'visible', timeout: 10000 })
             await page.waitForTimeout(500)
-            const s2 = await captureStableWithBox(page, popup) //E2E-005-2-list-open：清單展開，框住整份清單（每小時 / 每日）
+            //清單為 teleport 之浮層: 經 itemsUnionBox fit 框線置於清單內容(或項目)與清單外內容(觸發區)之間隙正中、項目間取間隙正中, 四周空白處照常外擴(2026-09-28)
+            const s2 = await captureStableWithBox(page, itemsUnionBox(popup.first(), { fit: true })) //E2E-005-2-list-open：清單展開，框住整份清單（每小時 / 每日）
             const dayItem = popup.locator('div[tabindex="0"]').filter({ hasText: dayText }).first()
-            const s3 = await captureStableWithBox(page, dayItem) //E2E-005-3-click-day：點擊前框住「每日」項目整顆
+            const s3 = await captureStableWithBox(page, itemsUnionBox(dayItem, { fit: true })) //E2E-005-3-click-day：點擊前框住「每日」項目整顆
             await dayItem.click()
             await popup.first().waitFor({ state: 'hidden', timeout: 10000 })
             await waitUntilExist(page, '每日分桶圖表（xAxis 7 桶）', () => {
@@ -394,6 +399,7 @@ const CASES = [
         //6 步真實路徑：①登入點「統計資訊」（1440 並排）②縮窄視窗至 430（導覽區自動收合、圖寬 330：一般式需 3 列會壓到刻度 → 改單列捲動式）
         //  ③點圖例右側「下一頁」箭頭 ④點該頁第一個事件（隱藏其折線）⑤再縮至 420 ⑥拉回 1440；不寫入任何資料
         name: 'E2E-006-legend-scroll-page',
+        stages: ['E2E-006-1-narrowed', 'E2E-006-2-click-next', 'E2E-006-3-next-page', 'E2E-006-4-click-event', 'E2E-006-5-event-hidden', 'E2E-006-6-widened'],
         run: async (browser, lang) => {
             const page = await openApp(browser)
             await setLang(page, lang)
@@ -410,8 +416,8 @@ const CASES = [
             const nPage = Number(s.pager.text.split('/')[1])
             assert.ok(nPage >= 2, `5 個事件於圖寬 330 應分成 ≥ 2 頁，實得 ${nPage}`)
             const firstP1 = s.items.find((o) => o.inWindow).name
-            const s1 = await captureStableWithBox(page, s.legendRect) //E2E-006-1-narrowed：縮為 430 後框住圖例列（可視之事件、翻頁箭頭與頁次）
-            const s2 = await captureStableWithBox(page, s.pager.next.rect) //E2E-006-2-click-next：點擊前框住「下一頁」箭頭
+            const s1 = await captureStableWithBox(page, inkRect(s.legendRect)) //E2E-006-1-narrowed：縮為 430 後框住圖例列（可視之事件、翻頁箭頭與頁次）
+            const s2 = await captureStableWithBox(page, inkRect(s.pager.next.rect, { neighbors: [s.pager.textRect, s.pager.prev && s.pager.prev.rect].filter(Boolean) })) //E2E-006-2-click-next：點擊前框住「下一頁」箭頭
 
             //③翻下一頁
             await clickStaLegendPager(page, 'next')
@@ -421,8 +427,21 @@ const CASES = [
             const inWin = s.items.filter((o) => o.inWindow)
             assert.ok(inWin.length >= 1 && inWin[0].name !== firstP1, `翻頁後可視之事件應換成下一批，實得 ${JSON.stringify(inWin.map((o) => o.name))}（第 1 頁首項 ${firstP1}）`)
             const target = inWin[0]
-            const s3 = await captureStableWithBox(page, s.legendRect) //E2E-006-3-next-page：框住圖例列（第 2 頁之事件與頁次 2/N）
-            const s4 = await captureStableWithBox(page, target.whole) //E2E-006-4-click-event：點擊前框住該頁第一個事件整顆（圖示與名稱）
+            const s3 = await captureStableWithBox(page, inkRect(s.legendRect)) //E2E-006-3-next-page：框住圖例列（第 2 頁之事件與頁次 2/N）
+            //圖例項緊鄰: 框線不越過與鄰項間隙之正中(inkRect neighbors; 原外擴後壓到下一項之圖示, 2026-09-28)。
+            //可見範圍取項目之實際墨跡左右範圍(w-package-tools-e2e canvasInkRects 讀 canvas 像素): whole 與 zrender 之文字矩形右緣皆比字形多約 3px,
+            //以之取中點會使框線偏向鄰項; 鄰項取畫面上有墨跡之其他項目(含被捲動窗裁掉一部分者——只算 inWindow 會漏掉緊鄰之半顯示項)
+            //(同日審圖: 框線距自身文字 7px、貼下一項之綠色圖示 0px)
+            const inks = await canvasInkRects(page, s.items.map((o) => o.whole))
+            const visOf = (o, ink) => {
+                const y0 = Math.min(o.whole.y, o.text.y)
+                const y1 = Math.max(o.whole.y + o.whole.height, o.text.y + o.text.height)
+                return { x: ink.x, y: y0, width: ink.width, height: y1 - y0 }
+            }
+            const ti = s.items.indexOf(target)
+            assert.ok(inks[ti], `目標圖例項於畫布上應有墨跡，實得 ${JSON.stringify(inks[ti])}`)
+            const others = s.items.map((o, i) => (i !== ti && inks[i] ? visOf(o, inks[i]) : null)).filter(Boolean)
+            const s4 = await captureStableWithBox(page, inkRect(visOf(target, inks[ti]), { neighbors: others })) //E2E-006-4-click-event：點擊前框住該頁第一個事件整顆（圖示與名稱）
 
             //④點該頁第一個事件
             await clickStaLegendItem(page, target.name)
@@ -446,7 +465,7 @@ const CASES = [
             s = await legendAt(page, '拉回 1440', 'plain')
             assert.equal(s.chartW, 1140, `拉回 1440 後圖寬應為 1140（導覽區展開並排），實得 ${s.chartW}`)
             assert.deepEqual(s.hidden, [target.name], `拉回後已隱藏之事件應仍隱藏，實得 ${JSON.stringify(s.hidden)}`)
-            const s6 = await captureStableWithBox(page, s.legendRect) //E2E-006-6-widened：框住圖例列（一般式列出全部事件，已隱藏者名稱為灰）
+            const s6 = await captureStableWithBox(page, inkRect(s.legendRect)) //E2E-006-6-widened：框住圖例列（一般式列出全部事件，已隱藏者名稱為灰）
             return {
                 shots: [
                     { name: 'E2E-006-1-narrowed', buf: s1 },
@@ -465,6 +484,7 @@ const CASES = [
         //6 步真實路徑：①登入點「統計資訊」②視窗縮為 700 ③點「隱藏選單」④圖隨內容區加寬、圖例恢復一般式 ⑤點「顯示選單」⑥圖變窄、圖例改回捲動式；不寫入任何資料
         //（2026-09-24 前事件圖之 autoresize 若以模板字面值傳入，收合導覽區時圖不會跟著改寬；本案例守住「圖寬＝容器寬」）
         name: 'E2E-007-legend-menu-toggle',
+        stages: ['E2E-007-1-click-hide', 'E2E-007-2-menu-hidden', 'E2E-007-3-click-show', 'E2E-007-4-menu-shown'],
         run: async (browser, lang) => {
             const page = await openApp(browser)
             await setLang(page, lang)
@@ -509,6 +529,7 @@ const CASES = [
         //6 步真實路徑：①登入點「統計資訊」②看圖例（13 事件、一般式兩列）③勾「全部加總」④點頂列語系下拉 ⑤點另一語系 ⑥圖例依新語系之加總名稱重新判定；不寫入任何資料
         name: 'E2E-008-legend-long-names',
         settings: { staEventMock: 'many' },
+        stages: ['E2E-008-1-check-total', 'E2E-008-2-total-shown', 'E2E-008-3-click-lang', 'E2E-008-4-lang-list', 'E2E-008-5-click-lang-item', 'E2E-008-6-lang-switched'],
         run: async (browser, lang) => {
             const other = lang === 'eng' ? 'cht' : 'eng'
             const typeWithTotal = { eng: 'plain', cht: 'scroll' }
@@ -520,14 +541,14 @@ const CASES = [
             await waitSeries(page, '13 事件之圖表', 13, null)
             let s = await legendAt(page, '進頁 13 事件', 'plain')
             assert.equal(s.rows, 2, `13 事件於圖寬 ${s.chartW} 應為一般式兩列，實得 ${s.rows} 列`)
-            const s1 = await captureStableWithBox(page, ['#staShowTotal', 'label[for="staShowTotal"]']) //E2E-008-1-check-total：點擊前框住「全部加總」勾選框與文字
+            const s1 = await captureStableWithBox(page, ['#staShowTotal', itemsUnionBox('label[for="staShowTotal"]', { fit: true })]) //E2E-008-1-check-total：點擊前框住「全部加總」勾選框與文字（標籤無可見邊界, 量墨跡並外擴）
 
             //③勾「全部加總」
             await page.locator('#staShowTotal').check()
             await waitSeries(page, '加入加總線之圖表', 14, TOTAL_NAME[lang])
             s = await legendAt(page, '勾全部加總', typeWithTotal[lang])
             if (s.type === 'plain') assert.equal(s.rows, 2, `加入加總後一般式應仍為兩列，實得 ${s.rows} 列`)
-            const s2 = await captureStableWithBox(page, s.legendRect) //E2E-008-2-total-shown：框住圖例（加總名稱加在最前；eng 仍兩列一般式、cht 改單列捲動式）
+            const s2 = await captureStableWithBox(page, inkRect(s.legendRect)) //E2E-008-2-total-shown：框住圖例（加總名稱加在最前；eng 仍兩列一般式、cht 改單列捲動式）
 
             //④點頂列語系下拉
             const s3 = await captureStableWithBox(page, langSelLoc(page)) //E2E-008-3-click-lang：點擊前框住頂列語系下拉整顆
@@ -535,10 +556,11 @@ const CASES = [
             const popup = page.locator('.WPopperFix:visible')
             await popup.first().waitFor({ state: 'visible', timeout: 10000 })
             await page.waitForTimeout(500)
-            const selBox = await langSelLoc(page).boundingBox()
-            const s4 = await captureStableWithBox(page, frameBelow(await popup.first().boundingBox(), selBox)) //E2E-008-4-lang-list：清單展開，框住整份語系清單（框之上緣收在清單內側，不蓋到下拉上之目前語系）
+            //清單緊接下拉下方: 經 itemsUnionBox fit(浮層規則)框線置於清單內容與清單外內容之間隙正中, 不蓋到清單外之下拉與頁面內容、也不貼清單內之字
+            //(2026-09-28 取代原 frameBelow——只收上緣、左右下仍外擴 6px)
+            const s4 = await captureStableWithBox(page, itemsUnionBox(popup.first(), { fit: true })) //E2E-008-4-lang-list：清單展開，框住整份語系清單（框線不蓋到清單外之下拉與頁面內容）
             const item = popup.locator('div[tabindex="0"]').filter({ hasText: LANG_TEXT[other] }).first()
-            const s5 = await captureStableWithBox(page, frameBelow(await item.boundingBox(), selBox)) //E2E-008-5-click-lang-item：點擊前框住另一語系項目整顆（該項為清單第一項時同上收邊）
+            const s5 = await captureStableWithBox(page, itemsUnionBox(item, { fit: true })) //E2E-008-5-click-lang-item：點擊前框住另一語系項目整顆（框線在與相鄰項目之間隙正中）
 
             //⑤點另一語系 → ⑥圖例依新語系之加總名稱重新判定
             await item.click()
@@ -546,7 +568,7 @@ const CASES = [
             await waitSeries(page, '切換語系後之圖表', 14, TOTAL_NAME[other])
             s = await legendAt(page, '切換語系後', typeWithTotal[other])
             if (s.type === 'plain') assert.equal(s.rows, 2, `切換語系後一般式應為兩列，實得 ${s.rows} 列`)
-            const s6 = await captureStableWithBox(page, s.legendRect) //E2E-008-6-lang-switched：框住圖例（切到 cht 改單列捲動式、切到 eng 恢復兩列一般式）
+            const s6 = await captureStableWithBox(page, inkRect(s.legendRect)) //E2E-008-6-lang-switched：框住圖例（切到 cht 改單列捲動式、切到 eng 恢復兩列一般式）
             return {
                 shots: [
                     { name: 'E2E-008-1-check-total', buf: s1 },
@@ -562,58 +584,80 @@ const CASES = [
     },
 ]
 
-//手術式重產（§6.3）：--names a,b,c 只產指定 case；--langs eng,cht 只產指定語系。截圖「前」就 gate（省截圖成本）。
-function argList(flag) {
-    const i = process.argv.indexOf(flag)
-    if (i >= 0 && process.argv[i + 1]) return process.argv[i + 1].split(',').map((s) => s.trim()).filter(Boolean)
-    return null
+//單一案例管線（產製端與比對端共用）：prepare（帶 c.settings 者）換後端 → fresh browser（每案 launch／close，消 GPU/font/CSS cache 跨 case 累積差異）
+//→ run(browser, lang) 自行 openApp → setLang → 進統計頁 → 流程與截圖（故 openPage 不開頁，以本案之 browser 呼叫 run）→ semantic（以 run 回傳之 page）
+//→ 寫檔／比對 → finally 關瀏覽器 → afterCase（帶 c.settings 者）還原本檔預設 mock 後端 MOCK_SETTINGS（同原兩端）
+async function runCase(mode, lang, c, extra = {}) {
+    return await runBaselineCase({
+        mode,
+        lang,
+        name: c.name,
+        openPage: async () => null,
+        run: (page, lg, ctx) => c.run(ctx.browserRef.current, lg),
+        stages: c.stages,
+        launch: launchBrowser,
+        pathOf: picPath,
+        labelOf: (lg, key) => `stainfor-${lg}-${key}`,
+        match: assertBaselineMatch,
+        prepare: async () => {
+            if (c.settings) await restartBackend(genTempSettings(c.settings)) //case 專用後端設定（兩端同）
+        },
+        semantic: c.semantic ? (ctx) => c.semantic(ctx.page, ctx.lang) : null,
+        afterCase: async () => {
+            if (c.settings) await restartBackend(genTempSettings(MOCK_SETTINGS)) //還原本檔預設 mock 後端
+        },
+        ...extra,
+    })
 }
-//前綴或完整匹配：傳 'E2E-001' 即可匹配 'E2E-001-event-all'
-function nameMatch(list, caseName) { return list.some((nm) => caseName === nm || caseName.startsWith(nm)) }
+
+//篩選（gate）通過、開始觸及服務後才設為 true；.catch 據此決定是否重啟後端還原。
+//why：篩選報錯（如 --names 打錯）時尚未觸及任何服務，此時不得 restartBackend——無自建後端時它會殺 11006 之監聽者並另起後端（e2e-setup killForeignOnRestart）。
+let servicesTouched = false
 
 async function generateBaseline() {
     console.log('=== 產製 stainfor baseline 開始 ===')
-    const onlyNames = argList('--names')
-    const onlyLangs = argList('--langs')
-    await startServersOnce()
-    //啟動 mock 後端（確定性事件資料集）
-    await restartBackend(genTempSettings(MOCK_SETTINGS))
-    fs.mkdirSync(PICS_DIR, { recursive: true })
     process.env.E2E_STRICT_CAPTURE = '1' //regen 端：captureStable 未 settle 即 throw，拒絕寫入未穩定畫面
-    try {
-        for (const lang of LANGS) {
-            if (onlyLangs && !nameMatch(onlyLangs, lang)) continue //§6.3 手術式：跳過未指定語系
-            for (const c of CASES) {
-                if (onlyNames && !nameMatch(onlyNames, c.name)) continue //§6.3 手術式：截圖前 gate
-                if (c.settings) await restartBackend(genTempSettings(c.settings)) //case 專用後端設定（同 mocha 端）
-                //per-case fresh browser（每 case 全新進程，消 GPU/font/CSS cache 跨 case 累積差異；對齊其他 perm e2e）
-                const browser = await launchBrowser()
-                try {
-                    const r = await c.run(browser, lang)
-                    //run 回傳「單張 { buf, page }」或「多階段 { shots:[{name,buf}], page }」；統一正規化為陣列後逐張寫入
-                    const shots = r.shots || [{ name: c.name, buf: r.buf }]
-                    for (const s of shots) {
-                        fs.writeFileSync(picPath(lang, s.name), s.buf)
-                        console.log('wrote', picPath(lang, s.name), s.buf.length, 'bytes')
-                    }
-                }
-                finally {
-                    await browser.close()
-                    if (c.settings) await restartBackend(genTempSettings(MOCK_SETTINGS)) //還原本檔預設 mock 後端
-                }
+    //截圖前篩選（--names / --langs / --write-mode / E2E_BASELINE_OUT_DIR）；不符任何鍵即於此報錯（尚未啟動或重啟任何服務）
+    const gate = createBaselineGate({ langs: LANGS, cases: CASES })
+    console.log(gate.describe())
+    servicesTouched = true
+    await startServersOnce()
+    fs.mkdirSync(PICS_DIR, { recursive: true })
+    for (const lang of gate.langs) {
+        const cs = gate.casesFor(lang)
+        if (cs.length === 0) continue //同 mocha：該語系 describe 無可跑之 it 時不執行 before／after
+        //同比對端 describe（每語系）之 before／after：啟動 mock 後端（確定性事件資料集）→ 各案 → 還原預設後端
+        await restartBackend(genTempSettings(MOCK_SETTINGS))
+        try {
+            for (const c of cs) {
+                console.log(`  ${lang}/${c.name}`)
+                const r = await runCase('regen', lang, c, { gate })
+                console.log(`  ✔ ${lang}/${c.name}（寫出 ${r.written.length} 張，略過 ${r.skipped.length}，保留 ${r.kept.length}）`)
             }
         }
+        finally {
+            //還原預設後端
+            await restartBackend('./settings.json')
+        }
     }
-    finally {
-        //還原預設後端
-        await restartBackend('./settings.json')
-    }
+    //--names 之任一項未產出即報錯（不靜默略過）
+    gate.finalize()
     cleanup() //←【必】非 mocha 直跑須顯式呼叫，否則 process 不退
     console.log('=== 產製 stainfor baseline 完成 ===')
 }
 
 if (isBaseline) {
-    generateBaseline().catch(async (err) => { console.log('baseline 例外', err); try { await restartBackend('./settings.json') } catch (e) {} ; cleanup(); process.exit(1) })
+    generateBaseline().catch(async (err) => {
+        console.log('baseline 例外', err)
+        if (servicesTouched) {
+            try {
+                await restartBackend('./settings.json')
+            }
+            catch (e) {}
+        }
+        cleanup()
+        process.exit(1)
+    })
 }
 else {
     for (const lang of LANGS) {
@@ -622,7 +666,7 @@ else {
             before(async function() {
                 this.timeout(200000)
                 await startServersOnce()
-                //啟動 mock 後端（確定性事件資料集）。before 對整 describe 一次，after 還原。
+                //啟動 mock 後端（確定性事件資料集）。before 對整 describe 一次，after 還原（產製端每語系同層級同順序）。
                 await restartBackend(genTempSettings(MOCK_SETTINGS))
             })
             after(async function() {
@@ -630,24 +674,11 @@ else {
                 //還原預設後端
                 await restartBackend('./settings.json')
             })
+            //per-case fresh browser、case 專用後端設定切換與還原、語意斷言（主）與像素比對（補）皆由 runCase 負責（與產製端同一管線）
             for (const c of CASES) {
                 it(c.name, async function() {
                     this.timeout(c.settings ? 360000 : 240000)
-                    if (c.settings) await restartBackend(genTempSettings(c.settings)) //case 專用後端設定（同 regen 端）
-                    //per-case fresh browser（每 case 全新進程，對齊其他 perm e2e）
-                    const browser = await launchBrowser()
-                    try {
-                        const r = await c.run(browser, lang)
-                        if (c.semantic) await c.semantic(r.page, lang)
-                        const shots = r.shots || [{ name: c.name, buf: r.buf }]
-                        for (const s of shots) {
-                            assertBaselineMatch(s.buf, picPath(lang, s.name), `stainfor-${lang}-${s.name}`)
-                        }
-                    }
-                    finally {
-                        await browser.close()
-                        if (c.settings) await restartBackend(genTempSettings(MOCK_SETTINGS)) //還原本檔預設 mock 後端
-                    }
+                    await runCase('compare', lang, c, { onKnownDefect: () => this.skip() }) //已知缺陷協定: 標 pending(提示框殘留已由 w-component-vue 2.5.24 修正, 其偵測改為直接失敗, 見 e2e-setup probeStuckTooltip)
                 })
             }
         })

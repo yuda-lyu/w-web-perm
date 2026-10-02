@@ -146,6 +146,14 @@ let kpLang = {
         eng: `Duplicate field value in saved data`,
         cht: `儲存資料的欄位值重複`,
     },
+    saveInProgress: { //同一操作者之同表儲存處理中再送出 (ADR-025)
+        eng: `The previous save is still in progress. Please do not submit again.`,
+        cht: `上一次儲存仍在處理中，請勿重複送出`,
+    },
+    saveNewRowExists: { //標為新增之列已存在(同一包資料重送) (ADR-025)
+        eng: `The newly added data has already been saved. Please reload the page before making changes.`,
+        cht: `新增之資料已儲存過，請重新整理頁面後再操作`,
+    },
     saveTabItemsSuccess: {
         eng: `Saved successfully`,
         cht: `儲存成功`,

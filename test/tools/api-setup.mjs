@@ -71,7 +71,10 @@ export async function getWoItems() {
 //callRpc：直打資料通道 POST /api/main（w-converhp 協定, obj2u8arr 編碼）；傳輸層拒絕時回 { ok:false, msg:'permission denied' }。
 //  opt.sysToken：本體 __sysToken__（預設同 Authorization 之 token；供 getUserIdByToken 路徑另給）；opt.headers：附加標頭（如 Referer）。
 //  回 { ok, state, msg, output, raw }，raw 為回應位元組之 utf8 文字（供權杖外洩掃描）。
-//  註：api-verifyConn-auth / api-updateTabs / api-updateUsers-forGrups / e2e-doubleclick 各有一份既有之近似實作，尚未改用本函式（見 CLAUDE_rulebook.md 已知缺口）。
+//  註（2026-09-28 收斂）：api-verifyConn-auth / api-updateTabs / api-doubleclick（原 e2e-doubleclick，見
+//  spec/設計要點與取捨.md ADR-017 Update）三檔原各有一份近似實作，逐呼叫點核對回傳形狀後確認斷言不受影響，
+//  已直接改 import 本函式；api-updateUsers-forGrups 因原呼叫慣例省略第 3 參（依賴預設 TOKEN_ADMIN，本函式
+//  token 為必填）故於該檔內以薄封裝補回預設值，不改本函式行為。
 export async function callRpc(funcName, args, token, opt = {}) {
     const sysToken = ('sysToken' in opt) ? opt.sysToken : token
     const payload = { func: funcName, input: { __sysInputArgs__: args, __sysToken__: sysToken } }

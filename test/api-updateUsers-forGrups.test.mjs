@@ -6,28 +6,13 @@
 //以 restartBackend(genTempSettings({ modeEditUsers: 'for:grups' })) 換設定, after 還原 './settings.json'; DB 以 RPC 還原 base seed。
 
 import assert from 'assert'
-import obj2u8arr from 'wsemi/src/obj2u8arr.mjs'
-import u8arr2obj from 'wsemi/src/u8arr2obj.mjs'
-import { startApi, apiBaseUrl, TOKEN_ADMIN, getWoItems } from './tools/api-setup.mjs'
+import { startApi, TOKEN_ADMIN, getWoItems, callRpc as callRpcShared } from './tools/api-setup.mjs'
 import { restartBackend, genTempSettings } from './tools/e2e-setup.mjs'
 
-
-async function callRpc(funcName, args, token = TOKEN_ADMIN) {
-    let payload = { func: funcName, input: { __sysInputArgs__: args, __sysToken__: token } }
-    let body = Buffer.from(obj2u8arr(payload))
-    let r = await fetch(`${apiBaseUrl}/api/main`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/octet-stream' },
-        body,
-    })
-    let ab = await r.arrayBuffer()
-    let respObj = u8arr2obj(new Uint8Array(ab))
-    if (respObj && 'error' in respObj) return { ok: false, msg: String(respObj.error) }
-    //kpFunExt 回傳包成 { state, msg }; msg 為回傳值本體(getWebInfor 為物件, updateXxx 為 key 字串)
-    let out = respObj?.success?.output
-    if (out && typeof out === 'object' && 'state' in out) return { ok: out.state === 'success', msg: out.msg, output: out.msg }
-    return { ok: true, output: out }
-}
+//callRpc：本檔原一份局部實作，2026-09-28 收斂改呼叫 test/tools/api-setup.mjs 之共用版。差異：共用版 token 為
+//必填參數（無預設值），本檔多處呼叫沿用省略第 3 參之慣例（依賴預設 TOKEN_ADMIN）；故此處以薄封裝補回預設值，
+//不改共用版本身之行為或回傳形狀（`.output` 兩版皆為 out.msg 原值，本檔斷言只用 `.ok`／`.output`，不受影響）。
+const callRpc = (funcName, args, token = TOKEN_ADMIN) => callRpcShared(funcName, args, token)
 
 async function readUsers() {
     let woItems = await getWoItems()

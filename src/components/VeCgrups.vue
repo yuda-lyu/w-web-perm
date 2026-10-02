@@ -763,7 +763,8 @@ export default {
 
             let vo = this
 
-            //save按鈕第一行立刻釋放視覺鎖
+            //save按鈕第一行立刻釋放視覺鎖: 本對話框不打 API(只把設定序列化回傳頁面, 由清單頁儲存統一寫入), 重複觸發只重複 resolve 同一 promise(無作用),
+            //故刻意不套 runSubmit; 打 API 之送出一律經 runSubmit 且不於 handler 解鎖 (ADR-025)
             msg.pm.resolve()
 
             //fire-and-forget, 不 await
@@ -860,6 +861,12 @@ export default {
             // console.log('methods show', msg)
 
             let vo = this
+
+            //單例: 對話框開啟中再次開啟(如焦點留在開啟鈕時按 Enter)時, 舊階段之等待者視同關閉(reject('close window'), 同 clickClose;
+            //對已結束者無作用), 否則其 promise 永久懸置 (ADR-025; 同 CheckYes / CheckYesNo)
+            if (vo.pm) {
+                vo.pm.reject('close window')
+            }
 
             //pm
             vo.pm = genPm()

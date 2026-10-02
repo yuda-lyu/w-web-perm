@@ -23,11 +23,13 @@ import replace from 'wsemi/src/replace.mjs'
 import strdelleft from 'wsemi/src/strdelleft.mjs'
 import ltdtmapping from 'wsemi/src/ltdtmapping.mjs'
 import pmKeyMutex from 'wsemi/src/pmKeyMutex.mjs'
+import cacheSt from 'wsemi/src/cacheSt.mjs'
 import WServHapiServer from 'w-serv-hapi/src/WServHapiServer.mjs'
 import WServOrm from 'w-serv-orm/src/WServOrm.mjs'
 import ds from '../src/schema/index.mjs'
 import { getUserRules } from '../src/plugins/mShare.mjs'
 import procCore from './procCore.mjs'
+import createLockSave from './lockSave.mjs'
 import procLang from './procLang.mjs'
 import srLogInit from './srLog.mjs'
 import procStaInfor from './procStaInfor.mjs'
@@ -320,8 +322,14 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     let kmx = pmKeyMutex()
 
 
+    //lockSave: 後台整表寫入(updateTabItems)之雙擊防護(後端, 見 lockSave.mjs, ADR-025): 以「updateTabItems:{表名}:{操作者 id}」於 cacheSt 原子占位,
+    //同一操作者之同表寫入處理中再送出即 reject 'saveInProgress'(不排隊); 包在 kmx 之外層, 不同操作者之並行仍由 kmx 序列化(ADR-012)
+    let cst = cacheSt()
+    let lockSave = createLockSave(cst)
+
+
     //procCore: 整表批次 diff 寫入邏輯 (updateTabItems + updateTargets/Pemis/Grups/Users)
-    let pc = procCore(woItems, procOrm, { srLog, kmx })
+    let pc = procCore(woItems, procOrm, { srLog, kmx, lockSave })
 
 
     //procStaInfor: 統計資訊, fdLog 對齊 srLog 使用同一目錄(讀 settings.logFd, fallback 邏輯同 srLog.mjs); mock 由 settings.staEventMock 注入(e2e 統計圖穩定用)
@@ -1077,6 +1085,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                 console.log('apiType', apiType)
                 console.log('authorization', maskTok(authorization))
                 console.log('invalid token')
+                srLog.error({ event: 'verifyConn-error', ok: false, apiType, msg: 'tokenNoPermission' }) //認證失敗須入 log 供稽核/統計(CLAUDE.md「log 記錄要點」; 同 w-web-api、w-web-task); 只記 key, 不記 authorization 原值
                 return false
             }
 

@@ -3,8 +3,9 @@
 //
 //【與既有 api 查詢測之差異】perm 的 4 個寫入函式註冊於 WServHapiServer 的 kpFunExt（WWebPerm.mjs:1132-1135，
 //委派 pc.updateTargets 等，pc 為 procCore 實例，WWebPerm.mjs:300），走 w-converhp RPC 通道（POST
-//{apiBaseUrl}/api/main，body 為 obj2u8arr 編碼），非裸 fetch 查詢 URL。故本檔仿
-//w-web-sso/test/e2e-doubleclick.test.mjs 之 callRpc：用 Node 內建 fetch + wsemi 之 obj2u8arr/u8arr2obj 直打。
+//{apiBaseUrl}/api/main，body 為 obj2u8arr 編碼），非裸 fetch 查詢 URL。callRpc 改自 test/tools/api-setup.mjs
+//import（2026-09-28 收斂；原本檔一份局部實作，仿 w-web-sso/test/api-doubleclick.test.mjs 之同名函式、
+//用 Node 內建 fetch + wsemi 之 obj2u8arr/u8arr2obj 直打，現直接改用共用版，斷言不受影響）。
 //RPC 為 stateless POST（非常駐連線），無 sso 的 force-exit 顧慮；process 由 e2e-setup 的 mocha root after 殺 backend。
 //
 //【整表 diff 語意（已 Read 原始碼確認）】updateTabItems 對整張表（select() 無 from 過濾）做 ltdtDiffByKey：
@@ -19,9 +20,7 @@
 //DB 斷言一律 getWoItems() 唯讀 select（跨進程唯讀實測可行；寫入一律走 backend RPC，測試進程不寫 DB）。
 
 import assert from 'assert'
-import obj2u8arr from 'wsemi/src/obj2u8arr.mjs'
-import u8arr2obj from 'wsemi/src/u8arr2obj.mjs'
-import { startApi, apiBaseUrl, TOKEN_ADMIN, getWoItems } from './tools/api-setup.mjs'
+import { startApi, TOKEN_ADMIN, getWoItems, callRpc } from './tools/api-setup.mjs'
 
 
 //4 個寫入 RPC 對照表：RPC 名 ↔ keyTable ↔ diff/去重 鍵
@@ -33,34 +32,11 @@ const RPC = {
 }
 
 
-//callRpc：直打 POST {apiBaseUrl}/api/main，仿 w-converhp client sendPkg('basic') 編碼。
-//回傳 normalized { ok, state, msg }。kpFunExt handler 首參為 userId（由 __sysToken__ 解出），故 args 只給前端參數。
-async function callRpc(funcName, args, token = TOKEN_ADMIN) {
-    let payload = { func: funcName, input: { __sysInputArgs__: args, __sysToken__: token } }
-    let body = Buffer.from(obj2u8arr(payload))
-    let r = await fetch(`${apiBaseUrl}/api/main`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/octet-stream' },
-        body,
-    })
-    let ab = await r.arrayBuffer()
-    let respObj = u8arr2obj(new Uint8Array(ab))
-    if (respObj && typeof respObj === 'object') {
-        if ('error' in respObj) {
-            return { ok: false, state: 'error', msg: String(respObj.error) }
-        }
-        if ('success' in respObj) {
-            let out = respObj.success?.output
-            if (out && typeof out === 'object') {
-                if (out.state === 'success') return { ok: true, state: 'success', msg: out.msg }
-                let m = out.msg
-                let msgStr = (typeof m === 'string') ? m : (m?.key ?? m?.message ?? JSON.stringify(m))
-                return { ok: false, state: out.state, msg: msgStr }
-            }
-        }
-    }
-    return { ok: false, state: 'error', msg: `unparseable response: ${JSON.stringify(respObj)}` }
-}
+//callRpc：本檔原一份局部實作（直打 POST {apiBaseUrl}/api/main，仿 w-converhp client sendPkg('basic') 編碼），
+//2026-09-28 收斂改直接 import test/tools/api-setup.mjs 之共用版。差異僅共用版多 raw／opt（本檔皆未使用）、
+//reject 訊息之非字串 msg 一律 JSON.stringify（本檔唯一之 duplicate-key 檢測回傳純字串 'saveRowFieldDuplicate'，
+//見 server/procCore.mjs 之 ckKey，兩版於此皆得同一字串），故換 import 後 `.ok`／`.msg.includes(...)` 斷言不受影響
+//（回歸測試已過）。kpFunExt handler 首參為 userId（由 __sysToken__ 解出），故 args 只給前端參數。
 
 
 //讀整張表（唯讀），回傳 rows 陣列（含全部欄位）。

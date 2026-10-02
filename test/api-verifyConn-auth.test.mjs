@@ -10,37 +10,11 @@
 //AUTH-003 需把 admin 自己停用, 停用後所有通道皆拒、無法經 RPC 還原, 故 after 以 restartBackend(reseed) 重建 base seed。
 
 import assert from 'assert'
-import obj2u8arr from 'wsemi/src/obj2u8arr.mjs'
-import u8arr2obj from 'wsemi/src/u8arr2obj.mjs'
-import { startApi, apiBaseUrl, TOKEN_ADMIN, TOKEN_APP, TOKEN_PETER, TOKEN_BAD, getWoItems } from './tools/api-setup.mjs'
+import { startApi, TOKEN_ADMIN, TOKEN_APP, TOKEN_PETER, TOKEN_BAD, getWoItems, callRpc } from './tools/api-setup.mjs'
 import { restartBackend } from './tools/e2e-setup.mjs'
 
-
-async function callRpc(funcName, args, token) {
-    let payload = { func: funcName, input: { __sysInputArgs__: args, __sysToken__: token } }
-    let body = Buffer.from(obj2u8arr(payload))
-    let r = await fetch(`${apiBaseUrl}/api/main`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/octet-stream' },
-        body,
-    })
-    let ab = await r.arrayBuffer()
-    let respObj = u8arr2obj(new Uint8Array(ab))
-    if (respObj && typeof respObj === 'object') {
-        if ('error' in respObj) {
-            return { ok: false, state: 'error', msg: String(respObj.error) }
-        }
-        if ('success' in respObj) {
-            //kpFunExt 回傳包成 { state, msg }; msg 為回傳值本體(getWebInfor 為物件, updateXxx 為 key 字串)
-            let out = respObj.success?.output
-            if (out && typeof out === 'object' && 'state' in out) {
-                return { ok: out.state === 'success', state: out.state, msg: typeof out.msg === 'string' ? out.msg : JSON.stringify(out.msg), output: out.msg }
-            }
-            return { ok: true, state: 'success', output: out }
-        }
-    }
-    return { ok: false, state: 'error', msg: `unparseable response: ${JSON.stringify(respObj)}` }
-}
+//callRpc：本檔原一份局部實作，與 test/tools/api-setup.mjs 匯出版之邏輯逐式相同（僅缺 raw 欄位與 opt 參數，
+//本檔皆未使用），2026-09-28 收斂改直接 import（斷言不受影響，回歸測試已過）。
 
 async function readTable(keyTable) {
     let woItems = await getWoItems()

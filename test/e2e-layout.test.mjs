@@ -1,12 +1,20 @@
 //後台導覽版面 e2e（導覽區收合／恢復與各頁標題讓位）。對應 spec/流程_後台導覽版面.md。
 //雙模式：
-//  - 產 baseline：node test/e2e-layout.test.mjs --baseline [--names E2E-001,...] [--langs eng,cht]（寫 test/pics/layout/）
+//  - 產 baseline：node test/e2e-layout.test.mjs --baseline [--names <項,...>] [--langs eng,cht] [--write-mode missing|changed]（寫 test/pics/layout/）
 //  - 驗證（mocha）：npx mocha test/e2e-layout.test.mjs --reporter list --timeout 300000（pixelmatch 反鋸齒感知 + maxDiffPixels 容差比對，非 byte-exact）
+//  手術式重產（截圖前篩選 createBaselineGate，規格見 test/tools/e2eLib.mjs 所指之 w-package-tools-e2e 之 README.md §2.2）：
+//    --names 每項可帶語系前綴（eng-/cht-），不帶則兩語系皆產；階段圖鍵（如 E2E-001-2-hidden）只寫該張，
+//    案例鍵或其編號前綴（如 E2E-001-hide-menu、E2E-001）寫該案全部階段；不符任何鍵即報錯並列出可用鍵（於啟動服務之前）；
+//    --langs 須完全等於已宣告語系（eng / cht）；--write-mode missing 只寫缺少者、changed 只寫與現行標準圖差異超過容差者（預設全寫）；
+//    env E2E_BASELINE_OUT_DIR=<dir> 寫到暫存目錄（等價驗證用，不動 test/pics）。
+//  產製端與比對端呼叫同一案例管線（runBaselineCase）：以案例設定重啟後端 → fresh browser → openApp → setLang → 流程與截圖
+//    → 語意斷言（兩端皆於寫檔／比對前執行，不過即一張都不寫）→ 寫檔／比對 → 關瀏覽器 → 以 ./settings.json 還原後端。
 //act 走 user-facing input（真點「隱藏選單」／「顯示選單」圓鈕、真點頁籤）；assert = 語意斷言（幾何：標題左緣 ≥ 圓鈕右緣）+ pixel baseline。
 //統計頁為預設頁且圖表隨 log 變動 → 每 case 以 settings:{ staEventMock:true } 換後端（同 e2e-stainfor / e2e-users E2E-012 之 c.settings 管線）。
 import fs from 'fs'
 import assert from 'assert'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, waitUntilExist, assertBaselineMatch, restartBackend, genTempSettings, clickNavItem, SEL_NAV, navBtn, waitNavSettled, waitStaLegendSettled, assertStaLegendLayout } from './tools/e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, setLang, captureStableWithBox, waitUntilExist, assertBaselineMatch, restartBackend, genTempSettings, clickNavItem, SEL_NAV, navBtn, waitNavSettled, waitStaLegendSettled, assertStaLegendLayout } from './tools/e2e-setup.mjs'
+import { runBaselineCase, createBaselineGate } from './tools/e2eLib.mjs'
 
 const PICS_DIR = './test/pics/layout'
 const LANGS = ['eng', 'cht']
@@ -15,17 +23,17 @@ const PAGE_KEYS = ['mmStaInfor', 'mmTargets', 'mmPemis', 'mmGrups', 'mmUsers']
 
 function picPath(lang, name) { return `${PICS_DIR}/layout-${lang}-${name}.png` }
 
-//設定語系（test setup 層，非 act-under-test）；沿用各 perm e2e 之對稱 buffer 慣例（eng 不切但補等量 settle）。
-async function setLang(page, lang) {
-    if (lang !== 'eng') {
-        await page.evaluate((l) => { window.$vo.$ui.setLang(l, 'e2e-setLang') }, lang)
-    }
-    await page.waitForTimeout(600)
-}
+//設定語系 setLang（test setup 層，非 act-under-test；eng 不切但補等量 settle）取自 e2e-setup（原本檔內版本與之逐字相同，已收斂）。
 
 //—— 「隱藏選單」／「顯示選單」圓鈕定位（navBtn，以 mdi path）與收合／展開落定等待（waitNavSettled，使用者可觀察之幾何）見 e2e-setup ——
 const SEL_DRAWER_PANEL = SEL_NAV //WDrawer 平移面板 divDrawer（帶 v-domstable 之 ev-stable 屬性；展開時 x=0 寬 200、收合後 display:none）
 const SEL_STA_TITLE = 'div[style*="font-size: 1.5rem"]'  //統計頁標題「統計資訊」（LayoutContentStaInfor.vue:19；Vue 2 會把靜態 style 正規化成含空白之 `font-size: 1.5rem`）
+//導覽區收合 / 縮窄後「因此擴滿之內容區」（技能 §7.2 收合列：框整個內容區含頁面標題；不框反向操作之「顯示選單」圓鈕本身）：
+//LayoutContent.vue 之 content slot 容器（inline style 含 position:relative、寬高隨版面），取含統計頁標題之最內層者。
+//2026-09-28 改：原框統計頁標題列（block 撐滿整寬，標題右側約 1250px 空白一併框入，且非「擴滿之內容區」）
+function contentArea(page) {
+    return page.locator('div[style*="position: relative"]').filter({ has: page.locator(SEL_STA_TITLE) }).last()
+}
 
 async function clickHide(page) {
     await navBtn(page, 'hide').first().click()
@@ -69,17 +77,19 @@ async function showBtnRight(page) {
     return bb ? Math.round(bb.x + bb.width) : null
 }
 
-//case 定義：run(page,lang) 走流程並回傳多階段截圖 [{name,buf}]；mocha 模式再加 semantic 語意斷言。
+//case 定義：run(page,lang) 走流程並回傳多階段截圖 [{name,buf}]；stages 為該案產出之全部圖鍵（與寫檔名、比對名一致，產出與宣告不符即報錯）；
+//semantic 為截圖之後之語意斷言（產製端與比對端皆於寫檔／比對前執行）。順序＝mocha it 順序＝產製順序。
 const CASES = [
     {
         //E2E-001：統計頁點「隱藏選單」→ 導覽收合、標題讓位於「顯示選單」圓鈕（spec E2E-001）。
         name: 'E2E-001-hide-menu',
         settings: { staEventMock: true },
+        stages: ['E2E-001-1-click-hide', 'E2E-001-2-hidden'],
         run: async (page) => {
             await gotoPage(page, 'mmStaInfor')
             const s1 = await captureStableWithBox(page, navBtn(page, 'hide')) //E2E-001-1-click-hide：點擊前框住「隱藏選單」整顆圓鈕
             await clickHide(page)
-            const s2 = await captureStableWithBox(page, SEL_STA_TITLE) //E2E-001-2-hidden：收合後框住統計頁標題整行（其左側為「顯示選單」圓鈕，不重疊）
+            const s2 = await captureStableWithBox(page, contentArea(page)) //E2E-001-2-hidden：收合後框住因此擴滿至整寬之內容區（含統計頁標題；左上角為「顯示選單」圓鈕）
             return [
                 { name: 'E2E-001-1-click-hide', buf: s1 },
                 { name: 'E2E-001-2-hidden', buf: s2 },
@@ -110,6 +120,7 @@ const CASES = [
         //E2E-002：收合後點「顯示選單」→ 導覽展開、五頁籤列出、標題回位（spec E2E-002）。
         name: 'E2E-002-show-menu',
         settings: { staEventMock: true },
+        stages: ['E2E-002-1-click-show', 'E2E-002-2-shown'],
         run: async (page) => {
             await gotoPage(page, 'mmStaInfor')
             await clickHide(page)
@@ -138,12 +149,13 @@ const CASES = [
         //E2E-003：視窗縮為 400 → 導覽自動收合；拉回 1440 → 導覽自動展開並恢復並排（spec E2E-003）。
         //6 步真實路徑：①登入停在統計頁 ②等導覽展開落定 ③縮窄視窗（使用者拖視窗邊界；無 DOM 點擊目標，以 setViewportSize 模擬）
         //  ④導覽收合、「顯示選單」圓鈕出現 ⑤拉寬視窗 ⑥導覽展開並排、標題回位、無灰色遮罩；不寫入任何資料
-        //語意斷言放在 run() 內：兩個寬度下之狀態皆為過程中之觀察，且 regen 端只跑 run()，寫檔前即守門
+        //語意斷言放在 run() 內：兩個寬度下之狀態皆為過程中之觀察（流程走完即不在畫面上），故於當下斷言；兩端皆在寫檔／比對前守門
         //（修復前拉回後導覽區浮在內容上並覆蓋遮罩、標題左緣 30，此處即紅；修復見 LayoutContent.vue autoSwitchToFix）。
         //統計頁事件圖隨內容區改寬：縮窄後圖例改單列捲動式、拉回後恢復一般式，兩處皆驗圖寬＝容器寬且圖例不壓最上方刻度
         //（2026-09-24 前 400 寬時一般式圖例 3 列壓到刻度，見 spec/流程_統計資訊事件展示.md〈已知落差〉）。
         name: 'E2E-003-resize-narrow-wide',
         settings: { staEventMock: true },
+        stages: ['E2E-003-1-narrowed', 'E2E-003-2-widened'],
         run: async (page) => {
             await gotoPage(page, 'mmStaInfor')
             await waitNavSettled(page, false) //縮窄前先等展開落定：元件庫於導覽區掛載後約 250ms 內之收合會被掛載展開覆蓋（spec〈已知落差〉）
@@ -163,7 +175,7 @@ const CASES = [
             const lg1 = await waitStaLegendSettled(page)
             assertStaLegendLayout(lg1, '縮窄後事件圖')
             assert.equal(lg1.type, 'scroll', `縮窄後（圖寬 ${lg1.chartW}）事件圖例應為捲動式`)
-            const s1 = await captureStableWithBox(page, SEL_STA_TITLE) //E2E-003-1-narrowed：縮為 400 後框住統計頁標題「統計資訊」整行（其左側為「顯示選單」圓鈕）
+            const s1 = await captureStableWithBox(page, contentArea(page)) //E2E-003-1-narrowed：縮為 400 後導覽區自動收合, 框住擴滿至整寬之內容區（含統計頁標題；左上角為「顯示選單」圓鈕）
 
             //⑤拉寬
             await page.setViewportSize({ width: 1440, height: 900 })
@@ -201,77 +213,87 @@ const CASES = [
     },
 ]
 
-//手術式重產：--names a,b 只產指定 case（前綴匹配）；--langs eng,cht 只產指定語系。截圖前 gate。
-function argList(flag) {
-    const i = process.argv.indexOf(flag)
-    if (i >= 0 && process.argv[i + 1]) return process.argv[i + 1].split(',').map((s) => s.trim()).filter(Boolean)
-    return null
+//單一案例管線（產製端與比對端共用）：prepare 以案例設定重啟後端（c.settings）→ fresh browser（每案 launch／close）→ openApp → setLang
+//→ run（流程與多階段截圖）→ semantic（語意斷言）→ 寫檔／比對 → finally 關瀏覽器 → afterCase 以 ./settings.json 還原後端（同原兩端）
+async function runCase(mode, lang, c, extra = {}) {
+    return await runBaselineCase({
+        mode,
+        lang,
+        name: c.name,
+        run: c.run,
+        stages: c.stages,
+        launch: launchBrowser,
+        openPage: async (browser) => {
+            const page = await openApp(browser)
+            await setLang(page, lang)
+            return page
+        },
+        pathOf: picPath,
+        labelOf: (lg, key) => `layout-${lg}-${key}`,
+        match: assertBaselineMatch,
+        prepare: async () => {
+            if (c.settings) await restartBackend(genTempSettings(c.settings))
+        },
+        semantic: c.semantic ? (ctx) => c.semantic(ctx.page) : null,
+        afterCase: async () => {
+            if (c.settings) await restartBackend('./settings.json')
+        },
+        ...extra,
+    })
 }
-function nameMatch(list, caseName) { return list.some((nm) => caseName === nm || caseName.startsWith(nm)) }
+
+//篩選（gate）通過、開始觸及服務後才設為 true；.catch 據此決定是否重啟後端還原。
+//why：篩選報錯（如 --names 打錯）時尚未觸及任何服務，此時不得 restartBackend——無自建後端時它會殺 11006 之監聽者並另起後端（e2e-setup killForeignOnRestart）。
+let servicesTouched = false
+
 async function generateBaseline() {
     console.log('=== 產製 layout baseline 開始 ===')
-    const onlyNames = argList('--names')
-    const onlyLangs = argList('--langs')
+    process.env.E2E_STRICT_CAPTURE = '1' //regen 端：captureStable 未 settle 即 throw
+    //截圖前篩選（--names / --langs / --write-mode / E2E_BASELINE_OUT_DIR）；不符任何鍵即於此報錯（尚未啟動或重啟任何服務）
+    const gate = createBaselineGate({ langs: LANGS, cases: CASES })
+    console.log(gate.describe())
+    servicesTouched = true
     await startServersOnce()
     fs.mkdirSync(PICS_DIR, { recursive: true })
-    process.env.E2E_STRICT_CAPTURE = '1' //regen 端：captureStable 未 settle 即 throw
-    for (const lang of LANGS) {
-        if (onlyLangs && !nameMatch(onlyLangs, lang)) continue
-        for (const c of CASES) {
-            if (onlyNames && !nameMatch(onlyNames, c.name)) continue
-            const browser = await launchBrowser() //per-case fresh browser（對齊其他 perm e2e）
-            if (c.settings) await restartBackend(genTempSettings(c.settings))
-            try {
-                const page = await openApp(browser)
-                await setLang(page, lang)
-                const shots = await c.run(page, lang)
-                for (const s of shots) {
-                    fs.writeFileSync(picPath(lang, s.name), s.buf)
-                    console.log('wrote', picPath(lang, s.name), s.buf.length, 'bytes')
-                }
-            }
-            finally {
-                await browser.close()
-                if (c.settings) await restartBackend('./settings.json')
-            }
+    for (const lang of gate.langs) {
+        for (const c of gate.casesFor(lang)) {
+            console.log(`  ${lang}/${c.name}`)
+            const r = await runCase('regen', lang, c, { gate })
+            console.log(`  ✔ ${lang}/${c.name}（寫出 ${r.written.length} 張，略過 ${r.skipped.length}，保留 ${r.kept.length}）`)
         }
     }
+    //--names 之任一項未產出即報錯（不靜默略過）
+    gate.finalize()
     cleanup()
     console.log('=== 產製 layout baseline 完成 ===')
 }
 
 if (isBaseline) {
-    generateBaseline().catch(async (err) => { console.log('baseline 例外', err); try { await restartBackend('./settings.json') } catch (e) {} ; cleanup(); process.exit(1) })
+    generateBaseline().catch(async (err) => {
+        console.log('baseline 例外', err)
+        if (servicesTouched) {
+            try {
+                await restartBackend('./settings.json')
+            }
+            catch (e) {}
+        }
+        cleanup()
+        process.exit(1)
+    })
 }
 else {
     for (const lang of LANGS) {
         describe(`e2e-layout (${lang})`, function() {
             this.timeout(240000)
-            let browser = null
             before(async function() {
                 this.timeout(200000)
                 await startServersOnce()
             })
-            beforeEach(async function() {
-                this.timeout(90000)
-                browser = await launchBrowser()
-            })
-            afterEach(async function() { if (browser) { await browser.close(); browser = null } })
+            //per-case fresh browser、後端設定切換與還原、語意斷言（主）與像素比對（補）皆由 runCase 負責（與產製端同一管線）
             for (const c of CASES) {
                 it(c.name, async function() {
-                    if (c.settings) { this.timeout(300000); await restartBackend(genTempSettings(c.settings)) }
-                    try {
-                        const page = await openApp(browser)
-                        await setLang(page, lang)
-                        const shots = await c.run(page, lang)
-                        if (c.semantic) await c.semantic(page)
-                        for (const s of shots) {
-                            assertBaselineMatch(s.buf, picPath(lang, s.name), `layout-${lang}-${s.name}`)
-                        }
-                    }
-                    finally {
-                        if (c.settings) await restartBackend('./settings.json')
-                    }
+                    if (c.settings) this.timeout(300000)
+                    await runCase('compare', lang, c, { onKnownDefect: () => this.skip() }) //已知缺陷協定: 標 pending(提示框殘留已由 w-component-vue 2.5.24 修正, 其偵測改為直接失敗, 見 e2e-setup probeStuckTooltip)
                 })
             }
         })

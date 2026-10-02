@@ -49,7 +49,7 @@ function mergePickKeysOnly(ltdtDb, rowsIn, keyDetect, pickKeys) {
 }
 
 
-function proc(woItems, procOrm, { srLog, kmx }) {
+function proc(woItems, procOrm, { srLog, kmx, lockSave }) {
 
 
     //updateTabItems
@@ -59,8 +59,21 @@ function proc(woItems, procOrm, { srLog, kmx }) {
         //pickKeysOnly, 僅採納既有列之指定欄位變更(見 mergePickKeysOnly), 未給則整表 diff 寫入
         let pickKeysOnly = get(opt, 'pickKeysOnly', null)
 
+        //idsNew: 前端標為新增(transient 欄位 _isNew === true, 清單頁 addItem / copyItem 標記)之列 id, 供下方比對既有列 (ADR-025);
+        //_isNew 不在 schema keys 內, 下方 ltdtmapping 取欄時即剝除不入庫. pickKeysOnly 模式不採納新增列(見 mergePickKeysOnly), 故不收集
+        let idsNew = []
+        if (!isearr(pickKeysOnly)) {
+            each(rows, (r) => {
+                if (get(r, '_isNew') === true) {
+                    idsNew.push(get(r, 'id', ''))
+                }
+            })
+        }
+
+        //雙擊防護(後端): 同一操作者之同表寫入處理中再送出即拒絕 'saveInProgress'(不排隊, 見 lockSave.mjs, ADR-025);
+        //占位包在 kmx 之外層, 不同操作者之並行寫入仍由 kmx 序列化、各自成功(ADR-012)
         //序列化同表之並行整表批次寫入: 防 lost update (同 keyTable 序列化, 不同表並行)
-        return await kmx('updateTabItems:' + keyTable, async () => {
+        return await lockSave(`updateTabItems:${keyTable}`, userId, () => kmx('updateTabItems:' + keyTable, async () => {
 
         //pickKeysOnly, 須於 mutex 內讀取資料庫為基底, 避免與並行寫入 race
         if (isearr(pickKeysOnly)) {
@@ -137,6 +150,19 @@ function proc(woItems, procOrm, { srLog, kmx }) {
 
         //ltdtDiffByKey
         let ltdtOld = await woItems[keyTable].select()
+
+        //新增列已存在即拒絕 (ADR-025): 同一包重送且第 2 次於第 1 次完成後才處理時(占位已釋放), 第 1 次已建立之列會被當「修改」(diff),
+        //以前端之佔位字覆寫伺服器於新增時填入之建立者 / 建立時間(procOrm save 只覆寫 userIdUpdate / timeUpdate); 故整包拒絕、不寫入
+        if (size(idsNew) > 0) {
+            let kpIdOld = {}
+            each(ltdtOld, (v) => {
+                kpIdOld[get(v, 'id', '')] = true
+            })
+            if (idsNew.some((id) => kpIdOld[id] === true)) {
+                return Promise.reject('saveNewRowExists')
+            }
+        }
+
         let ltdtNew = rows
         let r = ltdtDiffByKey(ltdtOld, ltdtNew, keyDetect)
         // console.log('ltdtDiffByKey r', r)
@@ -167,7 +193,7 @@ function proc(woItems, procOrm, { srLog, kmx }) {
 
         return ltdtNew
 
-        })
+        }))
     }
 
 

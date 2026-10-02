@@ -986,27 +986,24 @@ export default {
 
         clickSave: function(msg) {
             //console.log('methods clickSave', msg)
-
+            //WDialog 內建儲存鈕之 promiseUnlock 鎖交由 doSave 之 runSubmit 於請求結束時釋放, 不於此解鎖: 請求期間儲存鈕之滑鼠與鍵盤 Enter 皆擋 (ADR-025;
+            //原第一行即 msg.pm.resolve(), 鎖立即解除, 焦點留在儲存鈕時連按 Enter 可送出 2 次)
             let vo = this
-
-            //save按鈕第一行立刻釋放視覺鎖
-            msg.pm.resolve()
-
-            //fire-and-forget, 不 await
-            vo.doSave()
-
+            vo.doSave({ pm: msg.pm })
         },
 
-        doSave: function() {
+        doSave: function(opt = {}) {
 
             let vo = this
 
-            async function core() {
+            async function core(unlockBtn) {
 
-                //1) 事先檢測 (所有同步檢查在開 loading 之前, 空清單不應先閃 loading)
+                //1) 事先檢測 (所有同步檢查在開 loading 之前, 空清單不應先閃 loading); 訊息框前以 unlockBtn() 釋放儲存鈕之 promiseUnlock 鎖:
+                //按鈕鎖只涵蓋請求期間, 結果訊息框出現時按鈕已恢復(與打 API 之路徑一致) (ADR-025)
                 let rows = get(vo, 'opt.rows', [])
                 // console.log('rows', rows)
                 if (size(rows) === 0) {
+                    unlockBtn()
                     await vo.$dg.showCheckYes(`${vo.$t('grupSaveGrupsEmpty')}`)
                     return
                 }
@@ -1075,32 +1072,35 @@ export default {
 
             }
 
-            //core
-            core()
-                .then((rows) => {
+            //runSubmit: 對話框儲存流程(至結果訊息框關閉, 成功時含關閉對話框)進行中再觸發即略過; opt.pm 為對話框儲存鈕之 promiseUnlock 鎖,
+            //於請求結束(updateLoading(false))時釋放. 對話框之 promise(vo.pm)與開關(bShow)不變: 成功才 resolve 並關閉, 失敗保持開啟可重按儲存 (ADR-025)
+            return vo.$ui.runSubmit('savePemiBlngGrups', (unlockBtn) => {
+                return core(unlockBtn)
+                    .then((rows) => {
 
-                    //存檔失敗: 不 resolve、不關窗(規格「若寫入失敗…對話框不關閉，可修正後重按儲存」; 舊版於此無條件關窗, 2026-09-17 審計查出)
-                    if (rows === false) {
-                        return
-                    }
+                        //存檔失敗: 不 resolve、不關窗(規格「若寫入失敗…對話框不關閉，可修正後重按儲存」; 舊版於此無條件關窗, 2026-09-17 審計查出)
+                        if (rows === false) {
+                            return
+                        }
 
-                    //resolve
-                    vo.pm.resolve(rows)
+                        //resolve
+                        vo.pm.resolve(rows)
 
-                    //hide
-                    vo.bShow = false
+                        //hide
+                        vo.bShow = false
 
-                })
-                .catch((err) => {
-                    console.log('doSave', err)
-                    vo.$alert(vo.$t('anUnexpectedErrorOccurred'), { type: 'error' }) //§5.1: 非預期例外須告知, 不靜默吞 (失敗時 .then 不執行→視窗不關)
-                })
-                .finally(() => {
+                    })
+                    .catch((err) => {
+                        console.log('doSave', err)
+                        vo.$alert(vo.$t('anUnexpectedErrorOccurred'), { type: 'error' }) //§5.1: 非預期例外須告知, 不靜默吞 (失敗時 .then 不執行→視窗不關)
+                    })
+                    .finally(() => {
 
-                    //hide loading
-                    vo.$ui.updateLoading(false)
+                        //hide loading
+                        vo.$ui.updateLoading(false)
 
-                })
+                    })
+            }, opt)
 
         },
 
@@ -1121,6 +1121,12 @@ export default {
             // console.log('methods show', msg)
 
             let vo = this
+
+            //單例: 對話框開啟中再次開啟(如焦點留在開啟鈕時按 Enter)時, 舊階段之等待者視同關閉(reject('close window'), 同 clickClose;
+            //對已結束者無作用), 否則其 promise 永久懸置 (ADR-025; 同 CheckYes / CheckYesNo)
+            if (vo.pm) {
+                vo.pm.reject('close window')
+            }
 
             //pm
             vo.pm = genPm()

@@ -15,8 +15,16 @@
 //
 // 使用方式:
 //   1. 先依 script.txt 執行 npm run build 與 node toolg/genEntry.mjs 產 dist/index.tmp（或 git checkout -- dist/index.tmp）。
-//   2. 產標準圖: node test/e2e-init.test.mjs --baseline [--names E2E-001,...] [--langs eng,cht]（手術式重產，§6.3）
+//   2. 產標準圖: node test/e2e-init.test.mjs --baseline [--names <項,...>] [--langs eng,cht] [--write-mode missing|changed]
 //   3. 跑測試:   npx mocha test/e2e-init.test.mjs --timeout 120000 --reporter list （pixelmatch 反鋸齒感知 + maxDiffPixels 容差比對，非 byte-exact）
+//   手術式重產（截圖前篩選 createBaselineGate，規格見 test/tools/e2eLib.mjs 所指之 w-package-tools-e2e 之 README.md §2.2）：
+//     --names 每項可帶語系前綴（eng-/cht-），不帶則兩語系皆產；本檔每案單張、案例鍵即圖鍵，案例鍵或其編號前綴（如 E2E-004）寫該案；
+//     不符任何鍵即報錯並列出可用鍵（於驗證 dist/index.tmp 與重啟後端之前）；--langs 須完全等於已宣告語系（eng / cht）；
+//     --write-mode missing 只寫缺少者、changed 只寫與現行標準圖差異超過容差者（預設全寫）；
+//     env E2E_BASELINE_OUT_DIR=<dir> 寫到暫存目錄（等價驗證用，不動 test/pics）。
+//   產製端與比對端呼叫同一案例管線（runBaselineCase）：以該語系（與案例設定）之臨時設定重啟後端 → fresh browser → 新 context（1440×900）
+//     → 懸置 /api 或走真實登入 → 截圖 → 語意斷言 assertCase（兩端皆於寫檔／比對前執行，不過即一張都不寫）→ 寫檔／比對 → 關瀏覽器；
+//     兩端皆於全部案例前驗證 dist/index.tmp 模板（只讀不寫）、全部案例後以 ./settings.json 重啟後端還原預設語系。
 //
 // 標準圖: test/pics/init/init-{lang}-{NNN-name}.png（同 SSO 命名）
 //
@@ -24,6 +32,7 @@ import assert from 'assert'
 import fs from 'fs'
 import path from 'path'
 import { cleanup, launchBrowser, captureStableWithBox, apiBaseUrl, genTempSettings, restartBackend, assertBaselineMatch } from './tools/e2e-setup.mjs'
+import { runBaselineCase, createBaselineGate, openCasePage, itemsUnionBox } from './tools/e2eLib.mjs'
 
 
 const baselineDir = './test/pics/init'
@@ -62,146 +71,127 @@ function ensureIndexTmpl() {
 }
 
 
-//E2E-001: 連線中畫面（csIng）。restartBackend 注入語系 → 打後端 dist → routeHang 攔 converhp 主連線（apiName='api'）
+//各 capture(page, lang) 由案例管線以 run(page, lang, ctx) 呼叫：後端已於 prepare 以注入語系重啟（開瀏覽器前，同遷移前之 capture 開頭），
+//fresh browser 與新 context（1440×900、不掛 dialog 處理器）由管線開、finally 關（同遷移前之 launchBrowser → newContext → newPage 與 try/finally）；
+//回傳 { buf, info }，info 於截圖前取，由管線之 semantic（assertCase）於寫檔／比對前斷言。
+
+
+//E2E-001: 連線中畫面（csIng）。（prepare 已注入語系重啟後端）打後端 dist → routeHang 攔 converhp 主連線（apiName='api'）
 //使其懸而不答 → connState 卡 csIng → 穩定呈現「連線中」。spinner SVG 由 captureStable 之 animatedRects 自動填黑遮蔽。
-async function captureConnecting(lang) {
-    await restartBackend(genTempSettings({ language: lang }))
-    const browser = await launchBrowser() //確定性渲染組經 launchBrowser 統一供給, 不再裸 launch(旗標分叉防護)
-    try {
-        const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
-        const page = await context.newPage()
-        //攔全部 converhp /api 連線（apiName='api'）使其懸而不答 → 登入(token 驗證)永久懸置 → connState 卡 csIng。
-        //（perm 無 token 時 loginError 會即時重導 urlRedirect, 故帶 ?token=sys 走 token 驗證路徑再懸置, 而非無 token 短路報錯重導）
-        await page.route('**/api/**', (route) => {})
-        await page.goto(`${apiBaseUrl}/?token=sys`, { waitUntil: 'domcontentloaded', timeout: 20000 })
-        //等「連線中」文字渲染（connState 卡 csIng）
-        await page.waitForFunction(
-            (t) => (document.body.innerText || '').includes(t),
-            expectedText[lang].connecting,
-            { timeout: 15000 }
-        )
-        await page.mouse.move(0, 0)
-        const info = await page.evaluate(() => ({
-            winLang: (window.___pmwperm___ || {}).language,
-            body: (document.body.innerText || '').replace(/\s+/g, ' '),
-        }))
-        //觀看區 = LayoutState 連線中內容（data-fmid="conn-state"）: spinner + 連線中文字
-        const buf = await captureStableWithBox(page, '[data-fmid="conn-state"]')
-        return { buf, info }
-    }
-    finally {
-        await browser.close()
-    }
+async function captureConnecting(page, lang) {
+    //攔全部 converhp /api 連線（apiName='api'）使其懸而不答 → 登入(token 驗證)永久懸置 → connState 卡 csIng。
+    //（perm 無 token 時 loginError 會即時重導 urlRedirect, 故帶 ?token=sys 走 token 驗證路徑再懸置, 而非無 token 短路報錯重導）
+    await page.route('**/api/**', (route) => {})
+    await page.goto(`${apiBaseUrl}/?token=sys`, { waitUntil: 'domcontentloaded', timeout: 20000 })
+    //等「連線中」文字渲染（connState 卡 csIng）
+    await page.waitForFunction(
+        (t) => (document.body.innerText || '').includes(t),
+        expectedText[lang].connecting,
+        { timeout: 15000 }
+    )
+    await page.mouse.move(0, 0)
+    const info = await page.evaluate(() => ({
+        winLang: (window.___pmwperm___ || {}).language,
+        body: (document.body.innerText || '').replace(/\s+/g, ' '),
+    }))
+    //觀看區 = LayoutState 連線中內容（data-fmid="conn-state"）: spinner + 連線中文字
+    //容器無可見邊界且右緣止於文字 → itemsUnionBox fit 量內容（圖示框 ∪ 文字墨跡外擴 inkPad），免紅框壓字（2026-09-28）
+    const buf = await captureStableWithBox(page, itemsUnionBox('[data-fmid="conn-state"]', { fit: true }))
+    return { buf, info }
 }
 
 
 //連線前 fallback 狀態畫面（errLogin / errConn）的共用 capture：機制同 captureConnecting，差在多一步 forceConnState。
-//restartBackend 注入語系 → 打後端 dist → routeHang 攔 /api 使連線懸置（卡在連線前、無 webInfor）→ 等 window.$vo 出現
+//（prepare 已注入語系重啟後端）打後端 dist → routeHang 攔 /api 使連線懸置（卡在連線前、無 webInfor）→ 等 window.$vo 出現
 //  → updateConnState(connState) 強制落到目標狀態（e2e-startup 同款狀態畫面測法）→ 等該狀態文字渲染。
 //此時 $t 走 mUI fallback → getLang() → ___pmwperm___.language（注入語系）, 故畫面文字 = 注入語系。無需 DB / 無需真連線。
-async function captureConnState(lang, connState, expectKey) {
-    await restartBackend(genTempSettings({ language: lang }))
-    const browser = await launchBrowser() //確定性渲染組經 launchBrowser 統一供給, 不再裸 launch(旗標分叉防護)
-    try {
-        const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
-        const page = await context.newPage()
-        //攔全部 /api 連線使連線懸置 → 卡在連線前（webInfor 未回填）→ $t 走 fallback（注入語系）。
-        await page.route('**/api/**', (route) => {})
-        await page.goto(`${apiBaseUrl}/?token=sys`, { waitUntil: 'domcontentloaded', timeout: 20000 })
-        //等 App mounted（window.$vo 出現, App.vue:123），不等 csLogin
-        await page.waitForFunction(() => !!window.$vo, null, { timeout: 60000 })
-        //強制 connState 落到目標狀態（LayoutState 切到對應分支）
-        await page.evaluate((cs) => { window.$vo.$ui.updateConnState(cs) }, connState)
-        //等目標狀態文字渲染（fallback → 注入語系）
-        await page.waitForFunction(
-            (t) => (document.body.innerText || '').includes(t),
-            expectedText[lang][expectKey],
-            { timeout: 15000 }
-        )
-        await page.mouse.move(0, 0)
-        const info = await page.evaluate(() => ({
-            winLang: (window.___pmwperm___ || {}).language,
-            body: (document.body.innerText || '').replace(/\s+/g, ' '),
-        }))
-        //觀看區 = LayoutState 狀態畫面內容（data-fmid="conn-state"）: 圖示 + 狀態文字
-        const buf = await captureStableWithBox(page, '[data-fmid="conn-state"]')
-        return { buf, info }
-    }
-    finally {
-        await browser.close()
-    }
+async function captureConnState(page, lang, connState, expectKey) {
+    //攔全部 /api 連線使連線懸置 → 卡在連線前（webInfor 未回填）→ $t 走 fallback（注入語系）。
+    await page.route('**/api/**', (route) => {})
+    await page.goto(`${apiBaseUrl}/?token=sys`, { waitUntil: 'domcontentloaded', timeout: 20000 })
+    //等 App mounted（window.$vo 出現, App.vue:123），不等 csLogin
+    await page.waitForFunction(() => !!window.$vo, null, { timeout: 60000 })
+    //強制 connState 落到目標狀態（LayoutState 切到對應分支）
+    await page.evaluate((cs) => { window.$vo.$ui.updateConnState(cs) }, connState)
+    //等目標狀態文字渲染（fallback → 注入語系）
+    await page.waitForFunction(
+        (t) => (document.body.innerText || '').includes(t),
+        expectedText[lang][expectKey],
+        { timeout: 15000 }
+    )
+    await page.mouse.move(0, 0)
+    const info = await page.evaluate(() => ({
+        winLang: (window.___pmwperm___ || {}).language,
+        body: (document.body.innerText || '').replace(/\s+/g, ' '),
+    }))
+    //觀看區 = LayoutState 狀態畫面內容（data-fmid="conn-state"）: 圖示 + 狀態文字（量法同 captureConnecting）
+    const buf = await captureStableWithBox(page, itemsUnionBox('[data-fmid="conn-state"]', { fit: true }))
+    return { buf, info }
 }
 
 
 //E2E-004: 拒絕登入畫面（csErrLogin）。連線懸置 → 強制 connState='csErrLogin' → 穩定呈現「拒絕登入」/「Login denied」。
-async function captureErrLogin(lang) {
-    return await captureConnState(lang, 'csErrLogin', 'errLogin')
+async function captureErrLogin(page, lang) {
+    return await captureConnState(page, lang, 'csErrLogin', 'errLogin')
 }
 
 
 //E2E-005: 無法連線畫面（csErrConn）。連線懸置 → 強制 connState='csErrConn' → 穩定呈現「無法連線」/「Unable to connect」。
-async function captureErrConn(lang) {
-    return await captureConnState(lang, 'csErrConn', 'errConn')
+async function captureErrConn(page, lang) {
+    return await captureConnState(page, lang, 'csErrConn', 'errConn')
 }
 
 
 //E2E-002: 已登入過場畫面（csLogin LayoutState）。登入成功但 webInfor 尚未回填（ready=false）時，LayoutState 以連線動畫圖加
 //「已登入」文字呈現之過場態（此態之後 webInfor 回填、ready 轉真才切到五頁籤殼層 E2E-003-login-ok）。
 //連線懸置 → 強制 connState='csLogin'（webInfor 未回填 → ready=false → LayoutState csLogin 分支）→ 穩定呈現「已登入」/「Logged in」。
-async function captureLoggedIn(lang) {
-    return await captureConnState(lang, 'csLogin', 'login')
+async function captureLoggedIn(page, lang) {
+    return await captureConnState(page, lang, 'csLogin', 'login')
 }
 
 
 //E2E-003: 登入成功後台五頁籤（golden 終態）。語系亦為 server 注入：後端以指定 language 啟動 → dist 注入該語系，
 //且後端 getWebInfor 回傳 webInfor.language=該語系（WWebPerm.mjs:236,319），main.js 登入後 setLang(null) 只重刷不覆蓋
 //→ 殼層五頁籤 / webName 以注入語系渲染（較 dev server + 前端 setLang 更貼近 production）。
-//機制：restartBackend 注入語系 → 打後端 dist + ?token=sys（不攔截，走真實登入）→ 等 connState='csLogin' + webInfor 回填
-//（ready 為真，五頁籤殼層渲染）→ 截頂列。需 base seed 之 sys token（持久種子，與其他 e2e 同源）。
-async function captureLoginOk(lang) {
-    //staEventMock: 預設頁為統計頁, 其圖表/統計表若吃真實 srLog 則計數逐次遞增, x 軸日期隨當日變動 → baseline 逐日失效;
-    //故與 e2e-stainfor 同樣注入確定性事件資料集(48 桶, 固定起點 2025-01-01, 固定 sin 計數)
-    await restartBackend(genTempSettings({ language: lang, staEventMock: true }))
-    const browser = await launchBrowser() //確定性渲染組經 launchBrowser 統一供給, 不再裸 launch(旗標分叉防護)
-    try {
-        const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
-        const page = await context.newPage()
-        await page.goto(`${apiBaseUrl}/?token=sys`, { waitUntil: 'domcontentloaded', timeout: 20000 })
-        //等真實登入完成（ready=真：connState=csLogin 且 webInfor 為非空物件 → 五頁籤殼層渲染）
-        await page.waitForFunction(() => {
-            const vo = window.$vo
-            if (!vo) return false
-            const st = vo.$store && vo.$store.state
-            return !!(st && st.connState === 'csLogin' && st.webInfor && Object.keys(st.webInfor).length > 0)
-        }, null, { timeout: 60000 })
-        await page.waitForTimeout(600) //殼層 + 五頁籤譯文 settle
-        await page.mouse.move(0, 0)
-        const info = await page.evaluate(() => {
-            const vo = window.$vo
-            return {
-                winLang: (window.___pmwperm___ || {}).language,
-                body: (document.body.innerText || '').replace(/\s+/g, ' '),
-                tabs: ['mmStaInfor', 'mmTargets', 'mmPemis', 'mmGrups', 'mmUsers'].map((k) => vo.$t(k)),
-                webName: vo.$t('webName'),
-                csIng: vo.$t('csIng'),
-            }
-        })
-        //觀看區 = Layout 頂部工具列（webName + 語言選單），五頁籤之渲染由語意斷言驗
-        const buf = await captureStableWithBox(page, '[data-fmid="app-topbar"]')
-        return { buf, info }
-    }
-    finally {
-        await browser.close()
-    }
+//機制：（prepare）restartBackend 注入語系與 staEventMock（見 cases 之 settings）→ 打後端 dist + ?token=sys（不攔截，走真實登入）
+//→ 等 connState='csLogin' + webInfor 回填（ready 為真，五頁籤殼層渲染）→ 截頂列。需 base seed 之 sys token（持久種子，與其他 e2e 同源）。
+async function captureLoginOk(page, lang) {
+    await page.goto(`${apiBaseUrl}/?token=sys`, { waitUntil: 'domcontentloaded', timeout: 20000 })
+    //等真實登入完成（ready=真：connState=csLogin 且 webInfor 為非空物件 → 五頁籤殼層渲染）
+    await page.waitForFunction(() => {
+        const vo = window.$vo
+        if (!vo) return false
+        const st = vo.$store && vo.$store.state
+        return !!(st && st.connState === 'csLogin' && st.webInfor && Object.keys(st.webInfor).length > 0)
+    }, null, { timeout: 60000 })
+    await page.waitForTimeout(600) //殼層 + 五頁籤譯文 settle
+    await page.mouse.move(0, 0)
+    const info = await page.evaluate(() => {
+        const vo = window.$vo
+        return {
+            winLang: (window.___pmwperm___ || {}).language,
+            body: (document.body.innerText || '').replace(/\s+/g, ' '),
+            tabs: ['mmStaInfor', 'mmTargets', 'mmPemis', 'mmGrups', 'mmUsers'].map((k) => vo.$t(k)),
+            webName: vo.$t('webName'),
+            csIng: vo.$t('csIng'),
+        }
+    })
+    //觀看區 = Layout 頂部工具列（webName + 語言選單），五頁籤之渲染由語意斷言驗
+    const buf = await captureStableWithBox(page, '[data-fmid="app-topbar"]')
+    return { buf, info }
 }
 
 
+//順序＝mocha it 順序＝產製順序（語系外層、案例內層）；每案單張，stages 即案例鍵（與寫檔名、比對名一致，產出與宣告不符即報錯）。
+//settings：本案於 language 之外另注入之後端設定（prepare 合併為 { language, ...settings } 重啟後端）；kind / key：語意斷言 assertCase 之分派。
 const cases = [
-    { name: 'E2E-001-connecting-screen', capture: captureConnecting, kind: 'connState', key: 'connecting' },
-    { name: 'E2E-002-logged-in-screen', capture: captureLoggedIn, kind: 'connState', key: 'login' },
-    { name: 'E2E-003-login-ok', capture: captureLoginOk, kind: 'loginOk' },
-    { name: 'E2E-004-err-login-screen', capture: captureErrLogin, kind: 'connState', key: 'errLogin' },
-    { name: 'E2E-005-err-conn-screen', capture: captureErrConn, kind: 'connState', key: 'errConn' },
+    { name: 'E2E-001-connecting-screen', capture: captureConnecting, kind: 'connState', key: 'connecting', stages: ['E2E-001-connecting-screen'] },
+    { name: 'E2E-002-logged-in-screen', capture: captureLoggedIn, kind: 'connState', key: 'login', stages: ['E2E-002-logged-in-screen'] },
+    //staEventMock: 預設頁為統計頁, 其圖表/統計表若吃真實 srLog 則計數逐次遞增, x 軸日期隨當日變動 → baseline 逐日失效;
+    //故與 e2e-stainfor 同樣注入確定性事件資料集(48 桶, 固定起點 2025-01-01, 固定 sin 計數)
+    { name: 'E2E-003-login-ok', capture: captureLoginOk, kind: 'loginOk', settings: { staEventMock: true }, stages: ['E2E-003-login-ok'] },
+    { name: 'E2E-004-err-login-screen', capture: captureErrLogin, kind: 'connState', key: 'errLogin', stages: ['E2E-004-err-login-screen'] },
+    { name: 'E2E-005-err-conn-screen', capture: captureErrConn, kind: 'connState', key: 'errConn', stages: ['E2E-005-err-conn-screen'] },
 ]
 
 
@@ -235,34 +225,49 @@ function assertCase(lang, info, c) {
 }
 
 
-//手術式重產（§6.3）：--names a,b,c 只產指定 case；--langs eng,cht 只產指定語系。截圖（連 restartBackend/launch）「前」就 gate。
-function argList(flag) {
-    const i = process.argv.indexOf(flag)
-    if (i >= 0 && process.argv[i + 1]) return process.argv[i + 1].split(',').map((s) => s.trim()).filter(Boolean)
-    return null
-}
-//前綴或完整匹配：傳 'E2E-001' 即可匹配 'E2E-001-connecting-screen'（避免 §6.3 殷鑑「--names 只認字面」陷阱）
-function nameMatch(list, caseName) {
-    return list.some((nm) => caseName === nm || caseName.startsWith(nm))
+//單一案例管線（產製端與比對端共用）：prepare 以該語系臨時設定（{ language, ...c.settings }）重啟後端（server 注入語系；開瀏覽器前，同遷移前之 capture 開頭）
+//→ fresh browser（launchBrowser）→ 新 context（1440×900、不掛 dialog 處理器）→ capture（懸置 /api 或走真實登入 → 截圖，回 { buf, info }）
+//→ semantic：assertCase 語意斷言（依 kind 分派；主）→ 寫檔／比對（像素，補）→ finally 關瀏覽器
+async function runCase(mode, lang, c, extra = {}) {
+    return await runBaselineCase({
+        mode,
+        lang,
+        name: c.name,
+        run: c.capture,
+        stages: c.stages,
+        launch: launchBrowser, //確定性渲染組經 launchBrowser 統一供給, 不再裸 launch(旗標分叉防護)
+        openPage: (browser) => openCasePage(browser, { contextOptions: { viewport: { width: 1440, height: 900 } }, onDialog: null }),
+        pathOf: bp,
+        labelOf: (lg, key) => `init-${lg}-${key}`,
+        match: assertBaselineMatch,
+        prepare: async () => {
+            await restartBackend(genTempSettings({ language: lang, ...c.settings }))
+        },
+        semantic: async (ctx) => {
+            assertCase(lang, ctx.result.info, c) //語意斷言（依 kind 分派）
+        },
+        ...extra,
+    })
 }
 
 async function generateBaseline() {
-    const onlyNames = argList('--names')
-    const onlyLangs = argList('--langs')
+    process.env.E2E_STRICT_CAPTURE = '1' //regen 端：captureStable 未 settle 即 throw，拒絕寫入未穩定畫面
+    //截圖前篩選（--names / --langs / --write-mode / E2E_BASELINE_OUT_DIR）；不符任何鍵即於此報錯（先於驗證模板與重啟後端）
+    const gate = createBaselineGate({ langs, cases })
+    console.log(gate.describe())
     if (!fs.existsSync(baselineDir)) {
         fs.mkdirSync(baselineDir, { recursive: true })
     }
     ensureIndexTmpl()
-    process.env.E2E_STRICT_CAPTURE = '1' //regen 端：captureStable 未 settle 即 throw，拒絕寫入未穩定畫面
-    for (const lang of langs) {
-        if (onlyLangs && !nameMatch(onlyLangs, lang)) continue //§6.3 手術式：跳過未指定語系
-        for (const { name, capture } of cases) {
-            if (onlyNames && !nameMatch(onlyNames, name)) continue //§6.3 手術式：截圖（含 restartBackend/launch）前 gate，跳過未指定 case
-            const { buf } = await capture(lang)
-            fs.writeFileSync(bp(lang, name), buf)
-            console.log(`  wrote ${lang}/${name} (${buf.length} bytes)`)
+    for (const lang of gate.langs) {
+        for (const c of gate.casesFor(lang)) {
+            console.log(`  ${lang}/${c.name}`)
+            const r = await runCase('regen', lang, c, { gate })
+            console.log(`  ✔ ${lang}/${c.name}（寫出 ${r.written.length} 張，略過 ${r.skipped.length}，保留 ${r.kept.length}）`)
         }
     }
+    //--names 之任一項未產出即報錯（不靜默略過）
+    gate.finalize()
     await restartBackend('./settings.json') //還原預設語系
     console.log('=== init 標準圖產生完成 ===')
     cleanup() //←【必】非 mocha 環境須顯式呼叫
@@ -285,13 +290,12 @@ else {
             await restartBackend('./settings.json') //還原預設語系給後續測試
         })
 
+        //每案之語系設定重啟、fresh browser、語意斷言（主）與像素比對（補）皆由 runCase 負責（與產製端同一管線）
         for (const lang of langs) {
             for (const c of cases) {
-                const { name, capture } = c
+                const { name } = c
                 it(`${name} [${lang}]: 設定語系=${lang} → 畫面呈現 ${lang}`, async function() {
-                    const { buf, info } = await capture(lang)
-                    assertCase(lang, info, c) //語意斷言（依 kind 分派）
-                    assertBaselineMatch(buf, bp(lang, name), `init-${lang}-${name}`) //像素斷言
+                    await runCase('compare', lang, c, { onKnownDefect: () => this.skip() }) //已知缺陷協定: 標 pending(提示框殘留已由 w-component-vue 2.5.24 修正, 其偵測改為直接失敗, 見 e2e-setup probeStuckTooltip)
                 })
             }
         }

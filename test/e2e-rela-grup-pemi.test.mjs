@@ -1,9 +1,15 @@
 //群組權限關聯 e2e（B 類關聯編輯）。對應 spec/流程_群組權限關聯.md。
 //鏡像 test/e2e-rela-user-grup.test.mjs（B 類關聯 canonical）骨架，差異在於 user↔grup 換成 grup↔pemi、
 //且 VeCpemis（群組頁入口）Save 不打 API 只 resolve 回填、DB 寫入延到「群組頁工具列存檔」一步。
-//雙模式：
+//使用方式（以專案根為工作目錄）：
 //  - 產 baseline：node test/e2e-rela-grup-pemi.test.mjs --baseline （寫 test/pics/rela-grup-pemi/）
 //  - 驗證（mocha）：npx mocha test/e2e-rela-grup-pemi.test.mjs --reporter list （pixelmatch 反鋸齒感知 + maxDiffPixels 容差比對，非 byte-exact）
+//  - 手術式重產（截圖前篩選；規格詳 w-package-tools-e2e 之 README.md §2.2）：
+//      --names <項,...>   每項可帶語系前綴（eng-／cht-），不帶則兩語系皆產；階段圖鍵（如 eng-E2E-002-12-cpemis-save-ok）只寫該張；
+//                         案例鍵或其編號前綴（如 E2E-002-cpemis-save-ok、E2E-002）寫該案全部階段；不符任何鍵即報錯並列出可用鍵
+//      --langs <eng,cht>  限語系（須完全等於已宣告語系）；--write-mode missing|changed  只寫缺少者／只寫與現行標準圖差異超過容差者（預設 all）
+//      env E2E_BASELINE_OUT_DIR=<dir>  寫到該目錄（等價驗證用，不動 test/pics；比對端讀取之標準圖路徑不受影響）
+//  - 產製端與比對端呼叫同一案例管線（runBaselineCase）：每案 fresh browser → DB 還原 → 開頁 → 語系 → 各階段截圖 → 語意斷言 → 寫檔／比對；斷言不過該案一張都不寫。
 //act 走 user-facing input；assert = 語意斷言 + pixel baseline（§6.2 / §6.3）。
 //
 //兩入口（spec 重要流程）：
@@ -22,7 +28,9 @@
 import fs from 'fs'
 import assert from 'assert'
 import JSON5 from 'json5'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal, captureBaseSeed, resetDb, setDialogModeWithShots, dialogEnableCheckboxSel, clickNavItem, openChipsAllWithShots, dialogChipsVisibleTargets, readDialogChipsRow, resizeWindowForChips, setChipsAllModeWithShots } from './tools/e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal, captureBaseSeed, resetDb, setDialogModeWithShots, dialogEnableCheckboxSel, openChipsAllWithShots, dialogChipsVisibleTargets, readDialogChipsRow, resizeWindowForChips, setChipsAllModeWithShots, setLang, MDI, iconBtn, DLG_MDI, dlgBtn, waitDialogGrid, toggleDialogEnable, clickDialogSave, waitDialogClosed, gotoGrups, gotoPemis, toggleEditMode, openBelongDialog, saveBelongAndWaitModal, assertModalMsg } from './tools/e2e-setup.mjs'
+//產製端與比對端同一案例管線（runBaselineCase）與截圖前篩選（createBaselineGate），規格詳 w-package-tools-e2e 之 README.md §2.1-2.2
+import { runBaselineCase, createBaselineGate } from './tools/e2eLib.mjs'
 
 const PICS_DIR = './test/pics/rela-grup-pemi'
 const LANGS = ['eng', 'cht']
@@ -34,74 +42,18 @@ function picPath(lang, name) { return `${PICS_DIR}/rela-grup-pemi-${lang}-${name
 const SEL_GRID = '.ag-root-wrapper'                                            //清單 / grid 內容區
 const SEL_MODAL = 'div[style*="overscroll-behavior"] div[tabindex="0"] > div'  //WDialog 結果 modal / Ve 對話框
 
-//設定語系（test setup 層，非 act-under-test；對齊雙語覆蓋維度）。沿用 e2e-grups / e2e-rela-user-grup 之對稱 buffer 慣例：
-//cht 走語系切換；eng 為預設不切，但補等同的 settle buffer，治 eng-vs-cht 收斂不對稱（sso e2e-adduser 殷鑑）。
-async function setLang(page, lang) {
-    if (lang !== 'eng') {
-        await page.evaluate((l) => { window.$vo.$ui.setLang(l, 'e2e-setLang') }, lang)
-    }
-    await page.waitForTimeout(600)
-}
+//設定語系 setLang（test setup 層，非 act-under-test；eng 不切但補等量 600ms settle）自 e2e-setup.mjs import（本檔原副本與之語法樹及去空白註解之 token 序列皆相同，2026-09-28 收斂）。
 
-//導航至群組頁（user-facing：點左側「權限群組」導覽），等 ag-grid 載入。
-async function gotoGrups(page) {
-    const grupsLabel = await page.evaluate(() => window.$vo.$t('mmGrups'))
-    await clickNavItem(page, grupsLabel) //限定導覽面板內（見 e2e-setup clickNavItem 註解）
-    await waitUntilExist(page, '群組 ag-grid 列', () => document.querySelectorAll('.ag-row').length > 0, { timeout: 20000 })
-    await page.waitForTimeout(500)
-}
+//gotoGrups／gotoPemis／toggleEditMode：本檔原各自一份，與 e2e-setup.mjs 匯出版逐字相同（gotoGrups／gotoPemis
+//僅 clickNavItem 後之行內註解不同），2026-09-28 收斂並改 import（見檔頭 import 清單）。
 
-//導航至權限頁（user-facing：點左側「權限」導覽），等 ag-grid 載入。
-async function gotoPemis(page) {
-    const pemisLabel = await page.evaluate(() => window.$vo.$t('mmPemis'))
-    await clickNavItem(page, pemisLabel) //限定導覽面板內：自群組頁切換時, 該頁「管控使用權限」表頭之 eng 文字與本選單同字, 全頁定位會誤點表頭
-    await waitUntilExist(page, '權限 ag-grid 列', () => document.querySelectorAll('.ag-row').length > 0, { timeout: 20000 })
-    await page.waitForTimeout(500)
-}
-
-//切換清單頁編輯模式（點 WSwitch，以「Edit mode/編輯模式」標籤觸發其 click 區）。預設編輯模式 ON，故唯讀案例需切一次關閉。
-async function toggleEditMode(page) {
-    const label = await page.evaluate(() => window.$vo.$t('modeEdit'))
-    await page.getByText(label, { exact: true }).first().click()
-    await page.waitForTimeout(2000) //toggle 觸發 grid 欄位 reflow（增/減拖曳·勾選欄），等其完全 settle
-}
-
-//—— 對話框 / 工具列 icon 按鈕定位（WButtonCircle 渲染為 div[role=button] 內含 <svg><path d=...>，以 mdi path 定位）——
-//WDialog template（w-component-vue WDialog.vue）：Save 鈕=mdiCheckCircle（僅 isEditable && isModified 才渲染）、
-//Close 鈕=mdiClose（恆渲染）。群組頁工具列存檔鈕=mdiCloudUploadOutline（僅 isEditable && isModified 才渲染）。
-const DLG_MDI = {
-    save: 'M12 2C6.5 2 2 6.5 2 12S6.5 22 12 22 22 17.5 22 12 17.5 2 12 2M10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z',
-    close: 'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z',
-}
-const TOOLBAR_MDI = {
-    upload: 'M6.5 20Q4.22 20 2.61 18.43 1 16.85 1 14.58 1 12.63 2.17 11.1 3.35 9.57 5.25 9.15 5.88 6.85 7.75 5.43 9.63 4 12 4 14.93 4 16.96 6.04 19 8.07 19 11 20.73 11.2 21.86 12.5 23 13.78 23 15.5 23 17.38 21.69 18.69 20.38 20 18.5 20H13Q12.18 20 11.59 19.41 11 18.83 11 18V12.85L9.4 14.4L8 13L12 9L16 13L14.6 14.4L13 12.85V18H18.5Q19.55 18 20.27 17.27 21 16.55 21 15.5 21 14.45 20.27 13.73 19.55 13 18.5 13H17V11Q17 8.93 15.54 7.46 14.08 6 12 6 9.93 6 8.46 7.46 7 8.93 7 11H6.5Q5.05 11 4.03 12.03 3 13.05 3 14.5 3 15.95 4.03 17 5.05 18 6.5 18H9V20M12 13Z',
-}
-function pathBtn(page, path) {
-    return page.locator(`div[role="button"]:has(svg path[d="${path}"])`)
-}
-
-//—— 對話框內 grid 互動原語（列以 row-index 定位；enable=checkbox、mode=select）——
-//等對話框內 ag-grid 列就緒。
-async function waitDialogGrid(page) {
-    await waitUntilExist(page, '對話框內 ag-grid 列', () => document.querySelectorAll('.ag-row').length > 0, { timeout: 15000 })
-    await page.waitForTimeout(800)
-}
-//翻轉對話框內某列 enable checkbox（觸發 toggleItemEnableByName → isModified=true → Save 鈕現身）。
-//locator 限定 .ag-cell[col-id="enable"] 內 checkbox，避開頁面主表的 isActive checkbox。
-async function toggleDialogEnable(page, rowIndex) {
-    await page.locator(`.ag-row[row-index="${rowIndex}"] .ag-cell[col-id="enable"] input[type="checkbox"]`).first().click()
-    await page.waitForTimeout(800) //revRows / refresh settle
-}
+//—— 對話框 / 工具列 icon 按鈕與對話框內 grid 互動原語：自 e2e-setup.mjs import（本檔原副本與之語法樹及去空白註解之 token 序列皆相同，2026-09-28 收斂）——
+//WDialog Save 鈕＝DLG_MDI.save（mdiCheckCircle，僅 isEditable && isModified 才渲染），以 dlgBtn 定位；
+//群組頁工具列存檔鈕＝MDI.upload（mdiCloudUploadOutline，僅 isEditable && isModified 才渲染），以 iconBtn 定位（原本地 TOOLBAR_MDI.upload＋pathBtn，字串與本體相同）。
+//waitDialogGrid / toggleDialogEnable（列以 row-index 定位；enable=checkbox）/ clickDialogSave / waitDialogClosed 同上。
+//（原本地 clickDialogClose 於本檔零呼叫——本 flow 無取消案例——隨收斂刪除、不 import。）
 //setDialogModeWithShots（切對話框內某列之模式控制項；觸發 toggleItemModeByName → isModified=true）收斂進 e2e-setup.mjs 共用：
 //mode 欄已改自製下拉 WTextSelect（2026-09-14），須「點觸發 → 點清單項」兩步真點擊，本檔不再自留副本。
-//點對話框 Save 鈕（需 isModified=true 才渲染；呼叫前須已 toggle 過）。
-async function clickDialogSave(page) {
-    await pathBtn(page, DLG_MDI.save).first().click()
-}
-//點對話框 Close 鈕（恆渲染）。
-async function clickDialogClose(page) {
-    await pathBtn(page, DLG_MDI.close).first().click()
-}
 
 //—— 入口 A（VeCpemis）開啟 + 群組頁工具列存檔 helpers ——
 //開啟群組頁某列的 cpemis 對話框（VeCpemis）。
@@ -113,18 +65,11 @@ async function openCpemisDialog(page, rowIndex) {
     }, { timeout: 15000 })
     await waitDialogGrid(page)
 }
-//等對話框關閉（Save resolve / Close reject 後 bShow=false）。以標題消失偵測。
-async function waitDialogClosed(page, titleKey) {
-    await waitUntilExist(page, '對話框關閉', (k) => {
-        const vo = window.$vo
-        return !(document.body.innerText || '').includes(vo.$t(k))
-    }, { timeout: 15000, arg: titleKey })
-    await page.waitForTimeout(800)
-}
+//等對話框關閉 waitDialogClosed（Save resolve / Close reject 後 bShow=false，以標題消失偵測）自 e2e-setup.mjs import。
 //點群組頁工具列存檔鈕 → 等 CheckYes 結果 modal 出現（systemMessage 標題）→ 停在 modal 顯示態供截圖。
 //VeCpemis resolve 回填群組列後，DB 寫入延到此處：saveGrups → $fapi.updateGrups → showCheckYes（成功 grupSaveGrupsSuccess）。
 async function saveGrupsAndWaitModal(page) {
-    await pathBtn(page, TOOLBAR_MDI.upload).first().click()
+    await iconBtn(page, MDI.upload).first().click()
     await waitUntilExist(page, 'CheckYes 結果 modal（systemMessage 標題）', () => {
         const vo = window.$vo
         return (document.body.innerText || '').includes(vo.$t('systemMessage'))
@@ -133,31 +78,9 @@ async function saveGrupsAndWaitModal(page) {
 }
 
 //—— 入口 B（VePemiBlngGrups）開啟 + 結果 modal helpers ——
-//開啟權限頁某列的 belongGrups 對話框（VePemiBlngGrups）。
-async function openBelongDialog(page, rowIndex) {
-    await page.locator(`.ag-row[row-index="${rowIndex}"] .ag-cell[col-id="belongGrups"] button`).first().click()
-    await waitUntilExist(page, 'VePemiBlngGrups 對話框標題', () => {
-        const vo = window.$vo
-        return (document.body.innerText || '').includes(vo.$t('pemiBlngEditGrups'))
-    }, { timeout: 15000 })
-    await waitDialogGrid(page)
-}
-//點對話框 Save → 等 CheckYes 結果 modal 出現（systemMessage 標題）→ 停在 modal 顯示態供截圖。
-//入口 B 自帶 API：core → saveGrups → $fapi.updateGrups → showCheckYes（成功 grupSaveGrupsSuccess / 失敗 grupSaveGrupsFail）。
-async function saveBelongAndWaitModal(page) {
-    await clickDialogSave(page)
-    await waitUntilExist(page, 'CheckYes 結果 modal（systemMessage 標題）', () => {
-        const vo = window.$vo
-        return (document.body.innerText || '').includes(vo.$t('systemMessage'))
-    }, { timeout: 20000 })
-    await page.waitForTimeout(800) //modal 進場 settle
-}
-//語意斷言：結果 modal 顯示指定 i18n 訊息（lang-aware；fail 類只斷言前綴鍵）。
-async function assertModalMsg(page, i18nKey) {
-    const msg = await page.evaluate((k) => window.$vo.$t(k), i18nKey)
-    const txt = await page.evaluate(() => document.body.innerText)
-    assert.ok(txt.includes(msg), `結果 modal 應顯示 ${i18nKey}（${msg}）`)
-}
+//openBelongDialog／saveBelongAndWaitModal／assertModalMsg：本檔原各自一份，2026-09-28 收斂並改 import。
+//本 flow 開啟「所屬」對話框固定用此組值（供 openBelongDialog 第三參，見各呼叫點）。
+const BELONG_DIALOG_OPT = { colId: 'belongGrups', titleKey: 'pemiBlngEditGrups', label: 'VePemiBlngGrups 對話框標題' }
 
 //—— DB 衛生 helpers（每 case 前還原 grups 表為 base seed）——
 //兩入口最終都寫 grups.cpemis；為一致性與隔離每 case 還原 grups。
@@ -176,14 +99,16 @@ async function readDbGrupCpemis(page, grupName) {
     catch (e) { return raw } //fallback 回原字串
 }
 
-//case 定義：run(page,lang) 走流程並回傳截圖 buffer；mocha 模式再加語意斷言
-const CASES = [
+//案例宣告（產製端與比對端共用；順序＝mocha it 順序＝產製順序）：run(page, lang) 走流程並回傳截圖（多階段 [{ name, buf }]）；
+//semantic(page) 為語意斷言，兩端皆於寫檔／比對之前執行（runBaselineCase）；stages＝該案實際產出之全部圖鍵（與寫檔名、比對名一致，產出與宣告不符即報錯）。
+const cases = [
 
     //—————————————— 入口 A：VeCpemis（群組視角，resolve 回填、DB 寫入延到群組頁工具列存檔）——————————————
 
     {
         //E2E-001：自群組列 cpemis 按鈕開啟 VeCpemis 對話框（golden 起點）。僅驗開啟態：標題 + 逐權限列。
         name: 'E2E-001-cpemis-open',
+        stages: ['E2E-001-1-source-row', 'E2E-001-2-dialog-open'],
         run: async (page) => {
             await gotoGrups(page)
             const s1 = await captureStableWithBox(page, rowBoxSel(0)) //階段1：來源列（點 cpemis 按鈕前）
@@ -241,8 +166,14 @@ const CASES = [
         //→ 再點群組頁工具列存檔 → updateGrups 寫 DB + 成功 modal。
         //斷言（有 DB 寫入）：結果 modal 顯示 grupSaveGrupsSuccess；DB M1.cpemis 含 權限P3 鍵 = { mode:'AND', isActive:'y' }。
         //對話框內列＝全部 pemis（依 order）：row0=P1, row1=P2, row2=P3, row3=P4（M1 原無 P3）。
-        //多階段：E2E-002-1-dialog-toggled（toggle+mode 後、Save 前之對話框態）→ E2E-002-cpemis-save-ok（存檔成功 modal）。
+        //多階段 13 張（圖鍵見 stages；每步兩張：點擊前框要點、點擊後框反應元素）：來源列 → 對話框初始態 → 勾選 P3 enable → 切 AND（三張）→ 該列
+        //→ 對話框 Save → 回填後 M1 列 → 群組頁工具列存檔 → 成功 modal → 關 modal 後 M1 列。
         name: 'E2E-002-cpemis-save-ok',
+        stages: [
+            'E2E-002-1-source-row', 'E2E-002-2-dialog-open', 'E2E-002-3-click-enable', 'E2E-002-4-enable-checked',
+            'E2E-002-5-click-mode', 'E2E-002-6-list-open', 'E2E-002-7-click-and', 'E2E-002-8-row-toggled',
+            'E2E-002-9-click-save', 'E2E-002-10-cpemis-filled', 'E2E-002-11-click-page-save', 'E2E-002-12-cpemis-save-ok', 'E2E-002-13-data-changed',
+        ],
         run: async (page) => {
             await gotoGrups(page)
             const s1 = await captureStableWithBox(page, rowBoxSel(0)) //階段1：來源列（點 cpemis 按鈕前）
@@ -254,11 +185,11 @@ const CASES = [
             const s4 = await captureStableWithBox(page, dialogRowBoxSel(2)) //階段4 enable-checked：勾選後框住該列（checkbox 已勾、Save 鈕現身）
             const m = await setDialogModeWithShots(page, 2, 'AND') //階段5/6/7：點下拉前框觸發區 → 清單展開框整份清單 → 點「AND」前框該項目；選取後清單關閉
             const s8 = await captureStableWithBox(page, dialogRowBoxSel(2)) //階段8 row-toggled：切 AND 後框住該列（mode 顯示 AND）
-            const s9 = await captureStableWithBox(page, pathBtn(page, DLG_MDI.save)) //階段9 click-save：點擊前框住對話框 Save 鈕
+            const s9 = await captureStableWithBox(page, dlgBtn(page, DLG_MDI.save)) //階段9 click-save：點擊前框住對話框 Save 鈕
             await clickDialogSave(page) //resolve cpemis 字串回填群組列、isModified=true，對話框關閉
             await waitDialogClosed(page, 'grupEditCpemis')
             const s10 = await captureStableWithBox(page, rowBoxSel(0)) //階段10 cpemis-filled：對話框已關閉，M1 列 cpemis 摘要已回填（『使用 3 項權限』）、頁面儲存鈕現身
-            const s11 = await captureStableWithBox(page, pathBtn(page, TOOLBAR_MDI.upload)) //階段11 click-page-save：點擊前框住群組頁工具列存檔鈕
+            const s11 = await captureStableWithBox(page, iconBtn(page, MDI.upload)) //階段11 click-page-save：點擊前框住群組頁工具列存檔鈕
             await saveGrupsAndWaitModal(page) //群組頁工具列存檔 → updateGrups 寫 DB → 成功 modal
             const s12 = await captureStableWithBox(page, SEL_MODAL) //階段12：群組頁存檔成功結果 modal
             await assertModalMsg(page, 'grupSaveGrupsSuccess') //關 modal 前斷言成功訊息（dismiss 後文字消失，故移此處）
@@ -305,10 +236,11 @@ const CASES = [
         //E2E-003：自權限列 belongGrups 按鈕開啟 VePemiBlngGrups 對話框（golden 起點）。
         //僅驗開啟態：標題 + 當前權限名標籤 + 逐群組列。
         name: 'E2E-003-blnggrups-open',
+        stages: ['E2E-003-1-source-row', 'E2E-003-2-dialog-open'],
         run: async (page) => {
             await gotoPemis(page)
             const s1 = await captureStableWithBox(page, rowBoxSel(0)) //階段1：來源列（點 belongGrups 按鈕前）
-            await openBelongDialog(page, 0) //row 0 = 權限P1（僅 M1 使用之）
+            await openBelongDialog(page, 0, BELONG_DIALOG_OPT) //row 0 = 權限P1（僅 M1 使用之）
             const s2 = await captureStableWithBox(page, SEL_MODAL) //階段2：VePemiBlngGrups 對話框初始開啟態
             return [
                 { name: 'E2E-003-1-source-row', buf: s1 },
@@ -361,12 +293,17 @@ const CASES = [
         //E2E-004：於 VePemiBlngGrups 勾選 權限群組M2（原無 P1）enable + 切其 mode → 點對話框 Save → updateGrups 寫 DB + 成功 modal。
         //斷言（有 DB 寫入）：結果 modal 顯示 grupSaveGrupsSuccess；DB M2.cpemis 含 權限P1 鍵 = { mode:'AND', isActive:'y' }。
         //對話框內列＝全部 grups（依 order）：row0=M1, row1=M2, row2=M3, row3=M4。
-        //多階段：E2E-004-1-dialog-toggled（toggle+mode 後、Save 前之對話框態）→ E2E-004-blnggrups-save-ok（存檔成功 modal）。
+        //多階段 11 張（圖鍵見 stages；每步兩張）：來源列 → 對話框初始態 → 勾選 M2 enable → 切 AND（三張）→ 該列 → 對話框 Save → 成功 modal → 關 modal 後 P1 列。
         name: 'E2E-004-blnggrups-save-ok',
+        stages: [
+            'E2E-004-1-source-row', 'E2E-004-2-dialog-open', 'E2E-004-3-click-enable', 'E2E-004-4-enable-checked',
+            'E2E-004-5-click-mode', 'E2E-004-6-list-open', 'E2E-004-7-click-and', 'E2E-004-8-row-toggled',
+            'E2E-004-9-click-save', 'E2E-004-10-blnggrups-save-ok', 'E2E-004-11-data-changed',
+        ],
         run: async (page) => {
             await gotoPemis(page)
             const s1 = await captureStableWithBox(page, rowBoxSel(0)) //階段1：來源列（點 belongGrups 按鈕前）
-            await openBelongDialog(page, 0) //row 0 = 權限P1
+            await openBelongDialog(page, 0, BELONG_DIALOG_OPT) //row 0 = 權限P1
             const s2 = await captureStableWithBox(page, SEL_MODAL) //階段2：對話框初始態（toggleDialogEnable 前）
             //以下每步兩張（點擊前框要點、點擊後框反應元素）
             const s3 = await captureStableWithBox(page, dialogEnableCheckboxSel(1)) //階段3 click-enable：點擊前框住 權限群組M2 列之 enable checkbox
@@ -375,7 +312,7 @@ const CASES = [
             //模式併入本項標籤左段（2026-09-16 起所屬對話框無獨立 mode 欄），故傳 colId:'pemisNames'
             const m = await setDialogModeWithShots(page, 1, 'AND', { colId: 'pemisNames' }) //階段5/6/7：點標籤前框整顆本項標籤 → 清單展開框整份清單 → 點「AND」前框該項目
             const s8 = await captureStableWithBox(page, dialogRowBoxSel(1)) //階段8 row-toggled：切 AND 後框住該列（第 1 顆標籤之模式段顯示 AND）
-            const s9 = await captureStableWithBox(page, pathBtn(page, DLG_MDI.save)) //階段9 click-save：點擊前框住對話框 Save 鈕
+            const s9 = await captureStableWithBox(page, dlgBtn(page, DLG_MDI.save)) //階段9 click-save：點擊前框住對話框 Save 鈕
             await saveBelongAndWaitModal(page) //updateGrups 寫 DB → 成功 modal
             const s10 = await captureStableWithBox(page, SEL_MODAL) //階段10：對話框 Save 後成功結果 modal
             await assertModalMsg(page, 'grupSaveGrupsSuccess') //關 modal 前斷言成功訊息（dismiss 後文字消失，故移此處）
@@ -410,6 +347,7 @@ const CASES = [
     {
         //E2E-005：群組頁關閉編輯模式後開 VeCpemis → 檢視版標題（grupEditCpemisForDisplay）、無 Save 鈕、模式控制項為不可編輯態（淡化 0.6、無箭頭、點擊不展開）、checkbox 皆 disabled。
         name: 'E2E-005-readonly-view',
+        stages: ['E2E-005-1-source-row', 'E2E-005-2-dialog-open'],
         run: async (page) => {
             await gotoGrups(page)
             await toggleEditMode(page) //關閉編輯模式 → isEditable=false
@@ -434,7 +372,7 @@ const CASES = [
             assert.ok(txt.includes(dispLabel), `應顯示檢視版標題（${dispLabel}）`)
             assert.ok(!txt.includes(editLabel) || dispLabel.includes(editLabel) === false, '不應為可編輯版標題')
             //無對話框 Save 鈕（mdiCheckCircle）
-            const saveCnt = await pathBtn(page, DLG_MDI.save).count()
+            const saveCnt = await dlgBtn(page, DLG_MDI.save).count()
             assert.equal(saveCnt, 0, '唯讀檢視不應出現對話框 Save 鈕')
             //對應 spec E2E-005 驗證1：模式控制項為不可編輯態（透明度 0.6、無展開箭頭、點擊不展開）、checkbox 皆 disabled（VeCpemis.vue:134,138）
             const ro = await page.evaluate(() => {
@@ -462,8 +400,9 @@ const CASES = [
         //E2E-006：權限頁關閉編輯模式後開 VePemiBlngGrups（入口 B）→ 檢視版標題（pemiBlngEditGrupsForDisplay）、無 Save 鈕、標籤模式段為純文字（本對話框自 2026-09-16 起無獨立 mode 欄）、checkbox 皆 disabled。
         //對應 spec 流程_群組權限關聯.md E2E-006（補權限頁入口唯讀；E2E-005 已涵蓋群組頁入口 VeCpemis 唯讀）。
         //多階段（2026-09-17 起）：①1440 寬唯讀對話框 → ②縮為 440 後 M1 列收合（唯讀態本項模式段為純文字較窄, 2026-09-17 以 2px 步距實測 ≤464 才收合、480 仍放得下, eng/cht 相同） → ③點擊前框「+1」→ ④浮層展開（兩顆皆無展開箭頭）。
-        //  浮層與收合之語意斷言放在 run() 內（過程中觀察, 且 regen 端只跑 run()）。
+        //  浮層與收合之語意斷言放在 run() 內（過程中之觀察, 事後不可再觀察；兩端皆跑）。
         name: 'E2E-006-readonly-view',
+        stages: ['E2E-006-1-readonly-view', 'E2E-006-2-row-collapsed', 'E2E-006-3-click-more', 'E2E-006-4-popup-open', 'E2E-006-5-click-mode', 'E2E-006-6-popup-unchanged'],
         run: async (page) => {
             await gotoPemis(page)
             await toggleEditMode(page) //關閉編輯模式 → isEditable=false
@@ -500,7 +439,7 @@ const CASES = [
             const nList = await page.locator('.WPopperFix[wtlp="modeSelect"]:visible').count()
             assert.equal(nList, 0, `唯讀浮層內點模式段不應出現模式清單（實得 ${nList}）`)
             assert.equal(await page.locator('.WPopperFix[wtlp="relationChipsAll"]:visible').count(), 1, '唯讀浮層內點模式段後浮層應仍開著')
-            assert.equal(await pathBtn(page, DLG_MDI.save).count(), 0, '唯讀浮層內點模式段後對話框仍不應出現 Save 鈕')
+            assert.equal(await dlgBtn(page, DLG_MDI.save).count(), 0, '唯讀浮層內點模式段後對話框仍不應出現 Save 鈕')
             const s6 = await captureStableWithBox(page, popRo) //E2E-006-6-popup-unchanged：點擊後框住整個浮層（未出現模式清單，浮層維持原樣）
             return [
                 { name: 'E2E-006-1-readonly-view', buf: s1 },
@@ -519,7 +458,7 @@ const CASES = [
             assert.ok(txt.includes(dispLabel), `應顯示檢視版標題（${dispLabel}）`)
             assert.ok(!txt.includes(editLabel) || dispLabel.includes(editLabel) === false, '不應為可編輯版標題')
             //對應 spec E2E-006 驗證1：無對話框 Save 鈕（hasSaveBtn=isEditable && isModified，isEditable=false 恆不渲染）。
-            const saveCnt = await pathBtn(page, DLG_MDI.save).count()
+            const saveCnt = await dlgBtn(page, DLG_MDI.save).count()
             assert.equal(saveCnt, 0, '唯讀檢視不應出現對話框 Save 鈕')
             //對應 spec E2E-006 驗證1：標籤之模式段為純文字（無下拉觸發區）、enable checkbox 皆 disabled（VePemiBlngGrups.vue:152、RelationChip.vue:15）
             const ro = await page.evaluate(() => {
@@ -548,10 +487,14 @@ const CASES = [
         //視窗寬 480：2026-09-17 以 2px 步距實測 M1 列於視窗寬 ≤530 時收合（530 時儲存格寬 211），eng/cht 相同。
         //編輯模式：settings.json 之 modeEditPemis='y', 進頁即編輯模式；openBelongDialog 以編輯版標題 pemiBlngEditGrups 為就緒訊號, 等同守門。
         name: 'E2E-007-chips-collapse-edit',
+        stages: [
+            'E2E-007-1-source-row', 'E2E-007-2-dialog-open', 'E2E-007-3-row-collapsed', 'E2E-007-4-click-more', 'E2E-007-5-popup-open',
+            'E2E-007-6-click-mode', 'E2E-007-7-list-open', 'E2E-007-8-click-and', 'E2E-007-9-row-toggled', 'E2E-007-10-row-expanded',
+        ],
         run: async (page) => {
             await gotoPemis(page)
             const s1 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-007-1-source-row：開窗前來源列（權限P1，row 0）
-            await openBelongDialog(page, 0)
+            await openBelongDialog(page, 0, BELONG_DIALOG_OPT)
             const s2 = await captureStableWithBox(page, SEL_MODAL) //E2E-007-2-dialog-open：對話框初始態（1440 寬，4 列皆無「+」按鈕）
             const nInd = await page.evaluate((sel) => document.querySelectorAll(`${sel} .ag-cell[col-id="pemisNames"] div[title][style*="cursor: pointer"]`).length, SEL_MODAL)
             assert.equal(nInd, 0, `1440 寬下 4 列皆不應出現「+N」（實得 ${nInd}）`)
@@ -586,7 +529,7 @@ const CASES = [
             assert.deepEqual(r9.titles, ['權限P1'], `選取後 480 寬下仍應只見本項 1 顆（實得 ${JSON.stringify(r9.titles)}）`)
             assert.equal(r9.modes[0], 'AND', `選取後本項標籤模式段應顯示 AND（實得 ${r9.modes[0]}）`)
             assert.equal(r9.ind, '+1', `選取後仍應接「+1」（實得 ${r9.ind}）`)
-            assert.equal(await pathBtn(page, DLG_MDI.save).count(), 1, '於浮層內改模式後對話框應出現 Save 鈕（已有未存變更）')
+            assert.equal(await dlgBtn(page, DLG_MDI.save).count(), 1, '於浮層內改模式後對話框應出現 Save 鈕（已有未存變更）')
             const s9 = await captureStableWithBox(page, await dialogChipsVisibleTargets(page, 0, 'pemisNames')) //E2E-007-9-row-toggled：框住可見之醒目標籤（AND）與「+1」之聯集
 
             //⑥拉回寬視窗
@@ -617,43 +560,48 @@ const CASES = [
     },
 ]
 
-//手術式重產（§6.3）：--names a,b,c 只產指定 case；--langs eng,cht 只產指定語系。截圖「前」就 gate（省截圖成本）。
-function argList(flag) {
-    const i = process.argv.indexOf(flag)
-    if (i >= 0 && process.argv[i + 1]) return process.argv[i + 1].split(',').map((s) => s.trim()).filter(Boolean)
-    return null
+//單一案例管線（產製端與比對端共用，runBaselineCase）：per-case fresh browser（每案 launch／close，消除 GPU/font/CSS cache 跨 case 累積；對齊 sso）
+//→ throwaway page 還原 DB 為 base seed → 開 case page → 設語系 → run（各階段截圖）→ 語意斷言 → 產製端依 gate 寫檔／比對端逐張比對標準圖 → 關瀏覽器。
+async function runCase(mode, lang, c, extra = {}) {
+    return await runBaselineCase({
+        mode,
+        lang,
+        name: c.name,
+        run: c.run,
+        stages: c.stages,
+        semantic: c.semantic ? async (ctx) => c.semantic(ctx.page) : null,
+        launch: launchBrowser,
+        openPage: async (browser) => {
+            await resetDb(browser, 'grups', BASE_SEED) //throwaway page 還原 DB 為 base seed，關閉後再開 case page
+            const page = await openApp(browser)
+            await setLang(page, lang) //eng 也切（symmetric）：補等同 cht setLang 的 re-render+settle 時間
+            return page
+        },
+        pathOf: picPath,
+        labelOf: (lg, key) => `rela-grup-pemi-${lg}-${key}`,
+        match: assertBaselineMatch,
+        ...extra,
+    })
 }
-//前綴或完整匹配：傳 'E2E-002' 即可匹配 'E2E-002-cpemis-save-ok'（避免 §6.3 殷鑑「--names 只認字面」陷阱）
-function nameMatch(list, caseName) { return list.some((nm) => caseName === nm || caseName.startsWith(nm)) }
 
 async function generateBaseline() {
     console.log('=== 產製 rela-grup-pemi baseline 開始 ===')
-    const onlyNames = argList('--names')
-    const onlyLangs = argList('--langs')
+    //截圖前篩選（--names / --langs / --write-mode / E2E_BASELINE_OUT_DIR）；不符任何鍵即於此報錯（不啟動服務）
+    const gate = createBaselineGate({ langs: LANGS, cases })
+    console.log(gate.describe())
     await startServersOnce()
     fs.mkdirSync(PICS_DIR, { recursive: true })
     process.env.E2E_STRICT_CAPTURE = '1' //regen 端：captureStable 未 settle 即 throw，拒絕寫入未穩定畫面
     //擷取 pristine base seed（DB 剛 fresh seed）——用臨時 browser
     { const b = await launchBrowser(); const pp = await openApp(b); BASE_SEED = await captureBaseSeed(pp, 'grups'); await b.close() }
-    for (const lang of LANGS) {
-        if (onlyLangs && !nameMatch(onlyLangs, lang)) continue //§6.3 手術式：跳過未指定語系
-        for (const c of CASES) {
-            if (onlyNames && !nameMatch(onlyNames, c.name)) continue //§6.3 手術式：截圖前 gate，跳過未指定 case
-            //per-case fresh browser（消除 GPU/font/CSS cache 跨 case 累積造成的 cold/warm 差異；對齊 sso）
-            const browser = await launchBrowser()
-            await resetDb(browser, 'grups', BASE_SEED) //throwaway page 還原 DB 為 base seed，關閉後再開 case page
-            const page = await openApp(browser)
-            await setLang(page, lang) //eng 也切（symmetric）：補等同 cht setLang 的 re-render+settle 時間
-            //run 回傳「單張 Buffer」或「多階段 [{name, buf}]」；統一正規化為陣列後逐張寫入
-            let shots = await c.run(page, lang)
-            if (Buffer.isBuffer(shots)) shots = [{ name: c.name, buf: shots }]
-            for (const s of shots) {
-                fs.writeFileSync(picPath(lang, s.name), s.buf)
-                console.log('wrote', picPath(lang, s.name), s.buf.length, 'bytes')
-            }
-            await browser.close()
+    for (const lang of gate.langs) {
+        for (const c of gate.casesFor(lang)) {
+            console.log(`  ${lang}-${c.name}`)
+            await runCase('regen', lang, c, { gate })
         }
     }
+    //--names 之任一項未產出即報錯（不靜默略過）
+    gate.finalize()
     cleanup()
     console.log('=== 產製 rela-grup-pemi baseline 完成 ===')
 }
@@ -665,30 +613,15 @@ else {
     for (const lang of LANGS) {
         describe(`e2e-rela-grup-pemi (${lang})`, function() {
             this.timeout(180000)
-            let browser = null
             before(async function() {
                 this.timeout(200000)
                 await startServersOnce()
                 if (!BASE_SEED) { const b = await launchBrowser(); const pp = await openApp(b); BASE_SEED = await captureBaseSeed(pp, 'grups'); await b.close() }
             })
-            //per-case fresh browser：每 case 全新 browser 進程（對齊 sso），消 cross-case GPU/font cache 累積
-            beforeEach(async function() {
-                this.timeout(90000)
-                browser = await launchBrowser()
-                await resetDb(browser, 'grups', BASE_SEED) //throwaway page 還原 DB 為 base seed
-            })
-            afterEach(async function() { if (browser) { await browser.close(); browser = null } })
-            for (const c of CASES) {
-                it(c.name, async () => {
-                    const page = await openApp(browser)
-                    await setLang(page, lang)
-                    let shots = await c.run(page, lang)
-                    if (c.semantic) await c.semantic(page)
-                    //run 回傳「單張 Buffer」或「多階段 [{name, buf}]」；統一正規化為陣列後逐張比對
-                    if (Buffer.isBuffer(shots)) shots = [{ name: c.name, buf: shots }]
-                    for (const s of shots) {
-                        assertBaselineMatch(s.buf, picPath(lang, s.name), `rela-grup-pemi-${lang}-${s.name}`)
-                    }
+            //per-case fresh browser + DB 還原 + 開頁 + 語系由 runCase 負責（確保單 case --grep 也能跑）；語意斷言於比對標準圖之前（pixel baseline 為補強層）
+            for (const c of cases) {
+                it(c.name, async function() { //function(非箭頭): onKnownDefect 需 mocha 之 this.skip()
+                    await runCase('compare', lang, c, { onKnownDefect: () => this.skip() }) //已知缺陷協定: 標 pending(提示框殘留已由 w-component-vue 2.5.24 修正, 其偵測改為直接失敗, 見 e2e-setup probeStuckTooltip)
                 })
             }
         })

@@ -1,9 +1,15 @@
 //使用者群組關聯 e2e（B 類關聯編輯）。對應 spec/流程_使用者群組關聯.md。
 //鏡像 test/e2e-grups.test.mjs / e2e-users.test.mjs（canonical pilot）骨架，差異在於互動發生於對話框「內」
 //（勾選 enable checkbox / 切 OR-AND 模式控制項 / 點對話框 Save 或 Close）。
-//雙模式：
+//使用方式（以專案根為工作目錄）：
 //  - 產 baseline：node test/e2e-rela-user-grup.test.mjs --baseline （寫 test/pics/rela-user-grup/）
 //  - 驗證（mocha）：npx mocha test/e2e-rela-user-grup.test.mjs --reporter list （pixelmatch 反鋸齒感知 + maxDiffPixels 容差比對，非 byte-exact）
+//  - 手術式重產（截圖前篩選；規格詳 w-package-tools-e2e 之 README.md §2.2）：
+//      --names <項,...>   每項可帶語系前綴（eng-／cht-），不帶則兩語系皆產；階段圖鍵（如 eng-E2E-005-10-belong-saved）只寫該張；
+//                         案例鍵或其編號前綴（如 E2E-005-belong-saved、E2E-005）寫該案全部階段；不符任何鍵即報錯並列出可用鍵
+//      --langs <eng,cht>  限語系（須完全等於已宣告語系）；--write-mode missing|changed  只寫缺少者／只寫與現行標準圖差異超過容差者（預設 all）
+//      env E2E_BASELINE_OUT_DIR=<dir>  寫到該目錄（等價驗證用，不動 test/pics；比對端讀取之標準圖路徑不受影響）
+//  - 產製端與比對端呼叫同一案例管線（runBaselineCase）：每案 fresh browser → DB 還原 → 開頁 → 語系 → 各階段截圖 → 語意斷言 → 寫檔／比對；斷言不過該案一張都不寫。
 //act 走 user-facing input；assert = 語意斷言 + pixel baseline（§6.2 / §6.3）。
 //
 //兩入口（spec 重要流程）：
@@ -20,7 +26,9 @@
 import fs from 'fs'
 import assert from 'assert'
 import JSON5 from 'json5'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStable, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal, captureBaseSeed, resetDb, setDialogModeWithShots, dialogEnableCheckboxSel, clickNavItem, openChipsAllWithShots, dialogChipsAllBtnSel, dialogChipsVisibleTargets, readDialogChipsRow, resizeWindowForChips, setChipsAllModeWithShots } from './tools/e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal, captureBaseSeed, resetDb, setDialogModeWithShots, dialogEnableCheckboxSel, openChipsAllWithShots, dialogChipsAllBtnSel, dialogChipsVisibleTargets, readDialogChipsRow, resizeWindowForChips, setChipsAllModeWithShots, setLang, DLG_MDI, dlgBtn, waitDialogGrid, toggleDialogEnable, clickDialogSave, clickDialogClose, waitDialogClosed, gotoUsers, gotoGrups, toggleEditMode, openBelongDialog, saveBelongAndWaitModal, assertModalMsg } from './tools/e2e-setup.mjs'
+//產製端與比對端同一案例管線（runBaselineCase）與截圖前篩選（createBaselineGate），規格詳 w-package-tools-e2e 之 README.md §2.1-2.2
+import { runBaselineCase, createBaselineGate } from './tools/e2eLib.mjs'
 
 const PICS_DIR = './test/pics/rela-user-grup'
 const LANGS = ['eng', 'cht']
@@ -32,76 +40,19 @@ function picPath(lang, name) { return `${PICS_DIR}/rela-user-grup-${lang}-${name
 const SEL_GRID = '.ag-root-wrapper'                                            //清單 / grid 內容區
 const SEL_MODAL = 'div[style*="overscroll-behavior"] div[tabindex="0"] > div'  //WDialog 結果 modal / Ve 對話框
 
-//設定語系（test setup 層，非 act-under-test；對齊雙語覆蓋維度）。沿用 e2e-users / e2e-grups 之對稱 buffer 慣例：
-//cht 走語系切換；eng 為預設不切，但補等同的 settle buffer，治 eng-vs-cht 收斂不對稱（sso e2e-adduser 殷鑑）。
-async function setLang(page, lang) {
-    if (lang !== 'eng') {
-        await page.evaluate((l) => { window.$vo.$ui.setLang(l, 'e2e-setLang') }, lang)
-    }
-    await page.waitForTimeout(600)
-}
+//設定語系 setLang（test setup 層，非 act-under-test；eng 不切但補等量 600ms settle）自 e2e-setup.mjs import（本檔原副本與之語法樹及去空白註解之 token 序列皆相同，2026-09-28 收斂）。
 
-//導航至使用者頁（user-facing：點左側「使用者」導覽），等 ag-grid 載入。
-async function gotoUsers(page) {
-    const usersLabel = await page.evaluate(() => window.$vo.$t('mmUsers'))
-    await clickNavItem(page, usersLabel) //限定導覽面板內（見 e2e-setup clickNavItem 註解）
-    await waitUntilExist(page, '使用者 ag-grid 列', () => document.querySelectorAll('.ag-row').length > 0, { timeout: 20000 })
-    await page.waitForTimeout(500)
-}
+//gotoUsers／gotoGrups／toggleEditMode：本檔原各自一份，與 e2e-setup.mjs 匯出版逐字相同（gotoGrups 僅
+//clickNavItem 後之行內註解不同），2026-09-28 收斂並改 import（見檔頭 import 清單）。
 
-//導航至群組頁（user-facing：點左側「權限群組」導覽），等 ag-grid 載入。
-async function gotoGrups(page) {
-    const grupsLabel = await page.evaluate(() => window.$vo.$t('mmGrups'))
-    await clickNavItem(page, grupsLabel) //限定導覽面板內：自使用者頁切換時, 該頁「管控使用權限群組」表頭之 eng 文字與本選單同字, 全頁定位會誤點表頭
-    await waitUntilExist(page, '群組 ag-grid 列', () => document.querySelectorAll('.ag-row').length > 0, { timeout: 20000 })
-    await page.waitForTimeout(500)
-}
-
-//切換清單頁編輯模式（點 WSwitch，以「Edit mode/編輯模式」標籤觸發其 click 區）。預設編輯模式 ON，故唯讀案例需切一次關閉。
-//沿用 e2e-rela-grup-pemi / e2e-rela-pemi-rule 之同名 helper（本檔原無此 helper，唯讀案例需要，逐字沿用 sibling canonical）。
-async function toggleEditMode(page) {
-    const label = await page.evaluate(() => window.$vo.$t('modeEdit'))
-    await page.getByText(label, { exact: true }).first().click()
-    await page.waitForTimeout(2000) //toggle 觸發 grid 欄位 reflow（增/減拖曳·勾選欄），等其完全 settle
-}
-
-//—— 對話框 Save / Close 鈕定位（WDialog header 之 WButtonCircle）——
+//—— 對話框 Save / Close 鈕定位與對話框內 grid 互動原語：自 e2e-setup.mjs import（本檔原副本與之語法樹及去空白註解之 token 序列皆相同，2026-09-28 收斂）——
 //WDialog template（node_modules/w-component-vue/src/components/WDialog.vue:187-224）：
-//  Save 鈕 = WButtonCircle icon=mdiCheckCircle，僅 hasSaveBtn=(isEditable && isModified) 為真才渲染（:187,203）；
-//  Close 鈕 = WButtonCircle icon=mdiClose，hasCloseBtn 預設 true 恆渲染（:207-224）。
-//WButtonCircle 渲染為 div[role="button"]，內含 <svg><path d="..."/>，故以 mdi path 定位（同工具列 icon 按鈕慣例）。
-//mdi path 由 @mdi/js 取得（mdiCheckCircle / mdiClose）。
-const DLG_MDI = {
-    save: 'M12 2C6.5 2 2 6.5 2 12S6.5 22 12 22 22 17.5 22 12 17.5 2 12 2M10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z',
-    close: 'M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z',
-}
-function dlgBtn(page, path) {
-    return page.locator(`div[role="button"]:has(svg path[d="${path}"])`)
-}
-
-//—— 對話框內 grid 互動原語（列以 row-index 定位；enable=checkbox、mode=select）——
-//等對話框內 ag-grid 列就緒（標題已偵測，再等對話框內表格列出現）。
-async function waitDialogGrid(page) {
-    //對話框內表格列以 ag-row 呈現（與頁面主表共用 class）；對話框開啟後列數應 >0
-    await waitUntilExist(page, '對話框內 ag-grid 列', () => document.querySelectorAll('.ag-row').length > 0, { timeout: 15000 })
-    await page.waitForTimeout(800)
-}
-//翻轉對話框內某列 enable checkbox（觸發 showVe*ToggleItemEnableByName → isModified=true → Save 鈕現身）。
-//locator 限定 .ag-cell[col-id="enable"] 內 checkbox，避開頁面主表的 isActive checkbox。
-async function toggleDialogEnable(page, rowIndex) {
-    await page.locator(`.ag-row[row-index="${rowIndex}"] .ag-cell[col-id="enable"] input[type="checkbox"]`).first().click()
-    await page.waitForTimeout(800) //revRows / refresh settle
-}
+//  Save 鈕 = WButtonCircle icon=mdiCheckCircle（DLG_MDI.save），僅 hasSaveBtn=(isEditable && isModified) 為真才渲染（:187,203）；
+//  Close 鈕 = WButtonCircle icon=mdiClose（DLG_MDI.close），hasCloseBtn 預設 true 恆渲染（:207-224）。
+//WButtonCircle 渲染為 div[role="button"]，內含 <svg><path d="..."/>，故以 mdi path 定位（dlgBtn）。
+//waitDialogGrid / toggleDialogEnable（列以 row-index 定位；enable=checkbox）/ clickDialogSave / clickDialogClose / waitDialogClosed 同上。
 //setDialogModeWithShots（切對話框內某列之模式控制項；觸發 showVe*ToggleItemModeByName → isModified=true）收斂進 e2e-setup.mjs 共用：
 //mode 欄已改自製下拉 WTextSelect（2026-09-14），須「點觸發 → 點清單項」兩步真點擊，本檔不再自留副本。
-//點對話框 Save 鈕（需 isModified=true 才渲染；呼叫前須已 toggle 過）。
-async function clickDialogSave(page) {
-    await dlgBtn(page, DLG_MDI.save).first().click()
-}
-//點對話框 Close 鈕（恆渲染）。
-async function clickDialogClose(page) {
-    await dlgBtn(page, DLG_MDI.close).first().click()
-}
 
 //—— 入口 A（VeCgrups）開啟 + 讀回填值 helpers ——
 //開啟 peter（使用者頁 row 0）的 cgrups 對話框（VeCgrups）。
@@ -121,41 +72,12 @@ async function readUserRowCgrupsText(page, rowIndex) {
     }, rowIndex)
 }
 
-//等對話框關閉（Save resolve / Close reject 後 bShow=false）。以標題消失偵測。
-async function waitDialogClosed(page, titleKey) {
-    await waitUntilExist(page, '對話框關閉', (k) => {
-        const vo = window.$vo
-        return !(document.body.innerText || '').includes(vo.$t(k))
-    }, { timeout: 15000, arg: titleKey })
-    await page.waitForTimeout(800)
-}
+//等對話框關閉 waitDialogClosed（Save resolve / Close reject 後 bShow=false，以標題消失偵測）自 e2e-setup.mjs import。
 
 //—— 入口 B（VeGrupBlngUsers）開啟 + 結果 modal helpers ——
-//開啟權限群組M1（群組頁 row 0）的 belongUsers 對話框（VeGrupBlngUsers）。
-async function openBelongDialog(page, rowIndex) {
-    await page.locator(`.ag-row[row-index="${rowIndex}"] .ag-cell[col-id="belongUsers"] button`).first().click()
-    await waitUntilExist(page, 'VeGrupBlngUsers 對話框標題', () => {
-        const vo = window.$vo
-        return (document.body.innerText || '').includes(vo.$t('grupBlngEditUsers'))
-    }, { timeout: 15000 })
-    await waitDialogGrid(page)
-}
-//點對話框 Save → 等 CheckYes 結果 modal 出現（systemMessage 標題）→ 停在 modal 顯示態供截圖。
-//入口 B 自帶 API：saveUsers → $fapi.updateUsers → showCheckYes（成功 userSaveUsersSuccess / 失敗 userSaveUsersFail）。
-async function saveBelongAndWaitModal(page) {
-    await clickDialogSave(page)
-    await waitUntilExist(page, 'CheckYes 結果 modal（systemMessage 標題）', () => {
-        const vo = window.$vo
-        return (document.body.innerText || '').includes(vo.$t('systemMessage'))
-    }, { timeout: 20000 })
-    await page.waitForTimeout(800) //modal 進場 settle
-}
-//語意斷言：結果 modal 顯示指定 i18n 訊息（lang-aware；fail 類只斷言前綴鍵）。
-async function assertModalMsg(page, i18nKey) {
-    const msg = await page.evaluate((k) => window.$vo.$t(k), i18nKey)
-    const txt = await page.evaluate(() => document.body.innerText)
-    assert.ok(txt.includes(msg), `結果 modal 應顯示 ${i18nKey}（${msg}）`)
-}
+//openBelongDialog／saveBelongAndWaitModal／assertModalMsg：本檔原各自一份，2026-09-28 收斂並改 import。
+//本 flow 開啟「所屬」對話框固定用此組值（供 openBelongDialog 第三參，見各呼叫點）。
+const BELONG_DIALOG_OPT = { colId: 'belongUsers', titleKey: 'grupBlngEditUsers', label: 'VeGrupBlngUsers 對話框標題' }
 
 //—— DB 衛生 helpers（每 case 前還原 users 表為 base seed）——
 //入口 B 會寫 DB（updateUsers），入口 A 雖不寫 DB 但為一致性與隔離仍每 case 還原。
@@ -174,14 +96,16 @@ async function readDbUserCgrups(page, email) {
     catch (e) { return raw } //fallback 回原字串
 }
 
-//case 定義：run(page,lang) 走流程並回傳截圖 buffer；mocha 模式再加語意斷言
-const CASES = [
+//案例宣告（產製端與比對端共用；順序＝mocha it 順序＝產製順序）：run(page, lang) 走流程並回傳截圖（單張 Buffer 或多階段 [{ name, buf }]）；
+//semantic(page) 為語意斷言，兩端皆於寫檔／比對之前執行（runBaselineCase）；stages＝該案實際產出之全部圖鍵（與寫檔名、比對名一致，產出與宣告不符即報錯）。
+const cases = [
 
     //—————————————— 入口 A：VeCgrups（使用者視角，resolve 回填，不打 API）——————————————
 
     {
         //E2E-001：自使用者列 cgrups 按鈕開啟 VeCgrups 對話框（golden 起點）。僅驗開啟態：標題 + 逐群組列。
         name: 'E2E-001-cgrups-open',
+        stages: ['E2E-001-1-source-row', 'E2E-001-2-dialog-open'],
         run: async (page) => {
             await gotoUsers(page)
             const s1 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-001-1-source-row：開窗前來源列（peter，row 0）
@@ -239,8 +163,12 @@ const CASES = [
     {
         //E2E-002：於 VeCgrups 勾選 權限群組M2 enable + 切其 mode→AND → 點對話框 Save → resolve 回填使用者列。
         //斷言（前端回填，無 DB 寫入）：peter 使用者列 cgrups 文字由 1→2 群組；對話框關閉。不可斷言 userSaveUsersSuccess。
-        //多階段：E2E-002-1-dialog-toggled（toggle+mode 後、Save 前之對話框態）→ E2E-002-cgrups-saved（回到清單 grid，cgrups 已回填）。
+        //多階段 10 張（圖鍵見 stages；每步兩張）：來源列 → 對話框初始態 → 勾選 M2 enable → 切 AND（三張）→ 該列 → 對話框 Save → 回填後 peter 列。
         name: 'E2E-002-cgrups-saved',
+        stages: [
+            'E2E-002-1-source-row', 'E2E-002-2-dialog-open', 'E2E-002-3-click-enable', 'E2E-002-4-enable-checked', 'E2E-002-5-click-mode',
+            'E2E-002-6-list-open', 'E2E-002-7-click-and', 'E2E-002-8-row-toggled', 'E2E-002-9-click-save', 'E2E-002-10-cgrups-saved',
+        ],
         run: async (page) => {
             await gotoUsers(page)
             const s1 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-002-1-source-row：開窗前來源列（peter，row 0）
@@ -284,6 +212,7 @@ const CASES = [
         //E2E-003：於 VeCgrups 勾選 權限群組M2 enable（變更）後改點 Close → reject('close window')、入口 A .catch 不回填。
         //斷言（取消路徑）：peter 使用者列 cgrups 文字維持原值（仍 1 群組 M1）；對話框關閉。與 E2E-002 共覆蓋 Save/Close 分支。
         name: 'E2E-003-cgrups-cancel',
+        stages: ['E2E-003-1-source-row', 'E2E-003-2-dialog-open', 'E2E-003-3-row-toggled', 'E2E-003-4-cancelled-grid'],
         run: async (page) => {
             await gotoUsers(page)
             //先記錄開啟前 peter cgrups 文字（原值）
@@ -320,10 +249,11 @@ const CASES = [
     {
         //E2E-004：自群組列 belongUsers 按鈕開啟 VeGrupBlngUsers 對話框（golden 起點）。僅驗開啟態：標題 + 群組名 + 逐使用者列。
         name: 'E2E-004-belong-open',
+        stages: ['E2E-004-1-source-row', 'E2E-004-2-dialog-open'],
         run: async (page) => {
             await gotoGrups(page)
             const s1 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-004-1-source-row：開窗前來源列（權限群組M1，row 0）
-            await openBelongDialog(page, 0) //row 0 = 權限群組M1（peter 屬之）
+            await openBelongDialog(page, 0, BELONG_DIALOG_OPT) //row 0 = 權限群組M1（peter 屬之）
             const s2 = await captureStableWithBox(page, SEL_MODAL) //E2E-004-2-dialog-open：VeGrupBlngUsers 對話框初始開啟態
             return [
                 { name: 'E2E-004-1-source-row', buf: s1 },
@@ -372,12 +302,17 @@ const CASES = [
         //E2E-005：於 VeGrupBlngUsers 勾選 mary（原不屬 M1）enable + 切其 mode → 點對話框 Save → updateUsers 寫 DB + 成功 modal。
         //斷言（有 DB 寫入）：結果 modal 顯示 userSaveUsersSuccess；DB mary.cgrups 含 權限群組M1 鍵。
         //對話框內列＝全部 users（依 order）：row0=peter, row1=mary, row2=john, row3=admin。
-        //多階段：E2E-005-1-dialog-toggled（toggle+mode 後、Save 前之對話框態）→ E2E-005-belong-saved（存檔成功 modal）。
+        //多階段 11 張（圖鍵見 stages；每步兩張）：來源列 → 對話框初始態 → 勾選 mary enable → 切 AND（三張）→ 該列 → 對話框 Save → 成功 modal → 關 modal 後 M1 列。
         name: 'E2E-005-belong-saved',
+        stages: [
+            'E2E-005-1-source-row', 'E2E-005-2-dialog-open', 'E2E-005-3-click-enable', 'E2E-005-4-enable-checked',
+            'E2E-005-5-click-mode', 'E2E-005-6-list-open', 'E2E-005-7-click-and', 'E2E-005-8-row-toggled',
+            'E2E-005-9-click-save', 'E2E-005-10-belong-saved', 'E2E-005-11-data-changed',
+        ],
         run: async (page) => {
             await gotoGrups(page)
             const s1 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-005-1-source-row：開窗前來源列（權限群組M1，row 0）
-            await openBelongDialog(page, 0) //row 0 = 權限群組M1
+            await openBelongDialog(page, 0, BELONG_DIALOG_OPT) //row 0 = 權限群組M1
             const s2 = await captureStableWithBox(page, SEL_MODAL) //E2E-005-2-dialog-open：VeGrupBlngUsers 對話框初始態（第一個 toggle 前）
             //以下每步兩張（點擊前框要點、點擊後框反應元素）
             const s3 = await captureStableWithBox(page, dialogEnableCheckboxSel(1)) //E2E-005-3-click-enable：點擊前框住 mary 列之 enable checkbox
@@ -431,10 +366,11 @@ const CASES = [
         //E2E-006：於 VeGrupBlngUsers 勾選 mary enable（變更）後改點 Close → reject('close window')、入口 B .catch 接住、未打 API。
         //斷言（取消路徑）：對話框關閉、無成功 modal；DB mary.cgrups 維持原值（不含 權限群組M1）。與 E2E-005 共覆蓋 Save/Close 分支。
         name: 'E2E-006-belong-cancel',
+        stages: ['E2E-006-1-source-row', 'E2E-006-2-dialog-open', 'E2E-006-3-row-toggled', 'E2E-006-4-cancelled-grid'],
         run: async (page) => {
             await gotoGrups(page)
             const s1 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-006-1-source-row：開窗前來源列（權限群組M1，row 0）
-            await openBelongDialog(page, 0) //row 0 = 權限群組M1
+            await openBelongDialog(page, 0, BELONG_DIALOG_OPT) //row 0 = 權限群組M1
             const s2 = await captureStableWithBox(page, SEL_MODAL) //E2E-006-2-dialog-open：VeGrupBlngUsers 對話框初始態（第一個 toggle 前）
             await toggleDialogEnable(page, 1) //勾選 mary enable（製造變更）
             const s3 = await captureStableWithBox(page, dialogRowBoxSel(1)) //E2E-006-3-row-toggled：對話框內 row1（mary）toggle 後、Close 前
@@ -465,6 +401,7 @@ const CASES = [
         //E2E-007：使用者頁關閉編輯模式後開 VeCgrups → 檢視版標題（userEditCgrupsForDisplay）、無 Save 鈕、模式控制項不可編輯、enable checkbox 皆 disabled。
         //對應 spec 流程_使用者群組關聯.md E2E-007。單階段截圖：唯讀檢視對話框開啟態。
         name: 'E2E-007-readonly-view',
+        stages: ['E2E-007-readonly-view'], //單張案例：圖鍵即案例鍵
         run: async (page) => {
             await gotoUsers(page)
             await toggleEditMode(page) //關閉編輯模式 → isEditable=false
@@ -514,6 +451,7 @@ const CASES = [
         //E2E-008：群組頁關閉編輯模式後開 VeGrupBlngUsers → 檢視版標題（grupBlngEditUsersForDisplay）、無 Save 鈕、標籤模式段為純文字（本對話框自 2026-09-16 起無獨立 mode 欄）、enable checkbox 皆 disabled。
         //對應 spec 流程_使用者群組關聯.md E2E-008。單階段截圖：唯讀檢視對話框開啟態。
         name: 'E2E-008-readonly-view',
+        stages: ['E2E-008-readonly-view'], //單張案例：圖鍵即案例鍵
         run: async (page) => {
             await gotoGrups(page)
             await toggleEditMode(page) //關閉編輯模式 → isEditable=false
@@ -559,14 +497,19 @@ const CASES = [
         //對應 spec 流程_使用者群組關聯.md E2E-009；與 流程_群組權限關聯.md E2E-007 對稱。
         //6 步真實路徑：①群組頁 M1 列 ②點 belongUsers 按鈕開對話框 ③勾選 mary（該列 2 顆）④縮小瀏覽器視窗（對話框與表格隨之變窄, 標籤列收合）
         //  ⑤點「+1」開浮層、於浮層內點本項模式段選 AND ⑥浮層關閉、該列本項顯示 AND、對話框出現 Save 鈕；未按 Save, DB 不變
-        //語意斷言放在 run() 內：收合、浮層內容與選取後狀態皆為過程中之觀察（事後不可再觀察）, 且 regen 端只跑 run(), 寫檔前即守門。
+        //語意斷言放在 run() 內：收合、浮層內容與選取後狀態皆為過程中之觀察（事後不可再觀察）；兩端皆跑, 寫檔／比對前即守門。
         //視窗寬 480：2026-09-17 以 2px 步距實測 mary 列勾選後於視窗寬 ≤672 時收合（672 時儲存格寬 268），eng/cht 相同。
         //編輯模式：settings.json 之 modeEditGrups='y', 進頁即編輯模式；openBelongDialog 以編輯版標題 grupBlngEditUsers 為就緒訊號, 等同守門。
         name: 'E2E-009-chips-collapse-edit',
+        stages: [
+            'E2E-009-1-source-row', 'E2E-009-2-dialog-open', 'E2E-009-3-click-enable', 'E2E-009-4-enable-checked',
+            'E2E-009-5-row-collapsed', 'E2E-009-6-click-more', 'E2E-009-7-popup-open', 'E2E-009-8-click-mode',
+            'E2E-009-9-list-open', 'E2E-009-10-click-and', 'E2E-009-11-row-toggled', 'E2E-009-12-row-expanded',
+        ],
         run: async (page) => {
             await gotoGrups(page)
             const s1 = await captureStableWithBox(page, rowBoxSel(0)) //E2E-009-1-source-row：開窗前來源列（權限群組M1，row 0）
-            await openBelongDialog(page, 0)
+            await openBelongDialog(page, 0, BELONG_DIALOG_OPT)
             const s2 = await captureStableWithBox(page, SEL_MODAL) //E2E-009-2-dialog-open：VeGrupBlngUsers 對話框初始態
             const s3 = await captureStableWithBox(page, dialogEnableCheckboxSel(1)) //E2E-009-3-click-enable：點擊前框住 mary 列之 enable checkbox
             await toggleDialogEnable(page, 1)
@@ -641,6 +584,7 @@ const CASES = [
         //6 步真實路徑：①群組頁 ②點 M1 列 belongUsers 開對話框（兩列 mary）③點第二位 mary 之 enable ④該列插入醒目 M1、第一位不變
         //  ⑤點 Save ⑥成功 modal；DB 只有第二位加入 M1
         name: 'E2E-010-same-name-users',
+        stages: ['E2E-010-1-dialog-open', 'E2E-010-2-click-enable', 'E2E-010-3-enable-checked', 'E2E-010-4-click-save', 'E2E-010-5-belong-saved'],
         run: async (page) => {
             await page.waitForFunction(() => (window.$vo.$store.state.users || []).length > 0, null, { timeout: 30000 })
             const nAll = await page.evaluate(async () => {
@@ -654,7 +598,7 @@ const CASES = [
             await page.waitForTimeout(800)
 
             await gotoGrups(page)
-            await openBelongDialog(page, 0)
+            await openBelongDialog(page, 0, BELONG_DIALOG_OPT)
             const s1 = await captureStableWithBox(page, SEL_MODAL) //E2E-010-1-dialog-open：對話框初始態（兩列同名 mary），框住整個對話框
             const maryRows = await page.evaluate((sd) => [...document.querySelectorAll(`${sd} .ag-row[row-index]`)]
                 .filter((r) => ((r.querySelector('.ag-cell[col-id="name"]') || {}).textContent || '').trim() === 'mary')
@@ -699,43 +643,48 @@ const CASES = [
     },
 ]
 
-//手術式重產（§6.3）：--names a,b,c 只產指定 case；--langs eng,cht 只產指定語系。截圖「前」就 gate（省截圖成本）。
-function argList(flag) {
-    const i = process.argv.indexOf(flag)
-    if (i >= 0 && process.argv[i + 1]) return process.argv[i + 1].split(',').map((s) => s.trim()).filter(Boolean)
-    return null
+//單一案例管線（產製端與比對端共用，runBaselineCase）：per-case fresh browser（每案 launch／close，消除 GPU/font/CSS cache 跨 case 累積；對齊 sso）
+//→ throwaway page 還原 DB 為 base seed → 開 case page → 設語系 → run（各階段截圖）→ 語意斷言 → 產製端依 gate 寫檔／比對端逐張比對標準圖 → 關瀏覽器。
+async function runCase(mode, lang, c, extra = {}) {
+    return await runBaselineCase({
+        mode,
+        lang,
+        name: c.name,
+        run: c.run,
+        stages: c.stages,
+        semantic: c.semantic ? async (ctx) => c.semantic(ctx.page) : null,
+        launch: launchBrowser,
+        openPage: async (browser) => {
+            await resetDb(browser, 'users', BASE_SEED) //throwaway page 還原 DB 為 base seed，關閉後再開 case page
+            const page = await openApp(browser)
+            await setLang(page, lang) //eng 也切（symmetric）：補等同 cht setLang 的 re-render+settle 時間
+            return page
+        },
+        pathOf: picPath,
+        labelOf: (lg, key) => `rela-user-grup-${lg}-${key}`,
+        match: assertBaselineMatch,
+        ...extra,
+    })
 }
-//前綴或完整匹配：傳 'E2E-002' 即可匹配 'E2E-002-cgrups-saved'（避免 §6.3 殷鑑「--names 只認字面」陷阱）
-function nameMatch(list, caseName) { return list.some((nm) => caseName === nm || caseName.startsWith(nm)) }
 
 async function generateBaseline() {
     console.log('=== 產製 rela-user-grup baseline 開始 ===')
-    const onlyNames = argList('--names')
-    const onlyLangs = argList('--langs')
+    //截圖前篩選（--names / --langs / --write-mode / E2E_BASELINE_OUT_DIR）；不符任何鍵即於此報錯（不啟動服務）
+    const gate = createBaselineGate({ langs: LANGS, cases })
+    console.log(gate.describe())
     await startServersOnce()
     fs.mkdirSync(PICS_DIR, { recursive: true })
     process.env.E2E_STRICT_CAPTURE = '1' //regen 端：captureStable 未 settle 即 throw，拒絕寫入未穩定畫面
     //擷取 pristine base seed（DB 剛 fresh seed）——用臨時 browser
     { const b = await launchBrowser(); const pp = await openApp(b); BASE_SEED = await captureBaseSeed(pp, 'users'); await b.close() }
-    for (const lang of LANGS) {
-        if (onlyLangs && !nameMatch(onlyLangs, lang)) continue //§6.3 手術式：跳過未指定語系
-        for (const c of CASES) {
-            if (onlyNames && !nameMatch(onlyNames, c.name)) continue //§6.3 手術式：截圖前 gate，跳過未指定 case
-            //per-case fresh browser（消除 GPU/font/CSS cache 跨 case 累積造成的 cold/warm 差異；對齊 sso）
-            const browser = await launchBrowser()
-            await resetDb(browser, 'users', BASE_SEED) //throwaway page 還原 DB 為 base seed，關閉後再開 case page
-            const page = await openApp(browser)
-            await setLang(page, lang) //eng 也切（symmetric）：補等同 cht setLang 的 re-render+settle 時間
-            //run 回傳「單張 Buffer」或「多階段 [{name, buf}]」；統一正規化為陣列後逐張寫入
-            let shots = await c.run(page, lang)
-            if (Buffer.isBuffer(shots)) shots = [{ name: c.name, buf: shots }]
-            for (const s of shots) {
-                fs.writeFileSync(picPath(lang, s.name), s.buf)
-                console.log('wrote', picPath(lang, s.name), s.buf.length, 'bytes')
-            }
-            await browser.close()
+    for (const lang of gate.langs) {
+        for (const c of gate.casesFor(lang)) {
+            console.log(`  ${lang}-${c.name}`)
+            await runCase('regen', lang, c, { gate })
         }
     }
+    //--names 之任一項未產出即報錯（不靜默略過）
+    gate.finalize()
     cleanup()
     console.log('=== 產製 rela-user-grup baseline 完成 ===')
 }
@@ -747,30 +696,15 @@ else {
     for (const lang of LANGS) {
         describe(`e2e-rela-user-grup (${lang})`, function() {
             this.timeout(180000)
-            let browser = null
             before(async function() {
                 this.timeout(200000)
                 await startServersOnce()
                 if (!BASE_SEED) { const b = await launchBrowser(); const pp = await openApp(b); BASE_SEED = await captureBaseSeed(pp, 'users'); await b.close() }
             })
-            //per-case fresh browser：每 case 全新 browser 進程（對齊 sso），消 cross-case GPU/font cache 累積
-            beforeEach(async function() {
-                this.timeout(90000)
-                browser = await launchBrowser()
-                await resetDb(browser, 'users', BASE_SEED) //throwaway page 還原 DB 為 base seed
-            })
-            afterEach(async function() { if (browser) { await browser.close(); browser = null } })
-            for (const c of CASES) {
-                it(c.name, async () => {
-                    const page = await openApp(browser)
-                    await setLang(page, lang)
-                    let shots = await c.run(page, lang)
-                    if (c.semantic) await c.semantic(page)
-                    //run 回傳「單張 Buffer」或「多階段 [{name, buf}]」；統一正規化為陣列後逐張比對
-                    if (Buffer.isBuffer(shots)) shots = [{ name: c.name, buf: shots }]
-                    for (const s of shots) {
-                        assertBaselineMatch(s.buf, picPath(lang, s.name), `rela-user-grup-${lang}-${s.name}`)
-                    }
+            //per-case fresh browser + DB 還原 + 開頁 + 語系由 runCase 負責（確保單 case --grep 也能跑）；語意斷言於比對標準圖之前（pixel baseline 為補強層）
+            for (const c of cases) {
+                it(c.name, async function() { //function(非箭頭): onKnownDefect 需 mocha 之 this.skip()
+                    await runCase('compare', lang, c, { onKnownDefect: () => this.skip() }) //已知缺陷協定: 標 pending(提示框殘留已由 w-component-vue 2.5.24 修正, 其偵測改為直接失敗, 見 e2e-setup probeStuckTooltip)
                 })
             }
         })

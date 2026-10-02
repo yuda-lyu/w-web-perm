@@ -181,10 +181,12 @@
                         :icon="mdiCloudUploadOutline"
                         :backgroundColor="'rgba(255,0,50,0.7)'"
                         :backgroundColorHover="'rgba(255,0,50,0.8)'"
+                        :backgroundColorFocus="'rgba(255,0,50,0.8)'"
                         :textColor="'#eee'"
                         :textColorHover="'#fff'"
                         :iconColor="'#eee'"
                         :iconColorHover="'#fff'"
+                        :iconColorFocus="'#fff'"
                         :shadow="false"
                         :promiseUnlock="true"
                         @click="saveTargets"
@@ -248,6 +250,7 @@ import iseobj from 'wsemi/src/iseobj.mjs'
 import isnum from 'wsemi/src/isnum.mjs'
 import cdbl from 'wsemi/src/cdbl.mjs'
 import arrPull from 'wsemi/src/arrPull.mjs'
+import reuseDeletedIds from '../plugins/reuseDeletedIds.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
 import WSwitch from 'w-component-vue/src/components/WSwitch.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
@@ -702,6 +705,9 @@ export default {
             r.timeCreate = `{${vo.$t('targetAddIdNew')}}`
             r.userIdUpdate = `{${vo.$t('targetAddIdNew')}}`
             r.timeUpdate = `{${vo.$t('targetAddIdNew')}}`
+            //transient 欄位 _isNew: 標記未儲存之新列, 隨列送後端供「新增列已存在即拒絕」(saveNewRowExists), 後端檢查後剝除不入庫 (ADR-025);
+            //本表 id 為可就地改寫之標的路徑, 改寫後仍為新列, 標記不變
+            r._isNew = true
             // console.log('r', r)
 
             //添加至最首
@@ -768,6 +774,8 @@ export default {
             r.timeCreate = `{${vo.$t('targetAddIdNew')}}`
             r.userIdUpdate = `{${vo.$t('targetAddIdNew')}}`
             r.timeUpdate = `{${vo.$t('targetAddIdNew')}}`
+            //transient 欄位 _isNew: 複製出之列亦為新列(見 addItem) (ADR-025)
+            r._isNew = true
             // console.log('r', r)
 
             //添加至最首
@@ -827,26 +835,23 @@ export default {
         },
 
         saveTargets: function(msg) {
-
+            //promiseUnlock 之鎖交由 doSaveTargets 之 runSubmit 於請求結束時釋放, 不於此解鎖: 請求期間儲存鈕之滑鼠與鍵盤 Enter 皆擋 (ADR-025;
+            //原第一行即 msg.pm.resolve(), 鎖立即解除, 焦點留在儲存鈕時連按 Enter 可送出 2 次)
             let vo = this
-
-            //第一行立刻釋放按鈕視覺鎖
-            msg.pm.resolve()
-
-            //fire-and-forget, 不 await
-            vo.doSaveTargets()
-
+            vo.doSaveTargets({ pm: msg.pm })
         },
 
-        doSaveTargets: function() {
+        doSaveTargets: function(opt = {}) {
             // console.log('method doSaveTargets')
 
             let vo = this
 
-            async function core() {
+            async function core(unlockBtn) {
 
-                //1) 同步檢測 (在開 loading 之前)
+                //1) 同步檢測 (在開 loading 之前); 早退之訊息框前以 unlockBtn() 釋放儲存鈕之 promiseUnlock 鎖: 按鈕鎖只涵蓋請求期間,
+                //結果訊息框出現時按鈕已恢復(與打 API 之路徑一致); 流程狀態仍由 runSubmit 保持至訊息框關閉 (ADR-025)
                 if (isestr(vo.isError)) {
+                    unlockBtn()
                     await vo.$dg.showCheckYes(`${vo.isError}`)
                     return
                 }
@@ -856,16 +861,23 @@ export default {
 
                 //check
                 if (size(rows) === 0) {
+                    unlockBtn()
                     await vo.$dg.showCheckYes(`${vo.$t('targetAddEmpty')}`)
                     return
                 }
+
+                //新增列之 transient 欄位 _isNew(addItem / copyItem 標記)隨列送後端: 後端據以拒絕「標為新增但 id 已存在」之列
+                //(同一包重送時不把剛建立之列當修改覆寫, 回 saveNewRowExists), 檢查後由 ltdtmapping 依 schema 取欄時剝除不入庫 (ADR-025);
+                //本表 id 可就地改寫: 新增列之 id 改成本次刪除(或改掉 id)之既有標的者, 淨效果為修改該標的, 送出前改為一般列並沿用其建立者 / 建立時間,
+                //否則被後端當重送擋下(重新整理後重做仍被擋) (見 reuseDeletedIds)
+                let rowsSend = reuseDeletedIds(rows, vo.targets)
 
                 //2) 確定打 API 才開 loading
                 vo.$ui.updateLoading(true)
 
                 //3) updateTargets, 各自 catch + 旗標短路
                 let okSave = false
-                await vo.$fapi.updateTargets(rows)
+                await vo.$fapi.updateTargets(rowsSend)
                     .then(() => { okSave = true })
                     .catch(async (err) => {
                         vo.$ui.updateLoading(false) //showCheckYes 前關 loading（modal 阻斷期間避免 loading 疊在底下）
@@ -882,18 +894,20 @@ export default {
 
             }
 
-            //core
-            core()
-                .catch((err) => {
-                    console.log('catch', err)
-                    vo.$alert(vo.$t('anUnexpectedErrorOccurred'), { type: 'error' })
-                })
-                .finally(() => {
+            //runSubmit: 儲存流程(至結果訊息框關閉)進行中再觸發即略過; opt.pm 為儲存鈕之 promiseUnlock 鎖, 於請求結束(updateLoading(false))時釋放 (ADR-025)
+            return vo.$ui.runSubmit('saveTargets', (unlockBtn) => {
+                return core(unlockBtn)
+                    .catch((err) => {
+                        console.log('catch', err)
+                        vo.$alert(vo.$t('anUnexpectedErrorOccurred'), { type: 'error' })
+                    })
+                    .finally(() => {
 
-                    //hide loading
-                    vo.$ui.updateLoading(false)
+                        //hide loading
+                        vo.$ui.updateLoading(false)
 
-                })
+                    })
+            }, opt)
 
         },
 

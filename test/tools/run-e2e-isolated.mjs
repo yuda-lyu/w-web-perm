@@ -6,69 +6,35 @@
 //  baseline 不符 → 整批 pixel mismatch(2026-07-10 以 grups E2E-008 之 diff 圖確證: 同資料、列序相反)。
 //  逐檔各給全新後端(純 g_initialTestData 種子)即回到 solo 之綠燈狀態，且無須改動任何 baseline 或 production 碼。
 //
-//機制：每檔前只殺後端(11006)、保留前端(8090, 無狀態且啟動慢)。新 mocha 進程 startedBackend=false → seedDb+spawn
-//  全新後端；startedFrontend 段偵測 8090 已起 → reuse。
+//機制：每檔前只殺後端(11006, 專屬本專案, CLAUDE.md 明文例外)、保留前端(8090, 無狀態且啟動慢)。新 mocha 進程偵測 11006 沒人 → seedDb+spawn
+//  全新後端；8090 已起 → reuse。測試檔以 pattern 動態列舉(新增之 e2e-*.test.mjs 自動納入, 不因寫死清單而被靜默漏跑)；
+//  下方 runIsolatedE2e 之預設 pattern 為 /^e2e-.*\.test\.mjs$/(未覆寫)。
+//  api-doubleclick(2026-09-28 由 e2e-doubleclick 改名, 見 spec/設計要點與取捨.md ADR-017 Update；純 API 契約測試,
+//  無瀏覽器/UI 終態)改名後不再匹配此 pattern、不納入本隔離 runner；其自帶 restoreBaseSeed 經 RPC 還原 base seed,
+//  不需整檔換全新後端, 改與其餘 api-*/unit-* 共用同一後端、由 `npm test`(mocha test/*.test.mjs)涵蓋。
+//2026-09-28 起組裝自 e2e 共用設施（當時為 w-web-sso 之 srcPack，2026-09-29 起為 w-package-tools-e2e；runIsolatedE2e、killPortListeners；經 ./e2eLib.mjs 引用）。
+//  2026-09-30 升 1.0.3 起，有本地 mocha 時以 node 直接執行 node_modules/mocha/bin/mocha.js、不經 shell（原為 npx mocha，Windows 下經 cmd.exe）。
 //
 //用法：node test/tools/run-e2e-isolated.mjs   (exit 0=全綠；非 0=有失敗檔)
 
-import { spawn, spawnSync, execSync } from 'child_process'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
-import fs from 'fs'
+import { runIsolatedE2e, killPortListeners } from './e2eLib.mjs'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const fdTest = join(__dirname, '..') //= test
-const projRoot = join(__dirname, '..', '..') //= 專案根
-const isWin = process.platform === 'win32'
+const __dirname = dirname(fileURLToPath(import.meta.url)) //test/tools
 const BACKEND_PORT = 11006
-const FRONTEND_PORT = 8090
 
-//動態列舉全部 e2e 檔(pattern 白名單, 全域 §14.3): 新增之 e2e-*.test.mjs 自動納入, 不因寫死清單而被靜默漏跑。
-//e2e-doubleclick(API-level, ADR-017)亦以隔離模式跑——只多一次後端重啟成本, 換取零遺漏。
-const E2E_FILES = fs.readdirSync(fdTest)
-    .filter((f) => /^e2e-.*\.test\.mjs$/.test(f))
-    .sort()
-
-function killPort(port) {
-    if (!isWin) {
-        try { execSync(`lsof -ti:${port} | xargs -r kill -9`, { stdio: 'ignore' }) } catch (e) {}
-        return
-    }
-    try {
-        const out = execSync(`netstat -ano | findstr ":${port}"`, { encoding: 'utf8' })
-        const pids = new Set()
-        for (const line of out.split(/\r?\n/).filter((l) => /LISTENING/.test(l))) {
-            const m = line.match(/\s(\d+)\s*$/)
-            if (m) { pids.add(m[1]) }
-        }
-        for (const pid of pids) { try { execSync(`taskkill /F /T /PID ${pid}`, { stdio: 'ignore' }) } catch (e) {} }
-    }
-    catch (e) { /* 無監聽 */ }
-}
-
-function sleep(ms) { return new Promise((r) => setTimeout(r, ms)) }
-
-const results = []
-for (const f of E2E_FILES) {
-    //每檔前殺後端 → 新 mocha 進程自 seed+spawn 全新後端；前端保持暖機
-    killPort(BACKEND_PORT)
-    await sleep(2000)
-    console.log(`\n=== [run-e2e-isolated] 執行 ${f}（全新後端）===`)
-    //--reporter list: 每 case 立即印 ✓/✗ (技能慣例; spec 會延遲到 describe 結束才輸出)
-    const r = spawnSync('npx', ['mocha', join('test', f), '--reporter', 'list', '--timeout', '300000'], {
-        cwd: projRoot, stdio: 'inherit', shell: isWin,
-    })
-    results.push({ file: f, code: r.status })
-}
-
-//收尾殺後端(前端留給使用者/後續)
-killPort(BACKEND_PORT)
-
-console.log('\n=== [run-e2e-isolated] 逐檔結果 ===')
-let failed = 0
-for (const { file, code } of results) {
-    console.log(`  ${code === 0 ? '✔' : '✘'} ${file} (exit ${code})`)
-    if (code !== 0) { failed++ }
-}
-console.log(`\n${failed === 0 ? '✔ e2e 全部通過' : `✘ ${failed} 個 e2e 檔失敗`}`)
+let { failed } = await runIsolatedE2e({
+    projRoot: join(__dirname, '..', '..'),
+    testDir: join(__dirname, '..'),
+    beforeEachFile: async () => {
+        //每檔前殺後端 → 新 mocha 進程自 seed+spawn 全新後端；前端保持暖機
+        killPortListeners(BACKEND_PORT)
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+    },
+    afterAll: () => {
+        //收尾殺後端(前端留給使用者/後續)
+        killPortListeners(BACKEND_PORT)
+    },
+})
 process.exit(failed === 0 ? 0 : 1)
