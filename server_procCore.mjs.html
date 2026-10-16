@@ -29,7 +29,7 @@
 <nav >
     
     
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="WWebPerm.html">WWebPerm</a></li></ul><h3>Global</h3><ul><li><a href="global.html#createLegendMeasurer">createLegendMeasurer</a></li><li><a href="global.html#createLockSave">createLockSave</a></li><li><a href="global.html#decideLegendType">decideLegendType</a></li><li><a href="global.html#describeUpstream">describeUpstream</a></li><li><a href="global.html#fetchJson">fetchJson</a></li><li><a href="global.html#genLegend">genLegend</a></li><li><a href="global.html#maskQuery">maskQuery</a></li><li><a href="global.html#maskTok">maskTok</a></li><li><a href="global.html#maskUrl">maskUrl</a></li><li><a href="global.html#mergePickKeysOnly">mergePickKeysOnly</a></li><li><a href="global.html#reuseDeletedIds">reuseDeletedIds</a></li><li><a href="global.html#submitGuard">submitGuard</a></li><li><a href="global.html#wrapInjected">wrapInjected</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="WWebPerm.html">WWebPerm</a></li></ul><h3>Global</h3><ul><li><a href="global.html#createAuthorizeExec">createAuthorizeExec</a></li><li><a href="global.html#createLegendMeasurer">createLegendMeasurer</a></li><li><a href="global.html#createLockSave">createLockSave</a></li><li><a href="global.html#decideLegendType">decideLegendType</a></li><li><a href="global.html#describeUpstream">describeUpstream</a></li><li><a href="global.html#fetchJson">fetchJson</a></li><li><a href="global.html#genLegend">genLegend</a></li><li><a href="global.html#maskQuery">maskQuery</a></li><li><a href="global.html#maskTok">maskTok</a></li><li><a href="global.html#maskUrl">maskUrl</a></li><li><a href="global.html#mergePickKeysOnly">mergePickKeysOnly</a></li><li><a href="global.html#resolveShellWorker">resolveShellWorker</a></li><li><a href="global.html#reuseDeletedIds">reuseDeletedIds</a></li><li><a href="global.html#submitGuard">submitGuard</a></li><li><a href="global.html#validateRowsBeforeWrite">validateRowsBeforeWrite</a></li><li><a href="global.html#wrapInjected">wrapInjected</a></li><li><a href="global.html#wrapOperOrm">wrapOperOrm</a></li></ul>
     
 </nav>
 
@@ -57,6 +57,8 @@ import arrHas from 'wsemi/src/arrHas.mjs'
 import ltdtDiffByKey from 'wsemi/src/ltdtDiffByKey.mjs'
 import ltdtmapping from 'wsemi/src/ltdtmapping.mjs'
 import ds from '../src/schema/index.mjs'
+import procLang from './procLang.mjs'
+import validateRowsBeforeWrite from './validateRows.mjs'
 
 
 /**
@@ -71,7 +73,7 @@ import ds from '../src/schema/index.mjs'
  * @returns {Array} 以資料庫列為基底、僅覆蓋 pickKeys 之新列陣列(順序同資料庫)
  */
 function mergePickKeysOnly(ltdtDb, rowsIn, keyDetect, pickKeys) {
-    let kpIn = {}
+    let kpIn = Object.create(null) //無原型: 鍵為使用者資料(id), 不得命中 constructor 等原型鍵(規則帳本 R-KEY-01)
     each(rowsIn, (r) => {
         let v = get(r, keyDetect, '')
         if (isestr(v)) {
@@ -144,7 +146,7 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave }) {
             let err = null
 
             //check
-            let kp = {}
+            let kp = Object.create(null) //無原型: haskey 以 in 判斷, {} 之原型鍵(constructor、toString 等)恆為真而誤判重複(規則帳本 R-KEY-01)
             each(rows, (v, k) => {
 
                 //value
@@ -195,6 +197,13 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave }) {
             }
         }
 
+        //主鍵之有限數字轉為其字串形式(規則帳本 R-ORM-04; w-serv-orm 1.1.11 起庫內即如此存放): ltdtDiffByKey 以嚴格比對, 未轉時 123 對不上庫內之 '123',
+        //成為「刪 '123' 再新增」而重設建立者與建立時間(userId、timeCreate); 放在 ckKey 之後, targets 仍只收字串主鍵(ckKey 以 isestr 檢查 id)
+        rows = map(rows, (r) => {
+            let id = get(r, 'id')
+            return (typeof id === 'number' &amp;&amp; Number.isFinite(id)) ? { ...r, id: String(id) } : r
+        })
+
         //ltdtDiffByKey
         let ltdtOld = await woItems[keyTable].select()
 
@@ -213,6 +222,23 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave }) {
         let ltdtNew = rows
         let r = ltdtDiffByKey(ltdtOld, ltdtNew, keyDetect)
         // console.log('ltdtDiffByKey r', r)
+
+        //寫入前驗證(規則帳本 R-ORM-01, ADR-026): 於第一個破壞步驟(del)之前擋下可預判之寫入失敗, 被拒時資料表零變更.
+        //why: 寫入順序為 del → insert → save, 而 w-serv-orm 1.1.8 起對「會被 clearXSS 改寫之主鍵」整批拒絕、LMDB 對 > 1978 B 之主鍵整批拒絕,
+        //修正前遇之即「舊列已刪、新列被拒」(改標的 id 時該列遺失, 2026-10-14 V3/V7 實測); 非主鍵欄位之標記則被靜默改寫(存值≠送入值).
+        //只驗本次會寫入之 add + diff 列(任一字串欄位); 未變更之 same 列不寫入、只參與主鍵重複之判定(舊資料不阻擋儲存)
+        let ve = validateRowsBeforeWrite([...r.add, ...r.diff], { rowsIdOnly: r.same })
+        if (ve !== null) {
+            let key = 'saveRowFieldInvalid'
+            if (ve.reason === 'htmlMarkup') {
+                key = 'htmlMarkupNotAllowed'
+            }
+            else if (ve.reason === 'idDuplicate') {
+                key = 'saveRowFieldDuplicate'
+            }
+            srLog.error({ event: 'updateTabItems-validate-error', keyTable, msg: key, reason: ve.reason, row: ve.k, field: ve.field })
+            return Promise.reject(key)
+        }
 
         //del
         if (size(r.del) > 0) {
@@ -244,9 +270,15 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave }) {
     }
 
 
-    //errLog: 失敗統一記 err key (updateTabItems reject 為 key 字串如 saveRowFieldInvalid; procOrm 失敗為 Error)
+    //errLog: 失敗統一記 err key 並回傳對外之 key(規則帳本 R-ORM-02).
+    //拒絕值來源: updateTabItems 自身之 reject 為本套件語系鍵字串(saveRowFieldInvalid、htmlMarkupNotAllowed、saveInProgress 等), 原樣轉出;
+    //procOrm 之拒絕為 w-serv-orm 之英文原文字串(1.1.10 起, 如 failed to save data…)或 Error, updateTabItems 內直接呼叫之 woItems[keyTable].select()
+    //失敗為 ORM 之原錯誤(可能為 Error)——此兩類原文只入 srLog 之 raw, 對前端與外部改回 saveWriteFail(修正前原樣外送, 前端 tErr 換算為「無法連線至伺服器」)
     let errLog = (event, userId, err) => {
-        srLog.error({ event, userId, msg: (typeof err === 'string') ? err : ((err &amp;&amp; err.message) || event) })
+        let key = toOutKey(err)
+        let raw = (typeof err === 'string') ? err : ((err &amp;&amp; err.message) || String(err))
+        srLog.error({ event, userId, msg: key, ...(raw !== key ? { raw } : {}) })
+        return key
     }
 
 
@@ -255,7 +287,7 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave }) {
         try {
             await updateTabItems('targets', userId, rows, 'id')
         }
-        catch (err) { errLog('updateTargets-error', userId, err); throw err }
+        catch (err) { throw errLog('updateTargets-error', userId, err) }
         srLog.info({ event: 'updateTargets-success', userId })
         return 'saveTabItemsSuccess' //成功 msg key
     }
@@ -266,7 +298,7 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave }) {
         try {
             await updateTabItems('pemis', userId, rows, 'name')
         }
-        catch (err) { errLog('updatePemis-error', userId, err); throw err }
+        catch (err) { throw errLog('updatePemis-error', userId, err) }
         srLog.info({ event: 'updatePemis-success', userId })
         return 'saveTabItemsSuccess' //成功 msg key
     }
@@ -277,7 +309,7 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave }) {
         try {
             await updateTabItems('grups', userId, rows, 'name')
         }
-        catch (err) { errLog('updateGrups-error', userId, err); throw err }
+        catch (err) { throw errLog('updateGrups-error', userId, err) }
         srLog.info({ event: 'updateGrups-success', userId })
         return 'saveTabItemsSuccess' //成功 msg key
     }
@@ -288,7 +320,7 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave }) {
         try {
             await updateTabItems('users', userId, rows, 'id', opt)
         }
-        catch (err) { errLog('updateUsers-error', userId, err); throw err }
+        catch (err) { throw errLog('updateUsers-error', userId, err) }
         srLog.info({ event: 'updateUsers-success', userId })
         return 'saveTabItemsSuccess' //成功 msg key
     }
@@ -306,7 +338,17 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave }) {
 }
 
 
-export { mergePickKeysOnly }
+//toOutKey: 拒絕值為本套件語系鍵(procLang 之鍵集合)者原樣回傳, 其餘(ORM／I/O 原文、Error)回 keyFail(規則帳本 R-ORM-02)
+let kpLangKey = null
+function toOutKey(err, keyFail = 'saveWriteFail') {
+    if (kpLangKey === null) {
+        kpLangKey = new Set(Object.keys(procLang({}).eng))
+    }
+    return (typeof err === 'string' &amp;&amp; kpLangKey.has(err)) ? err : keyFail
+}
+
+
+export { mergePickKeysOnly, toOutKey }
 
 
 export default proc
@@ -324,7 +366,7 @@ export default proc
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Sun Oct 11 2026 16:35:27 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Fri Oct 16 2026 13:07:24 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
