@@ -158,6 +158,16 @@ let kpLang = {
         eng: `Saved successfully`,
         cht: `儲存成功`,
     },
+    //寫入之欄位值含 HTML 標記而會被 XSS 清除改寫(如 < 後接英文字母), 儲存值將與輸入不同, 於寫入前拒絕(清單儲存與外部同步, ADR-026; 用語同 w-web-sso ADR-081)
+    htmlMarkupNotAllowed: {
+        eng: 'The input contains HTML markup that is not allowed (such as "<" followed by a letter). Please remove it and try again.',
+        cht: '輸入內容含有不允許的 HTML 標記（如「<」後接英文字母），請移除後再試一次。',
+    },
+    //寫入階段之 ORM／I/O 失敗(非可預判之輸入問題), 部分變更可能已寫入(ADR-013、ADR-026; 用語同 w-web-sso ADR-080)
+    saveWriteFail: {
+        eng: `Not all changes were written, and some may have taken effect. Please reload the page and check before making changes.`,
+        cht: `資料寫入未全部完成，部分變更可能已生效，請重新整理頁面確認後再操作`,
+    },
     cannotGetUserId: {
         eng: `Cannot get the user id`,
         cht: `無法取得使用者 Id`,
@@ -206,9 +216,9 @@ let kpLang = {
         eng: `Invalid from`,
         cht: `來源欄位無效`,
     },
-    invalidRows: {
-        eng: `Invalid rows`,
-        cht: `資料列無效`,
+    invalidRows: { //外部同步之資料列無效(非陣列、主鍵型別錯誤／過長／重複、主鍵已屬其他來源(R-SYNC-01)); 2026-10-14 用語改同 w-web-sso(ADR-026, 原 `Invalid rows`／`資料列無效`)
+        eng: 'Invalid data format.',
+        cht: '資料格式錯誤。',
     },
     cannotGetUserRules: {
         eng: `Cannot get rules of user`,

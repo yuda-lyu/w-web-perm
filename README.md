@@ -33,10 +33,6 @@ let url = st.dbUrl
 let db = st.dbName
 let opt = {
 
-    useCheckUser: false,
-    getUserById: null,
-    useExcludeWhenNotAdmin: false,
-
     serverPort: 11006,
     subfolder: '', //mperm
     urlRedirect: 'https://www.google.com/', //本機測試時得先編譯, 再瀏覽: http://localhost:11006/
@@ -97,3 +93,17 @@ instWWebPerm.on('error', (err) => {
     console.log(err)
 })
 ```
+
+## Upgrade Notes
+
+### Upgrading to w-serv-orm 1.1.11 / w-syslog 1.0.33 (2026-10-14)
+- **Numeric ids are stored as strings**: a numeric row id sent to `/syncAndReplaceTabs` (or to `updatePemis`, `updateGrups`, `updateUsers`) is stored as its string form (`123` is stored as `'123'`) and the success response lists it as a string. Before, the number was replaced by a generated id while the response still showed the number. A number and its string form are the same id; `NaN` and `Infinity` count as no id (a new id is generated). `updateTargets` still accepts string ids only and rejects other ids with `saveRowFieldInvalid`.
+- **Ids owned by another source are rejected**: if an id pushed to `/syncAndReplaceTabs` already belongs to another `from`, the whole push is rejected with `invalidRows` before anything is deleted (before, the row was skipped while the push still returned success). External applications must use ids that do not overlap with other sources.
+- **Logging**: with w-syslog 1.0.33, a log write failure no longer terminates the process (it is reported on stderr), and `WWebPerm` throws at construction when `opt.logFd` cannot be created.
+- **Bundled usage**: the statistics worker file is located on first use from the installed package (`server/staLogs/staLogsCore.shellWorker.mjs`), so `dist/w-web-perm.umd.js` and downstream bundles can run the statistics; the package must be installed with its `server` folder.
+
+### Upgrading to w-serv-orm 1.1.10 / w-serv-hapi 1.1.6 (2026-10-14)
+- **Removed options**: `opt.useCheckUser`, `opt.getUserById` and `opt.useExcludeWhenNotAdmin` were removed together with w-serv-orm 1.1.9. Passing any value other than `undefined`, `null` or `false` now throws when constructing `WWebPerm` (the message comes from w-serv-orm `checkOptRemoved`) and is logged to srLog. Delete these keys; users of the data channel are authorized by `verifyConn` (`verifyClientUser`), no replacement option is needed.
+- **Data channel is select-only (behavior change)**: only `<table>.select` of `targets`, `pemis`, `grups` and `users` is exposed (`methodsExec: ['select']`, and `authorizeExec` allows select only). Calling raw `insert`, `save`, `del` or `delAll` now returns `invalid func[<table>.<method>]`. Clients that wrote tables directly must call `updateTargets`, `updatePemis`, `updateGrups` or `updateUsers`, which apply the save lock, serialization, validation and whole-table diff.
+- **Write validation**: rows to be written are validated before anything is deleted or written. A string value that XSS cleaning would rewrite (for example `<` followed by a letter) is rejected with `htmlMarkupNotAllowed`; an id longer than 1978 UTF-8 bytes is rejected with `saveRowFieldInvalid` (admin lists) or `invalidRows` (`syncAndReplaceTabs`). Unexpected database write failures return `saveWriteFail`; the ORM messages are written to srLog only.
+- **Process-level errors**: w-serv-hapi 1.1.6 no longer registers `unhandledRejection` or `uncaughtException` handlers, and `WWebPerm` does not register them either; the deployment decides its own process policy.

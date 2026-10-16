@@ -9,14 +9,13 @@
 //跑法: npx mocha test/unit-procCore-updateTabItems.test.mjs --timeout 30000
 import assert from 'assert'
 import cloneDeep from 'lodash-es/cloneDeep.js'
-import merge from 'lodash-es/merge.js'
 import pmKeyMutex from 'wsemi/src/pmKeyMutex.mjs'
 import cacheSt from 'wsemi/src/cacheSt.mjs'
-import getMapOrm from 'w-serv-orm/src/getMapOrm.mjs'
 import ds from '../src/schema/index.mjs'
 import proc from '../server/procCore.mjs'
 import createLockSave from '../server/lockSave.mjs'
 import reuseDeletedIds from '../src/plugins/reuseDeletedIds.mjs'
+import { mkTable, mkProcOrm, mkSrLog } from './tools/unitOrm.mjs'
 
 
 //PH: 前端新列之佔位字(清單頁 addItem / copyItem 把 userId / timeCreate / userIdUpdate / timeUpdate 設為 `{${$t('xxxAddIdNew')}}`)
@@ -31,44 +30,8 @@ const TABLES = {
 }
 
 
-//createFakeTable: w-orm-lmdb 之記憶體替身(只實作 procCore 與 getMapOrm 用到之 select / insert / save / del)
-function createFakeTable(rows0) {
-    let kp = new Map()
-    for (let r of rows0) {
-        kp.set(r.id, cloneDeep(r))
-    }
-    let cnt = { insert: 0, save: 0, del: 0 }
-    let arr = (d) => (Array.isArray(d) ? d : [d])
-    return {
-        cnt,
-        get: (id) => cloneDeep(kp.get(id)),
-        size: () => kp.size,
-        select: async () => {
-            return [...kp.values()].map((v) => cloneDeep(v))
-        },
-        insert: async (data) => {
-            cnt.insert++
-            for (let v of arr(data)) {
-                if (!kp.has(v.id)) { //同 w-orm-lmdb insert 之 ifNoExists(id)
-                    kp.set(v.id, cloneDeep(v))
-                }
-            }
-        },
-        save: async (data) => {
-            cnt.save++
-            for (let v of arr(data)) {
-                let old = kp.get(v.id)
-                kp.set(v.id, old ? merge({}, old, cloneDeep(v)) : cloneDeep(v)) //同 w-orm-lmdb save: 既有則合併, 無則插入(autoInsert)
-            }
-        },
-        del: async (data) => {
-            cnt.del++
-            for (let v of arr(data)) {
-                kp.delete(v.id)
-            }
-        },
-    }
-}
+//資料表替身: test/tools/unitOrm.mjs 之 mkTable(對齊 w-orm-lmdb 1.0.38 之對外語意: insert ifNoExists 與鍵長整批拒、save/del 逐筆結果, 2026-10-14 A-9 收斂;
+//原本檔一份只實作 select/insert/save/del 且 save/del 不回逐筆結果之替身, 測不到 w-serv-orm 1.1.8 起之新失敗型)
 
 
 //seedRows: 各表 base 列(伺服器已寫入之既有資料, 稽核欄位為真值)
@@ -126,21 +89,16 @@ describe('unit-procCore-updateTabItems (後台整表寫入之雙擊防護, ADR-0
 
     let env = null
 
-    //createEnv: 每案一組全新之資料表替身、kmx、占位與 procCore(getMapOrm 以模組層保存 woItems, 故一案只建一組)
+    //createEnv: 每案一組全新之資料表替身、kmx、占位與 procCore(procOrm 以 w-serv-orm 之 getMapOrm → getProc 組出, 1.1.10 起各實例各自保存 woItems)
     function createEnv() {
         let seed = seedRows()
         let woItems = {}
         for (let k of Object.keys(TABLES)) {
-            woItems[k] = createFakeTable(seed[k])
+            woItems[k] = mkTable(seed[k])
         }
-        let logs = []
-        let srLog = {
-            info: (o) => logs.push({ level: 'info', ...o }),
-            warn: (o) => logs.push({ level: 'warn', ...o }),
-            error: (o) => logs.push({ level: 'error', ...o }),
-        }
+        let { srLog, logs } = mkSrLog()
         let cst = cacheSt()
-        let pc = proc(woItems, getMapOrm(ds, woItems), { srLog, kmx: pmKeyMutex(), lockSave: createLockSave(cst) })
+        let pc = proc(woItems, mkProcOrm(ds, woItems), { srLog, kmx: pmKeyMutex(), lockSave: createLockSave(cst) })
         env = { seed, woItems, logs, cst, pc }
         return env
     }
@@ -320,6 +278,24 @@ describe('unit-procCore-updateTabItems (後台整表寫入之雙擊防護, ADR-0
         assert.strict.equal(rs[2], rows[2])
         assert.strict.equal(rs[3], rows[3])
         assert.strict.deepEqual(reuseDeletedIds([], db), [])
+    })
+
+
+    //R-ORM-04: w-serv-orm 1.1.11 起數字主鍵存為其字串形式: 送出之數字主鍵須對上庫內之字串主鍵(修改而非刪除後重建), 建立者 / 建立時間沿用資料庫
+    //(依 w-serv-orm 主責 agent 之建議書 3.5-3)
+    it('UNIT-UTI-010 使用者: 既有列主鍵 \'123\' 以數字 123 送出 → 視為修改, 建立者 / 建立時間沿用資料庫, 列數不變', async function() {
+        let { seed, woItems, pc } = createEnv()
+        let base = { ...cloneDeep(seed.users[0]), id: '123', name: 'p123', email: 'p123@example.com' }
+        await woItems.users.insert([base])
+        let rows = [...cloneDeep(seed.users), { ...cloneDeep(base), id: 123, name: 'p123-改' }]
+        assert.strict.equal(await pc.updateUsers('id-admin', rows), 'saveTabItemsSuccess')
+        let u = woItems.users.get('123')
+        assert.strict.equal(u.name, 'p123-改', '內容為送出之值')
+        assert.strict.equal(u.userId, base.userId, '建立者沿用資料庫之值')
+        assert.strict.equal(u.timeCreate, base.timeCreate, '建立時間沿用資料庫之值')
+        assert.strict.equal(u.userIdUpdate, 'id-admin', '修改者為本次操作者')
+        assert.strict.equal(woItems.users.size(), seed.users.length + 1, '列數不變(修改而非刪除後重建)')
+        assert.strict.equal(woItems.users.has(123), false, '不得以數字為鍵存放')
     })
 
 })

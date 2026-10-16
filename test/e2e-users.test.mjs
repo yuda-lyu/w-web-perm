@@ -14,7 +14,7 @@
 //act 走 user-facing input；assert = 語意斷言 + pixel baseline（§6.2 / §6.3）。
 import fs from 'fs'
 import assert from 'assert'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, assertBaselineMatch, typeIntoCell, captureBaseSeed, resetDb, restartBackend, genTempSettings, toggleDialogEnable, clickDialogSave, waitDialogGrid, waitDialogClosed, setLang, MDI, iconBtn, gotoUsers, checkRow, toggleEditMode, editSwitchLoc, clickAdd, cellHasWarn, clickSave, saveAndWaitModal, assertModalMsg } from './tools/e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, assertBaselineMatch, typeIntoCell, captureBaseSeedOnce, resetDb, restartBackend, genTempSettings, toggleDialogEnable, clickDialogSave, waitDialogGrid, waitDialogClosed, setLang, MDI, iconBtn, gotoUsers, checkRow, toggleEditMode, editSwitchLoc, clickAdd, cellHasWarn, clickSave, saveAndWaitModal, assertModalMsg } from './tools/e2e-setup.mjs'
 import { runBaselineCase, createBaselineGate, gridContentBox, itemsUnionBox } from './tools/e2eLib.mjs'
 
 const PICS_DIR = './test/pics/users'
@@ -432,7 +432,7 @@ async function generateBaseline() {
     fs.mkdirSync(PICS_DIR, { recursive: true })
     process.env.E2E_STRICT_CAPTURE = '1' //regen 端：captureStable 未 settle 即 throw，拒絕寫入未穩定畫面
     //擷取 pristine base seed（DB 剛 fresh seed，4 筆）——用臨時 browser
-    { const b = await launchBrowser(); const pp = await openApp(b); BASE_SEED = await captureBaseSeed(pp, 'users'); await b.close() }
+    { BASE_SEED = await captureBaseSeedOnce('users') }
     for (const lang of gate.langs) {
         console.log(`=== 產生標準圖（${lang}）===`)
         for (const c of gate.casesFor(lang)) {
@@ -457,7 +457,7 @@ else {
                 this.timeout(200000)
                 await startServersOnce()
                 //擷取 BASE_SEED 一次（用臨時 browser）
-                if (!BASE_SEED) { const b = await launchBrowser(); const pp = await openApp(b); BASE_SEED = await captureBaseSeed(pp, 'users'); await b.close() }
+                if (!BASE_SEED) { BASE_SEED = await captureBaseSeedOnce('users') }
             })
             //每案 fresh browser、DB 還原、換／還原 settings、開頁切語系、語意斷言、關瀏覽器皆在 runCase 內（與產製端同管線；--grep 單跑亦完整）
             for (const c of CASES) {

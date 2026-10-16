@@ -498,8 +498,8 @@ export default {
             let rows = get(vo, 'opt.rows', [])
 
             //kpErr
-            let kpErr = {}
-            let kpName = {}
+            let kpErr = Object.create(null) //無原型: 鍵為使用者資料, 不得命中 constructor 等原型鍵(規則帳本 R-KEY-01)
+            let kpName = Object.create(null)
             each(rows, (v, k) => {
 
                 //name
@@ -538,8 +538,8 @@ export default {
             let rows = get(vo, 'opt.rows', [])
 
             //kpErr
-            let kpErr = {}
-            let kpEmail = {}
+            let kpErr = Object.create(null)
+            let kpEmail = Object.create(null)
             each(rows, (v, k) => {
 
                 //email

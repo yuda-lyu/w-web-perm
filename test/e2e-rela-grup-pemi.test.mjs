@@ -28,7 +28,7 @@
 import fs from 'fs'
 import assert from 'assert'
 import JSON5 from 'json5'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal, captureBaseSeed, resetDb, setDialogModeWithShots, dialogEnableCheckboxSel, openChipsAllWithShots, dialogChipsVisibleTargets, readDialogChipsRow, resizeWindowForChips, setChipsAllModeWithShots, setLang, MDI, iconBtn, DLG_MDI, dlgBtn, waitDialogGrid, toggleDialogEnable, clickDialogSave, waitDialogClosed, gotoGrups, gotoPemis, toggleEditMode, openBelongDialog, saveBelongAndWaitModal, assertModalMsg } from './tools/e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal, captureBaseSeedOnce, resetDb, setDialogModeWithShots, dialogEnableCheckboxSel, openChipsAllWithShots, dialogChipsVisibleTargets, readDialogChipsRow, resizeWindowForChips, setChipsAllModeWithShots, setLang, MDI, iconBtn, DLG_MDI, dlgBtn, waitDialogGrid, toggleDialogEnable, clickDialogSave, waitDialogClosed, gotoGrups, gotoPemis, toggleEditMode, openBelongDialog, saveBelongAndWaitModal, assertModalMsg } from './tools/e2e-setup.mjs'
 //產製端與比對端同一案例管線（runBaselineCase）與截圖前篩選（createBaselineGate），規格詳 w-package-tools-e2e 之 README.md §2.1-2.2
 import { runBaselineCase, createBaselineGate } from './tools/e2eLib.mjs'
 
@@ -593,7 +593,7 @@ async function generateBaseline() {
     fs.mkdirSync(PICS_DIR, { recursive: true })
     process.env.E2E_STRICT_CAPTURE = '1' //regen 端：captureStable 未 settle 即 throw，拒絕寫入未穩定畫面
     //擷取 pristine base seed（DB 剛 fresh seed）——用臨時 browser
-    { const b = await launchBrowser(); const pp = await openApp(b); BASE_SEED = await captureBaseSeed(pp, 'grups'); await b.close() }
+    { BASE_SEED = await captureBaseSeedOnce('grups') }
     for (const lang of gate.langs) {
         for (const c of gate.casesFor(lang)) {
             console.log(`  ${lang}-${c.name}`)
@@ -616,7 +616,7 @@ else {
             before(async function() {
                 this.timeout(200000)
                 await startServersOnce()
-                if (!BASE_SEED) { const b = await launchBrowser(); const pp = await openApp(b); BASE_SEED = await captureBaseSeed(pp, 'grups'); await b.close() }
+                if (!BASE_SEED) { BASE_SEED = await captureBaseSeedOnce('grups') }
             })
             //per-case fresh browser + DB 還原 + 開頁 + 語系由 runCase 負責（確保單 case --grep 也能跑）；語意斷言於比對標準圖之前（pixel baseline 為補強層）
             for (const c of cases) {

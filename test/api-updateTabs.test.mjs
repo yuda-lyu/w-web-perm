@@ -287,6 +287,90 @@ describe('api-updateTabs（寫入 RPC：add / del / diff / order / 去重鍵）'
     })
 
 
+    // ============ 寫入前驗證（ADR-026，規則帳本 R-ORM-01）：可預判之寫入失敗於任何寫入之前回 key、DB 不變 ============
+    //修正前：updateTabItems 以 del → insert → save 落地，w-serv-orm 1.1.8 起對「會被 clearXSS 改寫之主鍵」整批拒絕、LMDB 對 > 1978 B 之主鍵整批拒絕，
+    //拒絕發生在 del 之後 → 舊列遺失；非主鍵欄位之標記則被靜默改寫為 &lt;（存值≠送入值）；拒絕訊息為 procOrm 英文原文（非語系鍵）。
+
+    //快照：整表依 id 排序之 JSON（零變更之斷言）
+    let snapTable = async (keyTable) => JSON.stringify((await readTable(keyTable)).sort((a, b) => String(a.id).localeCompare(String(b.id))))
+
+    it('API-updateTargets-003-markup-id-rejected：既有標的之 id 改為含 HTML 標記 → htmlMarkupNotAllowed、DB 不變（原標的仍在）', async function() {
+        await restoreBaseSeed('targets')
+        let before = await readTable('targets')
+        let snap0 = await snapTable('targets')
+        let editId = '專案A/頁A/區塊A'
+        let sent = before.map((t) => t.id === editId ? { ...t, id: `${editId}<x` } : { ...t })
+
+        let res = await callRpc('updateTargets', [sent], TOKEN_ADMIN)
+        assert.strict.equal(res.ok, false, `應被拒，實得: ${JSON.stringify(res)}`)
+        assert.strict.equal(res.msg, 'htmlMarkupNotAllowed', `reject 應為語系鍵 htmlMarkupNotAllowed，實得: ${res.msg}`)
+        assert.strict.equal(await snapTable('targets'), snap0, 'DB 須零變更（修正前原標的被刪除）')
+    })
+
+    it('API-updateTargets-004-long-id-rejected：主鍵 UTF-8 超過 1978 位元組 → saveRowFieldInvalid、DB 不變', async function() {
+        await restoreBaseSeed('targets')
+        let before = await readTable('targets')
+        let snap0 = await snapTable('targets')
+        let editId = '專案A/頁A/區塊A'
+        let longId = 'K' + 'x'.repeat(1978) //1979 B
+        let sent = before.map((t) => t.id === editId ? { ...t, id: longId } : { ...t })
+
+        let res = await callRpc('updateTargets', [sent], TOKEN_ADMIN)
+        assert.strict.equal(res.ok, false, `應被拒，實得: ${JSON.stringify(res)}`)
+        assert.strict.equal(res.msg, 'saveRowFieldInvalid', `reject 應為 saveRowFieldInvalid，實得: ${res.msg}`)
+        assert.strict.equal(await snapTable('targets'), snap0, 'DB 須零變更（修正前原標的被刪除）')
+    })
+
+    it('API-updateTargets-005-whitelisted-and-math-kept：白名單標籤與不構成標記之 < > 照常寫入、存值＝送入值', async function() {
+        await restoreBaseSeed('targets')
+        let before = await readTable('targets')
+        let editId = '專案A/頁A/區塊A'
+        let desc = '<b>重要</b> a < b 且 x > y'
+        let sent = before.map((t) => t.id === editId ? { ...t, description: desc } : { ...t })
+
+        let res = await callRpc('updateTargets', [sent], TOKEN_ADMIN)
+        assert.strict.ok(res.ok, `應成功，實得: ${JSON.stringify(res)}`)
+        let after = await readTable('targets')
+        assert.strict.equal(after.find((t) => t.id === editId).description, desc, '存值須等於送入值')
+    })
+
+    it('API-updateGrups-003-markup-name-rejected：新增群組名稱含 HTML 標記 → htmlMarkupNotAllowed、DB 不變', async function() {
+        await restoreBaseSeed('grups')
+        let before = await readTable('grups')
+        let snap0 = await snapTable('grups')
+        let sent = [...before.map((g) => ({ ...g })), { id: 'id-grup-markup', order: 77, name: 'g<b', description: '', from: 'apiTest', cpemis: '{}' }]
+
+        let res = await callRpc('updateGrups', [sent], TOKEN_ADMIN)
+        assert.strict.equal(res.ok, false, `應被拒，實得: ${JSON.stringify(res)}`)
+        assert.strict.equal(res.msg, 'htmlMarkupNotAllowed', `reject 應為 htmlMarkupNotAllowed，實得: ${res.msg}`)
+        assert.strict.equal(await snapTable('grups'), snap0, 'DB 須零變更（修正前存為 g&lt;b）')
+    })
+
+    it('API-updatePemis-003-markup-description-rejected：權限說明含 HTML 標記 → htmlMarkupNotAllowed、DB 不變', async function() {
+        await restoreBaseSeed('pemis')
+        let before = await readTable('pemis')
+        let snap0 = await snapTable('pemis')
+        let sent = before.map((p, k) => k === 0 ? { ...p, description: 'p<b' } : { ...p })
+
+        let res = await callRpc('updatePemis', [sent], TOKEN_ADMIN)
+        assert.strict.equal(res.ok, false, `應被拒，實得: ${JSON.stringify(res)}`)
+        assert.strict.equal(res.msg, 'htmlMarkupNotAllowed', `reject 應為 htmlMarkupNotAllowed，實得: ${res.msg}`)
+        assert.strict.equal(await snapTable('pemis'), snap0, 'DB 須零變更（修正前存為 p&lt;b）')
+    })
+
+    it('API-updateUsers-003-markup-email-rejected：新增使用者 email 含 HTML 標記 → htmlMarkupNotAllowed、DB 不變', async function() {
+        await restoreBaseSeed('users')
+        let before = await readTable('users')
+        let snap0 = await snapTable('users')
+        let sent = [...before.map((u) => ({ ...u })), { id: 'id-app-markup-user', order: 98, name: 'markupUser', email: 'x<y@example.com', description: '', from: 'apiTest', cgrups: '{}', isAdmin: 'n', isActive: 'y' }]
+
+        let res = await callRpc('updateUsers', [sent], TOKEN_ADMIN)
+        assert.strict.equal(res.ok, false, `應被拒，實得: ${JSON.stringify(res)}`)
+        assert.strict.equal(res.msg, 'htmlMarkupNotAllowed', `reject 應為 htmlMarkupNotAllowed，實得: ${res.msg}`)
+        assert.strict.equal(await snapTable('users'), snap0, 'DB 須零變更（修正前存為 x&lt;y@…，以所輸入之 email 對應不到）')
+    })
+
+
     //收尾：所有表復原為 base seed（避免遺留特化資料影響其他檔在同一 mocha run 的執行）
     after(async function() {
         this.timeout(60000)

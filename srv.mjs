@@ -18,10 +18,6 @@ let appSt = JSON5.parse(fs.readFileSync(pathSettings, 'utf8'))
 
 let opt = {
 
-    useCheckUser: false,
-    getUserById: null,
-    useExcludeWhenNotAdmin: false,
-
     //serverPort / subfolder / urlRedirect / showLanguage / language / showModeEdit* / modeEdit* / webName / webDescription / webLogo / kpLangExt 皆由 settings.json 提供
     ...appSt,
 

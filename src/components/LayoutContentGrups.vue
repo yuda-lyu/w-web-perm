@@ -449,7 +449,7 @@ export default {
             let vo = this
 
             //kp
-            let kp = {}
+            let kp = Object.create(null) //無原型: 鍵為使用者資料, 不得命中 constructor 等原型鍵(規則帳本 R-KEY-01)
             each(vo.useUsers, (u) => {
                 each(u.kpGrup, (v, k) => {
                     let isActive = get(v, 'isActive', '')
@@ -474,14 +474,14 @@ export default {
             let vo = this
 
             //_kp
-            let _kp = {}
+            let _kp = Object.create(null)
             each(vo.grups, (v, k) => {
                 _kp[v.name] = true
             })
             // console.log('_kp', _kp)
 
             //kp
-            let kp = {}
+            let kp = Object.create(null)
             each(vo.kpGrupUser, (v, k) => {
                 if (haskey(_kp, k)) {
                     kp[k] = v
@@ -552,8 +552,8 @@ export default {
             let rows = get(vo, 'opt.rows', [])
 
             //kpErr
-            let kpErr = {}
-            let kpName = {}
+            let kpErr = Object.create(null)
+            let kpName = Object.create(null)
             each(rows, (v, k) => {
 
                 //name
@@ -817,7 +817,7 @@ export default {
 
                 //us
                 let us = []
-                if (haskey(kpUseGrupUser, g.name)) {
+                if (Object.prototype.hasOwnProperty.call(kpUseGrupUser, g.name)) {
                     us = kpUseGrupUser[g.name]
                 }
                 // console.log('us', us)
@@ -1021,14 +1021,14 @@ export default {
             let vo = this
 
             //_kp
-            let _kp = {}
+            let _kp = Object.create(null)
             each(vo.pemis, (v, k) => {
                 _kp[v.name] = true
             })
             // console.log('_kp', _kp)
 
             //kpt
-            let kpt = {}
+            let kpt = Object.create(null)
             each(kp, (v, k) => {
                 if (haskey(_kp, k)) {
                     kpt[k] = v

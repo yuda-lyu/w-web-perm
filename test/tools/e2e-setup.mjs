@@ -34,6 +34,7 @@ import {
     waitGridIdle,
     probeStuckTooltip as pkgProbeStuckTooltip
 } from './e2eLib.mjs'
+import { runSeedChild } from './seedChild.mjs'
 
 //REGEN 診斷閘門守則（全域技能 role-coder-for-test-e2e references/pixel-mismatch-diagnosis.md §6）：
 //診斷 env（E2E_BARE / E2E_DIAG）生效時絕不可寫入正式 baseline，防止把診斷態誤凍結為標準圖（getE2eMode 於此拋錯）。
@@ -80,29 +81,42 @@ function wipeDbVerified(strict = true) {
 }
 
 //種子 DB（base seed：peter/mary/john/admin + grups/pemis/targets）。g_initialTestData 刪舊重建，
-//須在後端開啟 lmdb 之前完成。偵測 stdout 'finish.' 即視為完成並結束該子進程（避免 lmdb 卡 event loop）。
-function seedDb(opts = {}) {
+//須在後端開啟 lmdb 之前完成。完成判定經 runSeedChild（./seedChild.mjs, 規則帳本 R-SEED-01）：見 stdout 'finish.' 才 resolve 並結束子進程
+//（避免 lmdb 卡 event loop）；子進程結束而未見 'finish.'（不論離開碼）或逾時即 reject 並附輸出尾段。
+//2026-10-14 前於子進程 exit 即 resolve：種子腳本攔下錯誤後以離開碼 0 結束時（w-serv-orm 1.1.10 之 genTestData 遇逐筆失敗即拋錯）被當成功。
+async function seedDb(opts = {}) {
     const { strict = true } = opts
-    return new Promise((resolve, reject) => {
-        //先刪 ./db（lmdb）再重建，確保 hermetic base seed（genTestData 為 upsert 不清表）。
-        try { wipeDbVerified(strict) }
-        catch (e) { reject(e); return }
-        const child = spawn('node', ['g_initialTestData.mjs'], { cwd: projRoot, stdio: ['ignore', 'pipe', 'pipe'] })
-        let done = false
-        const finish = () => { if (done) return; done = true; try { child.kill() } catch (e) {} ; resolve() }
-        let buf = ''
-        child.stdout.on('data', (d) => { buf += String(d); if (buf.includes('finish.')) finish() })
-        child.stderr.on('data', () => {})
-        child.on('exit', () => finish())
-        child.on('error', reject)
-        setTimeout(() => { if (!done) { try { child.kill() } catch (e) {} ; reject(new Error('seedDb 逾時 60s')) } }, 60000)
-    })
+    //先刪 ./db（lmdb）再重建，確保 hermetic base seed（genTestData 為 upsert 不清表）。
+    wipeDbVerified(strict)
+    await runSeedChild({ args: ['g_initialTestData.mjs'], cwd: projRoot, timeoutMs: 60000 })
 }
 
+//spawnSrv：子進程之 stdout／stderr 只保留末段（避免 buffer 塞滿又不洩漏到測試輸出）；子進程非因本檔之重啟／cleanup 而結束且離開碼非 0 時印出尾段
+//（規則帳本 R-E2E-SPAWN-01）。why: 後端啟動即崩潰（如 2026-10-14 升版後缺 authorizeExec）時, readiness 只會等滿 60 s 得 `server not ready`, 不見根因。
+//restartBackend／cleanup 殺子進程樹時 Windows 之 taskkill 使離開碼為 1, 故先以 markExpectedExit 標記當下所有子進程; signal 結束(code 為 null)不印。
+const SPAWN_TAIL_MAX = 4000
+const liveChildren = new Set()
+function markExpectedExit(onlyBackend = false) {
+    for (const c of liveChildren) {
+        if (!onlyBackend || (c.spawnargs || []).includes(SRV_PATH)) c.__expectedExit = true
+    }
+}
 function spawnSrv(cmd, args, opts = {}) {
     const child = spawn(cmd, args, { cwd: projRoot, stdio: ['ignore', 'pipe', 'pipe'], ...opts })
-    child.stdout.on('data', () => {}) //保留管線避免 buffer 塞滿；需 debug 時改 process.stdout.write
-    child.stderr.on('data', () => {})
+    liveChildren.add(child)
+    let tail = ''
+    const keep = (d) => {
+        tail += String(d)
+        if (tail.length > SPAWN_TAIL_MAX) tail = tail.slice(tail.length - SPAWN_TAIL_MAX)
+    }
+    child.stdout.on('data', keep) //需 debug 全文時改 process.stdout.write
+    child.stderr.on('data', keep)
+    child.on('exit', (code) => {
+        liveChildren.delete(child)
+        if (!child.__expectedExit && typeof code === 'number' && code !== 0) {
+            console.log(`[e2e-setup] child exited unexpectedly (code=${code}, cmd=${[cmd, ...args].join(' ')})\n[output tail]\n${tail}`)
+        }
+    })
     return child
 }
 
@@ -205,10 +219,12 @@ export async function restartBackend(pathSettings = './settings.json', opts = {}
     //殺自建後端樹並等 port 釋放；無自建而 11006 被佔用（reuse / 外部啟動之同專案後端）→ 殺其監聽者並等釋放（明文例外）；
     //reseed 於 spawn 前執行（見 services.backend.beforeSpawn）
     const { reseed = false } = opts
+    markExpectedExit(true) //重啟所殺之舊後端不印尾段(見 spawnSrv)
     await services.restart('backend', { args: [pathSettings], hookArg: { reseed } })
 }
 
 export function cleanup() {
+    markExpectedExit()
     services.cleanup()
 }
 
@@ -732,6 +748,19 @@ export async function captureBaseSeed(page, key) {
         const us = (window.$vo.$store.state[k] || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0))
         return JSON.parse(JSON.stringify(us))
     }, key)
+}
+//以臨時瀏覽器擷取 base seed, finally 必關瀏覽器(規則帳本 R-E2E-SEED-01): openApp／captureBaseSeed 拋錯時不遺留 Chrome。
+//收斂自 7 檔 × 產製端與比對端共 14 處之手寫 `const b = await launchBrowser(); const pp = await openApp(b); …; await b.close()`
+//(無 try/finally; 2026-10-14 基準因後端無法啟動而 openApp 逾時, 遺留 15 個 Chrome 使 mocha 印出總結後不結束)。
+export async function captureBaseSeedOnce(key) {
+    const b = await launchBrowser()
+    try {
+        const pp = await openApp(b)
+        return await captureBaseSeed(pp, key)
+    }
+    finally {
+        await b.close().catch(() => {})
+    }
 }
 //在獨立 throwaway page 還原 DB（diff：刪多餘/補缺漏），關閉後再開 case page。
 //不可在 case page 上 reset：updateXxx 的 late 廣播(recvData)會在 clickAdd 後到、觸發 changeParams 重算

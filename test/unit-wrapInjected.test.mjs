@@ -162,15 +162,16 @@ describe('unit-wrapInjected', function() {
 
 //—— 站點不變式: 靜態掃描(不需 server/wrapInjected.mjs 存在, 修正前即可獨立執行) ——
 
-//第四個注入函數 getUserById(opt 選填, useCheckUser=true 時由 WServOrm 呼叫)於主代理複審時納入(2026-09-25, ADR-023)
-const NAMES = ['getUserByToken', 'verifyClientUser', 'verifyAppUser', 'getUserById']
+//注入函數為三個建構子參數. 原第四個 opt.getUserById(2026-09-25 納入, ADR-023)隨 w-serv-orm 1.1.9 移除而刪除(2026-10-14, ADR-026):
+//給值即於建構時由 checkOptRemoved 拋錯, 不再讀取、包裝或轉交(規則帳本 R-ORM-03; unit-wwebperm-init SITE-OPT-001)
+const NAMES = ['getUserByToken', 'verifyClientUser', 'verifyAppUser']
 
 
 describe('unit-wrapInjected-sites', function() {
 
     let fp = path.join(projRoot, 'server', 'WWebPerm.mjs')
 
-    //四個注入函數(三個建構子參數 + opt.getUserById)各恰有一處包裝指派, 且在 srLog 初始化之後
+    //三個注入函數(建構子參數)各恰有一處包裝指派, 且在 srLog 初始化之後
     it('WRAP-SITE-001-wrap-assignments-after-srLog-init', function() {
         let ls = sourceLines(fp, 'code')
         let srLogInit = ls.find((l) => /let srLog = srLogInit\(opt\)/.test(l.text))
@@ -197,7 +198,6 @@ describe('unit-wrapInjected-sites', function() {
             let limit = wrap ? wrap.no : Infinity
             let allowed = [
                 /^\s*function WWebPerm\(/,
-                new RegExp(`^\\s*let ${nm} = get\\(opt, '${nm}'`), //opt 選填之注入函數(getUserById)之讀取
                 new RegExp(`isfun\\(${nm}\\)`),
                 new RegExp(`console\\.log\\('invalid ${nm}', ${nm}\\)`),
                 new RegExp(`throw new Error\\('invalid ${nm}'\\)`),

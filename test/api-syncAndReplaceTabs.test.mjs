@@ -57,7 +57,7 @@ describe('api-syncAndReplaceTabs', function() {
     after(async function() {
         this.timeout(60000)
         let woItems = await getWoItems()
-        let froms = ['appTest-1', 'appTest-2', 'appTest-3', 'appTest-4', 'appTest-5', 'appTest-6']
+        let froms = ['appTest-1', 'appTest-2', 'appTest-3', 'appTest-4', 'appTest-5', 'appTest-6', 'appTest-7', 'appTest-8', 'appTest-9', 'appTest-10', 'appTest-11', 'appTest-11b']
         for (let kt of ['users', 'grups', 'pemis', 'targets']) {
             for (let from of froms) {
                 await woItems[kt].delAll({ from })
@@ -217,6 +217,86 @@ describe('api-syncAndReplaceTabs', function() {
         //base seed targets（from=''）不受影響，仍 22 筆
         let rowsBase = await woItems.targets.select({ from: '' })
         assert.strict.equal(rowsBase.length, SEED.targetCount, `base seed targets（from=''）應仍為 ${SEED.targetCount} 筆`)
+    })
+
+
+    // ============ 寫入前驗證（ADR-026，規則帳本 R-ORM-01／R-ORM-02；spec 流程_外部應用同步權限資料 E2E-007～009）============
+    //修正前：先 delAll({from}) 再 insert，insert 遇可預判之拒絕（主鍵含 HTML 標記、主鍵過長）時該 from 之既有列已全數清空（違反 ADR-008 防誤清源）；
+    //非主鍵欄位之標記被靜默改寫為 &lt;；拒絕訊息為 w-serv-orm／LMDB 英文原文（非語系鍵）。
+
+    //ids：該 from 分區之 id（排序）
+    let idsOf = async (kt, from) => (await (await getWoItems())[kt].select({ from })).map((v) => v.id).sort()
+
+    it('API-sync-007-markup-id-rejected-rows-kept：主鍵含 HTML 標記 → htmlMarkupNotAllowed，該 from 既有列不變', async function() {
+        const F = 'appTest-7'
+        let rows0 = [
+            { id: '專案Y/頁1/區塊A', order: 0, description: 'A', from: F },
+            { id: '專案Y/頁1/區塊B', order: 1, description: 'B', from: F },
+        ]
+        let res0 = await postSync('targets', TOKEN_APP, { from: F, rows: rows0 })
+        assert.strict.equal(res0.state, 'success', `預置應成功，實得: ${JSON.stringify(res0)}`)
+
+        let res = await postSync('targets', TOKEN_APP, { from: F, rows: [{ id: '專案Y/頁1/區塊C', order: 0, description: 'C', from: F }, { id: '專案Y/頁1/a<c', order: 1, description: 'D', from: F }] })
+        assert.strict.equal(res.state, 'error', `含標記主鍵應被拒，實得: ${JSON.stringify(res)}`)
+        assert.strict.equal(res.msg, 'htmlMarkupNotAllowed', `外部應用應收語系鍵（非 ORM 英文原文），實得: ${res.msg}`)
+        assert.strict.deepEqual(await idsOf('targets', F), rows0.map((v) => v.id).sort(), '該 from 之既有列須不變（修正前被清空）')
+    })
+
+    it('API-sync-008-markup-field-rejected-rows-kept：非主鍵欄位含 HTML 標記 → htmlMarkupNotAllowed，不靜默改寫、既有列不變', async function() {
+        const F = 'appTest-8'
+        let rows0 = [{ id: 'id-app8-g1', order: 0, name: 'app8Grup1', description: 'g1', from: F, cpemis: '{}' }]
+        let res0 = await postSync('grups', TOKEN_APP, { from: F, rows: rows0 })
+        assert.strict.equal(res0.state, 'success', `預置應成功，實得: ${JSON.stringify(res0)}`)
+
+        let res = await postSync('grups', TOKEN_APP, { from: F, rows: [{ id: 'id-app8-g2', order: 0, name: 'app8Grup2', description: 'x<y', from: F, cpemis: '{}' }] })
+        assert.strict.equal(res.state, 'error', `含標記之欄位應被拒（修正前存為 x&lt;y），實得: ${JSON.stringify(res)}`)
+        assert.strict.equal(res.msg, 'htmlMarkupNotAllowed')
+        let rs = await (await getWoItems()).grups.select({ from: F })
+        assert.strict.deepEqual(rs.map((v) => [v.id, v.description]), [['id-app8-g1', 'g1']], '該 from 之既有列須不變')
+    })
+
+    it('API-sync-009-long-id-rejected-rows-kept：主鍵 UTF-8 超過 1978 位元組 → invalidRows，該 from 既有列不變', async function() {
+        const F = 'appTest-9'
+        let rows0 = [{ id: 'id-app9-u1', order: 0, name: 'app9User1', email: 'app9user1@appTest.com', from: F, cgrups: '{}', isAdmin: 'n', isActive: 'y' }]
+        let res0 = await postSync('users', TOKEN_APP, { from: F, rows: rows0 })
+        assert.strict.equal(res0.state, 'success', `預置應成功，實得: ${JSON.stringify(res0)}`)
+
+        let longId = 'U' + 'x'.repeat(1978) //1979 B
+        let res = await postSync('users', TOKEN_APP, { from: F, rows: [{ id: longId, order: 0, name: 'app9User2', email: 'app9user2@appTest.com', from: F, cgrups: '{}', isAdmin: 'n', isActive: 'y' }] })
+        assert.strict.equal(res.state, 'error', `過長主鍵應被拒，實得: ${JSON.stringify(res).slice(0, 300)}`)
+        assert.strict.equal(res.msg, 'invalidRows', `應回語系鍵 invalidRows，實得: ${String(res.msg).slice(0, 200)}`)
+        assert.strict.deepEqual(await idsOf('users', F), ['id-app9-u1'], '該 from 之既有列須不變（修正前被清空）')
+    })
+
+
+    // ============ 數字主鍵與跨來源同鍵（2026-10-14 run05；規則帳本 R-ORM-04、R-SYNC-01；spec 流程_外部應用同步權限資料 E2E-010／E2E-011；依 w-serv-orm 主責 agent 之建議書 3.5-1）============
+    //w-serv-orm 1.1.11 起數字主鍵存為其字串形式（123 存為 '123'、回應之 id 為 '123'）；insert 為「主鍵已存在即略過」，
+    //他 from 已有之主鍵原本被靜默略過而整批回 success（以流水號為主鍵之各應用因而互撞）→ 改為整批拒絕 invalidRows、兩個 from 皆不變。
+
+    it('API-sync-010-numeric-id-stored-as-string：數字主鍵存為其字串形式、回應 id 為字串、重送不增列', async function() {
+        const F = 'appTest-10'
+        let row = { id: 1010, order: 0, name: 'app10User1', email: 'app10user1@appTest.com', from: F, cgrups: '{}', isAdmin: 'n', isActive: 'y' }
+        let res1 = await postSync('users', TOKEN_APP, { from: F, rows: [row] })
+        assert.strict.equal(res1.state, 'success', `應成功，實得: ${JSON.stringify(res1)}`)
+        assert.strict.deepEqual(res1.msg, [{ id: '1010' }], '回應之 id 為字串')
+        let res2 = await postSync('users', TOKEN_APP, { from: F, rows: [row] })
+        assert.strict.equal(res2.state, 'success', `重送應成功，實得: ${JSON.stringify(res2)}`)
+        assert.strict.deepEqual(await idsOf('users', F), ['1010'], '庫內以字串存放且重送不增列')
+    })
+
+    it('API-sync-011-id-of-other-from-rejected：主鍵已屬其他 from（數字或其字串形式）→ invalidRows，兩個 from 皆不變', async function() {
+        const F = 'appTest-11'
+        const G = 'appTest-11b'
+        let mk = (id, f) => ({ id, order: 0, name: `app11-${f}`, email: `app11-${f}@appTest.com`, from: f, cgrups: '{}', isAdmin: 'n', isActive: 'y' })
+        let res0 = await postSync('users', TOKEN_APP, { from: F, rows: [mk(1011, F)] })
+        assert.strict.equal(res0.state, 'success', `預置應成功，實得: ${JSON.stringify(res0)}`)
+        for (let id of [1011, '1011']) {
+            let res = await postSync('users', TOKEN_APP, { from: G, rows: [mk(id, G)] })
+            assert.strict.equal(res.state, 'error', `屬其他 from 之主鍵應被拒（修正前回 success 而該列未寫入），實得: ${JSON.stringify(res)}`)
+            assert.strict.equal(res.msg, 'invalidRows')
+        }
+        assert.strict.deepEqual(await idsOf('users', F), ['1011'], '原 from 不變')
+        assert.strict.deepEqual(await idsOf('users', G), [], '目標 from 不變')
     })
 
 })

@@ -548,14 +548,14 @@ export default {
             let vo = this
 
             //_kp
-            let _kp = {}
+            let _kp = Object.create(null) //無原型: 鍵為使用者資料, 不得命中 constructor 等原型鍵(規則帳本 R-KEY-01)
             each(vo.pemis, (v, k) => {
                 _kp[v.name] = true
             })
             // console.log('_kp', _kp)
 
             //kpt
-            let kpt = {}
+            let kpt = Object.create(null)
             each(kp, (v, k) => {
                 if (haskey(_kp, k)) {
                     kpt[k] = v
@@ -691,7 +691,7 @@ export default {
                     }
                 }
                 else {
-                    if (haskey(kpPemi, pemi.name)) {
+                    if (Object.prototype.hasOwnProperty.call(kpPemi, pemi.name)) {
                         delete kpPemi[pemi.name]
                     }
                 }
@@ -834,7 +834,7 @@ export default {
             // console.log('rows', rows)
 
             //kpRow
-            let kpRow = {}
+            let kpRow = Object.create(null)
             each(rows, (r, kr) => {
                 kpRow[r.name] = kr
             })
@@ -873,7 +873,7 @@ export default {
             // console.log('rows', rows)
 
             //kpRow
-            let kpRow = {}
+            let kpRow = Object.create(null)
             each(rows, (r, kr) => {
                 kpRow[r.name] = kr
             })
@@ -912,7 +912,7 @@ export default {
             // console.log('rows', rows)
 
             //kpRow
-            let kpRow = {}
+            let kpRow = Object.create(null)
             each(rows, (r, kr) => {
                 kpRow[r.name] = kr
             })

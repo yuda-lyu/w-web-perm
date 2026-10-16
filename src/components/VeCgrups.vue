@@ -632,7 +632,7 @@ export default {
             // console.log('rows', rows)
 
             //kpRow
-            let kpRow = {}
+            let kpRow = Object.create(null) //無原型: 鍵為使用者資料, 不得命中 constructor 等原型鍵(規則帳本 R-KEY-01)
             each(rows, (r, kr) => {
                 kpRow[r.name] = kr
             })
@@ -671,7 +671,7 @@ export default {
             // console.log('rows', rows)
 
             //kpRow
-            let kpRow = {}
+            let kpRow = Object.create(null)
             each(rows, (r, kr) => {
                 kpRow[r.name] = kr
             })
@@ -710,7 +710,7 @@ export default {
             // console.log('rows', rows)
 
             //kpRow
-            let kpRow = {}
+            let kpRow = Object.create(null)
             each(rows, (r, kr) => {
                 kpRow[r.name] = kr
             })

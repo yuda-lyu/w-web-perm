@@ -15,7 +15,7 @@
 //checkbox 與警告 icon 皆在 col-id="id"；save 結果走 $dg.showCheckYes 持久 modal。
 import fs from 'fs'
 import assert from 'assert'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, rowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, typeIntoCell, captureBaseSeed, resetDb, clickNavItem, setLang, MDI, iconBtn, checkRow, toggleEditMode, editSwitchLoc, clickAdd, cellHasWarn, clickSave, saveAndWaitModal, assertModalMsg } from './tools/e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, rowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, typeIntoCell, captureBaseSeedOnce, resetDb, clickNavItem, setLang, MDI, iconBtn, checkRow, toggleEditMode, editSwitchLoc, clickAdd, cellHasWarn, clickSave, saveAndWaitModal, assertModalMsg } from './tools/e2e-setup.mjs'
 import { runBaselineCase, createBaselineGate, gridContentBox, itemsUnionBox } from './tools/e2eLib.mjs'
 
 const PICS_DIR = './test/pics/targets'
@@ -331,6 +331,43 @@ const CASES = [
             assert.equal(n, BASE_SEED.length, 'DB 仍為 base seed 筆數')
         },
     },
+    {
+        //E2E-011：既有標的之路徑(id)就地改為含 HTML 標記者 → Save → 後端寫入前驗證於刪除舊列之前拒絕(htmlMarkupNotAllowed, ADR-026) → 儲存失敗訊息框; 資料庫不變
+        //6 步真實路徑: ①管理對象頁(進場路徑見 E2E-001; 預設即編輯模式) ②雙擊第 1 列之路徑儲存格 ③清除後輸入「原路徑<x」並按 Enter
+        //  ④點工具列 Save 鈕 ⑤看到儲存失敗訊息框, 原因為不允許之 HTML 標記 ⑥後端: 寫入前驗證於 del 之前拒絕, 原標的仍在、新路徑未寫入
+        //修正前(2026-10-14 V7 實測): 訊息框為「Failed to save targets: Cannot connect to server」, 且原標的已被刪除、新路徑被拒(重新進站後 22 → 21 筆)
+        name: 'E2E-011-markup-id-rejected',
+        stages: ['E2E-011-1-type-id', 'E2E-011-2-id-edited', 'E2E-011-3-click-save', 'E2E-011-4-fail-modal'],
+        run: async (page) => {
+            await gotoTargets(page)
+            //點擊前: 要改路徑之第 1 列(框住該列整列, 顯示原路徑)
+            const s1 = await captureStableWithBox(page, rowBoxSel(0))
+            await typeIntoCell(page, 0, 'id', `${BASE_SEED[0].id}<x`)
+            //結果: 第 1 列之路徑已改為原路徑接「<x」(框住該列整列; 尚未儲存)
+            const s2 = await captureStableWithBox(page, rowBoxSel(0))
+            //點擊前: 工具列 Save 鈕(框住整顆)
+            const s3 = await captureStableWithBox(page, iconBtn(page, MDI.upload))
+            await saveAndWaitModal(page)
+            //結果: 儲存失敗訊息框(框住訊息框面板, 含訊息與 OK 鈕)
+            const s4 = await captureStableWithBox(page, SEL_MODAL)
+            return [
+                { name: 'E2E-011-1-type-id', buf: s1 },
+                { name: 'E2E-011-2-id-edited', buf: s2 },
+                { name: 'E2E-011-3-click-save', buf: s3 },
+                { name: 'E2E-011-4-fail-modal', buf: s4 },
+            ]
+        },
+        semantic: async (page) => {
+            //spec E2E-011「訊息框顯示儲存失敗, 原因為不允許之 HTML 標記」: 前綴 targetSaveTargetsFail + 原因 htmlMarkupNotAllowed(非「無法連線至伺服器」)
+            await assertModalMsg(page, 'targetSaveTargetsFail')
+            await assertModalMsg(page, 'htmlMarkupNotAllowed')
+            //spec E2E-011「原標的仍在、新路徑未寫入」: 以資料通道之 select 直讀資料庫(不依前端同步之時序)
+            const ids = await page.evaluate(async () => (await window.$vo.$fapi.targets.select()).map((x) => x.id))
+            assert.ok(ids.includes(BASE_SEED[0].id), `原標的 ${BASE_SEED[0].id} 應仍在資料庫`)
+            assert.ok(!ids.includes(`${BASE_SEED[0].id}<x`), '含 HTML 標記之新路徑不應寫入')
+            assert.equal(ids.length, BASE_SEED.length, '資料庫仍為 base seed 筆數')
+        },
+    },
 ]
 
 //單一案例管線（產製端與比對端呼叫同一函數；w-package-tools-e2e runBaselineCase）：
@@ -369,7 +406,7 @@ async function generateBaseline() {
     fs.mkdirSync(PICS_DIR, { recursive: true })
     process.env.E2E_STRICT_CAPTURE = '1' //regen 端：captureStable 未 settle 即 throw，拒絕寫入未穩定畫面
     //擷取 pristine base seed（DB 剛 fresh seed）——用臨時 browser
-    { const b = await launchBrowser(); const pp = await openApp(b); BASE_SEED = await captureBaseSeed(pp, 'targets'); await b.close() }
+    { BASE_SEED = await captureBaseSeedOnce('targets') }
     for (const lang of gate.langs) {
         console.log(`=== 產生標準圖（${lang}）===`)
         for (const c of gate.casesFor(lang)) {
@@ -394,7 +431,7 @@ else {
                 this.timeout(200000)
                 await startServersOnce()
                 //擷取 BASE_SEED 一次（用臨時 browser）
-                if (!BASE_SEED) { const b = await launchBrowser(); const pp = await openApp(b); BASE_SEED = await captureBaseSeed(pp, 'targets'); await b.close() }
+                if (!BASE_SEED) { BASE_SEED = await captureBaseSeedOnce('targets') }
             })
             //每案 fresh browser、DB 還原、開頁切語系、語意斷言、關瀏覽器皆在 runCase 內（與產製端同管線；--grep 單跑亦完整）
             for (const c of CASES) {

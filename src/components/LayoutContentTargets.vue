@@ -454,8 +454,8 @@ export default {
             let rows = get(vo, 'opt.rows', [])
 
             //kpErr
-            let kpErr = {}
-            let kpId = {}
+            let kpErr = Object.create(null) //無原型: 鍵為使用者資料, 不得命中 constructor 等原型鍵(規則帳本 R-KEY-01)
+            let kpId = Object.create(null)
             each(rows, (v, k) => {
 
                 //id

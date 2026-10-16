@@ -88,6 +88,62 @@ describe('api-verifyConn-auth', function() {
         assert.strict.equal(rWrite.ok, false, `verifyClientUser 拒絕之使用者不得寫資料通道, 實得 ${JSON.stringify(rWrite)}`)
     })
 
+    // ============ 資料通道只開 select（ADR-026、ADR-015 Update；規則帳本 R-WSD-01）============
+    //政策：methodsExec:['select']＋authorizeExec 只放行 select。修正前（methodsExec 含 insert/save/del/delAll）已認證者可直呼裸表操作，
+    //繞過 updateXxx 之 lockSave、kmx、寫入前驗證與整表比對；前端與測試之寫入皆經 kpFunExt、同步只用 select。
+    const TABLES_DC = ['grups', 'pemis', 'targets', 'users']
+    const KP_FUN_EXT = ['getWebInfor', 'updateTargets', 'updatePemis', 'updateGrups', 'updateUsers', 'getStaEvent', 'getStaEventTable']
+
+    it('DC-FUNCLIST-001-table-ops-select-only：[sys:getFuncList] 之表操作只有各表之 select（其餘為 kpFunExt）', async function() {
+        let r = await callRpc('[sys:getFuncList]', [], TOKEN_ADMIN)
+        assert.strict.ok(r.ok, `getFuncList 應成功, 實得 ${JSON.stringify(r).slice(0, 300)}`)
+        let expected = [...TABLES_DC.map((t) => `${t}.select`), ...KP_FUN_EXT].sort()
+        assert.strict.deepEqual((r.output || []).slice().sort(), expected)
+    })
+
+    it('DC-WRITE-001-raw-writes-rejected：直呼裸 insert/save/del/delAll 一律回 invalid func[表名.方法] 且資料不變', async function() {
+        let snap = async () => JSON.stringify((await readTable('targets')).sort((a, b) => String(a.id).localeCompare(String(b.id))))
+        let base = sortByOrder(await readTable('targets'))
+        let snap0 = await snap()
+        let t0 = base[0]
+        try {
+            let calls = [
+                ['targets.save', [{ ...t0, description: String(t0.description || '') + '_DCW' }]],
+                ['targets.insert', [{ id: '專案DC/裸寫入', order: 99, description: 'raw', from: '' }]],
+                ['targets.del', [{ id: '專案DC/不存在' }]],
+                ['targets.delAll', { from: '__none__' }],
+            ]
+            for (let [fn, arg] of calls) {
+                let r = await callRpc(fn, [arg], TOKEN_ADMIN)
+                assert.strict.equal(r.ok, false, `${fn} 應被拒, 實得 ${JSON.stringify(r).slice(0, 300)}`)
+                assert.strict.equal(r.msg, `invalid func[${fn}]`, `${fn} 應不在函數清單`)
+            }
+            for (let t of ['grups', 'pemis', 'users']) {
+                for (let m of ['insert', 'save', 'del', 'delAll']) {
+                    let r = await callRpc(`${t}.${m}`, [{ id: '__none__' }], TOKEN_ADMIN)
+                    assert.strict.equal(r.msg, `invalid func[${t}.${m}]`, `${t}.${m} 應不在函數清單, 實得 ${JSON.stringify(r).slice(0, 200)}`)
+                }
+            }
+            assert.strict.equal(await snap(), snap0, 'targets 資料須不變')
+        }
+        finally {
+            //修正前(裸寫入可執行)之重跑會改到資料: 以 kpFunExt 整表寫回快照還原(修正後為 no-op)
+            if (await snap() !== snap0) {
+                let rr = await callRpc('updateTargets', [base], TOKEN_ADMIN)
+                assert.strict.ok(rr.ok, `還原 targets 應成功, 實得 ${JSON.stringify(rr)}`)
+            }
+        }
+    })
+
+    it('DC-SELECT-001-select-allowed：已認證者之裸 select 經授權放行（前端同步依賴），回該表全部列', async function() {
+        for (let t of TABLES_DC) {
+            let r = await callRpc(`${t}.select`, [], TOKEN_ADMIN)
+            assert.strict.ok(r.ok, `${t}.select 應成功, 實得 ${JSON.stringify(r).slice(0, 300)}`)
+            let db = await readTable(t)
+            assert.strict.deepEqual((r.output || []).map((v) => v.id).sort(), db.map((v) => v.id).sort(), `${t}.select 應回該表全部列`)
+        }
+    })
+
     //spec: 在表但 isActive='n' → 拒(UI 之「是否有效」對資料通道生效); 且被停用者不得自我復活
     //放最後: 停用 admin 後本進程再無可用 client token, 由 after 以 reseed 還原
     it('AUTH-003-admin-set-inactive-then-rejected-cannot-self-reactivate', async function() {
