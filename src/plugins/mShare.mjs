@@ -7,7 +7,6 @@ import join from 'lodash-es/join.js'
 import size from 'lodash-es/size.js'
 import find from 'lodash-es/find.js'
 import filter from 'lodash-es/filter.js'
-import cloneDeep from 'lodash-es/cloneDeep.js'
 import takeRight from 'lodash-es/takeRight.js'
 import dropRight from 'lodash-es/dropRight.js'
 import sortBy from 'lodash-es/sortBy.js'
@@ -15,6 +14,8 @@ import sep from 'wsemi/src/sep.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import haskey from 'wsemi/src/haskey.mjs'
+import eachOwn from '../js/eachOwn.mjs'
+import getOwn from '../js/getOwn.mjs'
 
 
 // //dlm
@@ -201,9 +202,16 @@ function getNameNew(rows, key = 'name', nameBase = '', nameExt = '') {
 
 function getUserRules(user, grups, pemis, targets) {
 
+    //cvKpToArr: kp 為 JSON5.parse(cgrups／cpemis／crules) 之結果, 內容為使用者(含外部應用)寫入, 鍵為群組／權限／規則名.
+    //一律以 eachOwn 依自有鍵走訪(規則帳本 R-OBJ-ITER-01): lodash each 對含非負整數 length 鍵之物件改走索引 0..length-1,
+    //真實鍵被略過(權限靜默評估為 n), length 極大時空轉或耗盡記憶體(每次 getPerm／getPermUserInfor 皆走此路徑).
+    //eachOwn 對陣列依索引、對物件依自有鍵, 對字串與其他原始值不迭代(lodash each 會逐字元迭代字串, 名稱為索引而無法對應任何群組／權限／規則, 無實用差異)
+    //名稱: 物件形式(以名稱為鍵)以外層鍵為名, 值內 name 不得改名(編輯器依外層鍵顯示與存檔, 授權若依值內 name 則顯示與授權不一致; 規則帳本 R-AUTH-PATH-01);
+    //陣列形式([{ name, … }])元素之 name 即名稱, 維持
     let cvKpToArr = (kp) => {
         let rs = []
-        each(kp, (v, k) => {
+        let isArr = Array.isArray(kp)
+        eachOwn(kp, (v, k) => {
             // console.log(k, v)
             let r = {
                 name: k,
@@ -212,6 +220,9 @@ function getUserRules(user, grups, pemis, targets) {
                 r = {
                     ...r,
                     ...v,
+                }
+                if (!isArr) {
+                    r.name = k
                 }
             }
             else {
@@ -228,7 +239,7 @@ function getUserRules(user, grups, pemis, targets) {
     let cvStrToArr = (c) => {
 
         //kp
-        let kp = {}
+        let kp = Object.create(null)
         try {
             kp = JSON5.parse(c)
             // console.log('kp', kp)
@@ -285,9 +296,9 @@ function getUserRules(user, grups, pemis, targets) {
                 return true //跳出換下一個
             }
 
-            //kpRule
+            //kpRule, 鍵為使用者寫入之規則名: 無原型容器, 使 __proto__／constructor 等原型鍵名之規則可被精確授權、不與繼承屬性混淆(規則帳本 R-AUTH-PATH-01、R-KEY-01)
             let rules = get(v, 'rules', [])
-            let kpRule = {}
+            let kpRule = Object.create(null)
             each(rules, (vv) => {
                 kpRule[vv.name] = vv.isActive
             })
@@ -305,11 +316,12 @@ function getUserRules(user, grups, pemis, targets) {
             return []
         }
 
+        //objOR／objAND／rulesFin 走訪之 kpRule 物件: 鍵為規則名、值為使用者寫入之 isActive(可為數字, 如規則名 length 之值), 同樣以 eachOwn 依自有鍵走訪
         let objOR = (obj1, obj2) => {
-            let kp = {}
+            let kp = Object.create(null)
             let objs = [obj1, obj2]
             each(objs, (obj) => {
-                each(obj, (v, k) => {
+                eachOwn(obj, (v, k) => {
                     if (!haskey(kp, k)) {
                         kp[k] = 'n'
                     }
@@ -325,10 +337,10 @@ function getUserRules(user, grups, pemis, targets) {
         }
 
         let objAND = (obj1, obj2) => {
-            let kp = cloneDeep(obj1)
+            let kp = Object.assign(Object.create(null), obj1) //淺複製入無原型容器(值皆為 y／n 或使用者寫入之原始值, 後續只比較不就地修改; cloneDeep 會把無原型物件複製成一般物件)
             let objs = [obj2]
             each(objs, (obj) => {
-                each(obj, (v, k) => {
+                eachOwn(obj, (v, k) => {
                     if (!haskey(kp, k)) {
                         kp[k] = 'n'
                     }
@@ -377,7 +389,7 @@ function getUserRules(user, grups, pemis, targets) {
 
         //rulesFin
         let rulesFin = []
-        each(kpRuleFin, (v, k) => {
+        eachOwn(kpRuleFin, (v, k) => {
             rulesFin.push({
                 name: k,
                 isActive: v,
@@ -482,8 +494,9 @@ function getUserRules(user, grups, pemis, targets) {
     //expand _rules：以「當前 targets」為輸出主軸——逐 target 取其解析後 isActive（取自合併 crules 的 kp、預設 'n'）。
     //如此只列現存管控對象；crules 仍引用但已從 targets 刪除的「孤兒 target」自然被濾掉，不再殘留於權限樹。
     //（修正前：輸出 kp 全部 keys = crules keys ∪ targets，導致已刪 target 因 crules 殘留引用而仍出現在權限樹。）
+    //標的 id 是資料不是路徑(規則帳本 R-AUTH-PATH-01): 以 getOwn 自有屬性查值, lodash get 會把 'A.0'、'A[0]'、'A.length' 解析為路徑而誤授權, 並取到 toString 等繼承屬性
     if (true) {
-        let kp = {}
+        let kp = Object.create(null)
         each(_rules, (v) => {
             kp[v.name] = v.isActive
         })
@@ -491,7 +504,7 @@ function getUserRules(user, grups, pemis, targets) {
         each(targets, (t) => {
             rs.push({
                 name: t.id,
-                isActive: get(kp, t.id, 'n'),
+                isActive: getOwn(kp, t.id, 'n'),
             })
         })
         _rules = rs

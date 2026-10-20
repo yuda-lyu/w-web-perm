@@ -10,6 +10,7 @@ import { execSync } from 'child_process'
 import ds from '../src/schema/index.mjs'
 import validateRowsBeforeWrite, { maxIdBytes } from '../server/validateRows.mjs'
 import { mkTable, mkProcOrm } from './tools/unitOrm.mjs'
+import { runChild, fileUrl, describeChild } from './tools/runChild.mjs'
 
 
 //clearXSS 之邊界語料(wsemi 1.9.15: 只轉義構成標籤起點之 <——後接字母、/、!、? 或位於結尾; 白名單標籤原樣)
@@ -130,6 +131,97 @@ describe('unit-validateRows (寫入前驗證之判準, ADR-026)', function() {
         let out = execSync('npm ls wsemi --all --parseable', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
         let paths = [...new Set(out.split(/\r?\n/).filter((l) => /[\\/]wsemi$/.test(l.trim())))]
         assert.strict.equal(paths.length, 1, `wsemi 應只有一份, 實得 ${paths.join(', ')}`)
+    })
+
+
+    // ===== R-OBJ-ITER-01: 列物件含數字 length 欄位時, 字串欄位仍須逐一檢查(lodash each 會把物件當陣列樣迭代而漏檢) =====
+    //建議書 建議w-web-perm修正.md §1: `{id:'a',length:1,name:'<script>x</script>'}` 與 `length:0` 修正前回 null(通過).
+    //本函數的承諾(檔頭 JSDoc 第 2 點)為「任一字串欄位之值會被 clearXSS 改寫者即拒絕」, 與列內是否有名為 length 之欄位無關.
+
+    it('VR-OI-001 列含數字 length 欄位(0、1、2、100) 且字串欄位含標記 → htmlMarkup(回該列與欄)', function() {
+        for (let n of [0, 1, 2, 100]) {
+            assert.strict.deepEqual(
+                validateRowsBeforeWrite([{ id: 'a', length: n, name: '<script>x</script>' }]),
+                { reason: 'htmlMarkup', k: 0, field: 'name' },
+                `length:${n}`
+            )
+        }
+        //標記在主鍵、在第 2 列、在 length 之後的欄位
+        assert.strict.deepEqual(validateRowsBeforeWrite([{ id: 'T1<x', length: 0 }]), { reason: 'htmlMarkup', k: 0, field: 'id' })
+        assert.strict.deepEqual(
+            validateRowsBeforeWrite([{ id: 'a', length: 0, name: 'ok' }, { id: 'b', length: 1, name: 'n', description: 'x<y' }]),
+            { reason: 'htmlMarkup', k: 1, field: 'description' }
+        )
+        //回報第一個違規之欄位(依鍵順序): length 在中間不影響順序
+        assert.strict.deepEqual(
+            validateRowsBeforeWrite([{ id: 'a', length: 0, name: 'a<b', description: 'c<d' }]),
+            { reason: 'htmlMarkup', k: 0, field: 'name' }
+        )
+    })
+
+    it('VR-OI-002 巨大 length(2**32-1、Number.MAX_SAFE_INTEGER、1e9) → 仍檢出標記且毫秒內完成(成本只依實際鍵數, 與 length 之值無關)', function() {
+        //子行程: 修前 lodash 對 length: 2**32-1 空轉約 80 秒(MAX_SAFE_INTEGER 為實質無窮迴圈), mocha 逾時無法中斷同步迴圈
+        let code = `
+            import validateRowsBeforeWrite from ${fileUrl('server/validateRows.mjs')}
+            let out = []
+            for (let n of [2 ** 32 - 1, Number.MAX_SAFE_INTEGER, 1e9]) {
+                out.push(validateRowsBeforeWrite([{ id: 'a', length: n, name: '<script>x</script>' }]))
+            }
+            //無標記之合法列帶巨大 length → 通過(不誤拒)
+            out.push(validateRowsBeforeWrite([{ id: 'a', length: 2 ** 32 - 1, name: 'ok' }]))
+            console.log(JSON.stringify(out))
+        `
+        let c = runChild(code, { timeoutMs: 20000 })
+        assert.strict.ok(c.ok, `子行程應正常結束(修前逾時): ${describeChild(c)}`)
+        assert.strict.deepEqual(c.result, [...Array(3).fill({ reason: 'htmlMarkup', k: 0, field: 'name' }), null])
+        assert.strict.ok(c.ms < 15000, `應快速完成, 實得 ${c.ms} ms`)
+    })
+
+    it('VR-OI-003 length 不是合法長度(負數、小數、字串、null、布林、物件、陣列、2**53) 時仍檢出標記(迴歸: 這些值修前即不走陣列樣迭代)', function() {
+        for (let n of [-1, 1.5, '3', null, true, { a: 1 }, [1], 2 ** 53]) {
+            assert.strict.deepEqual(
+                validateRowsBeforeWrite([{ id: 'a', length: n, name: 'x<y' }]),
+                { reason: 'htmlMarkup', k: 0, field: 'name' },
+                `length:${JSON.stringify(n)}`
+            )
+        }
+    })
+
+    it('VR-OI-004 length 欄位本身是字串且含標記 → 回報欄位 length; 無標記之列帶 length(數字或字串) → null(不誤拒)', function() {
+        assert.strict.deepEqual(validateRowsBeforeWrite([{ id: 'a', length: 'a<b' }]), { reason: 'htmlMarkup', k: 0, field: 'length' })
+        assert.strict.equal(validateRowsBeforeWrite([{ id: 'a', length: 0, name: 'ok' }, { id: 'b', length: 5, description: '<b>x</b> a < b' }, { id: 'c', length: 'abc' }]), null)
+    })
+
+    it('VR-OI-005 rowsIdOnly 之列帶 length: 仍參與主鍵重複判定, 欄位標記仍不驗', function() {
+        assert.strict.deepEqual(
+            validateRowsBeforeWrite([{ id: 'a' }], { rowsIdOnly: [{ id: 'a', length: 0, d: 'x<y' }] }),
+            { reason: 'idDuplicate', k: -1, field: 'id' }
+        )
+        assert.strict.equal(validateRowsBeforeWrite([{ id: 'a', d: 'ok' }], { rowsIdOnly: [{ id: 'b', length: 1, d: 'legacy<x' }] }), null)
+    })
+
+    it('VR-OI-006 以 Symbol.toStringTag 偽稱 Array 之物件不是陣列: rows → rowsInvalid、rowsIdOnly → 視為未給(不依其 length 迭代)', function() {
+        let fake = (len) => Object.defineProperty({ 0: { id: 'a', name: 'x<y' }, length: len }, Symbol.toStringTag, { value: 'Array' })
+        assert.strict.deepEqual(validateRowsBeforeWrite(fake(1)), { reason: 'rowsInvalid', k: -1, field: '' })
+        assert.strict.deepEqual(validateRowsBeforeWrite(fake(0)), { reason: 'rowsInvalid', k: -1, field: '' })
+        assert.strict.equal(validateRowsBeforeWrite([{ id: 'a' }], { rowsIdOnly: fake(1) }), null, '偽陣列之 rowsIdOnly 不參與重複判定')
+        //巨大 length 之偽陣列: 子行程驗毫秒內回應(修前依 length 迭代而空轉)
+        let code = `
+            import validateRowsBeforeWrite from ${fileUrl('server/validateRows.mjs')}
+            let fake = Object.defineProperty({ 0: { id: 'a' }, length: 2 ** 32 - 1 }, Symbol.toStringTag, { value: 'Array' })
+            console.log(JSON.stringify([validateRowsBeforeWrite(fake), validateRowsBeforeWrite([{ id: 'a' }], { rowsIdOnly: fake })]))
+        `
+        let c = runChild(code, { timeoutMs: 20000 })
+        assert.strict.ok(c.ok, `子行程應正常結束(修前逾時): ${describeChild(c)}`)
+        assert.strict.deepEqual(c.result, [{ reason: 'rowsInvalid', k: -1, field: '' }, null])
+    })
+
+    //外審 sol#8: 列物件本身以 Symbol.toStringTag 偽稱 Array 時, 依 toString 判型之 iseobj 會略過其全部欄位; 列只要是物件(非 null、非真陣列)就逐欄檢查
+    it('VR-OI-007 列物件以 Symbol.toStringTag 偽稱 Array(自有鍵仍為 id／name) → 仍逐欄檢查(htmlMarkup); 真陣列元素與 null、原始值之列不檢欄位', function() {
+        let spoof = Object.defineProperty({ id: 'spoof', name: 'x<y' }, Symbol.toStringTag, { value: 'Array' })
+        assert.strict.deepEqual(validateRowsBeforeWrite([spoof]), { reason: 'htmlMarkup', k: 0, field: 'name' })
+        //列為陣列、null、字串、數字: 不是物件列, 不檢欄位(主鍵檢查另行: 無 id 視為未給)
+        assert.strict.equal(validateRowsBeforeWrite([['a<b'], null, 'x<y', 5]), null)
     })
 
 })

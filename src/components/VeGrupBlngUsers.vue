@@ -188,6 +188,7 @@ import haskey from 'wsemi/src/haskey.mjs'
 import delay from 'wsemi/src/delay.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
+import eachOwn from '../js/eachOwn.mjs'
 import WDialog from 'w-component-vue/src/components/WDialog.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
 import WAggridVue from 'w-aggrid-vue/src/components/WAggridVue.vue'
@@ -558,7 +559,7 @@ export default {
 
             //kpt
             let kpt = Object.create(null)
-            each(kp, (v, k) => {
+            eachOwn(kp, (v, k) => {
                 if (haskey(_kp, k)) {
                     kpt[k] = v
                 }
@@ -587,7 +588,7 @@ export default {
                 let mode = 'OR'
                 let enable = 'n'
                 let grups = []
-                each(kpGrup, (v, k) => {
+                eachOwn(kpGrup, (v, k) => {
                     // console.log(k, 'v', v)
 
                     //_isActive, 此為使用者cgrups內設定, 可為y或n, 僅提取y, 再判斷此使用者是否有使用此grup
@@ -1038,7 +1039,7 @@ export default {
                     let grups = get(r, 'grups', [])
 
                     //kpGrupNew
-                    let kpGrupNew = {}
+                    let kpGrupNew = Object.create(null)
                     if (true) {
                         each(grups, (g) => {
                             if (g.isActive === 'y') {

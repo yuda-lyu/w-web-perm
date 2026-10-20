@@ -29,7 +29,7 @@
 <nav >
     
     
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="WWebPerm.html">WWebPerm</a></li></ul><h3>Global</h3><ul><li><a href="global.html#createAuthorizeExec">createAuthorizeExec</a></li><li><a href="global.html#createLegendMeasurer">createLegendMeasurer</a></li><li><a href="global.html#createLockSave">createLockSave</a></li><li><a href="global.html#decideLegendType">decideLegendType</a></li><li><a href="global.html#describeUpstream">describeUpstream</a></li><li><a href="global.html#fetchJson">fetchJson</a></li><li><a href="global.html#genLegend">genLegend</a></li><li><a href="global.html#maskQuery">maskQuery</a></li><li><a href="global.html#maskTok">maskTok</a></li><li><a href="global.html#maskUrl">maskUrl</a></li><li><a href="global.html#mergePickKeysOnly">mergePickKeysOnly</a></li><li><a href="global.html#resolveShellWorker">resolveShellWorker</a></li><li><a href="global.html#reuseDeletedIds">reuseDeletedIds</a></li><li><a href="global.html#submitGuard">submitGuard</a></li><li><a href="global.html#validateRowsBeforeWrite">validateRowsBeforeWrite</a></li><li><a href="global.html#wrapInjected">wrapInjected</a></li><li><a href="global.html#wrapOperOrm">wrapOperOrm</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="WWebPerm.html">WWebPerm</a></li></ul><h3>Global</h3><ul><li><a href="global.html#createAuthorizeExec">createAuthorizeExec</a></li><li><a href="global.html#createLegendMeasurer">createLegendMeasurer</a></li><li><a href="global.html#createLockSave">createLockSave</a></li><li><a href="global.html#decideLegendType">decideLegendType</a></li><li><a href="global.html#describeUpstream">describeUpstream</a></li><li><a href="global.html#eachOwn">eachOwn</a></li><li><a href="global.html#fetchJson">fetchJson</a></li><li><a href="global.html#genLegend">genLegend</a></li><li><a href="global.html#getOwn">getOwn</a></li><li><a href="global.html#getRuleEnable">getRuleEnable</a></li><li><a href="global.html#maskQuery">maskQuery</a></li><li><a href="global.html#maskTok">maskTok</a></li><li><a href="global.html#maskUrl">maskUrl</a></li><li><a href="global.html#mergePickKeysOnly">mergePickKeysOnly</a></li><li><a href="global.html#resolveShellWorker">resolveShellWorker</a></li><li><a href="global.html#reuseDeletedIds">reuseDeletedIds</a></li><li><a href="global.html#submitGuard">submitGuard</a></li><li><a href="global.html#validateRowsBeforeWrite">validateRowsBeforeWrite</a></li><li><a href="global.html#wrapInjected">wrapInjected</a></li><li><a href="global.html#wrapOperOrm">wrapOperOrm</a></li></ul>
     
 </nav>
 
@@ -76,7 +76,7 @@ import WServOrm from 'w-serv-orm/src/WServOrm.mjs'
 import checkOptRemoved from 'w-serv-orm/src/checkOptRemoved.mjs'
 import ds from '../src/schema/index.mjs'
 import { getUserRules } from '../src/plugins/mShare.mjs'
-import procCore, { toOutKey } from './procCore.mjs'
+import procCore, { toOutKey, isRowObj } from './procCore.mjs'
 import createLockSave from './lockSave.mjs'
 import procLang from './procLang.mjs'
 import srLogInit from './srLog.mjs'
@@ -661,6 +661,14 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                 return Promise.reject(`invalidRows`)
             }
 
+            //各列須為非空物件(規則帳本 R-ORM-05, 與後台整表寫入共用 isRowObj), 否則整批拒絕且不進 delAll:
+            //修正前非物件元素(字串、數字、null)使下方 v.from = from 拋 TypeError, 經 pm2resolve 把引擎原文外送給外部應用(R-ORM-02), 元素為 {} 時則寫入一筆自動主鍵之空白列
+            let kBadRow = rows.findIndex((v) => !isRowObj(v))
+            if (kBadRow >= 0) {
+                srLog.error({ event: 'syncAndReplaceTabs-error', msg: 'invalidRows', reason: 'rowInvalid', keyTable, from, row: kBadRow })
+                return Promise.reject(`invalidRows`)
+            }
+
             //save from
             rows = map(rows, (v, k) => {
             // v.order = k + 1 //order大部分由外部給予, 不能複寫
@@ -671,6 +679,18 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             //ltdtmapping
             rows = ltdtmapping(rows, ds[keyTable].keys)
             // console.log('ltdtmapping rows', rows)
+
+            //映射到 schema 欄位後, 除伺服器管理欄(from 與建立者／建立時間／更新者／更新時間, 寫入時由伺服器覆寫)外, 沒有任何欄位帶有內容者為空白列, 整批拒絕(規則帳本 R-ORM-05; 外審 minimax#3、sol#3／#4):
+            //上方 isRowObj 只擋 {} 與非物件, {"foo":1}、{"length":5} 等「只含非 schema 欄位」之列映射後與 {} 相同, 仍會被 insert 成自動主鍵之空白列;
+            //只帶伺服器管理欄(如 {"userId":"x"})之列, 該值於寫入時被覆寫, 結果同為空白列; 欄位值為 []／{} 等空容器亦非內容.
+            //內容 = 非空字串、有限數字(0 亦是)、布林
+            let kpSrvKey = { from: true, userId: true, timeCreate: true, userIdUpdate: true, timeUpdate: true }
+            let isContent = (x) => (typeof x === 'string' &amp;&amp; x !== '') || (typeof x === 'number' &amp;&amp; Number.isFinite(x)) || typeof x === 'boolean'
+            let kBlank = rows.findIndex((v) => !Object.keys(v).some((k) => kpSrvKey[k] !== true &amp;&amp; isContent(v[k])))
+            if (kBlank >= 0) {
+                srLog.error({ event: 'syncAndReplaceTabs-error', msg: 'invalidRows', reason: 'rowBlank', keyTable, from, row: kBlank })
+                return Promise.reject(`invalidRows`)
+            }
 
             //寫入前驗證(規則帳本 R-ORM-01, ADR-026): 於 delAll 之前擋下可預判之寫入失敗, 該 from 之既有列不變(ADR-008 防誤清源).
             //why: 先 delAll 再 insert, 而 w-serv-orm 1.1.8 起對「會被 clearXSS 改寫之主鍵」整批拒絕、LMDB 對 > 1978 B 之主鍵整批拒絕,
@@ -1304,7 +1324,7 @@ export default WWebPerm
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Tue Oct 20 2026 06:46:43 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Tue Oct 20 2026 14:44:45 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>

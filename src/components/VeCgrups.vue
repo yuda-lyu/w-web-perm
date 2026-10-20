@@ -176,6 +176,7 @@ import genPm from 'wsemi/src/genPm.mjs'
 import delay from 'wsemi/src/delay.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
+import getOwn from '../js/getOwn.mjs'
 import WDialog from 'w-component-vue/src/components/WDialog.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
 import WAggridVue from 'w-aggrid-vue/src/components/WAggridVue.vue'
@@ -789,7 +790,7 @@ export default {
                 // console.log('rows', rows)
 
                 //kpGrup
-                let kpGrup = {}
+                let kpGrup = Object.create(null)
                 each(rows, (r) => {
                     let name = get(r, 'name', '')
                     let mode = get(r, 'mode', '')
@@ -886,7 +887,7 @@ export default {
             // console.log('cgrups', cgrups)
 
             //kpGrup
-            let kpGrup = {}
+            let kpGrup = Object.create(null)
             if (isestr(cgrups)) {
                 try {
                     kpGrup = JSON5.parse(cgrups)
@@ -903,7 +904,7 @@ export default {
                 // console.log('grups v', v)
 
                 //p
-                let p = get(kpGrup, v.name, null)
+                let p = getOwn(kpGrup, v.name, null)
                 // console.log('p', p)
 
                 //name

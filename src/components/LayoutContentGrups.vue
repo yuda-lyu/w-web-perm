@@ -263,6 +263,7 @@ import iseobj from 'wsemi/src/iseobj.mjs'
 import isnum from 'wsemi/src/isnum.mjs'
 import cdbl from 'wsemi/src/cdbl.mjs'
 import arrPull from 'wsemi/src/arrPull.mjs'
+import eachOwn from '../js/eachOwn.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
 import WSwitch from 'w-component-vue/src/components/WSwitch.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
@@ -451,7 +452,7 @@ export default {
             //kp
             let kp = Object.create(null) //無原型: 鍵為使用者資料, 不得命中 constructor 等原型鍵(規則帳本 R-KEY-01)
             each(vo.useUsers, (u) => {
-                each(u.kpGrup, (v, k) => {
+                eachOwn(u.kpGrup, (v, k) => {
                     let isActive = get(v, 'isActive', '')
                     if (isActive !== 'y') {
                         return true //跳出換下一個
@@ -1029,7 +1030,7 @@ export default {
 
             //kpt
             let kpt = Object.create(null)
-            each(kp, (v, k) => {
+            eachOwn(kp, (v, k) => {
                 if (haskey(_kp, k)) {
                     kpt[k] = v
                 }
@@ -1058,7 +1059,7 @@ export default {
 
             //vs
             let vs = []
-            each(kpPemi, (v, k) => {
+            eachOwn(kpPemi, (v, k) => {
                 // console.log(k, 'v', v)
 
                 //isActive

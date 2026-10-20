@@ -3,7 +3,7 @@
 //cleanup 由 e2e-setup.mjs 的 mocha root after hook 自動觸發，本檔不寫 after(cleanup)。
 
 import assert from 'assert'
-import { startApi, apiBaseUrl, TOKEN_APP, TOKEN_BAD, urlGetPermUserInfor, SEED } from './tools/api-setup.mjs'
+import { startApi, apiBaseUrl, TOKEN_APP, TOKEN_BAD, urlGetPermUserInfor, urlSync, SEED, getWoItems } from './tools/api-setup.mjs'
 import getPermUserInfor from '../src/getPermUserInfor.mjs'
 
 
@@ -153,5 +153,90 @@ describe('api-getPermUserInfor', function() {
         catch (e) {
             assert.strict.equal(e, 'noUserDataAfterConvert', 'reject 應為 err key noUserDataAfterConvert')
         }
+    })
+
+    //R-OBJ-ITER-01（規則帳本「迭代使用端傳入之物件」）：cgrups／cpemis／crules 為使用者或外部應用寫入之 JSON 字串，解析後之物件含數字 length 鍵時，
+    //修正前 getUserRules 以 lodash each 當陣列樣迭代而略過真實鍵（群組、權限、規則被靜默評估為無權限）；length 極大時使每次權限查詢空轉或耗盡記憶體（毒化資料持久）。
+    //本案經真後端：外部應用以 syncAndReplaceTabs 寫入一組含 length 鍵之資料，再以 getPermUserInfor 查詢該使用者之有效權限。
+    //巨大 length 之單元案例見 unit-getUserRules UNIT-OI-007（子行程，避免修前使後端空轉或崩潰）。
+    describe('length 鍵於 JSON 字串欄位（R-OBJ-ITER-01）', function() {
+        const F = 'appTest-oi'
+        const TARGET = '專案A/頁A/區塊A' //base seed 既有標的
+
+        let postSync = async (keyTable, rows) => {
+            let url = urlSync.replace('{keyTable}', keyTable).replace('{token}', TOKEN_APP)
+            let res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify({ from: F, rows }) })
+            return await res.json()
+        }
+
+        after(async function() {
+            this.timeout(60000)
+            let woItems = await getWoItems()
+            for (let kt of ['users', 'grups', 'pemis']) {
+                await woItems[kt].delAll({ from: F })
+            }
+        })
+
+        it('API-getPermUserInfor-007-length-key-in-json-strings：三層 JSON 字串皆含 length 鍵 → 群組名稱與標的權限仍正確', async function() {
+            this.timeout(60000)
+            let OR = '{"mode":"OR","isActive":"y"}'
+            let r1 = await postSync('pemis', [{ id: 'id-oi-p1', order: 0, name: 'oiPemi', description: '', from: F, crules: `{"length":0,"${TARGET}":"y"}` }])
+            assert.strict.equal(r1.state, 'success', `pemis 預置應成功: ${JSON.stringify(r1)}`)
+            let r2 = await postSync('grups', [{ id: 'id-oi-g1', order: 0, name: 'oiGrup', description: '', from: F, cpemis: `{"length":1,"oiPemi":${OR}}` }])
+            assert.strict.equal(r2.state, 'success', `grups 預置應成功: ${JSON.stringify(r2)}`)
+            let r3 = await postSync('users', [{ id: 'id-oi-u1', order: 0, name: 'oiUser', email: 'oi@appTest.com', description: '', from: F, cgrups: `{"length":2,"oiGrup":${OR}}`, isAdmin: 'n', isActive: 'y' }])
+            assert.strict.equal(r3.state, 'success', `users 預置應成功: ${JSON.stringify(r3)}`)
+
+            let ur = await getPermUserInfor(urlGetPermUserInfor, TOKEN_APP, 'id-oi-u1')
+            assert.strict.equal(ur.user.grupsNames, 'oiGrup', 'cgrups 含 length 鍵時群組仍應被辨識（修正前為空字串）')
+            let rule = ur.rules.find((v) => v.name === TARGET)
+            assert.strict.ok(rule, `rules 應含標的 ${TARGET}`)
+            assert.strict.equal(rule.isActive, 'y', 'cpemis／crules 含 length 鍵時標的仍應為 y（修正前為 n）')
+        })
+    })
+
+    //R-AUTH-PATH-01（規則帳本；外審 sol#5，主控 run01 複審裁示 1）：標的 id 是資料不是路徑。
+    //修正前實測（單元層 getUserRules）：crules 只授權 apQ 時，標的 apQ.0、apQ[0] 經 lodash get 的字串索引得 y、apQ.length 得數字 1；未授權之 toString 取到繼承函數。
+    //本案經真後端：外部應用以 syncAndReplaceTabs 寫入一組標的／權限／群組／使用者，再以 getPermUserInfor 查有效權限。
+    describe('標的 id 含 . 或 [ 、或為原型鍵名（R-AUTH-PATH-01）', function() {
+        const F = 'appTest-ap'
+        const IDS = ['apQ', 'apQ.0', 'apQ[0]', 'apQ.length', 'apR', 'apR.exact', 'constructor', 'toString']
+
+        let postSync = async (keyTable, rows) => {
+            let url = urlSync.replace('{keyTable}', keyTable).replace('{token}', TOKEN_APP)
+            let res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify({ from: F, rows }) })
+            return await res.json()
+        }
+
+        after(async function() {
+            this.timeout(60000)
+            let woItems = await getWoItems()
+            for (let kt of ['users', 'grups', 'pemis', 'targets']) {
+                await woItems[kt].delAll({ from: F })
+            }
+        })
+
+        it('API-getPermUserInfor-008-target-id-not-a-path：只授權 apQ 與精確鍵 apR.exact → apQ.0／apQ[0]／apQ.length／constructor／toString 皆 n，精確鍵為 y', async function() {
+            this.timeout(60000)
+            let OR = '{"mode":"OR","isActive":"y"}'
+            let r0 = await postSync('targets', IDS.map((id, k) => ({ id, order: k, description: '', from: F })))
+            assert.strict.equal(r0.state, 'success', `targets 預置應成功: ${JSON.stringify(r0)}`)
+            let r1 = await postSync('pemis', [{ id: 'id-ap-p1', order: 0, name: 'apPemi', description: '', from: F, crules: '{"apQ":"y","apR.exact":"y"}' }])
+            assert.strict.equal(r1.state, 'success', `pemis 預置應成功: ${JSON.stringify(r1)}`)
+            let r2 = await postSync('grups', [{ id: 'id-ap-g1', order: 0, name: 'apGrup', description: '', from: F, cpemis: `{"apPemi":${OR}}` }])
+            assert.strict.equal(r2.state, 'success', `grups 預置應成功: ${JSON.stringify(r2)}`)
+            let r3 = await postSync('users', [{ id: 'id-ap-u1', order: 0, name: 'apUser', email: 'ap@appTest.com', description: '', from: F, cgrups: `{"apGrup":${OR}}`, isAdmin: 'n', isActive: 'y' }])
+            assert.strict.equal(r3.state, 'success', `users 預置應成功: ${JSON.stringify(r3)}`)
+
+            let ur = await getPermUserInfor(urlGetPermUserInfor, TOKEN_APP, 'id-ap-u1')
+            assert.strict.equal(ur.user.grupsNames, 'apGrup')
+            let by = new Map(ur.rules.map((v) => [v.name, v.isActive]))
+            assert.strict.equal(by.get('apQ'), 'y', '被授權之標的')
+            assert.strict.equal(by.get('apR.exact'), 'y', '精確鍵（含 .）照常授權')
+            for (let id of ['apQ.0', 'apQ[0]', 'apQ.length', 'apR', 'constructor', 'toString']) {
+                assert.strict.equal(by.get(id), 'n', `${id} 未被授權，須為 n（修正前 apQ.0／apQ[0] 為 y、apQ.length 為數字 1、toString 為函數）`)
+            }
+            assert.strict.deepEqual(ur.rules.filter((v) => IDS.includes(v.name)).map((v) => v.name).sort(), [...IDS].sort(), '本案標的各一筆(rules 另含 base seed 之標的)')
+        })
     })
 })

@@ -371,6 +371,75 @@ describe('api-updateTabs（寫入 RPC：add / del / diff / order / 去重鍵）'
     })
 
 
+    // ============ R-OBJ-ITER-01 / R-ORM-05：rows 容器與列物件含數字 length（2026-10-20，建議書 建議w-web-perm修正.md；規則帳本「迭代使用端傳入之物件」）============
+    //經真後端（RPC 通道）驗：①列物件帶 length 欄位仍須檢查字串欄位；②rows 本身非陣列（含帶 length 之物件）須拒絕且資料不變。
+    //修正前實測（HEAD 434c0d4，真後端）：①已被拒（ltdtmapping 於 validateRows 前依 schema 欄位重建列，length 到不了 validateRows——本案為整合面迴歸）；
+    //②rows = { length: N } 回 saveTabItemsSuccess 且整表清空（targets 22 → 0），N = 2**32-1 時 each(rows) 空轉約 80 秒阻塞事件迴圈。
+
+    it('API-updateTargets-006-row-with-length-field-markup-rejected：列帶 length 欄位（0、1、2**32-1）且欄位含標記 → htmlMarkupNotAllowed、DB 不變', async function() {
+        for (let n of [0, 1, 2 ** 32 - 1]) {
+            await restoreBaseSeed('targets')
+            let before = await readTable('targets')
+            let snap0 = await snapTable('targets')
+            let editId = '專案A/頁A/區塊A'
+            let sent = before.map((t) => t.id === editId ? { ...t, length: n, description: '<script>x</script>' } : { ...t })
+
+            let res = await callRpc('updateTargets', [sent], TOKEN_ADMIN)
+            assert.strict.equal(res.ok, false, `length:${n} 應被拒，實得: ${JSON.stringify(res)}`)
+            assert.strict.equal(res.msg, 'htmlMarkupNotAllowed', `length:${n} reject 應為 htmlMarkupNotAllowed，實得: ${res.msg}`)
+            assert.strict.equal(await snapTable('targets'), snap0, `length:${n} DB 須零變更`)
+        }
+    })
+
+    it('API-updateTargets-007-rows-not-array-rejected：rows 非陣列或含非物件／空物件之列（帶 length 之物件、一般物件、字串、null、[null]、[{}]、[\'\']、[[]]、[合法列, null]） → saveRowFieldInvalid、DB 不變（修正前整表清空並回成功）', async function() {
+        this.timeout(300000)
+        for (let keyTable of ['targets', 'grups', 'pemis']) {
+            await restoreBaseSeed(keyTable)
+            let before = await readTable(keyTable)
+            let snap0 = await snapTable(keyTable)
+            let probes = [
+                { length: 3 },
+                { length: 0 },
+                { length: 2, 0: { ...before[0] }, 1: { ...before[1] } }, //形似陣列之物件
+                {},
+                'abc',
+                null,
+                [null], //單元素「空」陣列: 修前經 ltdtmapping(isearr)變 []、整表清空並回成功
+                [{}],
+                [''],
+                [[]],
+                [{ ...before[0] }, null],
+            ]
+            for (let rows of probes) {
+                let res = await callRpc(RPC[keyTable].fn, [rows], TOKEN_ADMIN)
+                assert.strict.equal(res.ok, false, `${keyTable} rows=${JSON.stringify(rows)} 應被拒，實得: ${JSON.stringify(res)}`)
+                assert.strict.equal(res.msg, 'saveRowFieldInvalid', `${keyTable} reject 應為 saveRowFieldInvalid，實得: ${res.msg}`)
+                assert.strict.equal(await snapTable(keyTable), snap0, `${keyTable} rows=${JSON.stringify(rows)} DB 須零變更`)
+            }
+        }
+    })
+
+    it('API-updateTargets-008-rows-huge-length-fast：rows = { length: 2**32-1 } → 10 秒內回 saveRowFieldInvalid、DB 不變（修正前 each(rows) 空轉約 80 秒）', async function() {
+        this.timeout(300000)
+        await restoreBaseSeed('targets')
+        let snap0 = await snapTable('targets')
+        let t0 = Date.now()
+        let res = await callRpc('updateTargets', [{ length: 2 ** 32 - 1 }], TOKEN_ADMIN)
+        let ms = Date.now() - t0
+        assert.strict.equal(res.ok, false, `應被拒，實得: ${JSON.stringify(res)}`)
+        assert.strict.equal(res.msg, 'saveRowFieldInvalid', `reject 應為 saveRowFieldInvalid，實得: ${res.msg}`)
+        assert.strict.ok(ms < 10000, `應即時回應（不依 length 迭代），實得 ${ms} ms`)
+        assert.strict.equal(await snapTable('targets'), snap0, 'DB 須零變更')
+    })
+
+    it('API-updateTargets-009-empty-array-still-clears：rows = [] 仍合法（清空整表為正常操作）', async function() {
+        await restoreBaseSeed('targets')
+        let res = await callRpc('updateTargets', [[]], TOKEN_ADMIN)
+        assert.strict.ok(res.ok, `空陣列應成功，實得: ${JSON.stringify(res)}`)
+        assert.strict.equal((await readTable('targets')).length, 0, '整表應被清空')
+    })
+
+
     //收尾：所有表復原為 base seed（避免遺留特化資料影響其他檔在同一 mocha run 的執行）
     after(async function() {
         this.timeout(60000)

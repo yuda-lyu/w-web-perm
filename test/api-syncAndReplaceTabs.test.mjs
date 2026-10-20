@@ -57,7 +57,7 @@ describe('api-syncAndReplaceTabs', function() {
     after(async function() {
         this.timeout(60000)
         let woItems = await getWoItems()
-        let froms = ['appTest-1', 'appTest-2', 'appTest-3', 'appTest-4', 'appTest-5', 'appTest-6', 'appTest-7', 'appTest-8', 'appTest-9', 'appTest-10', 'appTest-11', 'appTest-11b']
+        let froms = ['appTest-1', 'appTest-2', 'appTest-3', 'appTest-4', 'appTest-5', 'appTest-6', 'appTest-7', 'appTest-8', 'appTest-9', 'appTest-10', 'appTest-11', 'appTest-11b', 'appTest-12', 'appTest-13', 'appTest-14', 'appTest-15', 'appTest-16', 'appTest-17']
         for (let kt of ['users', 'grups', 'pemis', 'targets']) {
             for (let from of froms) {
                 await woItems[kt].delAll({ from })
@@ -297,6 +297,119 @@ describe('api-syncAndReplaceTabs', function() {
         }
         assert.strict.deepEqual(await idsOf('users', F), ['1011'], '原 from 不變')
         assert.strict.deepEqual(await idsOf('users', G), [], '目標 from 不變')
+    })
+
+
+    // ============ R-OBJ-ITER-01：列物件含數字 length 欄位（2026-10-20，建議書 建議w-web-perm修正.md §1；規則帳本「迭代使用端傳入之物件」）============
+    //修正前實測（HEAD 434c0d4，真後端）：含 length 欄位之列已被拒——syncAndReplaceTabs 於 validateRowsBeforeWrite 之前以 ltdtmapping 依 schema 欄位重建列（四表 schema 皆無 length 欄），
+    //length 到不了 validateRows；本案為整合面迴歸（函數本身之縱深防禦見 unit-validateRows VR-OI-*）。
+
+    it('API-sync-012-row-with-length-field-markup-rejected-rows-kept：列帶 length 欄位（0、1、2**32-1）且欄位含標記 → htmlMarkupNotAllowed，該 from 既有列不變', async function() {
+        const F = 'appTest-12'
+        let rows0 = [{ id: '專案Z/頁1/區塊A', order: 0, description: 'A', from: F }]
+        let res0 = await postSync('targets', TOKEN_APP, { from: F, rows: rows0 })
+        assert.strict.equal(res0.state, 'success', `預置應成功，實得: ${JSON.stringify(res0)}`)
+
+        for (let n of [0, 1, 2 ** 32 - 1]) {
+            let res = await postSync('targets', TOKEN_APP, { from: F, rows: [{ id: '專案Z/頁1/區塊B', order: 0, length: n, description: '<script>x</script>', from: F }] })
+            assert.strict.equal(res.state, 'error', `length:${n} 含標記之列應被拒，實得: ${JSON.stringify(res)}`)
+            assert.strict.equal(res.msg, 'htmlMarkupNotAllowed', `length:${n} 應回語系鍵，實得: ${res.msg}`)
+            assert.strict.deepEqual(await idsOf('targets', F), rows0.map((v) => v.id), `length:${n} 該 from 之既有列須不變`)
+        }
+    })
+
+    it('API-sync-013-row-with-length-field-valid-accepted：列帶 length 欄位但內容合法 → 成功，length 不入庫', async function() {
+        const F = 'appTest-13'
+        let res = await postSync('targets', TOKEN_APP, { from: F, rows: [{ id: '專案Z/頁1/區塊C', order: 0, length: 5, description: 'ok', from: F }] })
+        assert.strict.equal(res.state, 'success', `應成功，實得: ${JSON.stringify(res)}`)
+        let rs = await (await getWoItems()).targets.select({ from: F })
+        assert.strict.equal(rs.length, 1)
+        assert.strict.ok(!Object.prototype.hasOwnProperty.call(rs[0], 'length'), 'length 不是 schema 欄位，不得入庫')
+    })
+
+    // ============ R-ORM-05（外部同步）：rows 之元素須為非空物件（2026-10-20 run02；主控 run01 複審裁示 5）============
+    //修正前實測（真後端）：元素為字串／數字／null 時 `v.from = from` 拋 TypeError，pm2resolve 把引擎原文外送（msg="Cannot create property 'from' on string 'abc'"）；
+    //元素為 {}（多元素陣列內）時寫入一筆自動主鍵之空白列。與後台整表寫入之 isRowObj 同判準。
+
+    it('API-sync-014-non-object-elements-rejected-no-engine-text：rows 含非物件元素（字串、數字、null、陣列、布林） → invalidRows（語系鍵），不外送引擎原文，該 from 既有列不變', async function() {
+        const F = 'appTest-14'
+        let row0 = (id) => ({ id, order: 0, description: 'ok', from: F })
+        let rows0 = [row0('專案14/頁1/區塊A')]
+        let res0 = await postSync('targets', TOKEN_APP, { from: F, rows: rows0 })
+        assert.strict.equal(res0.state, 'success', `預置應成功，實得: ${JSON.stringify(res0)}`)
+
+        let variants = [['abc', 1], ['abc'], [row0('專案14/頁1/區塊B'), null], [row0('專案14/頁1/區塊B'), 5], [row0('專案14/頁1/區塊B'), 'x'], [row0('專案14/頁1/區塊B'), [1]], [row0('專案14/頁1/區塊B'), true]]
+        for (let rows of variants) {
+            let res = await postSync('targets', TOKEN_APP, { from: F, rows })
+            assert.strict.equal(res.state, 'error', `rows=${JSON.stringify(rows)} 應被拒，實得: ${JSON.stringify(res)}`)
+            assert.strict.equal(res.msg, 'invalidRows', `rows=${JSON.stringify(rows)} 應回語系鍵 invalidRows，實得: ${JSON.stringify(res.msg)}`)
+            assert.strict.ok(!/Cannot|TypeError|undefined|property/.test(JSON.stringify(res)), `不得外送引擎原文: ${JSON.stringify(res)}`)
+            assert.strict.deepEqual(await idsOf('targets', F), rows0.map((v) => v.id), `rows=${JSON.stringify(rows)} 該 from 之既有列須不變`)
+        }
+    })
+
+    it('API-sync-015-empty-object-element-rejected-no-blank-row：rows 含 {} → invalidRows，不寫入空白列，該 from 既有列不變', async function() {
+        const F = 'appTest-15'
+        let rows0 = [{ id: '專案15/頁1/區塊A', order: 0, description: 'ok', from: F }]
+        let res0 = await postSync('targets', TOKEN_APP, { from: F, rows: rows0 })
+        assert.strict.equal(res0.state, 'success', `預置應成功，實得: ${JSON.stringify(res0)}`)
+
+        for (let rows of [[{ id: '專案15/頁1/區塊B', order: 0, description: 'x', from: F }, {}], [{}, {}], [{}, { id: '專案15/頁1/區塊C', order: 0, from: F }]]) {
+            let res = await postSync('targets', TOKEN_APP, { from: F, rows })
+            assert.strict.equal(res.state, 'error', `rows=${JSON.stringify(rows)} 應被拒，實得: ${JSON.stringify(res)}`)
+            assert.strict.equal(res.msg, 'invalidRows')
+            assert.strict.deepEqual(await idsOf('targets', F), rows0.map((v) => v.id), `rows=${JSON.stringify(rows)} 不得寫入空白列、既有列須不變`)
+        }
+    })
+
+    //外審 minimax#3: 只含非 schema 欄位之列（{"foo":1}、{"length":5}）映射到 schema 後與 {} 相同，isRowObj 擋不到；須以「映射後除 from 外各欄皆空」再擋一層
+    it('API-sync-016-row-without-schema-fields-rejected-no-blank-row：列只含非 schema 欄位（或只有 from）→ invalidRows，不寫入空白列，該 from 既有列不變', async function() {
+        const F = 'appTest-16'
+        let valid = { id: '專案16/頁1/區塊B', order: 0, description: 'x', from: F }
+        let rows0 = [{ id: '專案16/頁1/區塊A', order: 0, description: 'ok', from: F }]
+        let res0 = await postSync('targets', TOKEN_APP, { from: F, rows: rows0 })
+        assert.strict.equal(res0.state, 'success', `預置應成功，實得: ${JSON.stringify(res0)}`)
+
+        for (let rows of [[valid, { foo: 1 }], [valid, { length: 5 }], [{ foo: 1 }, { bar: 2 }], [valid, { from: 'other' }], [valid, { id: '', description: '' }], [{ foo: 1 }]]) {
+            let res = await postSync('targets', TOKEN_APP, { from: F, rows })
+            assert.strict.equal(res.state, 'error', `rows=${JSON.stringify(rows)} 應被拒，實得: ${JSON.stringify(res)}`)
+            assert.strict.equal(res.msg, 'invalidRows', `rows=${JSON.stringify(rows)} 應回 invalidRows，實得: ${JSON.stringify(res.msg)}`)
+            assert.strict.deepEqual(await idsOf('targets', F), rows0.map((v) => v.id), `rows=${JSON.stringify(rows)} 不得寫入空白列、既有列須不變`)
+        }
+        //有任一 schema 欄位有值之列照常寫入（order 為 0 亦算有值）
+        let ok = await postSync('targets', TOKEN_APP, { from: F, rows: [{ order: 0, description: 'only-desc-and-order', id: '專案16/頁1/區塊C' }, { id: '專案16/頁1/區塊D' }] })
+        assert.strict.equal(ok.state, 'success', `有值之列應成功，實得: ${JSON.stringify(ok)}`)
+        assert.strict.deepEqual(await idsOf('targets', F), ['專案16/頁1/區塊C', '專案16/頁1/區塊D'])
+    })
+
+    //外審 sol(run03)#3／#4: 只帶伺服器管理欄（userId、timeCreate、userIdUpdate、timeUpdate；寫入時被伺服器覆寫）或只帶空容器之列，結果同為空白列
+    it('API-sync-017-row-with-only-server-managed-or-empty-container-fields-rejected：只含伺服器管理欄或空容器值之列 → invalidRows，不寫入空白列；order 為 0 之列照常寫入', async function() {
+        const F = 'appTest-17'
+        let valid = { id: '專案17/頁1/區塊B', order: 0, description: 'x', from: F }
+        let rows0 = [{ id: '專案17/頁1/區塊A', order: 0, description: 'ok', from: F }]
+        let res0 = await postSync('targets', TOKEN_APP, { from: F, rows: rows0 })
+        assert.strict.equal(res0.state, 'success', `預置應成功，實得: ${JSON.stringify(res0)}`)
+
+        let bads = [
+            [{ userId: 'supplied' }],
+            [{ timeCreate: '2020-01-01 00:00:00' }],
+            [{ userIdUpdate: 'u', timeUpdate: 't' }],
+            [valid, { userId: 'supplied', timeCreate: 'x', userIdUpdate: 'y', timeUpdate: 'z', from: 'other' }],
+            [{ description: [] }],
+            [{ description: {} }],
+            [valid, { id: '', description: [], order: {} }],
+        ]
+        for (let rows of bads) {
+            let res = await postSync('targets', TOKEN_APP, { from: F, rows })
+            assert.strict.equal(res.state, 'error', `rows=${JSON.stringify(rows)} 應被拒，實得: ${JSON.stringify(res)}`)
+            assert.strict.equal(res.msg, 'invalidRows', `rows=${JSON.stringify(rows)} 應回 invalidRows，實得: ${JSON.stringify(res.msg)}`)
+            assert.strict.deepEqual(await idsOf('targets', F), rows0.map((v) => v.id), `rows=${JSON.stringify(rows)} 不得寫入空白列、既有列須不變`)
+        }
+
+        //order 為 0 本身即內容（獨立一列，不靠同批其他欄位）：照常寫入，由伺服器產生主鍵
+        let ok = await postSync('targets', TOKEN_APP, { from: F, rows: [{ order: 0 }] })
+        assert.strict.equal(ok.state, 'success', `僅 order:0 之列應成功，實得: ${JSON.stringify(ok)}`)
+        assert.strict.equal((await idsOf('targets', F)).length, 1)
     })
 
 })

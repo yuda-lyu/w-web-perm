@@ -267,6 +267,7 @@ import isnum from 'wsemi/src/isnum.mjs'
 import isEmail from 'wsemi/src/isEmail.mjs'
 import cdbl from 'wsemi/src/cdbl.mjs'
 import arrPull from 'wsemi/src/arrPull.mjs'
+import eachOwn from '../js/eachOwn.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
 import WSwitch from 'w-component-vue/src/components/WSwitch.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
@@ -1078,7 +1079,7 @@ export default {
             catch (err) {}
 
             let vs = []
-            each(kpGrup, (v, k) => {
+            eachOwn(kpGrup, (v, k) => {
                 // console.log(k, 'v', v)
 
                 //isActive

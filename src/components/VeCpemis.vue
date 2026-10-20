@@ -176,6 +176,7 @@ import genPm from 'wsemi/src/genPm.mjs'
 import delay from 'wsemi/src/delay.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
+import getOwn from '../js/getOwn.mjs'
 import WDialog from 'w-component-vue/src/components/WDialog.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
 import WAggridVue from 'w-aggrid-vue/src/components/WAggridVue.vue'
@@ -787,7 +788,7 @@ export default {
                 // console.log('rows', rows)
 
                 //kpPemi
-                let kpPemi = {}
+                let kpPemi = Object.create(null)
                 each(rows, (r) => {
                     let name = get(r, 'name', '')
                     let mode = get(r, 'mode', '')
@@ -884,7 +885,7 @@ export default {
             // console.log('cpemis', cpemis)
 
             //kpPemi
-            let kpPemi = {}
+            let kpPemi = Object.create(null)
             if (isestr(cpemis)) {
                 try {
                     kpPemi = JSON5.parse(cpemis)
@@ -901,7 +902,7 @@ export default {
                 // console.log('pemis v', v)
 
                 //p
-                let p = get(kpPemi, v.name, null)
+                let p = getOwn(kpPemi, v.name, null)
                 // console.log('p', p)
 
                 //name

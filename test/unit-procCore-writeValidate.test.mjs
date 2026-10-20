@@ -12,6 +12,7 @@ import pmKeyMutex from 'wsemi/src/pmKeyMutex.mjs'
 import cacheSt from 'wsemi/src/cacheSt.mjs'
 import ds from '../src/schema/index.mjs'
 import proc from '../server/procCore.mjs'
+import * as procMod from '../server/procCore.mjs'
 import createLockSave from '../server/lockSave.mjs'
 import { mkTable, mkProcOrm, mkSrLog } from './tools/unitOrm.mjs'
 
@@ -271,6 +272,117 @@ describe('unit-procCore-writeValidate (寫入前驗證與寫入失敗回 key, AD
             assert.strict.deepEqual(r, { ok: true, v: 'saveTabItemsSuccess' }, `${table} ${JSON.stringify(o)}`)
             cst.clear()
         }
+    })
+
+
+    // ===== R-ORM-05 / R-OBJ-ITER-01: 整表寫入之 rows 須為陣列; 列物件帶 length 欄位不影響驗證 =====
+
+    //修正前: rows 非陣列時 ltdtmapping 回 [], ltdtDiffByKey 視為「全部刪除」→ 回成功且整表清空(2026-10-20 真後端實測 rows={length:2e7}: targets 22 → 0)
+    //另一類(外審 sol#3／minimax#1 實測): 單元素陣列其元素為空值([null]、[{}]、['']、[[]])時, ltdtmapping 內 wsemi isearr 判為非陣列而回 [], 同樣整表清空並回成功
+    it('WV-OI-001 rows 非陣列或含非物件／空物件之列(帶 length 之物件、一般物件、字串、數字、null、undefined、[null]、[{}]、[\'\']、[[]]、[5]、[合法列, null]) → saveRowFieldInvalid, 四表皆零變更, srLog 記 rowsInvalid', async function() {
+        for (let table of Object.keys(TABLES)) {
+            let probes = (rowsDb) => [
+                { length: 3 },
+                { length: 0 },
+                { length: 2, 0: rowsDb[0], 1: rowsDb[1] }, //形似陣列之物件
+                {},
+                'abc',
+                5,
+                null,
+                undefined,
+                [null],
+                [{}],
+                [''],
+                [[]],
+                [5],
+                [rowsDb[0], null],
+                [rowsDb[0], 5],
+                [rowsDb[0], {}],
+            ]
+            let { woItems, logs, pc, cst } = createEnv()
+            let rowsDb = (await woItems[table].select()).sort((a, b) => a.order - b.order)
+            let before = snapAll(woItems)
+            for (let rows of probes(rowsDb)) {
+                logs.length = 0
+                let r = await run(pc, table, rows)
+                assert.strict.deepEqual(r, { ok: false, v: 'saveRowFieldInvalid' }, `${table} ${JSON.stringify(rows)}`)
+                assert.strict.deepEqual(snapAll(woItems), before, `${table} ${JSON.stringify(rows)}: 資料表須零變更`)
+                let e = logs.find((l) => l.level === 'error' && l.event === 'updateTabItems-validate-error')
+                assert.strict.ok(e && e.reason === 'rowsInvalid' && e.msg === 'saveRowFieldInvalid', `srLog 須記 key 與原因, 實得 ${JSON.stringify(e)}`)
+            }
+            cst.clear()
+        }
+    })
+
+    //modeEditUsers='for:grups'(pickKeysOnly): 修前非陣列 rows 經 mergePickKeysOnly 視為無送入列, 資料不變且回成功(帶 length 之物件則會採納索引 0 之列); 修後一律拒絕
+    it('WV-OI-005 pickKeysOnly 模式(for:grups): rows 非陣列或含空列 → saveRowFieldInvalid, 資料零變更; 合法陣列仍只採納 cgrups', async function() {
+        let { woItems, pc, cst } = createEnv()
+        let before = snapAll(woItems)
+        let rowsDb = (await woItems.users.select()).sort((a, b) => a.order - b.order)
+        for (let rows of [{}, { length: 1, 0: { ...rowsDb[0], cgrups: '{"X":1}' } }, 'abc', null, [null], [{}], [rowsDb[0], null]]) {
+            let r = null
+            try {
+                r = { ok: true, v: await pc.updateUsers('id-admin', rows, { pickKeysOnly: ['cgrups'] }) }
+            }
+            catch (err) {
+                r = { ok: false, v: err }
+            }
+            assert.strict.deepEqual(r, { ok: false, v: 'saveRowFieldInvalid' }, JSON.stringify(rows))
+            assert.strict.deepEqual(snapAll(woItems), before, `${JSON.stringify(rows)}: 資料表須零變更`)
+        }
+        //合法陣列: 只採納 cgrups
+        let rows = rowsDb.map((u) => ({ ...u, name: 'CHANGED', cgrups: '{"M9":{"mode":"OR","isActive":"y"}}' }))
+        let r = await pc.updateUsers('id-admin', rows, { pickKeysOnly: ['cgrups'] })
+        assert.strict.equal(r, 'saveTabItemsSuccess')
+        let after = (await woItems.users.select()).sort((a, b) => a.order - b.order)
+        assert.strict.deepEqual(after.map((u) => u.name), rowsDb.map((u) => u.name), '身分欄仍以資料庫為準')
+        assert.strict.ok(after.every((u) => u.cgrups === '{"M9":{"mode":"OR","isActive":"y"}}'), 'cgrups 被採納')
+        cst.clear()
+    })
+
+    it('WV-OI-002 rows 為空陣列 → 仍合法(清空整表為正常操作)', async function() {
+        let { woItems, pc } = createEnv()
+        let r = await run(pc, 'targets', [])
+        assert.strict.deepEqual(r, { ok: true, v: 'saveTabItemsSuccess' })
+        assert.strict.equal((await woItems.targets.select()).length, 0)
+    })
+
+    //列物件帶 length(0、1、2**32-1)＋標記: 兩條寫入路徑皆先以 ltdtmapping 依 schema 欄位重建列(schema 無 length 欄), length 到不了 validateRows,
+    //故修正前亦被拒(整合面迴歸; 函數本身之縱深防禦見 unit-validateRows VR-OI-*)
+    it('WV-OI-003 列帶 length 欄位(0、1、2**32-1)且某欄含標記 → htmlMarkupNotAllowed, 資料表零變更', async function() {
+        for (let n of [0, 1, 2 ** 32 - 1]) {
+            let { woItems, pc, cst } = createEnv()
+            let before = snapAll(woItems)
+            let rows = (await woItems.targets.select()).sort((a, b) => a.order - b.order)
+            rows[0] = { ...rows[0], length: n, description: '<script>x</script>' }
+            let r = await run(pc, 'targets', rows)
+            assert.strict.deepEqual(r, { ok: false, v: 'htmlMarkupNotAllowed' }, `length:${n}`)
+            assert.strict.deepEqual(snapAll(woItems), before, `length:${n}: 資料表須零變更`)
+            cst.clear()
+        }
+    })
+
+    //isRowObj(後台整表寫入與外部同步共用之「列」判準): 非 null、非陣列、至少一個自有可列舉鍵之物件; 不依 toString 判型(Symbol.toStringTag 偽稱不影響)
+    it('WV-OI-006 isRowObj 判準: 非空物件為 true; null、undefined、原始值、陣列、空物件為 false; 偽稱 Array 之物件依實際型別判', function() {
+        assert.strict.equal(typeof procMod.isRowObj, 'function', 'procCore 應匯出 isRowObj')
+        let f = procMod.isRowObj
+        for (let v of [{ id: 'a' }, { length: 0 }, Object.assign(Object.create(null), { id: 'a' }), Object.defineProperty({ id: 'x' }, Symbol.toStringTag, { value: 'Array' })]) {
+            assert.strict.equal(f(v), true, JSON.stringify(v))
+        }
+        for (let v of [null, undefined, 'abc', '', 5, 0, true, [], [1], [{ id: 'a' }], {}, () => {}, Object.create(null)]) {
+            assert.strict.equal(f(v), false, Object.prototype.toString.call(v))
+        }
+    })
+
+    it('WV-OI-004 列帶 length 欄位但內容合法 → 成功寫入, length 不入庫', async function() {
+        let { woItems, pc } = createEnv()
+        let rows = (await woItems.targets.select()).sort((a, b) => a.order - b.order)
+        rows[0] = { ...rows[0], length: 5, description: 'changed' }
+        let r = await run(pc, 'targets', rows)
+        assert.strict.deepEqual(r, { ok: true, v: 'saveTabItemsSuccess' })
+        let saved = woItems.targets.get('T1')
+        assert.strict.equal(saved.description, 'changed')
+        assert.strict.ok(!Object.prototype.hasOwnProperty.call(saved, 'length'), 'length 不是 schema 欄位, 不得入庫')
     })
 
 })

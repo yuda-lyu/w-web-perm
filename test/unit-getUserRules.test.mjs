@@ -1,5 +1,6 @@
 import assert from 'assert'
 import { getUserRules } from '../src/plugins/mShare.mjs'
+import { runChild, fileUrl, describeChild } from './tools/runChild.mjs'
 
 
 // ---------------------------------------------------------------
@@ -906,6 +907,215 @@ describe('getUserRules - 權限樹組裝', function() {
 
             let { rules } = getUserRules(user, grups, pemis, targets)
             assert.strictEqual(ruleOf(rules, 'A'), 'y')
+        })
+
+    })
+
+
+    // ===========================================================
+    // R-OBJ-ITER-01: cgrups / cpemis / crules 為使用者(含外部應用)寫入之 JSON 字串, 解析後之物件含 length 鍵時不得被當陣列樣迭代
+    // ===========================================================
+    // 缺陷: lodash each 對具非負整數 length 之物件只走索引 0..length-1, 真實鍵(群組／權限／規則名)被略過 → 權限被靜默評估為 n;
+    // length 極大時空轉或耗盡記憶體(getPerm／getPermUserInfor 每次查詢皆走此路徑, 毒化資料持久).
+    describe('R-OBJ-ITER-01 length 鍵', function() {
+
+        let targets = [t('A'), t('B')]
+        let pemis = [p('P1', { A: 'y' })]
+        let grups = [g('G1', { P1: OR })]
+        let ORs = '{"mode":"OR","isActive":"y"}'
+
+        it('UNIT-OI-001-user.cgrups 含 length 鍵(0、1、2、3、10) — 群組仍被辨識, A 為 y', function() {
+            for (let n of [0, 1, 2, 3, 10]) {
+                let user = { cgrups: `{"length":${n},"G1":${ORs}}` }
+                let { rules, grups: kg } = getUserRules(user, grups, pemis, targets)
+                assert.strictEqual(ruleOf(rules, 'A'), 'y', `length:${n}`)
+                assert.deepStrictEqual(kg.map((v) => v.name), ['G1'], `length:${n}`)
+            }
+        })
+
+        it('UNIT-OI-002-grup.cpemis 含 length 鍵(0、1、5) — 權限仍被辨識, A 為 y', function() {
+            for (let n of [0, 1, 5]) {
+                let gs = [{ name: 'G1', cpemis: `{"length":${n},"P1":${ORs}}` }]
+                let { rules } = getUserRules(u({ G1: OR }), gs, pemis, targets)
+                assert.strictEqual(ruleOf(rules, 'A'), 'y', `length:${n}`)
+            }
+        })
+
+        it('UNIT-OI-003-pemi.crules 含 length 鍵(0、1、5) — 規則仍被辨識, A 為 y、B 為 n', function() {
+            for (let n of [0, 1, 5]) {
+                let ps = [{ name: 'P1', crules: `{"length":${n},"A":"y","B":"n"}` }]
+                let { rules } = getUserRules(u({ G1: OR }), grups, ps, targets)
+                assert.strictEqual(ruleOf(rules, 'A'), 'y', `length:${n}`)
+                assert.strictEqual(ruleOf(rules, 'B'), 'n', `length:${n}`)
+            }
+        })
+
+        // 規則名為 length 且 isActive 為數字(object 形式): 合併用之 kpRule 物件帶數字 length 鍵 → 合併(OR／AND)與輸出皆須逐鍵走訪
+        it('UNIT-OI-004-規則 length 帶數字 isActive — OR 與 AND 合併後 A 仍為 y', function() {
+            let pm = [
+                { name: 'P1', crules: '{"A":"y","length":{"isActive":3}}' },
+                { name: 'P2', crules: '{"A":"y"}' },
+            ]
+            for (let mode of ['OR', 'AND']) {
+                let m = `{"mode":"${mode}","isActive":"y"}`
+                let gs = [{ name: 'G1', cpemis: `{"P1":${m},"P2":${m}}` }]
+                let { rules } = getUserRules({ cgrups: `{"G1":${m}}` }, gs, pm, targets)
+                assert.strictEqual(ruleOf(rules, 'A'), 'y', mode)
+            }
+            //單一權限: 只經 mergeRules 一輪
+            let { rules } = getUserRules(u({ G1: OR }), grups, [{ name: 'P1', crules: '{"A":"y","length":{"isActive":3}}' }], targets)
+            assert.strictEqual(ruleOf(rules, 'A'), 'y')
+        })
+
+        // AND 合併: 後一個權限的規則物件帶數字 length 且 A 為 n → 結果須為 n(objAND 若改走索引, A 被略過而沿用前一個權限之 y, 權限被放寬)
+        it('UNIT-OI-004a-AND 合併時後一權限帶數字 length 且 A 為 n — 結果 A 為 n(不得沿用前一權限之 y)', function() {
+            let pm = [
+                { name: 'P1', crules: '{"A":"y"}' },
+                { name: 'P2', crules: '{"A":"n","length":{"isActive":3}}' },
+            ]
+            let m = '{"mode":"AND","isActive":"y"}'
+            let gs = [{ name: 'G1', cpemis: `{"P1":${m},"P2":${m}}` }]
+            let { rules } = getUserRules({ cgrups: `{"G1":${m}}` }, gs, pm, targets)
+            assert.strictEqual(ruleOf(rules, 'A'), 'n')
+        })
+
+        // OR 合併: 先 n 後 y(後者帶數字 length) → y
+        it('UNIT-OI-004b-OR 合併時後一權限帶數字 length 且 A 為 y — 結果 A 為 y', function() {
+            let pm = [
+                { name: 'P1', crules: '{"A":"n"}' },
+                { name: 'P2', crules: '{"A":"y","length":{"isActive":3}}' },
+            ]
+            let gs = [{ name: 'G1', cpemis: `{"P1":${ORs},"P2":${ORs}}` }]
+            let { rules } = getUserRules({ cgrups: `{"G1":${ORs}}` }, gs, pm, targets)
+            assert.strictEqual(ruleOf(rules, 'A'), 'y')
+        })
+
+        it('UNIT-OI-005-target 與規則名皆為 length 且值為 y — 正常評估(迴歸: 非數字 length 值本來就不構成陣列樣)', function() {
+            let ts = [t('length'), t('A')]
+            let ps = [{ name: 'P1', crules: '{"length":"y","A":"y"}' }]
+            let { rules } = getUserRules(u({ G1: OR }), grups, ps, ts)
+            assert.strictEqual(ruleOf(rules, 'length'), 'y')
+            assert.strictEqual(ruleOf(rules, 'A'), 'y')
+        })
+
+        it('UNIT-OI-006-cgrups 為無法對應群組名稱之非物件 JSON(字串元素陣列、字串、數字、null、布林、空陣列) — 不拋錯, 全部 target 為 n', function() {
+            for (let c of ['["G1"]', '"y"', '5', 'null', 'true', '[]']) {
+                let { rules } = getUserRules({ cgrups: c }, grups, pemis, targets)
+                assert.strictEqual(ruleOf(rules, 'A'), 'n', c)
+                assert.strictEqual(ruleOf(rules, 'B'), 'n', c)
+            }
+        })
+
+        // 迴歸(外審 sol#9): 元素為含 name 的物件之 JSON 陣列, 修前即被辨識(cvKpToArr 的 ...v 以元素之 name 覆蓋索引名稱); eachOwn 對真陣列依索引走訪, 行為不變
+        it('UNIT-OI-006a-三欄皆為「元素含 name 之物件陣列」 — 維持修前行為(被辨識, A 為 y)', function() {
+            let user = { cgrups: '[{"name":"G1","mode":"OR","isActive":"y"}]' }
+            let gs = [{ name: 'G1', cpemis: '[{"name":"P1","mode":"OR","isActive":"y"}]' }]
+            let ps = [{ name: 'P1', crules: '[{"name":"A","isActive":"y"}]' }]
+            let { rules } = getUserRules(user, gs, ps, targets)
+            assert.strictEqual(ruleOf(rules, 'A'), 'y')
+        })
+
+        // 巨大 length: 修前 4.29e9 次迭代並逐次配置(耗盡 128 MB 堆積而崩潰, 或空轉); 子行程設逾時, 修後毫秒內完成
+        it('UNIT-OI-007-巨大 length(2**32-1) 於 cgrups、cpemis、crules、規則 isActive 四處 — 毫秒內完成且評估正確', function() {
+            let code = `
+                import { getUserRules } from ${fileUrl('src/plugins/mShare.mjs')}
+                let targets = [{ id: 'A' }]
+                let OR = '{"mode":"OR","isActive":"y"}'
+                let N = 4294967295
+                let run = (user, grups, pemis) => getUserRules(user, grups, pemis, targets).rules.map((v) => v.name + '=' + v.isActive).join()
+                let out = [
+                    run({ cgrups: '{"length":' + N + ',"G1":' + OR + '}' }, [{ name: 'G1', cpemis: '{"P1":' + OR + '}' }], [{ name: 'P1', crules: '{"A":"y"}' }]),
+                    run({ cgrups: '{"G1":' + OR + '}' }, [{ name: 'G1', cpemis: '{"length":' + N + ',"P1":' + OR + '}' }], [{ name: 'P1', crules: '{"A":"y"}' }]),
+                    run({ cgrups: '{"G1":' + OR + '}' }, [{ name: 'G1', cpemis: '{"P1":' + OR + '}' }], [{ name: 'P1', crules: '{"length":' + N + ',"A":"y"}' }]),
+                    run({ cgrups: '{"G1":' + OR + '}' }, [{ name: 'G1', cpemis: '{"P1":' + OR + '}' }], [{ name: 'P1', crules: '{"A":"y","length":{"isActive":' + N + '}}' }]),
+                ]
+                console.log(JSON.stringify(out))
+            `
+            let c = runChild(code, { timeoutMs: 30000, maxOldSpaceMb: 128 })
+            assert.strictEqual(c.ok, true, `子行程應正常結束(修前逾時或記憶體耗盡): ${describeChild(c)}`)
+            assert.deepStrictEqual(c.result, ['A=y', 'A=y', 'A=y', 'A=y'])
+        })
+
+    })
+
+
+    // ===========================================================
+    // R-AUTH-PATH-01: 標的 id／規則名是資料不是路徑——授權查值不得以 lodash 路徑語意解析, 原型鍵名須可精確授權且不被繼承屬性誤判
+    // ===========================================================
+    // 缺陷(外審 sol#5, 修前): 展開段以 lodash get(kp, t.id, 'n') 取值, crules 只授權 A 時, 標的 A.0、A[0] 經字串索引得 y、A.length 得數字 1;
+    // 未授權之 toString 取到繼承函數(isActive 不是 'n'); 規則名 __proto__ 因一般物件容器忽略字串指派而無法授權.
+    describe('R-AUTH-PATH-01 授權查值', function() {
+
+        let grupsAp = [g('G1', { P1: OR })]
+        let userAp = u({ G1: OR })
+        //rulesOf: 回 'name=isActive' 以逗號串接之字串(依 targets 順序; 以字串比對可表示 __proto__ 等原型鍵名, 一般物件的 map 做不到)
+        let rulesOf = (crules, ids, ps = null) => {
+            let pemisAp = ps || [{ name: 'P1', crules: typeof crules === 'string' ? crules : JSON.stringify(crules) }]
+            let { rules } = getUserRules(userAp, grupsAp, pemisAp, ids.map((id) => t(id)))
+            return rules.map((v) => v.name + '=' + (typeof v.isActive === 'string' ? v.isActive : '<' + typeof v.isActive + ':' + String(v.isActive) + '>')).join(',')
+        }
+
+        it('UNIT-AP-001-只授權 A — A.0、A[0]、A.length、A.1、A.x、B 皆不得授權(修前 A.0／A[0] 為 y、A.length 為數字 1)', function() {
+            assert.strictEqual(
+                rulesOf({ A: 'y' }, ['A', 'A.0', 'A[0]', 'A.length', 'A.1', 'A.x', 'B']),
+                'A=y,A.0=n,A[0]=n,A.length=n,A.1=n,A.x=n,B=n'
+            )
+        })
+
+        //迴歸保護(修前亦綠: lodash get 精確鍵優先)
+        it('UNIT-AP-002-精確鍵照常: crules 鍵含 . 或 [ 時, 該標的依其值授權, 其餘不受影響', function() {
+            assert.strictEqual(
+                rulesOf({ 'A.0': 'y', 'B[0]': 'y', 'x.y.z': 'y', A: 'n' }, ['A', 'A.0', 'B[0]', 'B', 'x.y.z', 'x.y', 'x']),
+                'A=n,A.0=y,B[0]=y,B=n,x.y.z=y,x.y=n,x=n'
+            )
+        })
+
+        it('UNIT-AP-003-原型鍵名之標的: 未授權者一律 n(不取繼承屬性); 精確授權者為 y(含 __proto__)', function() {
+            let ids = ['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf', 'A']
+            //只授權 A: 原型鍵名之標的皆 n(修前 toString 等取到繼承函數)
+            assert.strictEqual(rulesOf({ A: 'y' }, ids), 'constructor=n,__proto__=n,toString=n,hasOwnProperty=n,valueOf=n,A=y')
+            //精確授權 constructor 與 __proto__(JSON5 解析為自有鍵): 兩者為 y, 其餘仍 n(修前 __proto__ 因容器忽略指派而為 n)
+            assert.strictEqual(rulesOf('{"constructor":"y","__proto__":"y"}', ids), 'constructor=y,__proto__=y,toString=n,hasOwnProperty=n,valueOf=n,A=n')
+        })
+
+        it('UNIT-AP-004-OR／AND 合併下, 規則名 __proto__／constructor 依各權限值合併(OR 取 y 優先, AND 須皆 y)', function() {
+            let ps = [
+                { name: 'P1', crules: '{"__proto__":"y","constructor":"y","A":"y"}' },
+                { name: 'P2', crules: '{"__proto__":"n","constructor":"y","A":"y"}' },
+            ]
+            for (let [mode, expProto] of [['OR', 'y'], ['AND', 'n']]) {
+                let md = '{"mode":"' + mode + '","isActive":"y"}'
+                let gs = [{ name: 'G1', cpemis: '{"P1":' + md + ',"P2":' + md + '}' }]
+                let { rules } = getUserRules({ cgrups: '{"G1":' + md + '}' }, gs, ps, [t('__proto__'), t('constructor'), t('A'), t('toString')])
+                assert.strictEqual(rules.map((v) => v.name + '=' + v.isActive).join(','), '__proto__=' + expProto + ',constructor=y,A=y,toString=n', mode)
+            }
+        })
+
+        it('UNIT-AP-005-輸出結構不變: rules 為 { name, isActive } 陣列(isActive 恆為字串 y／n), 依 targets 順序', function() {
+            let { rules } = getUserRules(userAp, grupsAp, [{ name: 'P1', crules: '{"A":"y"}' }], [t('toString'), t('A'), t('A.0')])
+            assert.deepStrictEqual(rules, [{ name: 'toString', isActive: 'n' }, { name: 'A', isActive: 'y' }, { name: 'A.0', isActive: 'n' }])
+        })
+
+        //外審 sol(run03)#1: 物件形式(以名稱為鍵)之值內 name 不得改名——編輯器與關聯對話框皆依外層鍵顯示與存檔, 授權若依值內 name 則「顯示 A 啟用、實際授權 __proto__」.
+        //陣列形式([{name:'A', …}], UNIT-OI-006a)元素之 name 即名稱, 維持
+        it('UNIT-AP-006-物件形式以外層鍵為名: 值內 name 不得改名(crules／cpemis／cgrups 三欄; 修前 crules 值內 name:__proto__ 使 __proto__ 為 y、A 為 n)', function() {
+            //crules
+            assert.strictEqual(
+                rulesOf('{"A":{"name":"__proto__","isActive":"y"}}', ['A', '__proto__', 'B']),
+                'A=y,__proto__=n,B=n'
+            )
+            assert.strictEqual(
+                rulesOf('{"A":{"name":"B","isActive":"y"}}', ['A', 'B']),
+                'A=y,B=n'
+            )
+            //cpemis: 值內 name 不得改選另一個權限
+            let ps = [{ name: 'P1', crules: '{"A":"y"}' }, { name: 'P2', crules: '{"B":"y"}' }]
+            let r1 = getUserRules(userAp, [{ name: 'G1', cpemis: '{"P1":{"name":"P2","mode":"OR","isActive":"y"}}' }], ps, [t('A'), t('B')])
+            assert.deepStrictEqual(r1.rules, [{ name: 'A', isActive: 'y' }, { name: 'B', isActive: 'n' }])
+            //cgrups: 值內 name 不得改選另一個群組
+            let gs = [{ name: 'G1', cpemis: '{"P1":{"mode":"OR","isActive":"y"}}' }, { name: 'G2', cpemis: '{"P2":{"mode":"OR","isActive":"y"}}' }]
+            let r2 = getUserRules({ cgrups: '{"G1":{"name":"G2","mode":"OR","isActive":"y"}}' }, gs, ps, [t('A'), t('B')])
+            assert.deepStrictEqual(r2.rules, [{ name: 'A', isActive: 'y' }, { name: 'B', isActive: 'n' }])
         })
 
     })

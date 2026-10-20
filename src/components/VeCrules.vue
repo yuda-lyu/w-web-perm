@@ -164,6 +164,7 @@ import genPm from 'wsemi/src/genPm.mjs'
 import delay from 'wsemi/src/delay.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
+import getRuleEnable from '../js/getRuleEnable.mjs'
 import WDialog from 'w-component-vue/src/components/WDialog.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
 import WAggridVue from 'w-aggrid-vue/src/components/WAggridVue.vue'
@@ -721,7 +722,7 @@ export default {
                 // console.log('rows', rows)
 
                 //kpRule
-                let kpRule = {}
+                let kpRule = Object.create(null)
                 each(rows, (r) => {
                     let id = get(r, 'id', '')
                     let enable = get(r, 'enable', '')
@@ -809,7 +810,7 @@ export default {
             let crules = get(pemi, 'crules', '')
 
             //kpRule
-            let kpRule = {}
+            let kpRule = Object.create(null)
             if (isestr(crules)) {
                 try {
                     kpRule = JSON5.parse(crules)
@@ -824,8 +825,7 @@ export default {
 
             //items
             let items = map(vo.targets, (v) => {
-                let enable = get(kpRule, v.id, '')
-                enable = enable === 'y' ? 'y' : 'n'
+                let enable = getRuleEnable(kpRule, v.id)
                 let r = {
                     id: v.id,
                     enable,

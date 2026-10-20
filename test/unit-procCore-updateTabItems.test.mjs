@@ -298,4 +298,21 @@ describe('unit-procCore-updateTabItems (後台整表寫入之雙擊防護, ADR-0
         assert.strict.equal(woItems.users.has(123), false, '不得以數字為鍵存放')
     })
 
+
+    //R-KEY-01／R-AUTH-PATH-01: 「新增列已存在即拒絕」之查表鍵為資料庫 id(使用者資料), 查表容器須無原型;
+    //修前以一般物件 {} 為容器, id='__proto__' 時 kpIdOld['__proto__']=true 被忽略, 已存在之 __proto__ 列不被偵測(constructor 等其他原型鍵名本就偵測得到)
+    it('UNIT-UTI-011 標的 id 為 __proto__／constructor／toString 之既有列被標 _isNew 再送 → saveNewRowExists(查表容器無原型)', async function() {
+        for (let id of ['__proto__', 'constructor', 'toString']) {
+            let { seed, woItems, pc, cst } = createEnv()
+            let base = { ...cloneDeep(seed.targets[0]), id, order: 99, description: 'proto-key' }
+            await woItems.targets.insert([base])
+            let rows = [...cloneDeep(seed.targets), { ...cloneDeep(base), _isNew: true }]
+            let before = JSON.stringify(woItems.targets.snapshot())
+            let e = await pc.updateTargets('id-admin', rows).then(() => null, (err) => err)
+            assert.strict.equal(e, 'saveNewRowExists', `id=${id}`)
+            assert.strict.equal(JSON.stringify(woItems.targets.snapshot()), before, `id=${id}: 資料表須零變更`)
+            cst.clear()
+        }
+    })
+
 })

@@ -29,7 +29,7 @@
 <nav >
     
     
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="WWebPerm.html">WWebPerm</a></li></ul><h3>Global</h3><ul><li><a href="global.html#createAuthorizeExec">createAuthorizeExec</a></li><li><a href="global.html#createLegendMeasurer">createLegendMeasurer</a></li><li><a href="global.html#createLockSave">createLockSave</a></li><li><a href="global.html#decideLegendType">decideLegendType</a></li><li><a href="global.html#describeUpstream">describeUpstream</a></li><li><a href="global.html#fetchJson">fetchJson</a></li><li><a href="global.html#genLegend">genLegend</a></li><li><a href="global.html#maskQuery">maskQuery</a></li><li><a href="global.html#maskTok">maskTok</a></li><li><a href="global.html#maskUrl">maskUrl</a></li><li><a href="global.html#mergePickKeysOnly">mergePickKeysOnly</a></li><li><a href="global.html#resolveShellWorker">resolveShellWorker</a></li><li><a href="global.html#reuseDeletedIds">reuseDeletedIds</a></li><li><a href="global.html#submitGuard">submitGuard</a></li><li><a href="global.html#validateRowsBeforeWrite">validateRowsBeforeWrite</a></li><li><a href="global.html#wrapInjected">wrapInjected</a></li><li><a href="global.html#wrapOperOrm">wrapOperOrm</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="WWebPerm.html">WWebPerm</a></li></ul><h3>Global</h3><ul><li><a href="global.html#createAuthorizeExec">createAuthorizeExec</a></li><li><a href="global.html#createLegendMeasurer">createLegendMeasurer</a></li><li><a href="global.html#createLockSave">createLockSave</a></li><li><a href="global.html#decideLegendType">decideLegendType</a></li><li><a href="global.html#describeUpstream">describeUpstream</a></li><li><a href="global.html#eachOwn">eachOwn</a></li><li><a href="global.html#fetchJson">fetchJson</a></li><li><a href="global.html#genLegend">genLegend</a></li><li><a href="global.html#getOwn">getOwn</a></li><li><a href="global.html#getRuleEnable">getRuleEnable</a></li><li><a href="global.html#maskQuery">maskQuery</a></li><li><a href="global.html#maskTok">maskTok</a></li><li><a href="global.html#maskUrl">maskUrl</a></li><li><a href="global.html#mergePickKeysOnly">mergePickKeysOnly</a></li><li><a href="global.html#resolveShellWorker">resolveShellWorker</a></li><li><a href="global.html#reuseDeletedIds">reuseDeletedIds</a></li><li><a href="global.html#submitGuard">submitGuard</a></li><li><a href="global.html#validateRowsBeforeWrite">validateRowsBeforeWrite</a></li><li><a href="global.html#wrapInjected">wrapInjected</a></li><li><a href="global.html#wrapOperOrm">wrapOperOrm</a></li></ul>
     
 </nav>
 
@@ -46,11 +46,9 @@
     <section>
         <article>
             <pre class="prettyprint source linenums"><code>import get from 'lodash-es/get.js'
-import each from 'lodash-es/each.js'
 import isestr from 'wsemi/src/isestr.mjs'
-import isarr from 'wsemi/src/isarr.mjs'
-import iseobj from 'wsemi/src/iseobj.mjs'
 import clearXSS from 'wsemi/src/clearXSS.mjs'
+import eachOwn from '../src/js/eachOwn.mjs'
 
 
 //LMDB 之主鍵上限(lmdb 之 DEFAULT_MAX_KEY_SIZE): 主鍵 UTF-8 位元組數 1978 可寫, 1979 即被 ORM 整批拒絕(2026-10-14 實測)
@@ -67,17 +65,20 @@ let maxIdBytes = 1978
  * 2. 任一字串欄位之值會被 wsemi 之 clearXSS 改寫者(含 HTML 標記, 如「&lt;」後接英文字母)即拒絕——與 w-serv-orm 寫入前之 adjustData 同一函數,
  *    主鍵被改寫時 ORM 拒絕整批, 其他欄位則會被靜默改寫(存值與送入值不同), 兩者皆於此擋下, 使送入值即儲存值.
  * 本函數為純函數: 不修改輸入、不呼叫 ORM; 主鍵是否必填由呼叫端以 opt.idRequired 指定(未給主鍵之列由 ORM 自動補主鍵者可不要求).
+ * 列物件之欄位一律依自有可列舉字串鍵逐一檢查(規則帳本 R-OBJ-ITER-01): 名為 length 之欄位與其他欄位同為一般欄位, 即使其值為非負整數(0、1、2**32-1)亦然——
+ * lodash each 對這類物件會改走索引 0..length-1 而略過全部字串欄位, 且迭代次數即 length 之值; rows 與 rowsIdOnly 須為真陣列(Array.isArray),
+ * 以 Symbol.toStringTag 偽稱 Array 之物件不是陣列(rows → rowsInvalid、rowsIdOnly → 視為未給), 不依其 length 迭代.
  *
- * @param {Array} rows 輸入待寫入之列陣列, 各列為物件
+ * @param {Array} rows 輸入待寫入之列陣列, 各列為物件; 非真陣列回傳 { reason: 'rowsInvalid', k: -1, field: '' }
  * @param {Object} [opt={}] 輸入設定物件
  * @param {Boolean} [opt.idRequired=false] 輸入主鍵是否必填, 預設false
- * @param {Array} [opt.rowsIdOnly=[]] 輸入只參與主鍵檢查(重複、長度)而不檢查欄位標記之列陣列(如整表儲存中不會被寫入之既有列), 預設[]
- * @returns {Object|null} 回傳第一個違規 { reason, k, field }, reason 為 'idInvalid'、'idTooLong'、'idDuplicate'、'htmlMarkup' 之一, k 為該列於 rows 之位置(rowsIdOnly 之列為 -1), field 為欄位名; 皆通過回傳 null
+ * @param {Array} [opt.rowsIdOnly=[]] 輸入只參與主鍵檢查(重複、長度)而不檢查欄位標記之列陣列(如整表儲存中不會被寫入之既有列), 非真陣列視為未給, 預設[]
+ * @returns {Object|null} 回傳第一個違規 { reason, k, field }, reason 為 'rowsInvalid'、'idInvalid'、'idTooLong'、'idDuplicate'、'htmlMarkup' 之一, k 為該列於 rows 之位置(rowsIdOnly 之列為 -1), field 為欄位名; 皆通過回傳 null
  */
 function validateRowsBeforeWrite(rows, opt = {}) {
 
     //check
-    if (!isarr(rows)) {
+    if (!Array.isArray(rows)) {
         return { reason: 'rowsInvalid', k: -1, field: '' }
     }
 
@@ -86,7 +87,7 @@ function validateRowsBeforeWrite(rows, opt = {}) {
 
     //rowsIdOnly
     let rowsIdOnly = get(opt, 'rowsIdOnly', [])
-    if (!isarr(rowsIdOnly)) {
+    if (!Array.isArray(rowsIdOnly)) {
         rowsIdOnly = []
     }
 
@@ -116,7 +117,7 @@ function validateRowsBeforeWrite(rows, opt = {}) {
 
     //主鍵: 待寫入之列與只參與主鍵檢查之列
     let err = null
-    each(rows, (v, k) => {
+    eachOwn(rows, (v, k) => {
         err = checkId(v, k)
         if (err !== null) {
             return false //跳出
@@ -125,7 +126,7 @@ function validateRowsBeforeWrite(rows, opt = {}) {
     if (err !== null) {
         return err
     }
-    each(rowsIdOnly, (v) => {
+    eachOwn(rowsIdOnly, (v) => {
         err = checkId(v, -1)
         if (err !== null) {
             return false //跳出
@@ -135,12 +136,12 @@ function validateRowsBeforeWrite(rows, opt = {}) {
         return err
     }
 
-    //欄位標記: 只檢查待寫入之列之字串欄位
-    each(rows, (v, k) => {
-        if (!iseobj(v)) {
+    //欄位標記: 只檢查待寫入之列之字串欄位, 列物件依自有可列舉字串鍵走訪(length 為一般欄位, 見檔頭 JSDoc)
+    eachOwn(rows, (v, k) => {
+        if (v === null || typeof v !== 'object' || Array.isArray(v)) { //列須為物件(不用依 toString 判型之 iseobj: 可被 Symbol.toStringTag 偽稱為 Array 而略過全部欄位)
             return true //跳出換下一個
         }
-        each(v, (vv, kk) => {
+        eachOwn(v, (vv, kk) => {
             if (isestr(vv) &amp;&amp; clearXSS(vv) !== vv) {
                 err = { reason: 'htmlMarkup', k, field: kk }
                 return false //跳出
@@ -171,7 +172,7 @@ export default validateRowsBeforeWrite
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Tue Oct 20 2026 06:46:43 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Tue Oct 20 2026 14:44:45 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>

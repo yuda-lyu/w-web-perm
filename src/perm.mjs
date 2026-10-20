@@ -5,6 +5,7 @@ import isfun from 'wsemi/src/isfun.mjs'
 import genPm from 'wsemi/src/genPm.mjs'
 import pmInvResolve from 'wsemi/src/pmInvResolve.mjs'
 import fetchJson from './fetchJson.mjs'
+import getOwn from './js/getOwn.mjs'
 
 
 function perm() {
@@ -91,8 +92,9 @@ function perm() {
             let _isActive = get(v, 'isActive', '')
             let isActive = _isActive === 'y' ? 'y' : 'n'
 
-            //save
-            kpRule[name] = isActive
+            //save, 以 defineProperty 設為自有屬性: 規則名為使用者資料, 一般物件以 kpRule['__proto__'] = 'y' 指派時字串被忽略而無法授權(規則帳本 R-AUTH-PATH-01);
+            //_kpRule 維持一般物件, 使 getKpRule() 對外型別不變(外部應用可能呼叫其 hasOwnProperty 等方法)
+            Object.defineProperty(kpRule, name, { value: isActive, enumerable: true, writable: true, configurable: true })
 
         })
         _kpRule = kpRule
@@ -115,7 +117,8 @@ function perm() {
         //     return get(_kpRule, key, '')
         // },
         active: (key) => {
-            let _isActive = get(_kpRule, key, '')
+            //key 為標的名稱(資料): 自有屬性查值, 不解析路徑、不取繼承屬性(lodash get 會使只授權 A 時 'A.0'、'A[0]' 得 y)
+            let _isActive = getOwn(_kpRule, key, '')
             let isActive = _isActive === 'y' ? 'y' : 'n'
             return isActive
         },
