@@ -197,9 +197,32 @@ describe('unit-eachOwn (R-OBJ-ITER-01)', function() {
         for (let name of ['kp', 'obj', 'kpRuleFin']) {
             assert.strict.ok(!new RegExp(`\\beach\\(\\s*${name}\\s*,`).test(ms), `mShare 不得 each(${name}, …)`)
         }
-        has(ms, 'eachOwn(kp, (v, k) =>', 1) //cvKpToArr
+        has(ms, 'eachOwn(kp, (v, k) =>', 0) //cvKpToArr 已抽至 src/js/cvKpToArr.mjs(R-AUTH-DECODE-01), 見下
         has(ms, 'eachOwn(obj, (v, k) =>', 2) //objOR、objAND
         has(ms, 'eachOwn(kpRuleFin, (v, k) =>', 1) //rulesFin
+        assert.strict.ok(/import cvKpToArr from '\.\.\/js\/cvKpToArr\.mjs'/.test(ms), 'mShare 應 import 共用之 cvKpToArr')
+
+        //src/js/cvKpToArr.mjs(伺服端與編輯器共用之授權資料解碼): 走訪 JSON5 解析物件改 eachOwn; cvKpToObj 走訪其輸出(真陣列)亦 eachOwn
+        let ca = codeOf('src/js/cvKpToArr.mjs')
+        assert.strict.ok(!/lodash-es/.test(ca), 'cvKpToArr 不得 import lodash')
+        has(ca, 'eachOwn(kp, (v, k) =>', 1)
+        let co = codeOf('src/js/cvKpToObj.mjs')
+        assert.strict.ok(!/lodash-es/.test(co), 'cvKpToObj 不得 import lodash')
+        has(co, 'eachOwn(kp, (v, k) =>', 1) //物件形式
+        has(co, 'eachOwn(arr, (r) =>', 1) //陣列形式(crules)
+        has(co, 'eachOwn(arr, (r, i) =>', 1) //陣列形式(帶 mode; 位置 i 供鍵序: 有效啟用元素首次出現之序)
+        has(co, 'eachOwn(names, (name) =>', 1)
+        has(co, 'eachOwn(g.acts, (a) =>', 1)
+        assert.strict.ok(!/\beach\(/.test(co), 'cvKpToObj 不得用 lodash each')
+        //R-AUTH-ORDER-01／R-AUTH-LOSSY-01 之新模組(2026-10-20 run02): 走訪使用端物件一律 eachOwn, 不 import lodash
+        let ko = codeOf('src/js/keepKeyOrder.mjs')
+        assert.strict.ok(!/lodash-es/.test(ko) && !/\beach\(/.test(ko), 'keepKeyOrder 不得用 lodash')
+        has(ko, 'eachOwn(kpRef, (v, k) =>', 1)
+        has(ko, 'eachOwn(kpNew, (v, k) =>', 1)
+        let kl = codeOf('src/js/getKpLossy.mjs')
+        assert.strict.ok(!/lodash-es/.test(kl) && !/\beach\(/.test(kl), 'getKpLossy 不得用 lodash')
+        has(kl, 'eachOwn(cvKpToArr(kp), (r) =>', 1)
+        has(kl, 'eachOwn(kpModes, (ms, n) =>', 1)
 
         //server/procCore.mjs: mergePickKeysOnly 與 updateTabItems 對 rows 守門
         let pc = codeOf('server/procCore.mjs')

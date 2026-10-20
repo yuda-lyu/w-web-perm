@@ -268,6 +268,7 @@ import isEmail from 'wsemi/src/isEmail.mjs'
 import cdbl from 'wsemi/src/cdbl.mjs'
 import arrPull from 'wsemi/src/arrPull.mjs'
 import eachOwn from '../js/eachOwn.mjs'
+import cvKpToObj from '../js/cvKpToObj.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
 import WSwitch from 'w-component-vue/src/components/WSwitch.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
@@ -1074,7 +1075,7 @@ export default {
             let kpGrup = {}
             try {
                 // console.log('cgrups', cgrups)
-                kpGrup = JSON5.parse(cgrups)
+                kpGrup = cvKpToObj(JSON5.parse(cgrups), { hasMode: true }) //陣列形式經共用解碼(R-AUTH-LIST-01): 修前把陣列索引當群組名
             }
             catch (err) {}
 

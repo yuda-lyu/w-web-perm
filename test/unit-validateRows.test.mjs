@@ -6,11 +6,15 @@
 //  判準複製自上游之前提: 全樹只有一份 wsemi(VR-EQ-002 以 npm ls 守護); 語料取 clearXSS 之邊界(白名單標籤、< 後接字母／數字／空白、註解、實體).
 //跑法: npx mocha test/unit-validateRows.test.mjs --timeout 60000
 import assert from 'assert'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import { execSync } from 'child_process'
 import ds from '../src/schema/index.mjs'
 import validateRowsBeforeWrite, { maxIdBytes } from '../server/validateRows.mjs'
 import { mkTable, mkProcOrm } from './tools/unitOrm.mjs'
 import { runChild, fileUrl, describeChild } from './tools/runChild.mjs'
+import { sourceLines } from './tools/srcScan.mjs'
 
 
 //clearXSS 之邊界語料(wsemi 1.9.15: 只轉義構成標籤起點之 <——後接字母、/、!、? 或位於結尾; 白名單標籤原樣)
@@ -61,7 +65,8 @@ describe('unit-validateRows (寫入前驗證之判準, ADR-026)', function() {
     it('VR-007 任一字串欄位含會被 clearXSS 改寫之標記 → htmlMarkup(回第一個違規之列與欄); 非字串欄位不驗', function() {
         assert.strict.deepEqual(validateRowsBeforeWrite([{ id: 'a', name: 'ok' }, { id: 'b', name: 'n', description: 'x<y' }]), { reason: 'htmlMarkup', k: 1, field: 'description' })
         assert.strict.deepEqual(validateRowsBeforeWrite([{ id: 'T1<x' }]), { reason: 'htmlMarkup', k: 0, field: 'id' })
-        assert.strict.equal(validateRowsBeforeWrite([{ id: 'a', order: 1, flag: true, obj: { x: '<b' } }]), null, '數字、布林、物件欄位不驗(schema 欄位皆為字串或數字)')
+        assert.strict.equal(validateRowsBeforeWrite([{ id: 'a', order: 1, flag: true, none: null, nope: undefined }]), null, '數字、布林、null、undefined 欄位不驗標記(純量, schema 欄位皆為字串或數字)')
+        //物件欄位(原斷言「不驗」而通過)於 R-FIELD-SCALAR-01 起改為拒絕, 見 VR-NS-001~
     })
 
     it('VR-008 原型鍵名之主鍵不誤判重複(查表容器無原型, R-KEY-01)', function() {
@@ -177,11 +182,18 @@ describe('unit-validateRows (寫入前驗證之判準, ADR-026)', function() {
         assert.strict.ok(c.ms < 15000, `應快速完成, 實得 ${c.ms} ms`)
     })
 
-    it('VR-OI-003 length 不是合法長度(負數、小數、字串、null、布林、物件、陣列、2**53) 時仍檢出標記(迴歸: 這些值修前即不走陣列樣迭代)', function() {
-        for (let n of [-1, 1.5, '3', null, true, { a: 1 }, [1], 2 ** 53]) {
+    it('VR-OI-003 length 不是合法長度(負數、小數、字串、null、布林、2**53) 時仍檢出標記(迴歸: 這些值修前即不走陣列樣迭代); 物件、陣列之 length 屬非純量 → fieldNotScalar(R-FIELD-SCALAR-01 起)', function() {
+        for (let n of [-1, 1.5, '3', null, true, 2 ** 53]) {
             assert.strict.deepEqual(
                 validateRowsBeforeWrite([{ id: 'a', length: n, name: 'x<y' }]),
                 { reason: 'htmlMarkup', k: 0, field: 'name' },
+                `length:${JSON.stringify(n)}`
+            )
+        }
+        for (let n of [{ a: 1 }, [1]]) {
+            assert.strict.deepEqual(
+                validateRowsBeforeWrite([{ id: 'a', length: n, name: 'x<y' }]),
+                { reason: 'fieldNotScalar', k: 0, field: 'length' },
                 `length:${JSON.stringify(n)}`
             )
         }
@@ -222,6 +234,103 @@ describe('unit-validateRows (寫入前驗證之判準, ADR-026)', function() {
         assert.strict.deepEqual(validateRowsBeforeWrite([spoof]), { reason: 'htmlMarkup', k: 0, field: 'name' })
         //列為陣列、null、字串、數字: 不是物件列, 不檢欄位(主鍵檢查另行: 無 id 視為未給)
         assert.strict.equal(validateRowsBeforeWrite([['a<b'], null, 'x<y', 5]), null)
+    })
+
+
+    // ===== R-FIELD-SCALAR-01: 欄位值須為純量(字串、有限或非有限數字、布林、null、undefined); 物件、陣列、函數、symbol、bigint 一律拒絕 =====
+    //why: 四表 schema 欄位型別只有 STRING／INTEGER／TEXT(cgrups／cpemis／crules 為 TEXT 存 JSON 字串), 無合法物件型欄位; 預檢只看 isestr(vv),
+    //  巢狀字串(如 { description: { value: '<標記>' } })避過預檢, 寫入時才由 w-serv-orm 靜默改寫(非拒絕), 「送入值即儲存值」不成立.
+
+    it('VR-NS-001 欄位值為物件、陣列、巢狀、函數、symbol、bigint → fieldNotScalar(回該列與欄); 原型為 null 之物件、Date 亦屬物件', function() {
+        let bads = [
+            ['obj', { value: 'x' }],
+            ['arr', ['a']],
+            ['arr0', []],
+            ['obj0', {}],
+            ['nested', { a: { b: { c: 'deep' } } }],
+            ['nullProto', Object.assign(Object.create(null), { value: 'x' })],
+            ['date', new Date(0)],
+            ['fn', () => 'x'],
+            ['sym', Symbol('x')],
+            ['big', 10n],
+        ]
+        for (let [f, v] of bads) {
+            assert.strict.deepEqual(
+                validateRowsBeforeWrite([{ id: 'ok' }, { id: 'b', [f]: v }]),
+                { reason: 'fieldNotScalar', k: 1, field: f },
+                `欄位 ${f}`
+            )
+        }
+    })
+
+    it('VR-NS-002 巢狀字串含標記(修前避過預檢而於寫入時被靜默改寫) → 以 fieldNotScalar 拒絕, 不是 null', function() {
+        assert.strict.deepEqual(validateRowsBeforeWrite([{ id: 'a', description: { value: '<script>x</script>' } }]), { reason: 'fieldNotScalar', k: 0, field: 'description' })
+        assert.strict.deepEqual(validateRowsBeforeWrite([{ id: 'a', description: ['<b', 'x<y'] }]), { reason: 'fieldNotScalar', k: 0, field: 'description' })
+        assert.strict.deepEqual(validateRowsBeforeWrite([{ id: 'a', description: { value: 'plain' } }]), { reason: 'fieldNotScalar', k: 0, field: 'description' }, '內容無標記亦拒(型別問題, 與內容無關)')
+    })
+
+    it('VR-NS-003 純量全集通過: 字串、整數、小數、0、負數、NaN、±Infinity、true／false、null、undefined、空字串', function() {
+        let ok = ['x', '', 0, 1, -5, 1.5, NaN, Infinity, -Infinity, true, false, null, undefined]
+        for (let v of ok) {
+            assert.strict.equal(validateRowsBeforeWrite([{ id: 'a', name: v, order: v }]), null, `純量 ${String(v)}`)
+        }
+    })
+
+    it('VR-NS-004 兩個違規並存時依列、欄位走訪序回第一個(物件欄在前 → fieldNotScalar; 標記字串欄在前 → htmlMarkup); 主鍵型別錯誤先於欄位檢查', function() {
+        assert.strict.deepEqual(validateRowsBeforeWrite([{ id: 'a', description: { v: 1 }, name: 'x<y' }]), { reason: 'fieldNotScalar', k: 0, field: 'description' })
+        assert.strict.deepEqual(validateRowsBeforeWrite([{ id: 'a', name: 'x<y', description: { v: 1 } }]), { reason: 'htmlMarkup', k: 0, field: 'name' })
+        assert.strict.deepEqual(validateRowsBeforeWrite([{ id: { x: 1 }, description: { v: 1 } }]), { reason: 'idInvalid', k: 0, field: 'id' })
+    })
+
+    //站點不變式: server 內「寫入 ORM」的呼叫只在 procCore.mjs 與 WWebPerm.mjs 兩檔, 且各檔皆在第一個寫入之前呼叫 validateRowsBeforeWrite.
+    //寫入呼叫之判別放寬為: 任何 .insert(／.save(／.del(／.delAll(／.mix( 或 procOrm( 呼叫(不限參數名與字面方法名; 外審 sol#10);
+    //資料通道 dataChannel.mjs 之 procOrm 為泛用轉呼叫且只放行 select(ADR-026, 由 unit-dataChannel 守護), 排除在掃描外
+    let writeRe = /\.(insert|save|del|delAll|mix)\(|\bprocOrm\(/
+    let scanFirst = (lines) => {
+        let iWrite = lines.findIndex((l) => writeRe.test(l.text))
+        let iValidate = lines.findIndex((l) => /\bvalidateRowsBeforeWrite\(/.test(l.text))
+        return iWrite < 0 ? null : { validateFirst: iValidate >= 0 && iValidate < iWrite, no: lines[iWrite].no }
+    }
+
+    it('SITE-NS-001 寫入站點全集: 僅 procCore.mjs 與 WWebPerm.mjs, 皆在第一個寫入呼叫之前呼叫 validateRowsBeforeWrite', function() {
+        let fdServer = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'server')
+        let found = {}
+        let walk = (dir, rel) => { //遞迴(含 server/staLogs 等子目錄)
+            for (let ent of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+                if (ent.isDirectory()) {
+                    walk(path.join(dir, ent.name), `${rel}${ent.name}/`)
+                }
+                else if (ent.name.endsWith('.mjs') && ent.name !== 'dataChannel.mjs') {
+                    let r = scanFirst(sourceLines(path.join(dir, ent.name), 'code'))
+                    if (r) {
+                        found[`${rel}${ent.name}`] = r
+                    }
+                }
+            }
+        }
+        walk(fdServer, '')
+        assert.strict.deepEqual(Object.keys(found).sort(), ['WWebPerm.mjs', 'procCore.mjs'], `寫入站點檔案: ${JSON.stringify(found)}`)
+        assert.strict.ok(found['WWebPerm.mjs'].validateFirst && found['procCore.mjs'].validateFirst, `須在第一個寫入之前驗證: ${JSON.stringify(found)}`)
+        //資料通道只放行 select(寫入方法不得出現在其放行清單)
+        let dc = sourceLines(path.join(fdServer, 'dataChannel.mjs'), 'code').map((l) => l.text).join('\n')
+        assert.strict.ok(!/'(insert|save|del|delAll|mix)'/.test(dc), 'dataChannel.mjs 不得放行寫入方法')
+    })
+
+    it('SITE-NS-001b 掃描器本身: 任意參數名／字面方法名之寫入呼叫皆被辨識, 驗證在後或缺驗證者判為不合格', function() {
+        let L = (...ts) => ts.map((text, k) => ({ no: k + 1, text }))
+        assert.strict.deepEqual(scanFirst(L('woItems.users.insert(rows)')), { validateFirst: false, no: 1 })
+        assert.strict.deepEqual(scanFirst(L('await woItems[kt].save(rows)')), { validateFirst: false, no: 1 })
+        assert.strict.deepEqual(scanFirst(L('await procOrm(u, table, \'insert\', rows)')), { validateFirst: false, no: 1 })
+        assert.strict.deepEqual(scanFirst(L('await x.delAll({ from })')), { validateFirst: false, no: 1 })
+        assert.strict.deepEqual(scanFirst(L('let ve = validateRowsBeforeWrite(rows)', 'await woItems.users.insert(rows)')), { validateFirst: true, no: 2 })
+        assert.strict.deepEqual(scanFirst(L('await woItems.users.insert(rows)', 'let ve = validateRowsBeforeWrite(rows)')), { validateFirst: false, no: 1 })
+        assert.strict.equal(scanFirst(L('let a = woItems.users.select({})')), null)
+    })
+
+    it('VR-NS-005 rowsIdOnly 之列不驗欄位型別(未寫入之舊資料不阻擋); 物件欄位名為 length 亦不使走訪改成陣列樣', function() {
+        assert.strict.equal(validateRowsBeforeWrite([{ id: 'a' }], { rowsIdOnly: [{ id: 'b', description: { v: 1 } }] }), null)
+        assert.strict.deepEqual(validateRowsBeforeWrite([{ id: 'a', length: { v: 1 } }]), { reason: 'fieldNotScalar', k: 0, field: 'length' })
+        assert.strict.deepEqual(validateRowsBeforeWrite([{ id: 'a', length: 2 ** 32 - 1, description: [] }]), { reason: 'fieldNotScalar', k: 0, field: 'description' })
     })
 
 })

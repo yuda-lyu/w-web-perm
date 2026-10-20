@@ -264,6 +264,7 @@ import isnum from 'wsemi/src/isnum.mjs'
 import cdbl from 'wsemi/src/cdbl.mjs'
 import arrPull from 'wsemi/src/arrPull.mjs'
 import eachOwn from '../js/eachOwn.mjs'
+import cvKpToObj from '../js/cvKpToObj.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
 import WSwitch from 'w-component-vue/src/components/WSwitch.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
@@ -432,7 +433,7 @@ export default {
                 let kpGrup = {}
                 try {
                     // console.log('u.cgrups', u.cgrups)
-                    kpGrup = JSON5.parse(u.cgrups)
+                    kpGrup = cvKpToObj(JSON5.parse(u.cgrups), { hasMode: true }) //陣列形式經共用解碼(R-AUTH-LIST-01)
                 }
                 catch (err) {}
 
@@ -1048,7 +1049,7 @@ export default {
             let kpPemi = {}
             try {
                 // console.log('cpemis', cpemis)
-                kpPemi = JSON5.parse(cpemis)
+                kpPemi = cvKpToObj(JSON5.parse(cpemis), { hasMode: true }) //陣列形式經共用解碼(R-AUTH-LIST-01)
             }
             catch (err) {}
             // console.log('kpPemi', kpPemi)

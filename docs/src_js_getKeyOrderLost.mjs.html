@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    
+    <meta charset="utf-8">
+    <title>src/js/getKeyOrderLost.mjs - Documentation</title>
+    
+    
+    <script src="scripts/prettify/prettify.js"></script>
+    <script src="scripts/prettify/lang-css.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc.css">
+    <script src="scripts/nav.js" defer></script>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+<input type="checkbox" id="nav-trigger" class="nav-trigger" />
+<label for="nav-trigger" class="navicon-button x">
+  <div class="navicon"></div>
+</label>
+
+<label for="nav-trigger" class="overlay"></label>
+
+<nav >
+    
+    
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="WWebPerm.html">WWebPerm</a></li></ul><h3>Global</h3><ul><li><a href="global.html#createAuthorizeExec">createAuthorizeExec</a></li><li><a href="global.html#createLegendMeasurer">createLegendMeasurer</a></li><li><a href="global.html#createLockSave">createLockSave</a></li><li><a href="global.html#cvKpToArr">cvKpToArr</a></li><li><a href="global.html#cvKpToObj">cvKpToObj</a></li><li><a href="global.html#decideLegendType">decideLegendType</a></li><li><a href="global.html#describeUpstream">describeUpstream</a></li><li><a href="global.html#eachOwn">eachOwn</a></li><li><a href="global.html#fetchJson">fetchJson</a></li><li><a href="global.html#fmtLossyMsg">fmtLossyMsg</a></li><li><a href="global.html#genLegend">genLegend</a></li><li><a href="global.html#getKeyOrderLost">getKeyOrderLost</a></li><li><a href="global.html#getKpLossy">getKpLossy</a></li><li><a href="global.html#getKpWriteLost">getKpWriteLost</a></li><li><a href="global.html#getOwn">getOwn</a></li><li><a href="global.html#getRuleEnable">getRuleEnable</a></li><li><a href="global.html#isAuthMode">isAuthMode</a></li><li><a href="global.html#joinNames">joinNames</a></li><li><a href="global.html#keepKeyOrder">keepKeyOrder</a></li><li><a href="global.html#keyOrderOf">keyOrderOf</a></li><li><a href="global.html#maskQuery">maskQuery</a></li><li><a href="global.html#maskTok">maskTok</a></li><li><a href="global.html#maskUrl">maskUrl</a></li><li><a href="global.html#mergePickKeysOnly">mergePickKeysOnly</a></li><li><a href="global.html#resolveShellWorker">resolveShellWorker</a></li><li><a href="global.html#reuseDeletedIds">reuseDeletedIds</a></li><li><a href="global.html#submitGuard">submitGuard</a></li><li><a href="global.html#validateRowsBeforeWrite">validateRowsBeforeWrite</a></li><li><a href="global.html#wrapInjected">wrapInjected</a></li><li><a href="global.html#wrapOperOrm">wrapOperOrm</a></li></ul>
+    
+</nav>
+
+<div id="main">
+    
+    <h1 class="page-title">src/js/getKeyOrderLost.mjs</h1>
+    
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import isAuthMode from './isAuthMode.mjs'
+
+
+/**
+ * 判定欲寫出之物件 kpOut 的鍵序(JS 屬性序: 整數式鍵先排、遞增)是否與預期序 seq 不同, 使有效 AND 名稱之相對順序易位, 回傳受影響之 AND 名稱
+ *
+ * 編輯器以 keepKeyOrder 讓「原字串已有之名稱維持原序、新增者附加於後」, 但 JS 物件的整數式鍵(如群組名 '1')恆排在前面,
+ * 新增(或新啟用)的整數式 AND 名稱會排到既有 AND 名稱之前, 使伺服端 mergeRules 在沒有有效 OR 項時的「第一個 AND 項」易位而改變授權(規則帳本 R-AUTH-LOSSY-01);
+ * 此為編輯器無法在不改變授權下寫出的格, 須拒存並顯示固定訊息(authLossyBlocked).
+ * 只看有效 AND 項(isActive 'y' 且 mode 'AND')之「第一個」是否易位: 欲寫出之物件只含現存之群組／權限(編輯器列出之列, 無查無實體之名稱被丟棄的問題),
+ * mergeRules 的結果對 AND 項順序的依賴只經第一個 AND 項(其餘 AND 項彼此可交換), 故第一個不變則其後之相對順序改變不影響授權, 不需拒存(輸入側 getKpLossy 因幻影名稱須比整個相對順序, 見其說明).
+ *
+ * @param {Object} kpOut 輸入欲寫出之物件 { 名稱: { mode, isActive } }
+ * @param {Array} seq 輸入預期的名稱順序(keepKeyOrder 之 keyOrderOf 結果)
+ * @returns {Array} 回傳受影響之 AND 名稱(依預期序), 無易位回傳空陣列; 不改動輸入
+ * @example
+ *
+ * let seq = ['A', '1']
+ * let kpOut = { '1': { mode: 'AND', isActive: 'y' }, A: { mode: 'AND', isActive: 'y' } } //JS 把 '1' 排到 A 前面
+ * console.log(getKeyOrderLost(kpOut, seq))
+ * // => ['A', '1']
+ *
+ */
+function getKeyOrderLost(kpOut, seq) {
+    if (kpOut === null || typeof kpOut !== 'object' || !Array.isArray(seq)) {
+        return []
+    }
+    let isAnd = (n) => {
+        let p = Object.prototype.hasOwnProperty.call(kpOut, n) ? kpOut[n] : null
+        return p !== null &amp;&amp; typeof p === 'object' &amp;&amp; p.isActive === 'y' &amp;&amp; isAuthMode(p.mode) &amp;&amp; p.mode === 'AND'
+    }
+    //有任何有效 OR 項時, mergeRules 以 OR 聯集為基底、各 AND 項各鍵獨立相交, AND 項順序與授權無關(外審 minimax 第二輪#2: 否則多餘拒存)
+    let hasOr = Object.keys(kpOut).some((n) => {
+        let p = kpOut[n]
+        return p !== null &amp;&amp; typeof p === 'object' &amp;&amp; p.isActive === 'y' &amp;&amp; p.mode === 'OR'
+    })
+    if (hasOr) {
+        return []
+    }
+    let want = seq.filter((n) => isAnd(n))
+    if (want.length &lt; 2) {
+        return []
+    }
+    let got = Object.keys(kpOut).filter((n) => want.includes(n))
+    return got[0] !== want[0] ? want : []
+}
+
+
+export default getKeyOrderLost
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+    
+    
+</div>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Wed Oct 21 2026 01:27:46 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+</footer>
+
+<script>prettyPrint();</script>
+<script src="scripts/polyfill.js"></script>
+<script src="scripts/linenumber.js"></script>
+
+
+
+</body>
+</html>

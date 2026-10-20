@@ -146,6 +146,10 @@ let kpLang = {
         eng: `Duplicate field value in saved data`,
         cht: `儲存資料的欄位值重複`,
     },
+    authLossyBlocked: { //編輯器對「物件形式無法無損表示」之授權資料拒存(規則帳本 R-AUTH-LOSSY-01, 主控複審 R4); {names} 為受影響之名稱
+        eng: `Not saved: the authorization settings for {names} contain entries the editor cannot write without changing access (the same name set to both OR and AND, or an order that cannot be kept). Nothing was changed. Please correct the source data first.`,
+        cht: `未儲存：{names} 的授權設定含有編輯器無法在不改變授權下寫出的項目（同一名稱同時以 OR 與 AND 設定，或順序無法保留）。資料未變更，請先修正資料來源。`,
+    },
     saveInProgress: { //同一操作者之同表儲存處理中再送出 (ADR-025)
         eng: `The previous save is still in progress. Please do not submit again.`,
         cht: `上一次儲存仍在處理中，請勿重複送出`,

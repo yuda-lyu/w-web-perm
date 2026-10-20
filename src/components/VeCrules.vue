@@ -165,6 +165,8 @@ import delay from 'wsemi/src/delay.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import getRuleEnable from '../js/getRuleEnable.mjs'
+import cvKpToObj from '../js/cvKpToObj.mjs'
+import keepKeyOrder from '../js/keepKeyOrder.mjs'
 import WDialog from 'w-component-vue/src/components/WDialog.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
 import WAggridVue from 'w-aggrid-vue/src/components/WAggridVue.vue'
@@ -738,6 +740,9 @@ export default {
                 })
                 // console.log('kpRule', kpRule)
 
+                //保留原鍵序(R-AUTH-ORDER-01, 主控複審 R3): crules 之合併與順序無關(僅同名後者覆蓋, 解碼已等價), 與另四個編輯器統一套用使輸出穩定
+                kpRule = keepKeyOrder(vo.kpOrig, kpRule)
+
                 //crules
                 let crules = JSON.stringify(kpRule)
                 // console.log('crules', crules)
@@ -813,7 +818,7 @@ export default {
             let kpRule = Object.create(null)
             if (isestr(crules)) {
                 try {
-                    kpRule = JSON5.parse(crules)
+                    kpRule = cvKpToObj(JSON5.parse(crules))
                 }
                 catch (err) {
                     console.log('crules', crules)
@@ -838,6 +843,7 @@ export default {
             vo.isEditable = isEditable
             vo.pemi = pemi
             vo.items = items
+            vo.kpOrig = kpRule //存檔依據(非響應式): 解碼後之原資料(保序參考)
 
             //genOpt
             vo.genOpt()

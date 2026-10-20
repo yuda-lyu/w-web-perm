@@ -264,6 +264,8 @@ import isnum from 'wsemi/src/isnum.mjs'
 import cdbl from 'wsemi/src/cdbl.mjs'
 import arrPull from 'wsemi/src/arrPull.mjs'
 import eachOwn from '../js/eachOwn.mjs'
+import cvKpToObj from '../js/cvKpToObj.mjs'
+import getRuleEnable from '../js/getRuleEnable.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
 import WSwitch from 'w-component-vue/src/components/WSwitch.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
@@ -432,7 +434,7 @@ export default {
                 let kpPemi = {}
                 try {
                     // console.log('g.cpemis', g.cpemis)
-                    kpPemi = JSON5.parse(g.cpemis)
+                    kpPemi = cvKpToObj(JSON5.parse(g.cpemis), { hasMode: true }) //陣列形式經共用解碼(R-AUTH-LIST-01)
                 }
                 catch (err) {}
 
@@ -1049,7 +1051,7 @@ export default {
             let kpRule = {}
             try {
                 // console.log('crules', crules)
-                kpRule = JSON5.parse(crules)
+                kpRule = cvKpToObj(JSON5.parse(crules)) //陣列形式經共用解碼(R-AUTH-LIST-01)
             }
             catch (err) {}
             // console.log('kpRule', kpRule)
@@ -1064,7 +1066,7 @@ export default {
                 // console.log(k, 'v', v)
 
                 //isActive
-                let isActive = v //crules各值為直接儲存y或n
+                let isActive = getRuleEnable(kpRule, k) //啟用狀態依共用語意(值為 y／n 或物件形式 { isActive }; 與伺服端授權一致, R-AUTH-LIST-01)
                 if (isActive !== 'y') {
                     return true //跳出換下一個
                 }

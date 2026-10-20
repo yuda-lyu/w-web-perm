@@ -645,6 +645,19 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                 return Promise.reject(`invalidRows`)
             }
 
+            //名稱／標的 id 須為非空字串(規則帳本 R-SYNC-NAME-01, 主控複審 R2): 比照後台整表寫入之 ckKey(procCore.mjs: isestr(value)),
+            //grups／pemis 之 name、targets 之 id 缺漏、空字串、非字串(數字、布林、null)一律整批拒收, 於 delAll 之前, 該 from 與他 from 之既有列不變.
+            //why: 修正前 name:'' 之群組／權限可入庫, 伺服端 arrFinder 以 === 採納之(授權有效), 編輯器(cvKpToObj／doSave)視空名稱為無效, 管理者存檔即移除該授權
+            //(移除 AND 限制時等於增權); 與後台路徑(ckKey 拒收空名稱)不對稱. users 不在範圍(name 可重複); 不比照 ckKey 之重複偵測(複審範圍僅「非空」)
+            let keyName = (keyTable === 'targets') ? 'id' : ((keyTable === 'grups' || keyTable === 'pemis') ? 'name' : null)
+            if (keyName !== null) {
+                let kName = rows.findIndex((v) => !isestr(get(v, keyName)))
+                if (kName >= 0) {
+                    srLog.error({ event: 'syncAndReplaceTabs-error', msg: 'invalidRows', reason: (keyName === 'id') ? 'idInvalid' : 'nameInvalid', keyTable, from, row: kName, field: keyName })
+                    return Promise.reject(`invalidRows`)
+                }
+            }
+
             //寫入前驗證(規則帳本 R-ORM-01, ADR-026): 於 delAll 之前擋下可預判之寫入失敗, 該 from 之既有列不變(ADR-008 防誤清源).
             //why: 先 delAll 再 insert, 而 w-serv-orm 1.1.8 起對「會被 clearXSS 改寫之主鍵」整批拒絕、LMDB 對 > 1978 B 之主鍵整批拒絕,
             //修正前遇之即該 from 之既有列全數清空(2026-10-14 V4/V7 實測). 主鍵問題 → invalidRows; 任一字串欄位含標記 → htmlMarkupNotAllowed

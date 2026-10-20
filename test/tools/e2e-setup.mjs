@@ -35,6 +35,7 @@ import {
     probeStuckTooltip as pkgProbeStuckTooltip
 } from './e2eLib.mjs'
 import { runSeedChild } from './seedChild.mjs'
+import { assertPristineSeed } from './baseSeed.mjs'
 
 //REGEN 診斷閘門守則（全域技能 role-coder-for-test-e2e references/pixel-mismatch-diagnosis.md §6）：
 //診斷 env（E2E_BARE / E2E_DIAG）生效時絕不可寫入正式 baseline，防止把診斷態誤凍結為標準圖（getE2eMode 於此拋錯）。
@@ -752,11 +753,25 @@ export async function captureBaseSeed(page, key) {
 //以臨時瀏覽器擷取 base seed, finally 必關瀏覽器(規則帳本 R-E2E-SEED-01): openApp／captureBaseSeed 拋錯時不遺留 Chrome。
 //收斂自 7 檔 × 產製端與比對端共 14 處之手寫 `const b = await launchBrowser(); const pp = await openApp(b); …; await b.close()`
 //(無 try/finally; 2026-10-14 基準因後端無法啟動而 openApp 逾時, 遺留 15 個 Chrome 使 mocha 印出總結後不結束)。
+//擷取後以 assertPristineSeed 守門(R-E2E-ISO-01): 單一 mocha 行程全跑時前檔遺留改動會被當成 base seed 凍結(第 89 項: e2e-users 24 案失敗), 於檔案起點即以可讀訊息失敗。
 export async function captureBaseSeedOnce(key) {
     const b = await launchBrowser()
     try {
         const pp = await openApp(b)
-        return await captureBaseSeed(pp, key)
+        return assertPristineSeed(key, await captureBaseSeed(pp, key))
+    }
+    finally {
+        await b.close().catch(() => {})
+    }
+}
+//檔尾還原(規則帳本 R-E2E-ISO-01): 把 key 表還原為該檔開頭擷取之 base seed; 與 captureBaseSeedOnce 對稱(擷取 ↔ 還原), 各 e2e 檔於每個語系 describe 之 after 呼叫。
+//why: 單一 mocha 行程內各 e2e 檔共用同一後端與 ./db(逐檔隔離 runner 每檔重種, 故無此問題); 檔內以「下一案前的 resetDb」還原, 最後一案之後無人還原,
+//  遺留(如 e2e-rela-user-grup E2E-010 加入之同名使用者)會被下一個動同表的檔擷取為 base seed。seed 為空(before 失敗)時不動作。
+export async function restoreDbOnce(key, seed) {
+    if (!seed || seed.length === 0) return
+    const b = await launchBrowser()
+    try {
+        await resetDb(b, key, seed)
     }
     finally {
         await b.close().catch(() => {})

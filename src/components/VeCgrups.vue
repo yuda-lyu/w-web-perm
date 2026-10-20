@@ -171,12 +171,18 @@ import map from 'lodash-es/map.js'
 import size from 'lodash-es/size.js'
 import filter from 'lodash-es/filter.js'
 import sortBy from 'lodash-es/sortBy.js'
+import isEqual from 'lodash-es/isEqual.js'
 import cloneDeep from 'lodash-es/cloneDeep.js'
 import genPm from 'wsemi/src/genPm.mjs'
 import delay from 'wsemi/src/delay.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import getOwn from '../js/getOwn.mjs'
+import cvKpToObj from '../js/cvKpToObj.mjs'
+import keepKeyOrder from '../js/keepKeyOrder.mjs'
+import getKpLossy from '../js/getKpLossy.mjs'
+import getKpWriteLost from '../js/getKpWriteLost.mjs'
+import fmtLossyMsg from '../js/fmtLossyMsg.mjs'
 import WDialog from 'w-component-vue/src/components/WDialog.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
 import WAggridVue from 'w-aggrid-vue/src/components/WAggridVue.vue'
@@ -789,6 +795,18 @@ export default {
                 let rows = get(vo, 'opt.rows', [])
                 // console.log('rows', rows)
 
+                //無法無損表示之授權資料(R-AUTH-LOSSY-01, 主控複審 R4): 原字串含物件形式無法無損表示之格(getKpLossy)時一律不重寫——
+                //列內容與開啟時相同 → 回傳原字串(未變更); 有任何變更 → 拒存並顯示固定訊息(對話框保持開啟, 可還原變更後關閉)
+                if (size(vo.lossyNames) > 0) {
+                    let cur = map(rows, (r) => ({ name: r.name, mode: r.mode, enable: r.enable }))
+                    if (isEqual(cur, vo.itemsInit)) {
+                        return vo.cgrupsOrig
+                    }
+                    vo.$ui.updateLoading(false) //showCheckYes 前關 loading（modal 阻斷期間避免 loading 疊在底下）
+                    await vo.$dg.showCheckYes(fmtLossyMsg(vo.$t('authLossyBlocked'), vo.lossyNames))
+                    return false
+                }
+
                 //kpGrup
                 let kpGrup = Object.create(null)
                 each(rows, (r) => {
@@ -814,6 +832,19 @@ export default {
                 })
                 // console.log('kpGrup', kpGrup)
 
+                //保留原鍵序(R-AUTH-ORDER-01, 主控複審 R3): 對話框為群組表序, 原字串已有之群組維持原相對順序、新增者附加於後;
+                //伺服端 mergeRules 在沒有有效 OR 項時以第一個 AND 項為起始, 鍵序改變即改變授權
+                let lostNames = getKpWriteLost(vo.kpOrig, kpGrup) //預期序由參考(解碼後之原資料)與欲寫出之物件於函數內導出
+                kpGrup = keepKeyOrder(vo.kpOrig, kpGrup)
+
+                //欲寫出之鍵序若被 JS 屬性序(整數式鍵恆先排)改變而使有效 AND 項之相對順序易位(如新啟用整數式名稱之 AND 群組)
+                //→ 授權會改變, 編輯器無法在不改變授權下寫出, 拒存並顯示固定訊息(同無法無損表示, R-AUTH-LOSSY-01; 外審 minimax#2)
+                if (size(lostNames) > 0) {
+                    vo.$ui.updateLoading(false) //showCheckYes 前關 loading
+                    await vo.$dg.showCheckYes(fmtLossyMsg(vo.$t('authLossyBlocked'), lostNames))
+                    return false
+                }
+
                 //cgrups
                 let cgrups = JSON.stringify(kpGrup)
                 // console.log('cgrups', cgrups)
@@ -824,6 +855,11 @@ export default {
             //core
             core()
                 .then((rows) => {
+
+                    //拒存(無法無損表示之授權資料): 不 resolve、不關窗
+                    if (rows === false) {
+                        return
+                    }
 
                     //resolve
                     vo.pm.resolve(rows)
@@ -886,11 +922,14 @@ export default {
             let cgrups = get(user, 'cgrups', '')
             // console.log('cgrups', cgrups)
 
-            //kpGrup
+            //kpGrup, lossyNames(物件形式無法無損表示者, R-AUTH-LOSSY-01)
             let kpGrup = Object.create(null)
+            let lossyNames = []
             if (isestr(cgrups)) {
                 try {
-                    kpGrup = JSON5.parse(cgrups)
+                    let kpRaw = JSON5.parse(cgrups)
+                    kpGrup = cvKpToObj(kpRaw, { hasMode: true })
+                    lossyNames = getKpLossy(kpRaw)
                 }
                 catch (err) {
                     console.log('cgrups', cgrups)
@@ -939,6 +978,12 @@ export default {
             vo.isEditable = isEditable
             vo.user = user
             vo.items = items
+
+            //存檔依據(非響應式): 解碼後之原資料(保序參考)、原字串、有損名稱、開啟時之列內容
+            vo.kpOrig = kpGrup
+            vo.cgrupsOrig = cgrups
+            vo.lossyNames = lossyNames
+            vo.itemsInit = map(items, (r) => ({ name: r.name, mode: r.mode, enable: r.enable }))
 
             //genOpt
             vo.genOpt()

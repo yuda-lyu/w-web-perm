@@ -189,6 +189,11 @@ import delay from 'wsemi/src/delay.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import eachOwn from '../js/eachOwn.mjs'
+import getOwn from '../js/getOwn.mjs'
+import cvKpToObj from '../js/cvKpToObj.mjs'
+import getKpLossy from '../js/getKpLossy.mjs'
+import getKpWriteLost from '../js/getKpWriteLost.mjs'
+import fmtLossyMsg from '../js/fmtLossyMsg.mjs'
 import WDialog from 'w-component-vue/src/components/WDialog.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
 import WAggridVue from 'w-aggrid-vue/src/components/WAggridVue.vue'
@@ -575,7 +580,7 @@ export default {
             let items = map(grups, (g) => {
 
                 //kpPemi
-                let kpPemi = JSON5.parse(g.cpemis)
+                let kpPemi = cvKpToObj(JSON5.parse(g.cpemis), { hasMode: true })
                 // console.log(g.name, 'kpPemi', kpPemi)
 
                 //fltKpPemi
@@ -661,7 +666,7 @@ export default {
             grups = map(grups, (g, kg) => {
 
                 //kpPemi
-                let kpPemi = JSON5.parse(g.cpemis)
+                let kpPemi = cvKpToObj(JSON5.parse(g.cpemis), { hasMode: true })
                 // console.log(g.name, 'kpPemi', kpPemi)
 
                 //fltKpPemi
@@ -1009,27 +1014,65 @@ export default {
                     return
                 }
 
+                //1b) 無法無損表示之授權資料(R-AUTH-LOSSY-01, 主控複審 R4): 該列群組之 cpemis 含物件形式無法無損表示之格(getKpLossy)者, 本對話框不得改寫其字串——
+                //本對話框所管之歸屬／模式有變更 → 整次儲存拒絕並點名(原子, 其餘列亦不寫); 未變更 → 該列字串逐字元不動(見下方 kpLossyIdx)
+                //群組列之快照只取這一次: 有損檢查之值即下方寫入之值(外審 sol#2: 兩次讀取之間 store 可能被伺服器推送更新, 檢查與寫入看到不同資料)
+                let grups = cloneDeep(vo.grups)
+                let kpLossyIdx = Object.create(null)
+                let lossyNames = []
+                each(rows, (r, kr) => {
+                    let g = get(grups, kr, {})
+                    let kpRaw = null
+                    try {
+                        kpRaw = JSON5.parse(get(g, 'cpemis', ''))
+                    }
+                    catch (err) {
+                        return true //無法解析者交由下方原流程處理
+                    }
+                    if (size(getKpLossy(kpRaw)) === 0) {
+                        return true //跳出換下一個
+                    }
+                    kpLossyIdx[kr] = true
+                    let p = getOwn(cvKpToObj(kpRaw, { hasMode: true }), get(vo, 'pemi.name', ''), null)
+                    let was = get(p, 'isActive', '') === 'y'
+                    let wasMode = was ? get(p, 'mode', '') : ''
+                    let now = get(r, 'enable', '') === 'y'
+                    let nowMode = now ? get(r, 'mode', '') : ''
+                    if (was !== now || wasMode !== nowMode) {
+                        lossyNames.push(get(g, 'name', ''))
+                    }
+                })
+                if (size(lossyNames) > 0) {
+                    unlockBtn()
+                    await vo.$dg.showCheckYes(fmtLossyMsg(vo.$t('authLossyBlocked'), lossyNames))
+                    return false
+                }
+
                 //2) 確定打 API 才開 loading
                 vo.$ui.updateLoading(true)
 
                 //delay
                 await delay(300)
 
-                //grups
-                let grups = cloneDeep(vo.grups)
-                // console.log('grups', grups)
+                //grups: 沿用 1b 之快照(見上)
 
-                //grupsNew
+                //grupsNew, lostRows: 欲寫出之鍵序被 JS 屬性序改變而使有效 AND 項易位之群組(整次拒絕, 見下)
+                let lostRows = []
                 let grupsNew = map(rows, (r, kr) => {
 
                     //g
                     let g = get(grups, kr, {})
 
+                    //有損列(kpLossyIdx): 歸屬未變更, 字串逐字元不動(含 isEqual 判定為「不同」時之重寫)
+                    if (kpLossyIdx[kr] === true) {
+                        return g
+                    }
+
                     //cpemis
                     let cpemis = get(g, 'cpemis', '')
 
                     //kpPemi
-                    let kpPemi = JSON5.parse(cpemis)
+                    let kpPemi = cvKpToObj(JSON5.parse(cpemis), { hasMode: true })
                     // console.log('kpGrup', kpGrup)
 
                     //pemis
@@ -1051,6 +1094,12 @@ export default {
                     //check
                     if (!isEqual(kpPemi, kpPemiNew)) {
 
+                        //欲寫出之鍵序被 JS 屬性序改變而使有效 AND 項易位(如新啟用整數式名稱之 AND 權限) → 授權會改變, 不寫出(外審 minimax#2)
+                        if (size(getKpWriteLost(kpPemi, kpPemiNew)) > 0) { //預期序由 kpPemi(解碼後之原資料)與 kpPemiNew 於函數內導出——不可用本處已套用 JS 屬性序之物件序(外審 minimax 第二輪#1)
+                            lostRows.push(get(g, 'name', ''))
+                            return g
+                        }
+
                         //cpemis
                         g.cpemis = JSON.stringify(kpPemiNew)
 
@@ -1058,6 +1107,11 @@ export default {
 
                     return g
                 })
+                if (size(lostRows) > 0) {
+                    vo.$ui.updateLoading(false) //showCheckYes 前關 loading
+                    await vo.$dg.showCheckYes(fmtLossyMsg(vo.$t('authLossyBlocked'), lostRows))
+                    return false
+                }
                 console.log('grupsNew', grupsNew)
 
                 // //check

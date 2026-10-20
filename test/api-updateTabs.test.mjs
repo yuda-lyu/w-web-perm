@@ -440,6 +440,56 @@ describe('api-updateTabs（寫入 RPC：add / del / diff / order / 去重鍵）'
     })
 
 
+    // ===== R-FIELD-SCALAR-01（第 92 項②）：欄位值須為純量；非純量於 del 之前整批拒絕、DB 不變 =====
+    //四表 schema 欄位型別只有 STRING／INTEGER／TEXT，無合法物件型欄位。修正前真後端實測：`{ description: { value: '<script>x</script>' } }`
+    //避過預檢（預檢只看 isestr），寫入時才被 w-serv-orm 靜默改寫為其他值（非拒絕）。
+
+    it('API-updateTabs-NS-001-nonscalar-field-rejected：四表任一既有列之 description 改為物件／陣列／巢狀 → saveRowFieldInvalid、DB 不變', async function() {
+        this.timeout(300000)
+        let probes = [
+            { value: '<script>x</script>' },
+            { value: 'plain' },
+            ['a', 'b'],
+            [],
+            { a: { b: '<b' } },
+        ]
+        for (let kt of ['users', 'grups', 'pemis', 'targets']) {
+            for (let v of probes) {
+                await restoreBaseSeed(kt)
+                let before = await readTable(kt)
+                let snap0 = await snapTable(kt)
+                let sent = before.sort((a, b) => (a.order || 0) - (b.order || 0)).map((r, k) => (k === 0 ? { ...r, description: v } : { ...r }))
+                let res = await callRpc(RPC[kt].fn, [sent], TOKEN_ADMIN)
+                assert.strict.equal(res.ok, false, `${kt} ${JSON.stringify(v)} 應被拒，實得: ${JSON.stringify(res)}`)
+                assert.strict.equal(res.msg, 'saveRowFieldInvalid', `${kt} ${JSON.stringify(v)} reject 應為 saveRowFieldInvalid，實得: ${res.msg}`)
+                assert.strict.equal(await snapTable(kt), snap0, `${kt} ${JSON.stringify(v)} DB 須零變更`)
+            }
+        }
+    })
+
+    it('API-updateTabs-NS-002-nonscalar-new-row-with-delete-rejected：新增列欄位為物件 + 同批刪除他列 → saveRowFieldInvalid、刪除未落地、DB 不變', async function() {
+        this.timeout(120000)
+        await restoreBaseSeed('targets')
+        let before = (await readTable('targets')).sort((a, b) => (a.order || 0) - (b.order || 0))
+        let snap0 = await snapTable('targets')
+        let sent = [...before.slice(1), { id: '專案Z/頁Z/NS002', description: { value: '<script>x</script>' }, _isNew: true }]
+        let res = await callRpc('updateTargets', [sent], TOKEN_ADMIN)
+        assert.strict.equal(res.ok, false, `應被拒，實得: ${JSON.stringify(res)}`)
+        assert.strict.equal(res.msg, 'saveRowFieldInvalid')
+        assert.strict.equal(await snapTable('targets'), snap0, 'DB 須零變更（含被刪之第一列仍在）')
+    })
+
+    it('API-updateTabs-NS-003-scalar-values-still-written：description 為字串、純量照常寫入（迴歸保護）', async function() {
+        await restoreBaseSeed('targets')
+        let before = (await readTable('targets')).sort((a, b) => (a.order || 0) - (b.order || 0))
+        let sent = before.map((r, k) => (k === 0 ? { ...r, description: 'NS003 changed' } : { ...r }))
+        let res = await callRpc('updateTargets', [sent], TOKEN_ADMIN)
+        assert.strict.ok(res.ok, `應成功，實得: ${JSON.stringify(res)}`)
+        let after = (await readTable('targets')).find((r) => r.id === before[0].id)
+        assert.strict.equal(after.description, 'NS003 changed')
+    })
+
+
     //收尾：所有表復原為 base seed（避免遺留特化資料影響其他檔在同一 mocha run 的執行）
     after(async function() {
         this.timeout(60000)

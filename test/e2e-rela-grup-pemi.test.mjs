@@ -28,7 +28,7 @@
 import fs from 'fs'
 import assert from 'assert'
 import JSON5 from 'json5'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal, captureBaseSeedOnce, resetDb, setDialogModeWithShots, dialogEnableCheckboxSel, openChipsAllWithShots, dialogChipsVisibleTargets, readDialogChipsRow, resizeWindowForChips, setChipsAllModeWithShots, setLang, MDI, iconBtn, DLG_MDI, dlgBtn, waitDialogGrid, toggleDialogEnable, clickDialogSave, waitDialogClosed, gotoGrups, gotoPemis, toggleEditMode, openBelongDialog, saveBelongAndWaitModal, assertModalMsg } from './tools/e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal, captureBaseSeedOnce, resetDb, restoreDbOnce, setDialogModeWithShots, dialogEnableCheckboxSel, openChipsAllWithShots, dialogChipsVisibleTargets, readDialogChipsRow, resizeWindowForChips, setChipsAllModeWithShots, setLang, MDI, iconBtn, DLG_MDI, dlgBtn, waitDialogGrid, toggleDialogEnable, clickDialogSave, waitDialogClosed, gotoGrups, gotoPemis, toggleEditMode, openBelongDialog, saveBelongAndWaitModal, assertModalMsg } from './tools/e2e-setup.mjs'
 //產製端與比對端同一案例管線（runBaselineCase）與截圖前篩選（createBaselineGate），規格詳 w-package-tools-e2e 之 README.md §2.1-2.2
 import { runBaselineCase, createBaselineGate } from './tools/e2eLib.mjs'
 
@@ -617,6 +617,11 @@ else {
                 this.timeout(200000)
                 await startServersOnce()
                 if (!BASE_SEED) { BASE_SEED = await captureBaseSeedOnce('grups') }
+            })
+            //檔尾還原 grups 為檔首 base seed(R-E2E-ISO-01): 單一 mocha 行程全跑時最後一案之改動不遺留給下一個檔
+            after(async function() {
+                this.timeout(120000)
+                await restoreDbOnce('grups', BASE_SEED)
             })
             //per-case fresh browser + DB 還原 + 開頁 + 語系由 runCase 負責（確保單 case --grep 也能跑）；語意斷言於比對標準圖之前（pixel baseline 為補強層）
             for (const c of cases) {

@@ -17,7 +17,7 @@
 //save 結果（成功 / 失敗 / 空 / errInNames）皆走 $dg.showCheckYes 持久 modal。
 import fs from 'fs'
 import assert from 'assert'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, rowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, typeIntoCell, captureBaseSeedOnce, resetDb, setLang, MDI, iconBtn, gotoGrups, checkRow, toggleEditMode, editSwitchLoc, clickAdd, cellHasWarn, clickSave, saveAndWaitModal, assertModalMsg } from './tools/e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, rowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, typeIntoCell, captureBaseSeedOnce, resetDb, restoreDbOnce, setLang, MDI, iconBtn, gotoGrups, checkRow, toggleEditMode, editSwitchLoc, clickAdd, cellHasWarn, clickSave, saveAndWaitModal, assertModalMsg } from './tools/e2e-setup.mjs'
 import { runBaselineCase, createBaselineGate, gridContentBox, itemsUnionBox } from './tools/e2eLib.mjs'
 
 const PICS_DIR = './test/pics/grups'
@@ -400,6 +400,11 @@ else {
                 await startServersOnce()
                 //擷取 BASE_SEED 一次（用臨時 browser）
                 if (!BASE_SEED) { BASE_SEED = await captureBaseSeedOnce('grups') }
+            })
+            //檔尾還原 grups 為檔首 base seed(R-E2E-ISO-01): 單一 mocha 行程全跑時最後一案之改動不遺留給下一個檔
+            after(async function() {
+                this.timeout(120000)
+                await restoreDbOnce('grups', BASE_SEED)
             })
             //每案 fresh browser、DB 還原、開頁切語系、語意斷言、關瀏覽器皆在 runCase 內（與產製端同管線；--grep 單跑亦完整）
             for (const c of CASES) {

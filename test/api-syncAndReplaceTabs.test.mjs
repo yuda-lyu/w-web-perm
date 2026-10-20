@@ -57,7 +57,7 @@ describe('api-syncAndReplaceTabs', function() {
     after(async function() {
         this.timeout(60000)
         let woItems = await getWoItems()
-        let froms = ['appTest-1', 'appTest-2', 'appTest-3', 'appTest-4', 'appTest-5', 'appTest-6', 'appTest-7', 'appTest-8', 'appTest-9', 'appTest-10', 'appTest-11', 'appTest-11b', 'appTest-12', 'appTest-13', 'appTest-14', 'appTest-15', 'appTest-16', 'appTest-17']
+        let froms = ['appTest-1', 'appTest-2', 'appTest-3', 'appTest-4', 'appTest-5', 'appTest-6', 'appTest-7', 'appTest-8', 'appTest-9', 'appTest-10', 'appTest-11', 'appTest-11b', 'appTest-12', 'appTest-13', 'appTest-14', 'appTest-15', 'appTest-16', 'appTest-17', 'appTest-18', 'appTest-19', 'appTest-20', 'appTest-21', 'appTest-22']
         for (let kt of ['users', 'grups', 'pemis', 'targets']) {
             for (let from of froms) {
                 await woItems[kt].delAll({ from })
@@ -406,10 +406,164 @@ describe('api-syncAndReplaceTabs', function() {
             assert.strict.deepEqual(await idsOf('targets', F), rows0.map((v) => v.id), `rows=${JSON.stringify(rows)} 不得寫入空白列、既有列須不變`)
         }
 
-        //order 為 0 本身即內容（獨立一列，不靠同批其他欄位）：照常寫入，由伺服器產生主鍵
-        let ok = await postSync('targets', TOKEN_APP, { from: F, rows: [{ order: 0 }] })
-        assert.strict.equal(ok.state, 'success', `僅 order:0 之列應成功，實得: ${JSON.stringify(ok)}`)
-        assert.strict.equal((await idsOf('targets', F)).length, 1)
+        //order 為 0 本身即內容（獨立一列，不靠同批其他欄位）：照常寫入，由伺服器產生主鍵。
+        //targets 之 id 須為非空字串（R-SYNC-NAME-01，run02 複審 R2），僅 order:0 之 targets 列現於入口拒收；內容判定改以不要求 id 之 users 驗
+        let okT = await postSync('targets', TOKEN_APP, { from: F, rows: [{ order: 0 }] })
+        assert.strict.equal(okT.state, 'error', `targets 無 id 之列應被拒，實得: ${JSON.stringify(okT)}`)
+        assert.strict.equal(okT.msg, 'invalidRows')
+        assert.strict.deepEqual(await idsOf('targets', F), rows0.map((v) => v.id), 'targets 既有列不變')
+        let ok = await postSync('users', TOKEN_APP, { from: F, rows: [{ order: 0 }] })
+        assert.strict.equal(ok.state, 'success', `僅 order:0 之 users 列應成功，實得: ${JSON.stringify(ok)}`)
+        assert.strict.equal((await idsOf('users', F)).length, 1)
+    })
+
+    // ===== R-FIELD-SCALAR-01（第 92 項②）：欄位值須為純量；非純量於 delAll 之前整批拒絕 =====
+    //四表 schema 欄位型別只有 STRING／INTEGER／TEXT，無合法物件型欄位。修正前真後端實測：同一列其他欄位有內容時，
+    //{ description: { value: '<script>x</script>' } } 避過預檢（預檢只看 isestr）而於寫入時被 w-serv-orm 靜默改寫（非拒絕）。
+    //「不變」以全列快照比對（外審 sol#8）：該 from 分區之全部欄位（含稽核時間）與其他 from 之全部列，拒收前後逐位元相同。
+    let snapOf = async (kt, F) => JSON.stringify((await (await getWoItems())[kt].select({ from: F })).sort((a, b) => String(a.id).localeCompare(String(b.id))))
+    let snapOthers = async (kt, F) => JSON.stringify((await (await getWoItems())[kt].select()).filter((v) => v.from !== F).sort((a, b) => String(a.id).localeCompare(String(b.id))))
+
+    it('API-sync-018-nonscalar-field-rejected-rows-kept：列的 description 為物件／陣列／巢狀（同列他欄有內容） → invalidRows，該 from 分區全列與其他 from 之全部列逐位元不變', async function() {
+        const F = 'appTest-18'
+        let rows0 = [{ id: '專案18/頁1/區塊A', order: 0, description: 'ok', from: F }, { id: '專案18/頁1/區塊Z', order: 1, description: 'second', from: F }]
+        let res0 = await postSync('targets', TOKEN_APP, { from: F, rows: rows0 })
+        assert.strict.equal(res0.state, 'success', `預置應成功，實得: ${JSON.stringify(res0)}`)
+        let part0 = await snapOf('targets', F)
+        let others0 = await snapOthers('targets', F)
+        assert.strict.ok(part0.length > 10 && others0.length > 10, '前置快照非空')
+
+        let probes = [
+            { value: '<script>x</script>' },
+            { value: 'plain' },
+            ['a', 'b'],
+            { a: { b: '<b' } },
+        ]
+        for (let v of probes) {
+            let rows = [{ id: '專案18/頁1/區塊B', order: 1, description: v, from: F }]
+            let res = await postSync('targets', TOKEN_APP, { from: F, rows })
+            assert.strict.equal(res.state, 'error', `description=${JSON.stringify(v)} 應被拒，實得: ${JSON.stringify(res)}`)
+            assert.strict.equal(res.msg, 'invalidRows', `description=${JSON.stringify(v)} 應回 invalidRows，實得: ${JSON.stringify(res.msg)}`)
+            assert.strict.equal(await snapOf('targets', F), part0, `description=${JSON.stringify(v)} 該 from 分區須逐位元不變`)
+            assert.strict.equal(await snapOthers('targets', F), others0, `description=${JSON.stringify(v)} 其他 from 須逐位元不變`)
+        }
+        //同批多列只有一列帶非純量 → 整批拒絕
+        let resMix = await postSync('targets', TOKEN_APP, { from: F, rows: [{ id: '專案18/頁1/區塊C', description: 'good' }, { id: '專案18/頁1/區塊D', description: { v: 1 } }] })
+        assert.strict.equal(resMix.state, 'error')
+        assert.strict.equal(resMix.msg, 'invalidRows')
+        assert.strict.equal(await snapOf('targets', F), part0, '同批僅一列非純量亦整批拒絕（該 from 分區不變）')
+        assert.strict.equal(await snapOthers('targets', F), others0)
+    })
+
+    it('API-sync-019-nonscalar-in-other-tables-rejected：users／grups／pemis 的非純量欄位亦拒絕（cgrups／cpemis／crules 為 JSON 字串，物件非法）；先建立舊列，拒收後全列與其他 from 逐位元不變', async function() {
+        const F = 'appTest-19'
+        let legacy = {
+            users: { id: 'id-ns19-u0', name: 'ns19-old', email: 'ns19-old@example.com', cgrups: '{}', isAdmin: 'n', isActive: 'y' },
+            grups: { id: 'id-ns19-g0', name: 'ns19g-old', cpemis: '{}' },
+            pemis: { id: 'id-ns19-p0', name: 'ns19p-old', crules: '{}' },
+        }
+        let cases = [
+            ['users', { id: 'id-ns19-u', name: 'ns19', email: 'ns19@example.com', cgrups: { 權限群組M1: { mode: 'OR', isActive: 'y' } }, isAdmin: 'n', isActive: 'y' }],
+            ['grups', { id: 'id-ns19-g', name: 'ns19g', cpemis: { 權限P1: { mode: 'OR', isActive: 'y' } } }],
+            ['pemis', { id: 'id-ns19-p', name: 'ns19p', crules: ['專案A/頁A/區塊A'] }],
+        ]
+        for (let [kt, row] of cases) {
+            let ok0 = await postSync(kt, TOKEN_APP, { from: F, rows: [legacy[kt]] })
+            assert.strict.equal(ok0.state, 'success', `${kt} 預置舊列應成功，實得: ${JSON.stringify(ok0)}`)
+            let part0 = await snapOf(kt, F)
+            let others0 = await snapOthers(kt, F)
+            let res = await postSync(kt, TOKEN_APP, { from: F, rows: [row] })
+            assert.strict.equal(res.state, 'error', `${kt} 應被拒，實得: ${JSON.stringify(res)}`)
+            assert.strict.equal(res.msg, 'invalidRows', `${kt} 應回 invalidRows，實得: ${JSON.stringify(res.msg)}`)
+            assert.strict.equal(await snapOf(kt, F), part0, `${kt} 該 from 分區（舊列）須逐位元不變`)
+            assert.strict.equal(await snapOthers(kt, F), others0, `${kt} 其他 from 須逐位元不變`)
+            assert.strict.deepEqual(await idsOf(kt, F), [legacy[kt].id], `${kt} 只剩舊列`)
+        }
+        //純量（JSON 字串）照常寫入
+        let ok = await postSync('pemis', TOKEN_APP, { from: F, rows: [{ id: 'id-ns19-p', name: 'ns19p', crules: JSON.stringify({ '專案A/頁A/區塊A': 'y' }) }] })
+        assert.strict.equal(ok.state, 'success', `純量應成功，實得: ${JSON.stringify(ok)}`)
+        assert.strict.deepEqual(await idsOf('pemis', F), ['id-ns19-p'])
+    })
+
+
+    // ===== R-SYNC-NAME-01（run02，複審 R2）：grups／pemis 的 name、targets 的 id 須為非空字串，否則整批拒收（比照後台 ckKey） =====
+    //背景：外部同步灌入 name:'' 之群組／權限時，伺服端 arrFinder 以 === 採納，編輯器（cvKpToObj／doSave）視空名稱為無效，存檔即移除該授權（移除 AND 限制時增權）。
+    //修正後入口比照後台 ckKey(isestr)：缺漏、''、數字、布林、null 皆整批拒收（invalidRows），於 delAll 之前，該 from 與他 from 之既有列逐位元不變。
+    //不比照 ckKey 之重複偵測（複審 R2 範圍僅「非空」）。users 不在範圍（name 可重複）。
+
+    //BAD：name／id 的無效值（undefined 代表整個欄位缺漏）
+    const BAD_KEYS = [undefined, '', 5, true, null]
+    let withKey = (row, key, v) => {
+        let o = { ...row }
+        if (v === undefined) {
+            delete o[key]
+        }
+        else {
+            o[key] = v
+        }
+        return o
+    }
+
+    it('API-sync-020-empty-or-nonstring-name-rejected：grups／pemis 的 name 缺漏／空字串／數字／布林／null → invalidRows，整批拒收（含同批其他合法列），該 from 與他 from 逐位元不變', async function() {
+        const F = 'appTest-20'
+        let legacy = {
+            grups: { id: 'id-nm20-g0', name: 'nm20g-old', cpemis: '{}' },
+            pemis: { id: 'id-nm20-p0', name: 'nm20p-old', crules: '{}' },
+        }
+        let valid = {
+            grups: { id: 'id-nm20-g1', name: 'nm20g-new', cpemis: '{}' },
+            pemis: { id: 'id-nm20-p1', name: 'nm20p-new', crules: '{}' },
+        }
+        for (let kt of ['grups', 'pemis']) {
+            let ok0 = await postSync(kt, TOKEN_APP, { from: F, rows: [legacy[kt]] })
+            assert.strict.equal(ok0.state, 'success', `${kt} 預置舊列應成功，實得: ${JSON.stringify(ok0)}`)
+            let part0 = await snapOf(kt, F)
+            let others0 = await snapOthers(kt, F)
+            for (let v of BAD_KEYS) {
+                let bad = withKey({ ...valid[kt], id: 'id-nm20-bad' }, 'name', v)
+                for (let rows of [[bad], [valid[kt], bad], [bad, valid[kt]]]) {
+                    let res = await postSync(kt, TOKEN_APP, { from: F, rows })
+                    assert.strict.equal(res.state, 'error', `${kt} name=${JSON.stringify(v)} 應被拒，實得: ${JSON.stringify(res)}`)
+                    assert.strict.equal(res.msg, 'invalidRows', `${kt} name=${JSON.stringify(v)} 應回 invalidRows，實得: ${JSON.stringify(res.msg)}`)
+                    assert.strict.equal(await snapOf(kt, F), part0, `${kt} name=${JSON.stringify(v)} 該 from 分區須逐位元不變（整批拒收）`)
+                    assert.strict.equal(await snapOthers(kt, F), others0, `${kt} name=${JSON.stringify(v)} 其他 from 須逐位元不變`)
+                }
+            }
+            assert.strict.deepEqual(await idsOf(kt, F), [legacy[kt].id], `${kt} 只剩舊列`)
+        }
+    })
+
+    it('API-sync-021-empty-or-nonstring-id-rejected-targets：targets 的 id 缺漏／空字串／數字／布林／null → invalidRows，整批拒收，該 from 與他 from 逐位元不變', async function() {
+        const F = 'appTest-21'
+        let ok0 = await postSync('targets', TOKEN_APP, { from: F, rows: [{ id: '專案21/頁1/區塊A', order: 0, description: 'old', from: F }] })
+        assert.strict.equal(ok0.state, 'success', `預置舊列應成功，實得: ${JSON.stringify(ok0)}`)
+        let part0 = await snapOf('targets', F)
+        let others0 = await snapOthers('targets', F)
+        let valid = { id: '專案21/頁1/區塊B', order: 1, description: 'new', from: F }
+        for (let v of BAD_KEYS) {
+            let bad = withKey({ id: 'x', order: 2, description: 'bad', from: F }, 'id', v)
+            for (let rows of [[bad], [valid, bad], [bad, valid]]) {
+                let res = await postSync('targets', TOKEN_APP, { from: F, rows })
+                assert.strict.equal(res.state, 'error', `targets id=${JSON.stringify(v)} 應被拒，實得: ${JSON.stringify(res)}`)
+                assert.strict.equal(res.msg, 'invalidRows', `targets id=${JSON.stringify(v)} 應回 invalidRows，實得: ${JSON.stringify(res.msg)}`)
+                assert.strict.equal(await snapOf('targets', F), part0, `targets id=${JSON.stringify(v)} 該 from 分區須逐位元不變`)
+                assert.strict.equal(await snapOthers('targets', F), others0, `targets id=${JSON.stringify(v)} 其他 from 須逐位元不變`)
+            }
+        }
+    })
+
+    it('API-sync-022-valid-string-names-accepted-users-unaffected：合法非空字串（含中文、含空白字元內嵌）照常寫入；users 不要求 name（name 可重複）', async function() {
+        const F = 'appTest-22'
+        let rg = await postSync('grups', TOKEN_APP, { from: F, rows: [{ id: 'id-nm22-g1', name: '權限群組 22', cpemis: '{}' }, { id: 'id-nm22-g2', name: 'a', cpemis: '{}' }] })
+        assert.strict.equal(rg.state, 'success', `grups 合法 name 應成功，實得: ${JSON.stringify(rg)}`)
+        let rp = await postSync('pemis', TOKEN_APP, { from: F, rows: [{ id: 'id-nm22-p1', name: '權限 22', crules: '{}' }] })
+        assert.strict.equal(rp.state, 'success', `pemis 合法 name 應成功，實得: ${JSON.stringify(rp)}`)
+        let rt = await postSync('targets', TOKEN_APP, { from: F, rows: [{ id: '專案22/頁1/區塊A', description: 'x' }] })
+        assert.strict.equal(rt.state, 'success', `targets 合法 id 應成功，實得: ${JSON.stringify(rt)}`)
+        //users：name 與 id 皆可省（id 由伺服器產生）、name 可重複——不在 R-SYNC-NAME-01 範圍
+        let ru = await postSync('users', TOKEN_APP, { from: F, rows: [{ order: 0, email: 'nm22a@appTest.com', cgrups: '{}', isAdmin: 'n', isActive: 'y' }, { order: 1, name: 'dup', email: 'nm22b@appTest.com', cgrups: '{}', isAdmin: 'n', isActive: 'y' }, { order: 2, name: 'dup', email: 'nm22c@appTest.com', cgrups: '{}', isAdmin: 'n', isActive: 'y' }] })
+        assert.strict.equal(ru.state, 'success', `users 不受影響，實得: ${JSON.stringify(ru)}`)
+        assert.strict.equal((await idsOf('users', F)).length, 3)
     })
 
 })

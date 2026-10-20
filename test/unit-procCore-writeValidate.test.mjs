@@ -385,4 +385,71 @@ describe('unit-procCore-writeValidate (寫入前驗證與寫入失敗回 key, AD
         assert.strict.ok(!Object.prototype.hasOwnProperty.call(saved, 'length'), 'length 不是 schema 欄位, 不得入庫')
     })
 
+
+    // ===== R-FIELD-SCALAR-01: schema 欄位值須為純量; 非純量(物件、陣列、巢狀)於 del 之前整批拒絕, 資料表零變更 =====
+    //修前: 預檢只看 isestr(vv), { description: { value: '<標記>' } } 避過預檢, 寫入時才被 w-serv-orm 靜默改寫(非拒絕), 且 diff 先 del 後 insert 之路徑可能先動到他列
+
+    let NS_PROBES = [
+        ['物件', { value: 'plain' }],
+        ['物件內含標記', { value: '<script>x</script>' }],
+        ['陣列', ['a', 'b']],
+        ['空陣列', []],
+        ['空物件', {}],
+        ['巢狀', { a: { b: '<b' } }],
+    ]
+
+    it('WV-NS-001 既有列之欄位改為非純量 → saveRowFieldInvalid, 四表皆零變更, srLog 記 fieldNotScalar 與欄名', async function() {
+        for (let table of Object.keys(TABLES)) {
+            for (let [tag, v] of NS_PROBES) {
+                let { woItems, logs, pc, cst } = createEnv()
+                let before = snapAll(woItems)
+                let rows = (await woItems[table].select()).sort((a, b) => a.order - b.order)
+                rows[0] = { ...rows[0], description: cloneDeep(v) }
+                let r = await run(pc, table, rows)
+                assert.strict.deepEqual(r, { ok: false, v: 'saveRowFieldInvalid' }, `${table} ${tag}`)
+                assert.strict.deepEqual(snapAll(woItems), before, `${table} ${tag}: 資料表須零變更`)
+                let e = logs.find((l) => l.level === 'error' && l.event === 'updateTabItems-validate-error')
+                assert.strict.ok(e && e.reason === 'fieldNotScalar' && e.field === 'description' && e.msg === 'saveRowFieldInvalid', `${table} ${tag}: srLog 須記 key 與原因, 實得 ${JSON.stringify(e)}`)
+                cst.clear()
+            }
+        }
+    })
+
+    it('WV-NS-002 新增列之欄位為非純量 + 同批刪除他列 → 被拒且刪除未落地', async function() {
+        for (let table of ['targets', 'grups']) {
+            let { woItems, pc, cst } = createEnv()
+            let before = snapAll(woItems)
+            let rows = (await woItems[table].select()).sort((a, b) => a.order - b.order).slice(1) //刪第一列
+            rows.push(newRow(table, { description: { value: '<script>x</script>' } }))
+            let r = await run(pc, table, rows)
+            assert.strict.deepEqual(r, { ok: false, v: 'saveRowFieldInvalid' }, table)
+            assert.strict.deepEqual(snapAll(woItems), before, `${table}: 刪除不得落地`)
+            cst.clear()
+        }
+    })
+
+    it('WV-NS-003 純量(字串、null)照常寫入; 庫內既有列即使含非純量值(早期寫入之舊資料), 只要本次未變更(進 r.same、不寫入)就不阻擋他列儲存', async function() {
+        let { woItems, pc } = createEnv()
+        //舊資料: 直接在替身表放一筆含非純量 description 之既有列(模擬修正前已寫入之資料)
+        await woItems.targets.save([{ id: 'T2', description: { legacy: '<b' } }])
+        assert.strict.deepEqual(woItems.targets.get('T2').description, { legacy: '<b' }, '前置: 舊資料已含非純量值')
+        let rows = (await woItems.targets.select()).sort((a, b) => a.order - b.order)
+        rows[0] = { ...rows[0], description: 'changed' } //本次只改 T1; T2 原樣送回(未變更)
+        let r = await run(pc, 'targets', rows)
+        assert.strict.deepEqual(r, { ok: true, v: 'saveTabItemsSuccess' })
+        assert.strict.equal(woItems.targets.get('T1').description, 'changed')
+        assert.strict.deepEqual(woItems.targets.get('T2').description, { legacy: '<b' }, '未變更之舊列原樣保留(不寫入、不驗)')
+        //T2 一旦被改成仍含非純量值則屬本次寫入列 → 拒絕且零變更
+        let before = snapAll(woItems)
+        let rows2 = (await woItems.targets.select()).sort((a, b) => a.order - b.order)
+        rows2[1] = { ...rows2[1], description: { legacy: 'changed' } }
+        let r2 = await run(pc, 'targets', rows2)
+        assert.strict.deepEqual(r2, { ok: false, v: 'saveRowFieldInvalid' })
+        assert.strict.deepEqual(snapAll(woItems), before)
+        //純量 null 亦可寫
+        let rows3 = (await woItems.targets.select()).sort((a, b) => a.order - b.order)
+        rows3[0] = { ...rows3[0], description: null }
+        assert.strict.deepEqual(await run(pc, 'targets', rows3), { ok: true, v: 'saveTabItemsSuccess' })
+    })
+
 })
