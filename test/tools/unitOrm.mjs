@@ -1,6 +1,6 @@
 //單元測試共用之 ORM 替身(規則帳本 R-ORM-01、ADR-026; 對齊 w-orm-lmdb 1.0.38 之對外語意, 同 w-web-sso test/tools/unitProc.mjs 之 mkTable):
 //  - insert: 主鍵已存在即略過(ifNoExists); 任一列主鍵 UTF-8 > 1978 B 即整批 reject(LMDB 鍵長上限, 整批性錯誤); 回聚合 { n, nInserted, ok }
-//  - save: 逐筆結果陣列 { n, nInserted, nModified, ok[, err] }; 既存以 lodash merge 合併、無則插入(autoInsert); 主鍵過長該筆 ok:0
+//  - save: 逐筆結果陣列 { n, nInserted, nModified, ok[, err] }; 既存以 lodash merge 合併(option.merge === false 則整筆覆寫)、無則插入(autoInsert); 主鍵過長該筆 ok:0
 //  - del: 逐筆結果陣列; 主鍵無效該筆 ok:0、查無 { n:0, ok:1 }
 //  - delAll(find): find 為物件時刪除各欄相等之列, 否則全刪
 //  - 可注入失敗: fail.insert(整批 reject)、fail.saveIds(該些 id 之 save 逐筆 ok:0)、fail.delIds(del 逐筆 ok:0)
@@ -55,7 +55,7 @@ export function mkTable(rows0 = [], fail = {}) {
             }
             return { n: ds.length, nInserted: n, ok: 1 }
         },
-        save: async (data) => {
+        save: async (data, option = {}) => {
             cnt.save++
             return arr(data).map((v) => {
                 if (tooLong(v.id)) {
@@ -66,7 +66,7 @@ export function mkTable(rows0 = [], fail = {}) {
                 }
                 let old = kp.get(v.id)
                 if (old) {
-                    kp.set(v.id, merge({}, old, cloneDeep(v)))
+                    kp.set(v.id, (option && option.merge === false) ? cloneDeep(v) : merge({}, old, cloneDeep(v))) //option.merge === false: 整筆覆寫(w-orm-lmdb 之選項)
                     return { n: 1, nModified: 1, ok: 1 }
                 }
                 kp.set(v.id, cloneDeep(v))

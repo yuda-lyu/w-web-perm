@@ -1574,6 +1574,7 @@ describe('unit-authMerge - 授權合併規格(R-AUTH-MERGE-00; 未給＝n、OR �
                 'src/js/isAuthMode.mjs': 1, //合法性判定(頁面提示之 modeInvalid、編輯器停用列之顯示), 非有效值
                 'src/js/cvKpToObj.mjs': 1, //acts 之 mode 已為 getEffMode 之有效值, 於 AND／OR 並存時挑 AND 支作顯示值
                 'src/js/getAuthWarn.mjs': 1, //getEffMode(r.mode) === 'AND'(刪除前提示影響人數)
+                'src/js/refAudit.mjs': 1, //modeInfo: getEffMode(m) === 'OR'(已取有效值後之比對; 懸空稽核對授權影響之結構判定, 對照 mergeRules; run06 audit 新增站點, 逐站判讀後列入)
                 'src/plugins/mShare.mjs': 2, //mergeRules 之 filter(ts, { mode: 'OR'／'AND' }): ts 之 mode 已為 getEffMode 之有效值
                 'src/components/VeGrupBlngUsers.vue': 1, //對話框列之 UI 值守門(列之 mode 恆由選單指定, 非解碼之引用)
                 'src/components/VePemiBlngGrups.vue': 1, //同上

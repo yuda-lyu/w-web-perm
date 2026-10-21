@@ -1,7 +1,6 @@
 import eachOwn from './eachOwn.mjs'
 import cvKpToArr from './cvKpToArr.mjs'
 import getEffMode from './getEffMode.mjs'
-import isAuthMode from './isAuthMode.mjs'
 
 
 /**
@@ -14,8 +13,11 @@ import isAuthMode from './isAuthMode.mjs'
  * - 啟用元素之名稱不是字串(陣列元素無 name 等): 物件形式沒有對應的鍵. 該元素仍以懸空引用參與合併(內容全 n; AND 使結果為空, OR 使「無 OR 時以第一個 AND 為基底」失效,
  *   R-PRINCIPLE-00 c), 靜默丟棄即放寬, 故拒存(R-PRINCIPLE-00 f 之「無法原樣保留則拒存」; 空字串名稱則可原樣保留為物件鍵 '', 不在此格). 名稱以 `#<序號>`(1 起算)表示.
  *
- * - 該層啟用項皆 mode 缺或非法(沒有任何 mode 合法的啟用項; 陣列與物件形式皆可): mode 缺或非法者伺服端只當限制項(R-PRINCIPLE-00 e, 無合法項時結果全 n),
- *   編輯器解碼為 AND 並於存檔時寫出 AND, 該項會成為唯一的 AND 基底而授予其內容(比修正前多給), 故拒存; 該層另有 mode 合法之啟用項時, 限制項與 AND 等價, 不在此格.
+ * 不判定「該層啟用項皆 mode 缺或非法」(原第三格, ADR-035 決定 e; run06 使用者裁示放寬, ADR-035 Update 2026-10-22): mode 缺或非法之啟用項伺服端只當限制項
+ * (R-PRINCIPLE-00 e, 該層無任何 mode 合法之啟用項時結果全 n), 編輯器雖顯示為「AND、啟用」, 但存檔時對未被管理者改動者原樣寫回其原始 mode(editorRefRows 之
+ * getRawModeMap／putRowsToKp／putRefEntry, 方案 A; R-EDIT-KEEP-01), 故未改動時存檔前後授權相等、不會成為唯一 AND 基底而多給; 放寬前此格拒存只會使管理者無法存任何變更.
+ * 該項之 mode 缺漏提示仍由 getAuthWarn 之 modeInvalid 警告圖示承擔(不變). 管理者在對話框內明確改動(改為 OR／AND、啟用其他項)之結果, 等於伺服端對「改動後之狀態」之解讀,
+ * 未被改動之項不放寬(以真 getUserRules 窮舉證明見 unit-editorRows RT-LOSSY3-*).
  *
  * 不再判定「AND 名稱之相對順序」: 合併規則下結果與項目之儲存順序、物件鍵序、陣列元素序無關(R-AUTH-MERGE-00 第 4 條; ADR-033 取代 ADR-001 非對稱條),
  * 整數式名稱被 JS 屬性序排前不再改變授權(原 run02 之排序保護 keepKeyOrder／getKeyOrderLost／getKpWriteLost 隨之移除).
@@ -35,6 +37,8 @@ import isAuthMode from './isAuthMode.mjs'
  * // => ['#1']
  * console.log(getKpLossy({ G1: { mode: 'OR', isActive: 'y' } }))
  * // => []
+ * console.log(getKpLossy({ G1: { isActive: 'y' } }))
+ * // => []  (該層啟用項皆 mode 缺漏: 原第三格, 已放寬)
  *
  */
 function getKpLossy(kp) {
@@ -42,26 +46,18 @@ function getKpLossy(kp) {
         return []
     }
 
-    //kpModes: 啟用元素之名稱 → 出現過的有效 mode; unnamed: 啟用而名稱非字串之元素; bad: 啟用而 mode 缺或非法之名稱; nValid: mode 合法之啟用元素數
+    //kpModes: 啟用元素之名稱 → 出現過的有效 mode; unnamed: 啟用而名稱非字串之元素
     let kpModes = Object.create(null)
     let unnamed = []
-    let bad = []
-    let nValid = 0
     let k = 0
     eachOwn(cvKpToArr(kp), (r) => {
         k++
         if (r.isActive !== 'y') {
             return true //跳出換下一個
         }
-        if (isAuthMode(r.mode)) {
-            nValid++
-        }
         if (typeof r.name !== 'string') {
             unnamed.push(`#${k}`)
             return true //跳出換下一個
-        }
-        if (!isAuthMode(r.mode)) {
-            bad.push(r.name)
         }
         let m = getEffMode(r.mode)
         if (!(r.name in kpModes)) {
@@ -79,15 +75,6 @@ function getKpLossy(kp) {
             out.push(n)
         }
     })
-
-    //該層啟用項皆 mode 缺或非法(沒有任何合法 mode 的啟用項, 含物件形式): 伺服端以其為限制項、結果全 n(mergeRules), 編輯器解碼為 AND 後存檔會使其成為基底而授予內容(多給), 故拒存
-    if (nValid === 0) {
-        eachOwn(bad, (n) => {
-            if (!out.includes(n)) {
-                out.push(n)
-            }
-        })
-    }
 
     return [...out, ...unnamed]
 }

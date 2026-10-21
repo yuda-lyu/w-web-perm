@@ -292,7 +292,7 @@ describe('unit-validateRows (寫入前驗證之判準, ADR-026)', function() {
         return iWrite < 0 ? null : { validateFirst: iValidate >= 0 && iValidate < iWrite, no: lines[iWrite].no }
     }
 
-    it('SITE-NS-001 寫入站點全集: 僅 procCore.mjs 與 WWebPerm.mjs, 皆在第一個寫入呼叫之前呼叫 validateRowsBeforeWrite', function() {
+    it('SITE-NS-001 寫入站點全集: 僅 procCore.mjs、WWebPerm.mjs 與 cascadeWrite.mjs(引用連帶之引用端寫入與補償, ADR-036), 皆在第一個寫入呼叫之前呼叫 validateRowsBeforeWrite', function() {
         let fdServer = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'server')
         let found = {}
         let walk = (dir, rel) => { //遞迴(含 server/staLogs 等子目錄)
@@ -309,8 +309,8 @@ describe('unit-validateRows (寫入前驗證之判準, ADR-026)', function() {
             }
         }
         walk(fdServer, '')
-        assert.strict.deepEqual(Object.keys(found).sort(), ['WWebPerm.mjs', 'procCore.mjs'], `寫入站點檔案: ${JSON.stringify(found)}`)
-        assert.strict.ok(found['WWebPerm.mjs'].validateFirst && found['procCore.mjs'].validateFirst, `須在第一個寫入之前驗證: ${JSON.stringify(found)}`)
+        assert.strict.deepEqual(Object.keys(found).sort(), ['WWebPerm.mjs', 'cascadeWrite.mjs', 'procCore.mjs'], `寫入站點檔案: ${JSON.stringify(found)}`)
+        assert.strict.ok(found['WWebPerm.mjs'].validateFirst && found['procCore.mjs'].validateFirst && found['cascadeWrite.mjs'].validateFirst, `須在第一個寫入之前驗證: ${JSON.stringify(found)}`)
         //資料通道只放行 select(寫入方法不得出現在其放行清單)
         let dc = sourceLines(path.join(fdServer, 'dataChannel.mjs'), 'code').map((l) => l.text).join('\n')
         assert.strict.ok(!/'(insert|save|del|delAll|mix)'/.test(dc), 'dataChannel.mjs 不得放行寫入方法')

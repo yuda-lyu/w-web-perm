@@ -226,11 +226,12 @@ function getRuleWarns(c) {
 
 
 /**
- * 計算「刪除後其授權將被收回」之引用者數(R-PRINCIPLE-00 c: 刪除被 AND 引用之群組／權限前提示影響人數),
+ * 計算「以 AND 引用被刪名稱且刪除後該名稱完全消失」之引用者數(R-PRINCIPLE-00 c: 刪除被 AND 引用之群組／權限前提示影響人數;
+ * run06 起刪除連帶清理會把該引用自引用端移除, 其 AND 限制隨之解除、授權可能變多, 見 ADR-036; run05 前為「AND 項變懸空、授權被收回」),
  * 以及「刪除歷史同名之一列後其授權可能變多」之引用者數(R-PRINCIPLE-00 d: 同名多筆取各候選之交集, 候選變少則交集變寬)
  *
  * n／holders(既有): 引用者(使用者的 cgrups、群組的 cpemis)中, 有 isActive 為 'y'、有效模式為 AND(mode 缺或非法者亦視為 AND)、名稱屬於被刪名稱,
- * 且刪除後被引用表已無該名稱之列者, 該引用者於刪除後其授權將被收回(AND 項變懸空, 內容全 n).
+ * 且刪除後被引用表已無該名稱之列者(刪除後該引用被連帶清理, 其 AND 限制解除).
  * nWiden／holdersWiden(新增; 須給 rowsBefore): 引用者中有 isActive 為 'y' 之引用(任何 mode)、名稱屬於被刪名稱,
  * 且刪除後該名稱仍有 ≥ 1 筆剩餘列但筆數比刪除前少者(歷史同名只刪其一), 該引用者之授權可能變多(少一個較嚴之候選).
  * 未給 rowsBefore(非陣列)則不計, nWiden 為 0.
@@ -240,7 +241,7 @@ function getRuleWarns(c) {
  * @param {Array} delNames 輸入被刪除之名稱陣列
  * @param {Array} rowsRemain 輸入刪除後被引用表之剩餘列(grups 或 pemis)
  * @param {Array} [rowsBefore] 輸入刪除前被引用表之列(基準, 已儲存者), 供計 nWiden
- * @returns {Object} 回傳 { n, holders, nWiden, holdersWiden }: n 為授權將被收回之引用者數, holders 為其列; nWiden 為授權可能變多之引用者數, holdersWiden 為其列
+ * @returns {Object} 回傳 { n, holders, nWiden, holdersWiden }: n 為以 AND 引用且名稱完全消失之引用者數(其 AND 限制將隨引用被清理而解除), holders 為其列; nWiden 為授權可能變多之引用者數, holdersWiden 為其列
  */
 function countAndRefs(holders, field, delNames, rowsRemain, rowsBefore) {
     let setDel = new Set(delNames)
@@ -283,10 +284,13 @@ function countAndRefs(holders, field, delNames, rowsRemain, rowsBefore) {
 
 
 /**
- * 把訊息範本之 {names}、{kind}、{n} 代入(以 split／join, 名稱可含 $& 等字樣, 原樣顯示)
+ * 把訊息範本之 {names}、{kind}、{n}、{m}、{w}、{e}、{list} 代入(以 split／join 之等價單趟掃描, 名稱可含 $& 等字樣, 原樣顯示)
+ *
+ * names 以 joinNames 串接(至多 5 個, 超過加省略號); list 為呼叫端已組好之字串(如 getCascadePreview 之「舊→新」清單, 自訂截斷文字), 原樣代入;
+ * n、m、w、e 為筆數(刪除／改名確認框: n 為受影響之引用端列數, m 為其中以 AND 引用者, w 為歷史同名致授權可能變多者, e 為其中來源為外部應用者). 未給之佔位符原樣保留.
  *
  * @param {String} tpl 輸入範本
- * @param {Object} vars 輸入 { names, kind, n }
+ * @param {Object} vars 輸入 { names, kind, n, m, w, e, list }
  * @returns {String} 回傳代入後之文字
  */
 function fmtWarn(tpl, vars = {}) {
@@ -298,10 +302,12 @@ function fmtWarn(tpl, vars = {}) {
     if ('kind' in vars) {
         kp.kind = String(vars.kind)
     }
-    if ('n' in vars) {
-        kp.n = String(vars.n)
+    for (let k of ['n', 'm', 'w', 'e', 'list']) {
+        if (k in vars) {
+            kp[k] = String(vars[k])
+        }
     }
-    return String(tpl).replace(/\{(names|kind|n)\}/g, (m, k) => (k in kp ? kp[k] : m))
+    return String(tpl).replace(/\{(names|kind|n|m|w|e|list)\}/g, (hit, k) => (k in kp ? kp[k] : hit))
 }
 
 

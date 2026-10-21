@@ -1,0 +1,384 @@
+==== full @ 上午2:53:41
+  exit=0
+    [quiet-run] exit=0 time=49s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261022-025341-tapi-full.log (54 行, 8 KB)
+    39 passing (48s)
+    ✔ API-RC-020 後台刪除群組: users.cgrups 該名稱被移除(含停用項); AND 引用者授權變寬且等於「找不到即忽略」(對照使用者)、僅引用者清為全 n(S3) (1175ms)
+    ✔ API-RC-021 後台刪除權限: grups.cpemis 該名稱被移除(物件／陣列形式皆清); AND 引用者之授權等於對照群組之使用者(S3) (184ms)
+    ✔ API-RC-022 後台刪除標的: pemis.crules 該標的被移除、其餘規則不動、各使用者授權除該標的外不變(S3) (351ms)
+    ✔ API-RC-023 後台刪除群組 M1 並於同一次寫入以同名新增(新 id): 舊引用被清理、新列不繼承(S3 原則 6) (76ms)
+    ✔ API-RC-024 後台刪除權限 P1 並同次以同名新增(新 id): 舊引用被清理、新列不繼承(S3 原則 6)
+    ✔ API-RC-025 後台標的刪除再同 id 新增(同一次寫入): 同 id 不算刪除, pemis.crules 逐位元不變(S3: 身分以主鍵, targets 之 id 即名稱)
+    ✔ API-RC-030 renameCascadeNameInUse(後台): 新名為仍被啟用中引用之懸空名 → 回語系鍵、四表逐位元不變、srLog 有 reason 且不含引用端 id／email／name; 停用之懸空引用與「新增同名」不擋(S4) (1370ms)
+    ✔ API-RC-031 renameCascadeConflict(後台): 同一字串含舊名與一個停用之同名懸空項 → 回語系鍵、四表逐位元不變、srLog 有 reason 且不含引用端值(S4) (868ms)
+    ✔ API-RC-036 權限同形(updatePemis): renameCascadeNameInUse／renameCascadeConflict 對 grups.cpemis 亦拒、四表逐位元不變、srLog 有 reason 且不含引用端 id／name; saveCascadePartial 語系鍵有 eng／cht(S4) (1697ms)
+    ✔ API-RC-040 外部同步同 id 改名: 引用端(他 from 外部列、同 from 外部列、後台列)之 cgrups 連帶改寫、授權不變、後台 from 之群組列不動(S5a、S1、S2) (1092ms)
+    ✔ API-RC-041 外部同步某 id 不再推送: 該群組之引用被清理(含陣列形式 AND 項), 清理後授權等於「找不到即忽略」(S5b、S3) (330ms)
+    ✔ API-RC-042 外部同步未帶 id 之列、名稱不變重推(連推 3 次): 引用不被清理、引用端全列逐位元不變(含更新者)、授權不變; 每次 ORM 補之隨機主鍵雖變(S5c) (183ms)
+    ✔ API-RC-043 外部同步未帶 id 且改名(已知限制②): 視為刪舊增新, 舊名引用被清理、新名之列不繼承(斷言之) (54ms)
+    ✔ API-RC-044 外部同步被拒(NameInUse／Conflict): 回固定鍵 invalidRows、四表逐位元不變、srLog 之 reason 為對應鍵且不含引用端值(S4、S5e) (2059ms)
+    ✔ API-RC-045 外部同步 pemis: 同 id 改名連帶改寫 grups.cpemis(授權不變); 舊 id 不再推送則清理(授權等於對照; S5f) (318ms)
+    ✔ API-RC-046 外部同步 targets: 舊 id 不再推送則 pemis.crules 清理該標的; 改 id 視為刪舊增新(舊 id 引用被清、新 id 不繼承; S5f、階段 1 已知限制①) (106ms)
+    ✔ API-RC-060 只改說明／調列序／新增列之 updateGrups: 不改 users 任何列(含 timeUpdate／userIdUpdate), pemis／targets 亦同(S7)
+    ✔ API-RC-061 只改說明／新增列之 updatePemis 與 updateTargets: 不改 grups、users(pemis 不改 grups; targets 不改 pemis; S7)
+    ✔ API-RC-062 外部同步同 id 同名只改說明: 不改 users(含更新者欄位)(S7) (55ms)
+    ✔ API-RC-080 後台(admin)改名連帶改寫之引用端列: userIdUpdate 記為 id-for-admin、timeUpdate 前進、其餘欄位不變; 未改寫列之更新者不動(S9)
+    ✔ API-RC-081 外部同步(application)改名連帶改寫之後台引用端列: userIdUpdate 記為 id-for-application、timeUpdate 前進、其餘欄位不變(S9) (72ms)
+    ✔ API-RC-070 並行五寫入者(updateGrups 含改名＋刪除、updateUsers、updatePemis 含刪除＋改名、updateTargets 含刪除、syncAndReplaceTabs grups 含改名＋刪除)×3 輪、輪輪不同啟動次序: 30 秒內全數完成、全部成功、終態無懸空且無遺失更新(S8) (385ms)
+    ✔ API-RC-071 並行改名級聯(updateGrups 改名＋同步 grups 改名, 皆連帶改寫 users)∥ updatePemis 刪除 ∥ updateTargets 刪除 ×3 輪: 全部成功、users 之物件／陣列引用皆為新名、授權不變、無懸空(S8、S1、S2) (1223ms)
+    ✔ API-RC-072 並行 updatePemis 改名(連帶改寫 grups)∥ updateTargets 刪除(清理 pemis)∥ updateUsers ×3 輪: 全部成功、grups.cpemis 為新名、授權不變、無懸空(S8) (905ms)
+    ✔ API-RC-032 renameCascadeDupGroup(後台): 被改名者屬歷史同名組且該名稱仍被引用 → 回語系鍵、四表逐位元不變、srLog 有 reason 且不含引用端值; 改名任一筆皆同(S4) (1692ms)
+    ✔ API-RC-033 renameCascadeDupGroup(外部同步): 同步歷史同名組中屬該 from 之一列改名 → 回固定鍵 invalidRows、四表逐位元不變、srLog 之 reason 為 renameCascadeDupGroup 且不含引用端值(S4、S5e) (837ms)
+    ✔ API-RC-034 歷史同名組無人引用時改名不擋(清理路徑): 其中一筆改名成功、引用端表逐位元不變(S4 規則 3)
+    ✔ API-RC-035 刪除歷史同名組之一筆: 仍有同 id 同名之存續列, 引用不清理(逐位元不變); 兩筆皆刪後才清理(S3) (39ms)
+    ✔ API-RC-050 關閉後群組改名不連帶: users 逐位元不變、引用成為懸空、授權只收嚴不放寬且被改名者之使用者授權為全 n、grupsNames 不再列出(S6; ADR-035 c) (333ms)
+    ✔ API-RC-051 關閉後不產生三種改名相關拒絕: 新名撞懸空名、容器內相撞、權限改名皆成功且引用端不動(S6) (58ms)
+    ✔ API-RC-052 關閉後刪除仍連帶清理: 群組→users.cgrups、權限→grups.cpemis、標的→pemis.crules(S6、S3) (113ms)
+    ✔ API-RC-053 關閉後外部同步: 同 id 改名不連帶(引用端逐位元不變)、舊 id 不再推送仍清理引用(S6、S5) (66ms)
+    ✔ API-RC-054 關閉後歷史同名組改名不產生 renameCascadeDupGroup: 改名成功、users 逐位元不變(S6)
+==== m8 @ 上午2:54:30
+  未命中之引用端列亦被改寫(移除「未變更則略過」)  (grep=API-RC-001|API-RC-02[0-2])
+  exit=4
+    [quiet-run] exit=4 time=15s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\run06\tapi\mut\m8\tmp\quiet-run\20261022-025430-tapi-m8.log (163 行, 8 KB)
+    [quiet-run] cmd: node C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\node_modules\mocha\bin\mocha.js test/api-refCascade.test.mjs --timeout 300000 --grep "API-RC-001|API-RC-02[0-2]"
+    0 passing (14s)
+    4 failing
+    1) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    API-RC-001 後台群組改名: users.cgrups(物件／陣列形式、外部 teamA 列)連帶改寫、授權與改名前相同、未命中列逐位元不變、pemis／targets 不動(S1、S2、S7; srLog 計數不含引用端值):
+    2) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    4) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    API-RC-022 後台刪除標的: pemis.crules 該標的被移除、其餘規則不動、各使用者授權除該標的外不變(S3):
+==== m9 @ 上午2:54:44
+  外部同步未帶 id 之列不依名稱對應(視為新實體)  (grep=API-RC-042)
+  exit=1
+    [quiet-run] exit=1 time=14s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\run06\tapi\mut\m9\tmp\quiet-run\20261022-025445-tapi-m9.log (30 行, 10 KB)
+    [quiet-run] cmd: node C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\node_modules\mocha\bin\mocha.js test/api-refCascade.test.mjs --timeout 300000 --grep API-RC-042
+    0 passing (12s)
+    1 failing
+    1) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    API-RC-042 外部同步未帶 id 之列、名稱不變重推(連推 3 次): 引用不被清理、引用端全列逐位元不變(含更新者)、授權不變; 每次 ORM 補之隨機主鍵雖變(S5c):
+    1) API-RC-042 外部同步未帶 id 之列、名稱不變重推(連推 3 次): 引用不被清理、引用端全列逐位元不變(含更新者)、授權不變; 每次 ORM 補之隨機主鍵雖變(S5c)
+==== m10 @ 上午2:54:58
+  刪除連帶清理略過停用項(只清 isActive 為 y 者)  (grep=API-RC-020)
+  exit=1
+    [quiet-run] exit=1 time=14s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\run06\tapi\mut\m10\tmp\quiet-run\20261022-025459-tapi-m10.log (46 行, 2 KB)
+    [quiet-run] cmd: node C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\node_modules\mocha\bin\mocha.js test/api-refCascade.test.mjs --timeout 300000 --grep API-RC-020
+    0 passing (13s)
+    1 failing
+    1) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    API-RC-020 後台刪除群組: users.cgrups 該名稱被移除(含停用項); AND 引用者授權變寬且等於「找不到即忽略」(對照使用者)、僅引用者清為全 n(S3):
+    1) API-RC-020 後台刪除群組: users.cgrups 該名稱被移除(含停用項); AND 引用者授權變寬且等於「找不到即忽略」(對照使用者)、僅引用者清為全 n(S3)
+==== m11 @ 上午2:55:13
+  移除 renameCascadeConflict(容器內相撞時照改, 兩項混成一項)  (grep=API-RC-031|API-RC-044)
+  exit=2
+    [quiet-run] exit=2 time=15s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\run06\tapi\mut\m11\tmp\quiet-run\20261022-025513-tapi-m11.log (45 行, 3 KB)
+    [quiet-run] cmd: node C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\node_modules\mocha\bin\mocha.js test/api-refCascade.test.mjs --timeout 300000 --grep "API-RC-031|API-RC-044"
+    0 passing (14s)
+    2 failing
+    1) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    API-RC-031 renameCascadeConflict(後台): 同一字串含舊名與一個停用之同名懸空項 → 回語系鍵、四表逐位元不變、srLog 有 reason 且不含引用端值(S4):
+    2) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    API-RC-044 外部同步被拒(NameInUse／Conflict): 回固定鍵 invalidRows、四表逐位元不變、srLog 之 reason 為對應鍵且不含引用端值(S4、S5e):
+    1) API-RC-031 renameCascadeConflict(後台): 同一字串含舊名與一個停用之同名懸空項 → 回語系鍵、四表逐位元不變、srLog 有 reason 且不含引用端值(S4)
+    2) API-RC-044 外部同步被拒(NameInUse／Conflict): 回固定鍵 invalidRows、四表逐位元不變、srLog 之 reason 為對應鍵且不含引用端值(S4、S5e)
+==== m12 @ 上午2:55:29
+  移除 renameCascadeDupGroup 檢查(歷史同名組改名照做)  (grep=API-RC-03[23])
+  exit=2
+    [quiet-run] exit=2 time=16s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\run06\tapi\mut\m12\tmp\quiet-run\20261022-025529-tapi-m12.log (46 行, 3 KB)
+    [quiet-run] cmd: node C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\node_modules\mocha\bin\mocha.js test/api-refCascade.test.mjs --timeout 300000 --grep API-RC-03[23]
+    0 passing (15s)
+    2 failing
+    1) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    API-RC-032 renameCascadeDupGroup(後台): 被改名者屬歷史同名組且該名稱仍被引用 → 回語系鍵、四表逐位元不變、srLog 有 reason 且不含引用端值; 改名任一筆皆同(S4):
+    2) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    API-RC-033 renameCascadeDupGroup(外部同步): 同步歷史同名組中屬該 from 之一列改名 → 回固定鍵 invalidRows、四表逐位元不變、srLog 之 reason 為 renameCascadeDupGroup 且不含引用端值(S4、S5e):
+    1) API-RC-032 renameCascadeDupGroup(後台): 被改名者屬歷史同名組且該名稱仍被引用 → 回語系鍵、四表逐位元不變、srLog 有 reason 且不含引用端值; 改名任一筆皆同(S4)
+    2) API-RC-033 renameCascadeDupGroup(外部同步): 同步歷史同名組中屬該 from 之一列改名 → 回固定鍵 invalidRows、四表逐位元不變、srLog 之 reason 為 renameCascadeDupGroup 且不含引用端值(S4、S5e)
+==== m13 @ 上午2:55:45
+  失敗補償被移除(主體寫入失敗時不還原引用端; API 層無故障注入點, 預期 API 抓不到)  (grep=API-RC-0)
+  exit=0
+    [quiet-run] exit=0 time=46s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\run06\tapi\mut\m13\tmp\quiet-run\20261022-025545-tapi-m13.log (54 行, 8 KB)
+    [quiet-run] cmd: node C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\node_modules\mocha\bin\mocha.js test/api-refCascade.test.mjs --timeout 300000 --grep API-RC-0
+    39 passing (45s)
+    ✔ API-RC-020 後台刪除群組: users.cgrups 該名稱被移除(含停用項); AND 引用者授權變寬且等於「找不到即忽略」(對照使用者)、僅引用者清為全 n(S3) (1147ms)
+    ✔ API-RC-021 後台刪除權限: grups.cpemis 該名稱被移除(物件／陣列形式皆清); AND 引用者之授權等於對照群組之使用者(S3) (201ms)
+    ✔ API-RC-022 後台刪除標的: pemis.crules 該標的被移除、其餘規則不動、各使用者授權除該標的外不變(S3) (370ms)
+    ✔ API-RC-023 後台刪除群組 M1 並於同一次寫入以同名新增(新 id): 舊引用被清理、新列不繼承(S3 原則 6) (79ms)
+    ✔ API-RC-024 後台刪除權限 P1 並同次以同名新增(新 id): 舊引用被清理、新列不繼承(S3 原則 6)
+    ✔ API-RC-025 後台標的刪除再同 id 新增(同一次寫入): 同 id 不算刪除, pemis.crules 逐位元不變(S3: 身分以主鍵, targets 之 id 即名稱)
+    ✔ API-RC-030 renameCascadeNameInUse(後台): 新名為仍被啟用中引用之懸空名 → 回語系鍵、四表逐位元不變、srLog 有 reason 且不含引用端 id／email／name; 停用之懸空引用與「新增同名」不擋(S4) (1065ms)
+    ✔ API-RC-031 renameCascadeConflict(後台): 同一字串含舊名與一個停用之同名懸空項 → 回語系鍵、四表逐位元不變、srLog 有 reason 且不含引用端值(S4) (846ms)
+    ✔ API-RC-036 權限同形(updatePemis): renameCascadeNameInUse／renameCascadeConflict 對 grups.cpemis 亦拒、四表逐位元不變、srLog 有 reason 且不含引用端 id／name; saveCascadePartial 語系鍵有 eng／cht(S4) (1652ms)
+    ✔ API-RC-040 外部同步同 id 改名: 引用端(他 from 外部列、同 from 外部列、後台列)之 cgrups 連帶改寫、授權不變、後台 from 之群組列不動(S5a、S1、S2) (1056ms)
+    ✔ API-RC-041 外部同步某 id 不再推送: 該群組之引用被清理(含陣列形式 AND 項), 清理後授權等於「找不到即忽略」(S5b、S3) (322ms)
+    ✔ API-RC-042 外部同步未帶 id 之列、名稱不變重推(連推 3 次): 引用不被清理、引用端全列逐位元不變(含更新者)、授權不變; 每次 ORM 補之隨機主鍵雖變(S5c) (196ms)
+    ✔ API-RC-043 外部同步未帶 id 且改名(已知限制②): 視為刪舊增新, 舊名引用被清理、新名之列不繼承(斷言之) (47ms)
+    ✔ API-RC-044 外部同步被拒(NameInUse／Conflict): 回固定鍵 invalidRows、四表逐位元不變、srLog 之 reason 為對應鍵且不含引用端值(S4、S5e) (1720ms)
+    ✔ API-RC-045 外部同步 pemis: 同 id 改名連帶改寫 grups.cpemis(授權不變); 舊 id 不再推送則清理(授權等於對照; S5f) (293ms)
+    ✔ API-RC-046 外部同步 targets: 舊 id 不再推送則 pemis.crules 清理該標的; 改 id 視為刪舊增新(舊 id 引用被清、新 id 不繼承; S5f、階段 1 已知限制①) (92ms)
+    ✔ API-RC-060 只改說明／調列序／新增列之 updateGrups: 不改 users 任何列(含 timeUpdate／userIdUpdate), pemis／targets 亦同(S7)
+    ✔ API-RC-061 只改說明／新增列之 updatePemis 與 updateTargets: 不改 grups、users(pemis 不改 grups; targets 不改 pemis; S7)
+    ✔ API-RC-062 外部同步同 id 同名只改說明: 不改 users(含更新者欄位)(S7) (64ms)
+    ✔ API-RC-080 後台(admin)改名連帶改寫之引用端列: userIdUpdate 記為 id-for-admin、timeUpdate 前進、其餘欄位不變; 未改寫列之更新者不動(S9)
+    ✔ API-RC-081 外部同步(application)改名連帶改寫之後台引用端列: userIdUpdate 記為 id-for-application、timeUpdate 前進、其餘欄位不變(S9) (73ms)
+    ✔ API-RC-070 並行五寫入者(updateGrups 含改名＋刪除、updateUsers、updatePemis 含刪除＋改名、updateTargets 含刪除、syncAndReplaceTabs grups 含改名＋刪除)×3 輪、輪輪不同啟動次序: 30 秒內全數完成、全部成功、終態無懸空且無遺失更新(S8) (380ms)
+    ✔ API-RC-071 並行改名級聯(updateGrups 改名＋同步 grups 改名, 皆連帶改寫 users)∥ updatePemis 刪除 ∥ updateTargets 刪除 ×3 輪: 全部成功、users 之物件／陣列引用皆為新名、授權不變、無懸空(S8、S1、S2) (1211ms)
+    ✔ API-RC-072 並行 updatePemis 改名(連帶改寫 grups)∥ updateTargets 刪除(清理 pemis)∥ updateUsers ×3 輪: 全部成功、grups.cpemis 為新名、授權不變、無懸空(S8) (891ms)
+    ✔ API-RC-032 renameCascadeDupGroup(後台): 被改名者屬歷史同名組且該名稱仍被引用 → 回語系鍵、四表逐位元不變、srLog 有 reason 且不含引用端值; 改名任一筆皆同(S4) (1659ms)
+    ✔ API-RC-033 renameCascadeDupGroup(外部同步): 同步歷史同名組中屬該 from 之一列改名 → 回固定鍵 invalidRows、四表逐位元不變、srLog 之 reason 為 renameCascadeDupGroup 且不含引用端值(S4、S5e) (825ms)
+    ✔ API-RC-034 歷史同名組無人引用時改名不擋(清理路徑): 其中一筆改名成功、引用端表逐位元不變(S4 規則 3)
+    ✔ API-RC-035 刪除歷史同名組之一筆: 仍有同 id 同名之存續列, 引用不清理(逐位元不變); 兩筆皆刪後才清理(S3)
+    ✔ API-RC-050 關閉後群組改名不連帶: users 逐位元不變、引用成為懸空、授權只收嚴不放寬且被改名者之使用者授權為全 n、grupsNames 不再列出(S6; ADR-035 c) (328ms)
+    ✔ API-RC-051 關閉後不產生三種改名相關拒絕: 新名撞懸空名、容器內相撞、權限改名皆成功且引用端不動(S6) (55ms)
+    ✔ API-RC-052 關閉後刪除仍連帶清理: 群組→users.cgrups、權限→grups.cpemis、標的→pemis.crules(S6、S3) (94ms)
+    ✔ API-RC-053 關閉後外部同步: 同 id 改名不連帶(引用端逐位元不變)、舊 id 不再推送仍清理引用(S6、S5) (73ms)
+    ✔ API-RC-054 關閉後歷史同名組改名不產生 renameCascadeDupGroup: 改名成功、users 逐位元不變(S6)
+==== m14 @ 上午2:56:31
+  寫入次序顛倒(主體先寫、引用端後寫; 終態相同, API 層預期抓不到)  (grep=API-RC-0)
+  exit=0
+    [quiet-run] exit=0 time=41s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\run06\tapi\mut\m14\tmp\quiet-run\20261022-025632-tapi-m14.log (54 行, 8 KB)
+    [quiet-run] cmd: node C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\node_modules\mocha\bin\mocha.js test/api-refCascade.test.mjs --timeout 300000 --grep API-RC-0
+    39 passing (41s)
+    ✔ API-RC-020 後台刪除群組: users.cgrups 該名稱被移除(含停用項); AND 引用者授權變寬且等於「找不到即忽略」(對照使用者)、僅引用者清為全 n(S3) (1169ms)
+    ✔ API-RC-021 後台刪除權限: grups.cpemis 該名稱被移除(物件／陣列形式皆清); AND 引用者之授權等於對照群組之使用者(S3) (201ms)
+    ✔ API-RC-022 後台刪除標的: pemis.crules 該標的被移除、其餘規則不動、各使用者授權除該標的外不變(S3) (342ms)
+    ✔ API-RC-023 後台刪除群組 M1 並於同一次寫入以同名新增(新 id): 舊引用被清理、新列不繼承(S3 原則 6) (57ms)
+    ✔ API-RC-024 後台刪除權限 P1 並同次以同名新增(新 id): 舊引用被清理、新列不繼承(S3 原則 6) (56ms)
+    ✔ API-RC-025 後台標的刪除再同 id 新增(同一次寫入): 同 id 不算刪除, pemis.crules 逐位元不變(S3: 身分以主鍵, targets 之 id 即名稱)
+    ✔ API-RC-030 renameCascadeNameInUse(後台): 新名為仍被啟用中引用之懸空名 → 回語系鍵、四表逐位元不變、srLog 有 reason 且不含引用端 id／email／name; 停用之懸空引用與「新增同名」不擋(S4) (1041ms)
+    ✔ API-RC-031 renameCascadeConflict(後台): 同一字串含舊名與一個停用之同名懸空項 → 回語系鍵、四表逐位元不變、srLog 有 reason 且不含引用端值(S4) (842ms)
+    ✔ API-RC-036 權限同形(updatePemis): renameCascadeNameInUse／renameCascadeConflict 對 grups.cpemis 亦拒、四表逐位元不變、srLog 有 reason 且不含引用端 id／name; saveCascadePartial 語系鍵有 eng／cht(S4) (1668ms)
+    ✔ API-RC-040 外部同步同 id 改名: 引用端(他 from 外部列、同 from 外部列、後台列)之 cgrups 連帶改寫、授權不變、後台 from 之群組列不動(S5a、S1、S2) (1039ms)
+    ✔ API-RC-041 外部同步某 id 不再推送: 該群組之引用被清理(含陣列形式 AND 項), 清理後授權等於「找不到即忽略」(S5b、S3) (291ms)
+    ✔ API-RC-042 外部同步未帶 id 之列、名稱不變重推(連推 3 次): 引用不被清理、引用端全列逐位元不變(含更新者)、授權不變; 每次 ORM 補之隨機主鍵雖變(S5c) (202ms)
+    ✔ API-RC-043 外部同步未帶 id 且改名(已知限制②): 視為刪舊增新, 舊名引用被清理、新名之列不繼承(斷言之) (49ms)
+    ✔ API-RC-044 外部同步被拒(NameInUse／Conflict): 回固定鍵 invalidRows、四表逐位元不變、srLog 之 reason 為對應鍵且不含引用端值(S4、S5e) (1704ms)
+    ✔ API-RC-045 外部同步 pemis: 同 id 改名連帶改寫 grups.cpemis(授權不變); 舊 id 不再推送則清理(授權等於對照; S5f) (319ms)
+    ✔ API-RC-046 外部同步 targets: 舊 id 不再推送則 pemis.crules 清理該標的; 改 id 視為刪舊增新(舊 id 引用被清、新 id 不繼承; S5f、階段 1 已知限制①) (106ms)
+    ✔ API-RC-060 只改說明／調列序／新增列之 updateGrups: 不改 users 任何列(含 timeUpdate／userIdUpdate), pemis／targets 亦同(S7) (47ms)
+    ✔ API-RC-061 只改說明／新增列之 updatePemis 與 updateTargets: 不改 grups、users(pemis 不改 grups; targets 不改 pemis; S7)
+    ✔ API-RC-062 外部同步同 id 同名只改說明: 不改 users(含更新者欄位)(S7) (65ms)
+    ✔ API-RC-080 後台(admin)改名連帶改寫之引用端列: userIdUpdate 記為 id-for-admin、timeUpdate 前進、其餘欄位不變; 未改寫列之更新者不動(S9)
+    ✔ API-RC-081 外部同步(application)改名連帶改寫之後台引用端列: userIdUpdate 記為 id-for-application、timeUpdate 前進、其餘欄位不變(S9) (66ms)
+    ✔ API-RC-070 並行五寫入者(updateGrups 含改名＋刪除、updateUsers、updatePemis 含刪除＋改名、updateTargets 含刪除、syncAndReplaceTabs grups 含改名＋刪除)×3 輪、輪輪不同啟動次序: 30 秒內全數完成、全部成功、終態無懸空且無遺失更新(S8) (346ms)
+    ✔ API-RC-071 並行改名級聯(updateGrups 改名＋同步 grups 改名, 皆連帶改寫 users)∥ updatePemis 刪除 ∥ updateTargets 刪除 ×3 輪: 全部成功、users 之物件／陣列引用皆為新名、授權不變、無懸空(S8、S1、S2) (1221ms)
+    ✔ API-RC-072 並行 updatePemis 改名(連帶改寫 grups)∥ updateTargets 刪除(清理 pemis)∥ updateUsers ×3 輪: 全部成功、grups.cpemis 為新名、授權不變、無懸空(S8) (932ms)
+    ✔ API-RC-032 renameCascadeDupGroup(後台): 被改名者屬歷史同名組且該名稱仍被引用 → 回語系鍵、四表逐位元不變、srLog 有 reason 且不含引用端值; 改名任一筆皆同(S4) (1670ms)
+    ✔ API-RC-033 renameCascadeDupGroup(外部同步): 同步歷史同名組中屬該 from 之一列改名 → 回固定鍵 invalidRows、四表逐位元不變、srLog 之 reason 為 renameCascadeDupGroup 且不含引用端值(S4、S5e) (838ms)
+    ✔ API-RC-034 歷史同名組無人引用時改名不擋(清理路徑): 其中一筆改名成功、引用端表逐位元不變(S4 規則 3)
+    ✔ API-RC-035 刪除歷史同名組之一筆: 仍有同 id 同名之存續列, 引用不清理(逐位元不變); 兩筆皆刪後才清理(S3)
+    ✔ API-RC-050 關閉後群組改名不連帶: users 逐位元不變、引用成為懸空、授權只收嚴不放寬且被改名者之使用者授權為全 n、grupsNames 不再列出(S6; ADR-035 c) (344ms)
+    ✔ API-RC-051 關閉後不產生三種改名相關拒絕: 新名撞懸空名、容器內相撞、權限改名皆成功且引用端不動(S6) (47ms)
+    ✔ API-RC-052 關閉後刪除仍連帶清理: 群組→users.cgrups、權限→grups.cpemis、標的→pemis.crules(S6、S3) (107ms)
+    ✔ API-RC-053 關閉後外部同步: 同 id 改名不連帶(引用端逐位元不變)、舊 id 不再推送仍清理引用(S6、S5) (57ms)
+    ✔ API-RC-054 關閉後歷史同名組改名不產生 renameCascadeDupGroup: 改名成功、users 逐位元不變(S6)
+==== m15 @ 上午2:57:13
+  後台寫入不取引用端表鎖(只取本表鎖; 競態窗口, API 層預期難以決定性抓到)  (grep=API-RC-07)
+  exit=0
+    [quiet-run] exit=0 time=14s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\run06\tapi\mut\m15\tmp\quiet-run\20261022-025713-tapi-m15.log (13 行, 2 KB)
+    [quiet-run] cmd: node C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\node_modules\mocha\bin\mocha.js test/api-refCascade.test.mjs --timeout 300000 --grep API-RC-07
+    3 passing (13s)
+    ✔ API-RC-070 並行五寫入者(updateGrups 含改名＋刪除、updateUsers、updatePemis 含刪除＋改名、updateTargets 含刪除、syncAndReplaceTabs grups 含改名＋刪除)×3 輪、輪輪不同啟動次序: 30 秒內全數完成、全部成功、終態無懸空且無遺失更新(S8) (371ms)
+    ✔ API-RC-071 並行改名級聯(updateGrups 改名＋同步 grups 改名, 皆連帶改寫 users)∥ updatePemis 刪除 ∥ updateTargets 刪除 ×3 輪: 全部成功、users 之物件／陣列引用皆為新名、授權不變、無懸空(S8、S1、S2) (1255ms)
+    ✔ API-RC-072 並行 updatePemis 改名(連帶改寫 grups)∥ updateTargets 刪除(清理 pemis)∥ updateUsers ×3 輪: 全部成功、grups.cpemis 為新名、授權不變、無懸空(S8) (946ms)
+==== unit13 @ 上午2:57:27
+  copied unit-procCore-refCascade.test.mjs, copied unit-refCascade.test.mjs, copied unit-keyCheck.test.mjs
+  exit=29
+    [quiet-run] exit=29 time=20s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\run06\tapi\mut\m13\tmp\quiet-run\20261022-025727-tapi-unit13.log (859 行, 163 KB)
+    220 passing (20s)
+    29 failing
+    1) unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清理之伺服端寫入, R-REF-CASCADE-01／R-WRITE-LOCK-02)
+    RW-401 a2 形狀 swap × (a) 引用端 save 逐筆 ok:0(u3 失敗, u1／u2 已寫入=引用端部分寫入) → 引用端逐位元還原(含 userIdUpdate／timeUpdate)、回 saveWriteFail、故障解除後重送同一份資料成功且結果正確:
+    2) unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清理之伺服端寫入, R-REF-CASCADE-01／R-WRITE-LOCK-02)
+    RW-401 d1 形狀 swap × (d) 主體 save(diff) 整批 reject → 引用端逐位元還原(含 userIdUpdate／timeUpdate)、回 saveWriteFail、故障解除後重送同一份資料成功且結果正確:
+    3) unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清理之伺服端寫入, R-REF-CASCADE-01／R-WRITE-LOCK-02)
+    RW-401 a2 形狀 chain × (a) 引用端 save 逐筆 ok:0(u3 失敗, u1／u2 已寫入=引用端部分寫入) → 引用端逐位元還原(含 userIdUpdate／timeUpdate)、回 saveWriteFail、故障解除後重送同一份資料成功且結果正確:
+    ✔ RW-508 fn 同步拋錯／reject／拋非 Error 值之後鎖皆釋放: 後續呼叫可取(5 秒內完成, 否則視為死結)
+    29) unit-refCascade (引用連帶純函數: 改名級聯與刪除清理, R-PRINCIPLE-00 原則 6、適用表 m／n)
+==== unit14 @ 上午2:57:47
+  copied unit-procCore-refCascade.test.mjs, copied unit-refCascade.test.mjs, copied unit-keyCheck.test.mjs
+  exit=22
+    [quiet-run] exit=22 time=20s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\run06\tapi\mut\m14\tmp\quiet-run\20261022-025747-tapi-unit14.log (932 行, 64 KB)
+    227 passing (20s)
+    22 failing
+    1) unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清理之伺服端寫入, R-REF-CASCADE-01／R-WRITE-LOCK-02)
+    RW-401 a1 形狀 swap × (a) 引用端 save 整批 reject → 引用端逐位元還原(含 userIdUpdate／timeUpdate)、回 saveWriteFail、故障解除後重送同一份資料成功且結果正確:
+    2) unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清理之伺服端寫入, R-REF-CASCADE-01／R-WRITE-LOCK-02)
+    ✔ RW-508 fn 同步拋錯／reject／拋非 Error 值之後鎖皆釋放: 後續呼叫可取(5 秒內完成, 否則視為死結)
+    22) unit-refCascade (引用連帶純函數: 改名級聯與刪除清理, R-PRINCIPLE-00 原則 6、適用表 m／n)
+==== unit15 @ 上午2:58:08
+  copied unit-procCore-refCascade.test.mjs, copied unit-refCascade.test.mjs, copied unit-keyCheck.test.mjs
+  exit=20
+    [quiet-run] exit=20 time=19s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\run06\tapi\mut\m15\tmp\quiet-run\20261022-025808-tapi-unit15.log (686 行, 61 KB)
+    229 passing (18s)
+    20 failing
+    1) unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清理之伺服端寫入, R-REF-CASCADE-01／R-WRITE-LOCK-02)
+    RW-411 e1 雙重故障: 補償失敗不得吞掉原錯誤之記錄——引起補償之原錯誤(ORM 之 failed to save／insert／delete data)須仍可自 srLog 查得(規則帳本 R-REF-CASCADE-01 規則 4: 後重新拋出原錯誤; 對外雖為 saveCascadePartial, 但原文須入 srLog 供稽核):
+    2) unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清理之伺服端寫入, R-REF-CASCADE-01／R-WRITE-LOCK-02)
+    RW-411 e2 雙重故障: 補償失敗不得吞掉原錯誤之記錄——引起補償之原錯誤(ORM 之 failed to save／insert／delete data)須仍可自 srLog 查得(規則帳本 R-REF-CASCADE-01 規則 4: 後重新拋出原錯誤; 對外雖為 saveCascadePartial, 但原文須入 srLog 供稽核):
+    3) unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清理之伺服端寫入, R-REF-CASCADE-01／R-WRITE-LOCK-02)
+    RW-411 e3 雙重故障: 補償失敗不得吞掉原錯誤之記錄——引起補償之原錯誤(ORM 之 failed to save／insert／delete data)須仍可自 srLog 查得(規則帳本 R-REF-CASCADE-01 規則 4: 後重新拋出原錯誤; 對外雖為 saveCascadePartial, 但原文須入 srLog 供稽核):
+    4) unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清理之伺服端寫入, R-REF-CASCADE-01／R-WRITE-LOCK-02)
+    ✔ RW-508 fn 同步拋錯／reject／拋非 Error 值之後鎖皆釋放: 後續呼叫可取(5 秒內完成, 否則視為死結)
+    20) unit-refCascade (引用連帶純函數: 改名級聯與刪除清理, R-PRINCIPLE-00 原則 6、適用表 m／n)
+==== updateTabs @ 上午2:58:27
+  exit=0
+    [quiet-run] exit=0 time=5s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261022-025827-tapi-updateTabs.log (31 行, 4 KB)
+    23 passing (4s)
+    ✔ API-updateUsers-001-add-del-diff-order：新增/刪除/修改列 + order 重給 (49ms)
+    ✔ API-updateUsers-002-duplicate-email-rejected：同 email 重複 → 整表寫入被拒、DB 不變
+    ✔ API-updateUsers-004-legacy-dup-email-roundtrip：歷史重複 email（外部同步造成）原樣送回並編修他列 → 成功、兩列皆在；修復可存；新增第三列／他列併入／重複列改成第三者已用值 → saveRowFieldDuplicate、DB 不變（run05 新增，待實跑） (111ms)
+    ✔ API-updateUsers-005-legacy-empty-email-roundtrip：歷史空 email（外部同步造成）原樣送回並編修他列 → 成功；新增空 email 列／既有有效列改為空 → saveRowFieldInvalid、DB 不變；空 email 列自行改成有效 email → 成功（run05 新增，待實跑） (104ms)
+    ✔ API-updateGrups-001-add-del-diff-order：新增/刪除/修改列 + order 重給
+    ✔ API-updateGrups-002-duplicate-name-rejected：同 name 重複 → 被拒、DB 不變
+    ✔ API-updatePemis-001-add-del-diff-order：新增/刪除/修改列 + order 重給
+    ✔ API-updatePemis-002-duplicate-name-rejected：同 name 重複 → 被拒、DB 不變
+    ✔ API-updateTargets-001-add-del-diff-order：新增/刪除/修改列 + order 重給 (63ms)
+    ✔ API-updateTargets-002-duplicate-id-rejected：同 id 重複 → 被拒、DB 不變 (47ms)
+    ✔ API-updateTargets-003-markup-id-rejected：既有標的之 id 改為含 HTML 標記 → htmlMarkupNotAllowed、DB 不變（原標的仍在） (46ms)
+    ✔ API-updateTargets-004-long-id-rejected：主鍵 UTF-8 超過 1978 位元組 → saveRowFieldInvalid、DB 不變 (47ms)
+    ✔ API-updateTargets-005-whitelisted-and-math-kept：白名單標籤與不構成標記之 < > 照常寫入、存值＝送入值 (49ms)
+    ✔ API-updateGrups-003-markup-name-rejected：新增群組名稱含 HTML 標記 → htmlMarkupNotAllowed、DB 不變
+    ✔ API-updatePemis-003-markup-description-rejected：權限說明含 HTML 標記 → htmlMarkupNotAllowed、DB 不變
+    ✔ API-updateUsers-003-markup-email-rejected：新增使用者 email 含 HTML 標記 → htmlMarkupNotAllowed、DB 不變
+    ✔ API-updateTargets-006-row-with-length-field-markup-rejected：列帶 length 欄位（0、1、2**32-1）且欄位含標記 → htmlMarkupNotAllowed、DB 不變 (120ms)
+    ✔ API-updateTargets-007-rows-not-array-rejected：rows 非陣列或含非物件／空物件之列（帶 length 之物件、一般物件、字串、null、[null]、[{}]、['']、[[]]、[合法列, null]） → saveRowFieldInvalid、DB 不變（修正前整表清空並回成功） (529ms)
+    ✔ API-updateTargets-008-rows-huge-length-fast：rows = { length: 2**32-1 } → 10 秒內回 saveRowFieldInvalid、DB 不變（修正前 each(rows) 空轉約 80 秒） (47ms)
+    ✔ API-updateTargets-009-empty-array-still-clears：rows = [] 仍合法（清空整表為正常操作） (75ms)
+    ✔ API-updateTabs-NS-001-nonscalar-field-rejected：四表任一既有列之 description 改為物件／陣列／巢狀 → saveRowFieldInvalid、DB 不變 (634ms)
+    ✔ API-updateTabs-NS-002-nonscalar-new-row-with-delete-rejected：新增列欄位為物件 + 同批刪除他列 → saveRowFieldInvalid、刪除未落地、DB 不變 (46ms)
+    ✔ API-updateTabs-NS-003-scalar-values-still-written：description 為字串、純量照常寫入（迴歸保護） (48ms)
+==== sync @ 上午2:58:31
+  exit=0
+    [quiet-run] exit=0 time=5s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261022-025832-tapi-sync.log (35 行, 4 KB)
+    27 passing (4s)
+    ✔ API-sync-001-success-replace-users (255ms)
+    ✔ API-sync-002-empty-rows-rejected
+    ✔ API-sync-003-bad-token-reject-no-write
+    ✔ API-sync-004-invalid-keyTable-reject
+    ✔ API-sync-005-invalid-payload-reject (43ms)
+    ✔ API-sync-006-success-replace-targets
+    ✔ API-sync-007-markup-id-rejected-rows-kept：主鍵含 HTML 標記 → htmlMarkupNotAllowed，該 from 既有列不變
+    ✔ API-sync-008-markup-field-rejected-rows-kept：非主鍵欄位含 HTML 標記 → htmlMarkupNotAllowed，不靜默改寫、既有列不變
+    ✔ API-sync-009-long-id-rejected-rows-kept：主鍵 UTF-8 超過 1978 位元組 → invalidRows，該 from 既有列不變
+    ✔ API-sync-010-numeric-id-stored-as-string：數字主鍵存為其字串形式、回應 id 為字串、重送不增列
+    ✔ API-sync-011-id-of-other-from-rejected：主鍵已屬其他 from（數字或其字串形式）→ invalidRows，兩個 from 皆不變 (46ms)
+    ✔ API-sync-012-row-with-length-field-markup-rejected-rows-kept：列帶 length 欄位（0、1、2**32-1）且欄位含標記 → htmlMarkupNotAllowed，該 from 既有列不變 (63ms)
+    ✔ API-sync-013-row-with-length-field-valid-accepted：列帶 length 欄位但內容合法 → 成功，length 不入庫
+    ✔ API-sync-014-non-object-elements-rejected-no-engine-text：rows 含非物件元素（字串、數字、null、陣列、布林） → invalidRows（語系鍵），不外送引擎原文，該 from 既有列不變 (125ms)
+    ✔ API-sync-015-empty-object-element-rejected-no-blank-row：rows 含 {} → invalidRows，不寫入空白列，該 from 既有列不變 (62ms)
+    ✔ API-sync-016-row-without-schema-fields-rejected-no-blank-row：列只含非 schema 欄位（或只有 from）→ invalidRows，不寫入空白列，該 from 既有列不變 (125ms)
+    ✔ API-sync-017-row-with-only-server-managed-or-empty-container-fields-rejected：只含伺服器管理欄或空容器值之列 → invalidRows，不寫入空白列；order 為 0 之列照常寫入 (139ms)
+    ✔ API-sync-018-nonscalar-field-rejected-rows-kept：列的 description 為物件／陣列／巢狀（同列他欄有內容） → invalidRows，該 from 分區全列與其他 from 之全部列逐位元不變 (60ms)
+    ✔ API-sync-019-nonscalar-in-other-tables-rejected：users／grups／pemis 的非純量欄位亦拒絕（cgrups／cpemis／crules 為 JSON 字串，物件非法）；先建立舊列，拒收後全列與其他 from 逐位元不變 (114ms)
+    ✔ API-sync-020-empty-or-nonstring-name-rejected：grups／pemis 的 name 缺漏／空字串／數字／布林／null → invalidRows，整批拒收（含同批其他合法列），該 from 與他 from 逐位元不變 (462ms)
+    ✔ API-sync-021-empty-or-nonstring-id-rejected-targets：targets 的 id 缺漏／空字串／數字／布林／null → invalidRows，整批拒收，該 from 與他 from 逐位元不變 (232ms)
+    ✔ API-sync-022-valid-string-names-accepted-users-unaffected：合法非空字串（含中文、含空白字元內嵌）照常寫入；users 不要求 name（name 可重複） (47ms)
+    ✔ API-sync-023-duplicate-name-in-batch-rejected：grups／pemis 同批 rows 內 name 重複（相鄰、不相鄰、三筆中兩筆）→ invalidRows，該 from 與他 from 全列逐位元不變 (123ms)
+    ✔ API-sync-024-name-used-by-other-from-rejected：grups／pemis 的 name 已為他 from 之既有列使用（含 base seed）→ invalidRows，兩個 from 皆不變 (110ms)
+    ✔ API-sync-025-same-from-resend-same-name-accepted：同 from 重送同名（含換 id 保留 name、重送完全相同之批）→ 成功（同 from 之既有列隨 delAll 重寫，不算衝突） (98ms)
+    ✔ API-sync-026-exact-match-only：僅大小寫或前後空白不同之 name 視為不同名稱（精確 ===，不正規化），可寫入
+    ✔ API-sync-027-users-default-mappingBy-id-no-mapkey-check：預設 mappingBy=id 時 users 不另檢查對應鍵（email 空／批內重複／與他 from 重複皆可寫入）
+==== chain2 finished
+==== unit0 @ 上午2:58:49
+  copied unit-procCore-refCascade.test.mjs, copied unit-refCascade.test.mjs, copied unit-keyCheck.test.mjs
+  exit=6
+    [quiet-run] exit=6 time=20s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\run06\tapi\mut\m0\tmp\quiet-run\20261022-025849-tapi-unit0.log (416 行, 47 KB)
+    243 passing (20s)
+    6 failing
+    1) unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清理之伺服端寫入, R-REF-CASCADE-01／R-WRITE-LOCK-02)
+    RW-411 e1 雙重故障: 補償失敗不得吞掉原錯誤之記錄——引起補償之原錯誤(ORM 之 failed to save／insert／delete data)須仍可自 srLog 查得(規則帳本 R-REF-CASCADE-01 規則 4: 後重新拋出原錯誤; 對外雖為 saveCascadePartial, 但原文須入 srLog 供稽核):
+    2) unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清理之伺服端寫入, R-REF-CASCADE-01／R-WRITE-LOCK-02)
+    RW-411 e2 雙重故障: 補償失敗不得吞掉原錯誤之記錄——引起補償之原錯誤(ORM 之 failed to save／insert／delete data)須仍可自 srLog 查得(規則帳本 R-REF-CASCADE-01 規則 4: 後重新拋出原錯誤; 對外雖為 saveCascadePartial, 但原文須入 srLog 供稽核):
+    3) unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清理之伺服端寫入, R-REF-CASCADE-01／R-WRITE-LOCK-02)
+    RW-411 e3 雙重故障: 補償失敗不得吞掉原錯誤之記錄——引起補償之原錯誤(ORM 之 failed to save／insert／delete data)須仍可自 srLog 查得(規則帳本 R-REF-CASCADE-01 規則 4: 後重新拋出原錯誤; 對外雖為 saveCascadePartial, 但原文須入 srLog 供稽核):
+    4) unit-refCascade (引用連帶純函數: 改名級聯與刪除清理, R-PRINCIPLE-00 原則 6、適用表 m／n)
+    ✔ RW-508 fn 同步拋錯／reject／拋非 Error 值之後鎖皆釋放: 後續呼叫可取(5 秒內完成, 否則視為死結)
+    6) unit-refCascade (引用連帶純函數: 改名級聯與刪除清理, R-PRINCIPLE-00 原則 6、適用表 m／n)
+==== chain2 finished
+==== m1 @ 上午3:01:07
+  忽略 cascadeRename:false(永遠做改名級聯)  (grep=API-RC-05)
+  exit=4
+    [quiet-run] exit=4 time=17s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\run06\tapi\mut\m1\tmp\quiet-run\20261022-030107-tapi-m1.log (80 行, 30 KB)
+    [quiet-run] cmd: node C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\node_modules\mocha\bin\mocha.js test/api-refCascade.test.mjs --timeout 300000 --grep API-RC-05
+    1 passing (17s)
+    4 failing
+    1) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    API-RC-050 關閉後群組改名不連帶: users 逐位元不變、引用成為懸空、授權只收嚴不放寬且被改名者之使用者授權為全 n、grupsNames 不再列出(S6; ADR-035 c):
+    2) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    API-RC-051 關閉後不產生三種改名相關拒絕: 新名撞懸空名、容器內相撞、權限改名皆成功且引用端不動(S6):
+    3) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    API-RC-053 關閉後外部同步: 同 id 改名不連帶(引用端逐位元不變)、舊 id 不再推送仍清理引用(S6、S5):
+    4) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    API-RC-054 關閉後歷史同名組改名不產生 renameCascadeDupGroup: 改名成功、users 逐位元不變(S6):
+==== m2 @ 上午3:01:24
+  陣列形式引用改名時不改 name(改名級聯對陣列形式失效)  (grep=API-RC-00[12])
+  exit=2
+    [quiet-run] exit=2 time=16s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\run06\tapi\mut\m2\tmp\quiet-run\20261022-030125-tapi-m2.log (87 行, 5 KB)
+    [quiet-run] cmd: node C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\node_modules\mocha\bin\mocha.js test/api-refCascade.test.mjs --timeout 300000 --grep API-RC-00[12]
+    0 passing (16s)
+    2 failing
+    1) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    API-RC-001 後台群組改名: users.cgrups(物件／陣列形式、外部 teamA 列)連帶改寫、授權與改名前相同、未命中列逐位元不變、pemis／targets 不動(S1、S2、S7; srLog 計數不含引用端值):
+    2) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    API-RC-002 後台權限改名: grups.cpemis(物件／陣列形式)連帶改寫、全部使用者授權不變、users／targets 不動(S1、S2、S7):
+==== m3 @ 上午3:01:41
+  改名逐一套用(二段跳: 舊名→新名後若新名亦在改名表再套一次), 互換／鏈式失效  (grep=API-RC-00[34])
+  exit=2
+    [quiet-run] exit=2 time=11s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\run06\tapi\mut\m3\tmp\quiet-run\20261022-030141-tapi-m3.log (71 行, 3 KB)
+    [quiet-run] cmd: node C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\node_modules\mocha\bin\mocha.js test/api-refCascade.test.mjs --timeout 300000 --grep API-RC-00[34]
+    0 passing (11s)
+    2 failing
+    1) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    API-RC-003 群組互換改名 M1↔M2: 同時套用(非逐一套用)、物件形式 OR M1＋AND M2 者兩鍵互換、全部使用者授權不變(S1、S2):
+    2) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    API-RC-004 群組鏈式改名 M1→M2、M2→M5: 同時套用(引用 M2 者不被連續改成 M5 以外之名、引用 M1 者不被改成 M5)、授權不變(S1、S2):
+==== m4 @ 上午3:01:53
+  刪除後以同名新增者繼承引用(新表有同名列即不清理)  (grep=API-RC-02[34])
+  exit=2
+    [quiet-run] exit=2 time=11s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\run06\tapi\mut\m4\tmp\quiet-run\20261022-030153-tapi-m4.log (31 行, 3 KB)
+    [quiet-run] cmd: node C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\node_modules\mocha\bin\mocha.js test/api-refCascade.test.mjs --timeout 300000 --grep API-RC-02[34]
+    0 passing (11s)
+    2 failing
+    1) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    API-RC-023 後台刪除群組 M1 並於同一次寫入以同名新增(新 id): 舊引用被清理、新列不繼承(S3 原則 6):
+    2) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    API-RC-024 後台刪除權限 P1 並同次以同名新增(新 id): 舊引用被清理、新列不繼承(S3 原則 6):
+    1) API-RC-023 後台刪除群組 M1 並於同一次寫入以同名新增(新 id): 舊引用被清理、新列不繼承(S3 原則 6)
+    2) API-RC-024 後台刪除權限 P1 並同次以同名新增(新 id): 舊引用被清理、新列不繼承(S3 原則 6)
+==== m5 @ 上午3:02:04
+  移除 renameCascadeNameInUse 檢查(新名接管懸空引用)  (grep=API-RC-030|API-RC-044)
+  exit=2
+    [quiet-run] exit=2 time=11s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\run06\tapi\mut\m5\tmp\quiet-run\20261022-030204-tapi-m5.log (45 行, 3 KB)
+    [quiet-run] cmd: node C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\node_modules\mocha\bin\mocha.js test/api-refCascade.test.mjs --timeout 300000 --grep "API-RC-030|API-RC-044"
+    0 passing (11s)
+    2 failing
+    1) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    API-RC-030 renameCascadeNameInUse(後台): 新名為仍被啟用中引用之懸空名 → 回語系鍵、四表逐位元不變、srLog 有 reason 且不含引用端 id／email／name; 停用之懸空引用與「新增同名」不擋(S4):
+    2) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    API-RC-044 外部同步被拒(NameInUse／Conflict): 回固定鍵 invalidRows、四表逐位元不變、srLog 之 reason 為對應鍵且不含引用端值(S4、S5e):
+    1) API-RC-030 renameCascadeNameInUse(後台): 新名為仍被啟用中引用之懸空名 → 回語系鍵、四表逐位元不變、srLog 有 reason 且不含引用端 id／email／name; 停用之懸空引用與「新增同名」不擋(S4)
+    2) API-RC-044 外部同步被拒(NameInUse／Conflict): 回固定鍵 invalidRows、四表逐位元不變、srLog 之 reason 為對應鍵且不含引用端值(S4、S5e)
+==== m6 @ 上午3:02:15
+  引用端改寫繞過 procOrm(不記更新者與更新時間)  (grep=API-RC-08)
+  exit=2
+    [quiet-run] exit=2 time=11s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\run06\tapi\mut\m6\tmp\quiet-run\20261022-030216-tapi-m6.log (45 行, 3 KB)
+    [quiet-run] cmd: node C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\node_modules\mocha\bin\mocha.js test/api-refCascade.test.mjs --timeout 300000 --grep API-RC-08
+    0 passing (11s)
+    2 failing
+    1) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    API-RC-080 後台(admin)改名連帶改寫之引用端列: userIdUpdate 記為 id-for-admin、timeUpdate 前進、其餘欄位不變; 未改寫列之更新者不動(S9):
+    2) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    API-RC-081 外部同步(application)改名連帶改寫之後台引用端列: userIdUpdate 記為 id-for-application、timeUpdate 前進、其餘欄位不變(S9):
+    1) API-RC-080 後台(admin)改名連帶改寫之引用端列: userIdUpdate 記為 id-for-admin、timeUpdate 前進、其餘欄位不變; 未改寫列之更新者不動(S9)
+    2) API-RC-081 外部同步(application)改名連帶改寫之後台引用端列: userIdUpdate 記為 id-for-application、timeUpdate 前進、其餘欄位不變(S9)
+==== m7 @ 上午3:02:27
+  取鎖次序違反階層: users 寫入先取 users 再取 grups(與 grups 寫入之 grups→users 相反)→ 並行死結  (grep=API-RC-070)
+  exit=1
+    [quiet-run] exit=1 time=1m43s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\run06\tapi\mut\m7\tmp\quiet-run\20261022-030227-tapi-m7.log (21 行, 2 KB)
+    [quiet-run] cmd: node C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\node_modules\mocha\bin\mocha.js test/api-refCascade.test.mjs --timeout 300000 --grep API-RC-070
+    0 passing (2m)
+    1 failing
+    1) api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真後端)
+    API-RC-070 並行五寫入者(updateGrups 含改名＋刪除、updateUsers、updatePemis 含刪除＋改名、updateTargets 含刪除、syncAndReplaceTabs grups 含改名＋刪除)×3 輪、輪輪不同啟動次序: 30 秒內全數完成、全部成功、終態無懸空且無遺失更新(S8):
+    1) API-RC-070 並行五寫入者(updateGrups 含改名＋刪除、updateUsers、updatePemis 含刪除＋改名、updateTargets 含刪除、syncAndReplaceTabs grups 含改名＋刪除)×3 輪、輪輪不同啟動次序: 30 秒內全數完成、全部成功、終態無懸空且無遺失更新(S8)
+==== chain2 finished

@@ -449,6 +449,107 @@ export async function dismissResultModal(page) {
     await page.waitForTimeout(600) //modal 退場 + grid 回穩
 }
 
+//—— 引用連帶(run06; ADR-036、規則帳本 R-REF-CASCADE-01)之確認框／結果框互動原語 ——
+//群組頁／權限頁刪除前確認、改名儲存前確認、標的頁儲存前確認皆為 $dg.showCheckYesNo: 最上層彈窗之逐行文字為 [標題 systemMessage, 單一訊息, 否(no), 是(yes)];
+//成功／失敗結果框(showCheckYes)為 [標題, 單一訊息, 確認(ok)]. 期望文字一律以頁面語系範本代入(expTemplate, 不寫死整句),
+//另以 frags(各語系之字面片段, 由呼叫端依語系給)擋「範本之佔位符對調／筆數寫錯」——期望若全由範本代入, 範本錯誤無從察覺.
+//註: 與 e2e-array-form 檔內同名函式(topModalLines／clickModalBtn／expectConfirm／expectResult／waitModalGone／expWarn)等價; 該檔 run06 段先行落地且本輪依派工不重跑,
+//  故未改其 import, 其本地副本待下輪收斂至本檔(收斂須重跑該檔)
+//期望之文字: 以頁面語系之範本代入 {n}／{m}／{w}／{e}／{list}(只掃描原始範本一次, 代入結果不再解析, 同 src/js/getAuthWarn.mjs:fmtWarn; e2e 不得 import src／server, 故自寫)
+export async function expTemplate(page, key, vars = {}) {
+    return await page.evaluate(([k, v]) => {
+        const kp = Object.create(null)
+        for (const x of ['n', 'm', 'w', 'e', 'list']) {
+            if (x in v) kp[x] = String(v[x])
+        }
+        return String(window.$vo.$t(k)).replace(/\{(n|m|w|e|list)\}/g, (hit, x) => (x in kp ? kp[x] : hit))
+    }, [key, vars])
+}
+//最上層彈窗(確認框或結果框)之逐行文字(去首尾空白、略空行); 無彈窗回 []
+export async function topModalLines(page) {
+    return await page.evaluate(() => {
+        const els = [...document.querySelectorAll('div[style*="overscroll-behavior"]')]
+        const e = els[els.length - 1]
+        return e ? (e.innerText || '').split('\n').map((s) => s.trim()).filter((s) => s !== '') : []
+    })
+}
+//點最上層彈窗之按鈕: 以語系鍵('no'／'yes'／'ok')之文字精確比對, 取最後一個可見者(彈窗後掛載、位於 DOM 尾端; 避免命中背後頁面之同字元素)
+export async function clickModalBtn(page, key) {
+    const txt = await page.evaluate((k) => window.$vo.$t(k), key)
+    const loc = page.getByText(txt, { exact: true })
+    for (let i = (await loc.count()) - 1; i >= 0; i--) {
+        if (await loc.nth(i).isVisible()) {
+            await loc.nth(i).click()
+            return
+        }
+    }
+    throw new Error(`找不到可見之「${txt}」鈕`)
+}
+//等確認框出現並斷言其整體形狀: 標題 systemMessage、單一訊息逐字等於 expText(字串, 或「任一皆可」之字串陣列: 名單之排列次序不是本案要驗之事時)、按鈕為否／是(單一框、單一問句); 回傳框內訊息文字
+export async function expectConfirmBox(page, label, expText, frags = []) {
+    const cands = Array.isArray(expText) ? expText : [expText]
+    await waitUntilExist(page, label, (ts) => ts.some((t) => (document.body.innerText || '').includes(t)), { timeout: 20000, arg: cands })
+    await page.waitForTimeout(500)
+    const t = await page.evaluate(() => ({ sys: window.$vo.$t('systemMessage'), no: window.$vo.$t('no'), yes: window.$vo.$t('yes') }))
+    const lines = await topModalLines(page)
+    assert.strictEqual(lines.length, 4, `${label}: 確認框應為 [標題, 單一訊息, 否, 是], 實得 ${JSON.stringify(lines)}`)
+    assert.deepEqual([lines[0], lines[2], lines[3]], [t.sys, t.no, t.yes], `${label}: 確認框之標題與按鈕應為 systemMessage／否／是`)
+    assert.ok(cands.includes(lines[1]), `${label}: 確認框訊息應逐字等於期望之範本代入文字 ${JSON.stringify(cands)}, 實得 ${lines[1]}`)
+    for (const f of frags) {
+        assert.ok(lines[1].includes(f), `${label}: 確認框文字應含「${f}」, 實得 ${lines[1]}`)
+    }
+    return lines[1]
+}
+//等結果框(成功／失敗彈窗)出現並斷言其訊息逐字等於 expText(單一訊息＋確認鈕, 不是確認框)
+export async function expectResultBox(page, label, expText) {
+    await waitUntilExist(page, label, (t) => (document.body.innerText || '').includes(t), { timeout: 20000, arg: expText })
+    await page.waitForTimeout(500)
+    const t = await page.evaluate(() => ({ sys: window.$vo.$t('systemMessage'), ok: window.$vo.$t('ok') }))
+    assert.deepEqual(await topModalLines(page), [t.sys, expText, t.ok], `${label}: 結果框應為單一訊息＋確認鈕`)
+}
+//等某段彈窗文字自畫面消失(確認框按否或按是之後)
+export async function waitModalGone(page, label, text) {
+    await waitUntilExist(page, label, (t) => !(document.body.innerText || '').includes(t), { arg: text })
+    await page.waitForTimeout(500)
+}
+//以「是」或「否」(btnKey 為 'yes'／'no')回應確認框: 等框出現並核對形狀與文字 → 點鈕 → 等框消失; 回傳框內訊息文字
+export async function answerConfirm(page, label, expText, btnKey, frags = []) {
+    const msg = await expectConfirmBox(page, label, expText, frags)
+    await clickModalBtn(page, btnKey)
+    await waitModalGone(page, `${label}(${btnKey})關閉`, msg)
+    return msg
+}
+//點工具列儲存鈕後先出現確認框者(標的頁刪除／改 id 而有權限之規則將被清理時, 群組頁／權限頁改名而有引用端被更新時): 核對確認框並按「是」, 再等結果 modal(成功或失敗, 標題 systemMessage)出現,
+//停在 modal 顯示態供截圖(同 saveAndWaitModal 之進場 settle); 回傳確認框之訊息文字
+export async function saveConfirmYesAndWaitModal(page, label, expConfirm, frags = []) {
+    await clickSave(page)
+    const msg = await answerConfirm(page, label, expConfirm, 'yes', frags)
+    await waitUntilExist(page, 'CheckYes 結果 modal（systemMessage 標題）', () => {
+        return (document.body.innerText || '').includes(window.$vo.$t('systemMessage'))
+    }, { timeout: 20000 })
+    await page.waitForTimeout(800) //modal 進場 settle（captureStable 再 retry-until-stable 收斂）
+    return msg
+}
+//主表中某欄(colId)顯示文字(去首尾空白)等於 text 之列的 row-index(依 DOM; 呼叫端須先確保該列已渲染——虛擬捲動只渲染可見列, 見各案例之夾具列置於清單最上方)
+export async function rowIndexByCell(page, colId, text) {
+    const k = await page.evaluate(([c, t]) => {
+        for (const r of document.querySelectorAll('.ag-row[row-index]')) {
+            const cell = r.querySelector(`.ag-cell[col-id="${c}"]`)
+            if (cell && (cell.textContent || '').trim() === t) {
+                return r.getAttribute('row-index')
+            }
+        }
+        return null
+    }, [colId, text])
+    assert.ok(k !== null, `主表應有 ${colId} 為「${text}」之列`)
+    return Number(k)
+}
+//清單頁工具列儲存鈕是否出現(儲存鈕只在有變更時渲染)
+export async function pageSaveShown(page) {
+    const loc = iconBtn(page, MDI.upload)
+    return (await loc.count()) > 0 && await loc.first().isVisible()
+}
+
 //—— Ve* 對話框（VeCgrups / VeCpemis / VeCrules / VeGrupBlngUsers / VePemiBlngGrups）互動原語共用層 ——
 //收斂自 e2e-rela-user-grup / e2e-rela-grup-pemi / e2e-rela-pemi-rule 三檔各自一份之同名 helper（既有三份留待另案改 import；
 //新 case 一律自此 import，不再複製）。Save 鈕 = WButtonCircle icon=mdiCheckCircle（僅 isEditable && isModified 才渲染）；
@@ -800,6 +901,35 @@ export async function resetDb(browser, key, seed) {
     await p.waitForFunction(({ k, n }) => (window.$vo.$store.state[k] || []).length === n, { k: key, n: seed.length }, { timeout: 15000 })
     await p.waitForTimeout(800)
     await p.context().close()
+}
+
+//跨表隔離(run06 引用連帶, ADR-036、R-REF-CASCADE-01): 刪除群組／權限／標的(及改名群組／權限)會於「同一次寫入」內連帶改寫引用端表之授權字串
+//  (群組→users.cgrups、權限→grups.cpemis、標的→pemis.crules), 故每案前只以 resetDb 還原「被編輯表」不足以使下一案回到 base seed——
+//  引用端表之被清理列(如 peter 之 cgrups 移除 M1)會遺留給後續案例(2026-10-22 首輪實跑: grups E2E-005 之後 E2E-006～ 之清單頁「所屬使用者」欄由「Has 1 user(s)(peter)」變「No users」而標準圖失配).
+//  resetDbTables: 於同一個 throwaway page 依序還原多表(items: [{ key, seed }, …]; 次序＝還原次序, 引用端表在前、被編輯表在後), 每表之 update 呼叫 resolve 後再等 store 筆數相符; 其餘同 resetDb(test setup 層、非 act).
+export async function resetDbTables(browser, items) {
+    for (const { key, seed } of items) {
+        if (!seed || seed.length === 0) throw new Error(`resetDbTables: ${key} 之 BASE_SEED 為空，拒絕還原（避免清空 DB）`)
+    }
+    const p = await openApp(browser)
+    for (const { key, seed } of items) {
+        const fname = 'update' + key[0].toUpperCase() + key.slice(1)
+        await p.evaluate(({ f, s }) => window.$vo.$fapi[f](s), { f: fname, s: seed })
+        await p.waitForFunction(({ k, n }) => (window.$vo.$store.state[k] || []).length === n, { k: key, n: seed.length }, { timeout: 15000 })
+    }
+    await p.waitForTimeout(800)
+    await p.context().close()
+}
+//檔尾還原(與 restoreDbOnce 同, 多表版; R-E2E-ISO-01): 任一表之 seed 為空(before 失敗)時不動作
+export async function restoreDbTablesOnce(items) {
+    if (items.some(({ seed }) => !seed || seed.length === 0)) return
+    const b = await launchBrowser()
+    try {
+        await resetDbTables(b, items)
+    }
+    finally {
+        await b.close().catch(() => {})
+    }
 }
 
 //表格 mutation settle 訊號（連續 n 筆內容簽章全同才放行）；移植自 w-web-api test/e2e-setup.mjs 之

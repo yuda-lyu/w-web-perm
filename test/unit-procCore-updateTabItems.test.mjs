@@ -245,7 +245,9 @@ describe('unit-procCore-updateTabItems (後台整表寫入之雙擊防護, ADR-0
         }
         assert.strict.equal(done, false, '持鎖期間不得完成')
         assert.strict.equal(woItems.grups.cnt.insert + woItems.grups.cnt.save + woItems.grups.cnt.del, 0, '持鎖期間不得寫入')
-        //另一張表不受影響(鍵依表而異)
+        //另一張表不受影響(鍵依表而異): 此處用 targets(其引用端為 pemis, 與被持有之 grups 無涉); 單純新增而無改名／刪除之 pemis 寫入亦只取 pemis 鎖, 不被 grups 鎖擋住(分段取鎖, R-WRITE-LOCK-02)
+        let rt = await pc.updateTargets('id-admin', [...cloneDeep(seed.targets), newRow('targets', '013')])
+        assert.strict.equal(rt, 'saveTabItemsSuccess')
         let rp = await pc.updatePemis('id-admin', [...cloneDeep(seed.pemis), newRow('pemis', '013')])
         assert.strict.equal(rp, 'saveTabItemsSuccess')
         release()

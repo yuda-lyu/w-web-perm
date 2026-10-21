@@ -1,15 +1,24 @@
 import eachOwn from './eachOwn.mjs'
 import { countAndRefs, fmtWarn } from './getAuthWarn.mjs'
+import { planRefChanges } from './refCascade.mjs'
 
 
-//群組頁／權限頁按「刪除」前, 計算刪除對引用者授權的影響, 並產生確認框文字(規則帳本 R-PRINCIPLE-00 c、d):
-//  c: 以 AND 引用被刪名稱且刪除後該名稱完全消失者 → 其授權將被收回(AND 項變懸空, 內容全 n);
-//  d: 引用的名稱有多筆同名(歷史同名)而只刪其一 → 取各候選之交集, 候選變少則交集變寬, 其授權可能變多(任何 mode).
-//兩頁共用: 群組頁 holders 為 users(欄位 cgrups)、權限頁 holders 為 grups(欄位 cpemis). 純函數, 不依賴 Vue／DOM.
+//群組頁／權限頁按「刪除」前, 計算刪除對引用端的影響, 並產生確認框文字(規則帳本 R-PRINCIPLE-00 c、d、原則 6、適用表 n; ADR-036):
+//  n: 刪除後, 引用被刪名稱之引用端列(任何 mode、含停用項目)將於同一次寫入內被連帶清理(自其授權字串移除該引用), 其數量以 planRefChanges 之 nDelHolders 計(與伺服端同一純函數, R-REF-CASCADE-01);
+//  c: 其中以 AND 引用且刪除後該名稱完全消失者 → 引用被移除後其 AND 限制解除, 授權可能變多(run05 前為「AND 項變懸空、授權被收回」, 與連帶清理互斥, 已改);
+//  d: 引用的名稱有多筆同名(歷史同名)而只刪其一 → 取各候選之交集, 候選變少則交集變寬, 其授權可能變多(任何 mode; 該名稱仍有實體, 引用不清理, 不計入 n).
+//兩頁共用: 群組頁引用端為 users(欄位 cgrups)、權限頁引用端為 grups(欄位 cpemis). 純函數, 不依賴 Vue／DOM.
+
+
+//KIND_OF: 被刪者種類 → 被刪表與引用欄位('Grup' 群組頁、'Pemi' 權限頁)
+let KIND_OF = {
+    Grup: { keyTable: 'grups', field: 'cgrups' },
+    Pemi: { keyTable: 'pemis', field: 'cpemis' },
+}
 
 
 /**
- * 計算刪除所選列對引用者授權的影響
+ * 計算刪除所選列對引用者授權的影響(其中 AND 與歷史同名兩項)
  *
  * 被刪名稱只取「基準(store 之已儲存列)中存在」之列的名稱: 尚未儲存的新增列(id 不在基準)刪除不影響他人;
  * 以基準名稱為準(引用者所寫的是已儲存的名稱, 未儲存的改名不影響其引用). 「刪除後」以刪除後的剩餘列(含未儲存的新增與改名)判斷,
@@ -20,7 +29,7 @@ import { countAndRefs, fmtWarn } from './getAuthWarn.mjs'
  * @param {Array} holders 輸入引用者列(store 之 users 或 grups)
  * @param {String} field 輸入引用欄位名('cgrups' 或 'cpemis')
  * @param {Array} rowsRemain 輸入刪除後剩餘之列(目前清單剔除被刪列)
- * @returns {Object} 回傳 { n, nWiden }: n 為授權將被收回之引用者數(AND 引用且名稱完全消失), nWiden 為授權可能變多之引用者數(歷史同名只刪其一)
+ * @returns {Object} 回傳 { n, nWiden }: n 為以 AND 引用且名稱完全消失之引用者數(其 AND 限制將隨引用被清理而解除), nWiden 為授權可能變多之引用者數(歷史同名只刪其一)
  * @example
  *
  * let users = [{ cgrups: '{"G1":{"mode":"AND","isActive":"y"}}' }]
@@ -45,28 +54,85 @@ function getDelRefCount(delIds, rowsBase, holders, field, rowsRemain) {
 
 
 /**
- * 刪除確認框文字: 兩種影響任一大於 0 才有文字(單一框); 兩者皆大於 0 時併入同一框、同一個問句; 皆為 0 回空字串(不彈框)
+ * 計算刪除所選列對引用端之完整影響: 將被連帶清理(移除引用)之引用端列數、其中以 AND 引用者、歷史同名致授權可能變多者
  *
- * @param {Object} impact 輸入 getDelRefCount 之結果 { n, nWiden }
+ * nRefs 以 planRefChanges 計(只算本次刪除: rowsOld 為基準列、rowsNew 為基準列剔除被刪 id 之列, 不含其他未儲存之編輯; holdersOld 為引用端列),
+ * 即伺服端寫入時實際會被改寫之引用端列數(任何 mode、含停用項目); nAnd／nWiden 沿用 getDelRefCount.
+ * nAnd 以 nRefs 為上限(AND 引用者本即屬被清理者之子集; 若「目前清單之未儲存改名」使兩者判準不一致, 不使文案出現「其中 M 位」大於總數).
+ *
+ * @param {Array} delIds 輸入被刪列的 id 陣列
+ * @param {Array} rowsBase 輸入基準列(store 之 grups 或 pemis)
+ * @param {Array} holders 輸入引用端列(store 之 users 或 grups)
+ * @param {String} kind 輸入被刪者種類: 'Grup'(群組頁)或 'Pemi'(權限頁); 其他值回傳全 0
+ * @param {Array} rowsRemain 輸入刪除後剩餘之列(目前清單剔除被刪列)
+ * @returns {Object} 回傳 { nRefs, nAnd, nWiden }
+ * @example
+ *
+ * let users = [{ id: 'u1', cgrups: '{"G1":{"mode":"AND","isActive":"y"}}' }, { id: 'u2', cgrups: '{"G1":{"mode":"OR","isActive":"n"}}' }]
+ * console.log(getDelImpact(['g1'], [{ id: 'g1', name: 'G1' }], users, 'Grup', []))
+ * // => { nRefs: 2, nAnd: 1, nWiden: 0 }
+ *
+ */
+function getDelImpact(delIds, rowsBase, holders, kind, rowsRemain) {
+    let res = { nRefs: 0, nAnd: 0, nWiden: 0 }
+    if (!Object.prototype.hasOwnProperty.call(KIND_OF, kind)) {
+        return res
+    }
+    let ref = KIND_OF[kind]
+    let base = Array.isArray(rowsBase) ? rowsBase : []
+    let setIds = new Set(Array.isArray(delIds) ? delIds : [])
+    let rowsNew = base.filter((r) => !(r !== null && typeof r === 'object' && setIds.has(r.id)))
+    let plan = planRefChanges({
+        keyTable: ref.keyTable,
+        rowsOld: base,
+        rowsNew,
+        holdersOld: Array.isArray(holders) ? holders : [],
+    })
+    //名稱是否「仍有存續列」依伺服端之身分判準(refCascade.diffRefTargets): 只有「同 id 同名」之列算存續, 刪除後以同名新增之新 id 列或由他列改名而來者不繼承引用, 故不算(否則 nRefs 計其被清理而 nAnd 以為名稱仍在, 漏報 AND 限制解除)
+    let nameOf = (r) => (r.name === undefined ? '' : r.name)
+    let baseById = new Map()
+    base.forEach((r) => {
+        if (r !== null && typeof r === 'object' && typeof r.id === 'string') {
+            baseById.set(r.id, r)
+        }
+    })
+    let remainRetained = (Array.isArray(rowsRemain) ? rowsRemain : []).filter((r) => {
+        let b = (r !== null && typeof r === 'object') ? baseById.get(r.id) : undefined
+        return b !== undefined && nameOf(b) === nameOf(r)
+    })
+    let c = getDelRefCount(delIds, rowsBase, holders, ref.field, remainRetained)
+    res.nRefs = plan.nDelHolders
+    res.nAnd = Math.min(c.n, res.nRefs)
+    res.nWiden = c.nWiden
+    return res
+}
+
+
+/**
+ * 刪除確認框文字: 有引用端將被清理(nRefs)或授權可能變多(nWiden)任一大於 0 才有文字(單一框、單一問句); 皆為 0 回空字串(不彈框)
+ *
+ * 文案依 nRefs／nAnd／nWiden 組合選鍵(語系鍵尾碼 kind): 僅 nRefs → confirmDelRefs; nRefs＋nAnd → confirmDelRefsAnd; nRefs＋nWiden → confirmDelRefsDup;
+ * 三者皆有 → confirmDelRefsAndDup; 僅 nWiden → confirmDelDupRefs({n} 為 nWiden). nAnd 為 0 或 nRefs 為 0 時不提 AND(nAnd 以 nRefs 為上限).
+ *
+ * @param {Object} impact 輸入 getDelImpact 之結果 { nRefs, nAnd, nWiden }
  * @param {Function} $t 輸入語系函數(key → 文字)
- * @param {String} kind 輸入被刪者種類: 'Grup'(群組頁) 或 'Pemi'(權限頁), 組成語系鍵 confirmDelAndRefs／confirmDelDupRefs／confirmDelBothRefs 之尾碼
+ * @param {String} kind 輸入被刪者種類: 'Grup'(群組頁) 或 'Pemi'(權限頁), 組成語系鍵 confirmDelRefs／confirmDelRefsAnd／confirmDelRefsDup／confirmDelRefsAndDup／confirmDelDupRefs 之尾碼
  * @returns {String} 回傳確認框文字, 無影響為空字串
  */
 function getDelConfirmText(impact, $t, kind) {
-    let n = impact && impact.n > 0 ? impact.n : 0
-    let m = impact && impact.nWiden > 0 ? impact.nWiden : 0
-    if (n > 0 && m > 0) {
-        return fmtWarn($t(`confirmDelBothRefs${kind}`), { n }).split('{m}').join(String(m))
-    }
+    let n = impact && impact.nRefs > 0 ? impact.nRefs : 0
+    let m = n > 0 && impact && impact.nAnd > 0 ? Math.min(impact.nAnd, n) : 0
+    let w = impact && impact.nWiden > 0 ? impact.nWiden : 0
     if (n > 0) {
-        return fmtWarn($t(`confirmDelAndRefs${kind}`), { n })
+        let key = `confirmDelRefs${m > 0 ? 'And' : ''}${w > 0 ? 'Dup' : ''}${kind}`
+        return fmtWarn($t(key), { n, m, w })
     }
-    if (m > 0) {
-        return fmtWarn($t(`confirmDelDupRefs${kind}`), { n: m })
+    if (w > 0) {
+        return fmtWarn($t(`confirmDelDupRefs${kind}`), { n: w })
     }
     return ''
 }
 
 
-export { getDelRefCount, getDelConfirmText }
+export { getDelRefCount, getDelImpact, getDelConfirmText }
 export default getDelRefCount

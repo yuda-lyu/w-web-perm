@@ -11,13 +11,16 @@
 //  產製端與比對端呼叫同一案例管線（runBaselineCase，見 runCase）：每案 fresh browser → throwaway page 還原 DB 為 base seed →
 //  開頁切語系 → 流程截圖 → 語意斷言（兩端皆於寫檔／比對之前；不過則該案一張都不寫）→ 產製端依篩選寫檔／比對端比對標準圖。
 //act 走 user-facing input；assert = 語意斷言 + pixel baseline（§6.2 / §6.3）。
+//run06(引用連帶, ADR-036、R-REF-CASCADE-01; spec 流程_後台權限清單 E2E-005): 刪除被引用之權限先彈確認框(E2E-005 刪 P1 ← M1, n=1, 按「是」)、儲存後引用端 grups.cpemis 被連帶清理;
+//  每案前連同引用端 grups 表一併還原(resetDbTables, 否則清理遺留給後續案例); 標準圖 0 張重產、確認框不入圖(依派工不新增標準圖). 確認框互動原語見 e2e-setup.mjs(answerConfirm 等).
 //pemis 結構最接近 grups：主鍵為 id（funNew 自動產生、清單隱藏），列鍵以 name 去重；
 //name 空 / 重複為「前端 errItemsByName 攔截」（isError 引用 errItemsByName，非空→errInNames 擋存、不送後端，
 //對齊 grups / users；異於 targets 之 isError 引用未定義變數恆空而走後端 ckKey）；另有 crules / belongGrups 兩個關聯欄按鈕；
 //save 結果（成功 / 失敗 / 空 / errInNames）皆走 $dg.showCheckYes 持久 modal。
 import fs from 'fs'
 import assert from 'assert'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, rowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, typeIntoCell, captureBaseSeedOnce, resetDb, restoreDbOnce, setLang, MDI, iconBtn, gotoPemis, checkRow, toggleEditMode, editSwitchLoc, clickAdd, cellHasWarn, clickSave, saveAndWaitModal, assertModalMsg } from './tools/e2e-setup.mjs'
+import JSON5 from 'json5'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, rowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, typeIntoCell, captureBaseSeedOnce, resetDb, restoreDbOnce, resetDbTables, restoreDbTablesOnce, setLang, MDI, iconBtn, gotoPemis, checkRow, toggleEditMode, editSwitchLoc, clickAdd, cellHasWarn, clickSave, saveAndWaitModal, assertModalMsg, expTemplate, answerConfirm } from './tools/e2e-setup.mjs'
 import { runBaselineCase, createBaselineGate, gridContentBox, itemsUnionBox } from './tools/e2eLib.mjs'
 
 const PICS_DIR = './test/pics/pemis'
@@ -46,6 +49,8 @@ function picPath(lang, name) { return `${PICS_DIR}/pemis-${lang}-${name}.png` }
 //—— DB 衛生 helpers ——
 //pristine base seed（含全欄位），每 case 前還原 DB，使跨 case／跨語系可重現
 let BASE_SEED = null
+//run06(ADR-036): 刪除權限於同一次寫入內連帶清理 grups.cpemis 之引用(E2E-005 刪 P1 → M1 之 cpemis 被移除 P1), 故每案前須連同引用端 grups 表一併還原(resetDbTables, 引用端在前), 否則清理遺留給後續案例
+let BASE_GRUPS = null
 //captureBaseSeed(page,'pemis') / resetDb(browser,'pemis',seed) 收斂進 e2e-setup.mjs 共用
 //（原本 grups/pemis/rela-grup-pemi/rela-pemi-rule/rela-user-grup/targets/users 七檔重複定義）。
 
@@ -170,15 +175,20 @@ const CASES = [
         },
     },
     {
-        //E2E-005：勾選某列 → 刪除 → 儲存 → DB 該列消失（next case 的 resetDb 還原）
+        //E2E-005：勾選某列 → 刪除（被引用者先彈確認框, 按「是」）→ 儲存 → DB 該列消失、引用連帶清理（next case 的 resetDb 還原）
         //比照 grups pilot E2E-005：直接刪 base seed row 0，靠每 case 前 resetDb 還原（最簡穩）。
+        //run06(ADR-036、R-REF-CASCADE-01; spec 流程_後台權限清單 E2E-005): 被刪之 base seed row 0(權限P1)為群組 M1 所引用, 故點刪除後先彈確認框
+        //  (confirmDelRefsPemi: 將自 1 個群組移除對所選權限之引用; n=1 由 base seed 推導: 僅 M1 之 cpemis 含 P1, 且為 OR 引用故無「其中 N 個以 AND 引用」子句), 按「是」才自清單移除;
+        //  確認框為本輪新增之流程步驟, 標準圖 0 張改變(依派工不重產; 確認框不入圖, 三張圖之畫面皆與舊流程相同: 確認框於 s1 之後、s2 之前開關). 儲存後 M1 之 cpemis 被連帶清理(見 semantic)
         name: 'E2E-005-delete-ok',
         stages: ['E2E-005-1-row-checked', 'E2E-005-2-deleted', 'E2E-005-3-delete-ok'],
-        run: async (page) => {
+        run: async (page, lang) => {
             await gotoPemis(page)
             await checkRow(page, 0) //勾選 base seed 第一列
             const s1 = await captureStableWithBox(page, rowBoxSel(0))   //階段1：勾選列（按刪除前）
             await iconBtn(page, MDI.trash).first().click()
+            //刪除確認框(單一框、否／是): 範本代入 n=1; 字面片段各語系各給一組(擋範本佔位符對調或筆數寫錯); 按「是」→ 列自清單移除(尚未寫入 DB, 要按儲存才寫)
+            await answerConfirm(page, 'E2E-005 刪除確認框', await expTemplate(page, 'confirmDelRefsPemi', { n: 1 }), 'yes', lang === 'eng' ? ['from 1 group(s)'] : ['自 1 個群組'])
             await page.waitForTimeout(500)
             const s2 = await captureStableWithBox(page, gridContentBox(SEL_GRID))  //階段2：刪除後（列已移除、存檔前）
             await saveAndWaitModal(page)
@@ -196,6 +206,10 @@ const CASES = [
             assert.ok(!has, `base seed 第一列（${delName}）應已刪除`)
             const n = await page.evaluate(() => (window.$vo.$store.state.pemis || []).length)
             assert.equal(n, BASE_SEED.length - 1, `DB 應為 base-1（${BASE_SEED.length - 1}）筆`)
+            //spec E2E-005「引用連帶清理」(run06; ADR-036): 刪 P1 之同一次寫入內, 引用它之群組 M1 其 cpemis 被移除該引用, 只剩 P2(OR、啟用; base seed 中 M1 之 cpemis 為 P1 與 P2; 以資料通道 select 直讀庫, 不依前端同步時序)
+            const m1 = (await page.evaluate(async () => await window.$vo.$fapi.grups.select())).find((x) => x.name === '權限群組M1')
+            assert.ok(m1, '權限群組M1 應仍在資料庫')
+            assert.deepEqual(JSON5.parse(m1.cpemis), { '權限P2': { mode: 'OR', isActive: 'y' } }, `刪除 ${delName} 後 M1 之 cpemis 應只剩 權限P2（實得 ${m1.cpemis}）`)
             //【端到端不變式：刪 permission → 受影響 user 權限樹】base seed row 0 = 權限P1（peter 之群組 M1 使用 P1+P2）；
             //刪 P1 後 M1 僅剩 P2 → peter 解析後權限樹失去 P1 獨有的 專案A/頁A/區塊A，剩 P2 的 3 個 target。
             //驗 getPermUserInfor 回傳的 resolved 權限樹，守護「刪權限 → 受影響使用者權限正確縮減」。
@@ -353,6 +367,7 @@ async function runCase(mode, lang, c, extra = {}) {
         stages: c.stages,
         launch: launchBrowser,
         openPage: async (browser) => {
+            await resetDbTables(browser, [{ key: 'grups', seed: BASE_GRUPS }]) //引用端先還原(連帶清理之遺留)
             await resetDb(browser, 'pemis', BASE_SEED)
             const page = await openApp(browser)
             await setLang(page, lang)
@@ -375,7 +390,7 @@ async function generateBaseline() {
     fs.mkdirSync(PICS_DIR, { recursive: true })
     process.env.E2E_STRICT_CAPTURE = '1' //regen 端：captureStable 未 settle 即 throw，拒絕寫入未穩定畫面
     //擷取 pristine base seed（DB 剛 fresh seed）——用臨時 browser
-    { BASE_SEED = await captureBaseSeedOnce('pemis') }
+    { BASE_SEED = await captureBaseSeedOnce('pemis'); BASE_GRUPS = await captureBaseSeedOnce('grups') }
     for (const lang of gate.langs) {
         console.log(`=== 產生標準圖（${lang}）===`)
         for (const c of gate.casesFor(lang)) {
@@ -401,10 +416,12 @@ else {
                 await startServersOnce()
                 //擷取 BASE_SEED 一次（用臨時 browser）
                 if (!BASE_SEED) { BASE_SEED = await captureBaseSeedOnce('pemis') }
+                if (!BASE_GRUPS) { BASE_GRUPS = await captureBaseSeedOnce('grups') }
             })
-            //檔尾還原 pemis 為檔首 base seed(R-E2E-ISO-01): 單一 mocha 行程全跑時最後一案之改動不遺留給下一個檔
+            //檔尾還原 pemis 為檔首 base seed(R-E2E-ISO-01): 單一 mocha 行程全跑時最後一案之改動不遺留給下一個檔; 連同引用端 grups 表(刪除權限之連帶清理, 見 BASE_GRUPS 註解)
             after(async function() {
                 this.timeout(120000)
+                await restoreDbTablesOnce([{ key: 'grups', seed: BASE_GRUPS }])
                 await restoreDbOnce('pemis', BASE_SEED)
             })
             //每案 fresh browser、DB 還原、開頁切語系、語意斷言、關瀏覽器皆在 runCase 內（與產製端同管線；--grep 單跑亦完整）

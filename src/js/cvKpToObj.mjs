@@ -21,13 +21,13 @@ import getPropKey from './getPropKey.mjs'
  *   同名重複列所有列皆 y 才 y(任一列非 y 即 n, 與列序無關; 舊規則為後者覆蓋前者); 本函數以同一個鍵轉型(getPropKey)取得相同鍵與相同收斂結果;
  *   屬性鍵轉型必拋者(name 為 { toString: null } 等物件, 伺服端 mergeRules 同樣略過)略過該元素, 不拋 TypeError(R-KEY-PROP-01).
  * - opt.hasMode 為 true(cgrups／cpemis): 伺服端 findRefRows 以 === 比對名稱, isActive 為 'y' 之引用一律參與合併(R-PRINCIPLE-00 c／e／f): 查無實體(懸空)者內容全 n、
- *   mode 缺或非法者視為 AND 限制項(只當交集項、不單獨當基底;該層無合法 mode 之啟用項時全 n,見 getKpLossy)、名稱為空字串者照常(與名稱為 '' 之列相符, 否則為懸空). 故名稱為字串者(含 '')保留; isActive 為 'y' 而 mode 不合法者改為 mode 'AND'(與伺服端同解讀,
+ *   mode 缺或非法者視為 AND 限制項(只當交集項、不單獨當基底;該層無合法 mode 之啟用項時全 n; 編輯器存檔時對未被改動者原樣寫回原始 mode, 見 editorRefRows.getRawModeMap, 故不判有損)、名稱為空字串者照常(與名稱為 '' 之列相符, 否則為懸空). 故名稱為字串者(含 '')保留; isActive 為 'y' 而 mode 不合法者改為 mode 'AND'(與伺服端同解讀,
  *   存檔後授權不變——改為停用會丟掉 AND 限制而放寬, 補預設 OR 則多給); 同名重複者, 各啟用元素之有效模式一致時合為一個啟用項(與伺服端逐項合併等價: 同模式同名之重複不改變結果);
  *   無啟用元素時為 'n'; 同名 AND 與 OR 並存者(物件形式無法無損表示, 由 getKpLossy 判定並拒存)此處僅取 AND 支作為顯示值. 名稱非字串之元素(物件形式無法表示)略過, 由 getKpLossy 判定並拒存.
  *   鍵序: 名稱首次出現之序(僅供顯示, 不影響授權).
  *
  * 物件形式: 值為物件者去掉值內 name(外層鍵為名, 規則帳本 R-AUTH-PATH-01: 否則關聯對話框存檔會把授權改指到值內 name 所指之項目); hasMode 時另把 isActive 'y' 而 mode 不合法者改為 mode 'AND'
- * (伺服端以之為限制項; 該層無任何合法 mode 之啟用項時 getKpLossy 判有損而拒存); hasMode 時非物件值(舊式簡寫 { G1: 'y' })改為 { isActive: 值 }(值為 'y' 者另加 mode 'AND').
+ * (伺服端以之為限制項; 該層無任何合法 mode 之啟用項時結果全 n, 編輯器存檔對未被改動者原樣寫回原始 mode〔getRawModeMap, 方案 A〕, 不再判有損〔run06 放寬〕); hasMode 時非物件值(舊式簡寫 { G1: 'y' })改為 { isActive: 值 }(值為 'y' 者另加 mode 'AND').
  * 無需修改時原樣回傳(同一參考, 既有行為不變). 陣列形式一律回傳無原型物件(原型鍵名〔__proto__、constructor、toString〕可為一般鍵).
  *
  * @param {Object|Array} kp 輸入 JSON5.parse(cgrups／cpemis／crules) 之結果

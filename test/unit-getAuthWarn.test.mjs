@@ -194,7 +194,7 @@ describe('unit-getAuthWarn (授權資料衝突提示, R-PRINCIPLE-00 原則 3)',
         })
 
         it('GW-402-兩語系之警告語系鍵齊備; 各警告碼之 tooltip(getItemWarnText)非空、已代入名稱與種類、無殘留佔位符; emptyName 之範本不含名稱(名稱即空字串)', function() {
-            let keys = ['warnKindGrup', 'warnKindPemi', 'warnRefDangling', 'warnRefAmbiguous', 'warnRefModeInvalid', 'warnRefBothModes', 'warnRefEmptyName', 'warnRefNoName', 'warnDataUnparsable', 'warnRuleConflict', 'warnNameHistDup', 'warnDupRowsInconsistent', 'confirmDelAndRefsGrup', 'confirmDelAndRefsPemi']
+            let keys = ['warnKindGrup', 'warnKindPemi', 'warnRefDangling', 'warnRefAmbiguous', 'warnRefModeInvalid', 'warnRefBothModes', 'warnRefEmptyName', 'warnRefNoName', 'warnDataUnparsable', 'warnRuleConflict', 'warnNameHistDup', 'warnDupRowsInconsistent', 'confirmDelRefsGrup', 'confirmDelRefsPemi']
             for (let lang of ['eng', 'cht']) {
                 let $t = tOf(lang)
                 for (let k of keys) {

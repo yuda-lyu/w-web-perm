@@ -130,6 +130,29 @@ export async function restoreTables(snap) {
     }
 }
 
+//selectAllRows／editTableRows(run06 引用連帶): 與 e2e-array-form 檔內 selectAll／editTable 等價(該檔本輪不改、其本地副本待下輪收斂至本檔), 另含 targets 表(updateTargets).
+//  selectAllRows: 經資料通道 select 讀某表全部列(不經瀏覽器); 失敗即拋錯(不得把失敗當空表)
+export async function selectAllRows(kt) {
+    const r = await callRpc(`${kt}.select`, [], TOKEN_ADMIN)
+    if (!(r.ok && Array.isArray(r.output))) {
+        throw new Error(`${kt}.select 應成功, 實得 ${JSON.stringify(r).slice(0, 200)}`)
+    }
+    return r.output
+}
+//  editTableRows: 以管理者寫入 RPC 在某表現況之上追加(或改)列: fn(依 order 排序之現況列複本) → 新整表(回傳 undefined 視為就地修改); 失敗即拋錯。
+//  整表寫入會依陣列位置重給 order(供案例把夾具列置於最上方, 免虛擬捲動未渲染)
+const EDIT_FN = { users: 'updateUsers', grups: 'updateGrups', pemis: 'updatePemis', targets: 'updateTargets' }
+export async function editTableRows(kt, fn) {
+    if (!Object.prototype.hasOwnProperty.call(EDIT_FN, kt)) {
+        throw new Error(`editTableRows: 未知的表名「${kt}」`)
+    }
+    const rows = (await selectAllRows(kt)).slice().sort((a, b) => (a.order || 0) - (b.order || 0)).map((v) => JSON.parse(JSON.stringify(v)))
+    const res = await callRpc(EDIT_FN[kt], [fn(rows) || rows], TOKEN_ADMIN)
+    if (!res.ok) {
+        throw new Error(`夾具 ${EDIT_FN[kt]} 應成功, 實得 ${JSON.stringify(res).slice(0, 300)}`)
+    }
+}
+
 //readSrLogSince：讀本專案後端 srLog 中 time ≥ t0 之各行（已 JSON.parse；解析失敗之行略過；_raw 為原始行文字）。
 //  目錄＝settings.json 之 logFd（相對專案根＝後端 cwd；未給同 server/srLog.mjs 預設 './logs'）；只讀 mtime ≥ t0 − 2s 之檔。
 //  srLog 經 pino transport 非同步落檔，呼叫端須以哨兵事件等待（見 api-tokenSafety），不得讀到空集合即斷言「無外洩」。

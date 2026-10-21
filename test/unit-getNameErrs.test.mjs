@@ -5,7 +5,7 @@
 //  GN-2 重複之判準與伺服端同一份(findTouchedDup): 對同樣輸入, 前端判「擋存(dup)」⇔ 伺服端(procCore.updateGrups／updatePemis)回 nameDuplicate; 前端判不擋 ⇔ 伺服端可存;
 //  GN-3 群組／權限之空／非字串名稱一律擋存(badScope 'all'); 使用者之 name／email(badScope 'touched'): 新增或改成壞值者擋存, 基準內原樣就是壞值者不擋(warnHistBad);
 //  GN-4 同一名稱不同時屬於擋存與歷史警告(以擋存者為準); 比對為精確 ===; 原型鍵名(constructor／__proto__)無誤判;
-//  GN-5 getDelRefCount: 只以基準(已儲存)列之名稱計, 未儲存新增列刪除不影響他人; 僅 AND 引用且刪除後查無者計入;
+//  GN-5 getDelRefCount: 只以基準(已儲存)列之名稱計, 未儲存新增列刪除不影響他人; 僅 AND 引用且刪除後查無者計入; run06 起刪除確認改走 getDelImpact(nRefs 連帶清理之引用端數, 任何 mode 皆計; nAnd 其中 AND 引用者; nWiden 歷史同名)＋getDelConfirmText(GN-047、GN-048);
 //  GN-6 站點: 三個清單頁以 getNameErrs 取代舊的逐列 haskey 計重複; 新增之警告儲存格僅在有衝突時換成 flex 容器, 無衝突之分支維持原 DOM; 刪除確認走專案 DOM 模態(showCheckYesNo), 不用原生 confirm.
 //
 //跑法: npx mocha test/unit-getNameErrs.test.mjs --reporter list --timeout 30000
@@ -25,7 +25,7 @@ import { getUserRules } from '../src/plugins/mShare.mjs'
 import { countAndRefs } from '../src/js/getAuthWarn.mjs'
 import procLang from '../server/procLang.mjs'
 import { getNameErrs, mapNameKp } from '../src/js/getNameErrs.mjs'
-import { getDelRefCount, getDelConfirmText } from '../src/js/getDelRefCount.mjs'
+import { getDelRefCount, getDelImpact, getDelConfirmText } from '../src/js/getDelRefCount.mjs'
 import { mkTable, mkProcOrm, mkSrLog } from './tools/unitOrm.mjs'
 import { sourceLines } from './tools/srcScan.mjs'
 
@@ -557,23 +557,77 @@ describe('unit-getNameErrs (清單頁名稱／email 擋存與歷史警告判準,
             assert.strict.deepEqual(r1.holdersWiden.map((h) => h.id), ['u1', 'u2'])
         })
 
-        it('GN-047 getDelConfirmText: 只有 n → 既有 confirmDelAndRefs*; 只有 nWiden → confirmDelDupRefs*; 兩者皆有 → 同一框、同一問句(confirmDelBothRefs*, {n}、{m} 皆代入); 皆 0 → 空字串(不彈框); eng／cht 兩語系', function() {
+        it('GN-047 getDelConfirmText(run06 起 impact 為 { nRefs, nAnd, nWiden }; 刪除連帶清理, 文案為「移除引用」而非「授權被收回」): 只有 nRefs → confirmDelRefs*; nRefs＋nAnd → confirmDelRefsAnd*; nRefs＋nWiden → confirmDelRefsDup*; 三者皆有 → confirmDelRefsAndDup*; 只有 nWiden → confirmDelDupRefs*; 皆 0 → 空字串(不彈框); nAnd 以 nRefs 為上限; 同一框、同一問句; eng／cht 兩語系', function() {
             let LANG = procLang({})
             for (let lang of ['eng', 'cht']) {
                 let $t = (k) => LANG[lang][k]
+                let ask = lang === 'cht' ? /確定刪除？/g : /Delete anyway\?/g
                 for (let kind of ['Grup', 'Pemi']) {
-                    assert.strict.equal(getDelConfirmText({ n: 0, nWiden: 0 }, $t, kind), '')
+                    assert.strict.equal(getDelConfirmText({ nRefs: 0, nAnd: 0, nWiden: 0 }, $t, kind), '')
                     assert.strict.equal(getDelConfirmText(null, $t, kind), '')
-                    assert.strict.equal(getDelConfirmText({ n: 3, nWiden: 0 }, $t, kind), $t(`confirmDelAndRefs${kind}`).split('{n}').join('3'))
-                    let t2 = getDelConfirmText({ n: 0, nWiden: 4 }, $t, kind)
+                    assert.strict.equal(getDelConfirmText({ nRefs: 3, nAnd: 0, nWiden: 0 }, $t, kind), $t(`confirmDelRefs${kind}`).split('{n}').join('3'))
+                    assert.strict.equal(getDelConfirmText({ nRefs: 3, nAnd: 2, nWiden: 0 }, $t, kind), $t(`confirmDelRefsAnd${kind}`).split('{n}').join('3').split('{m}').join('2'))
+                    assert.strict.equal(getDelConfirmText({ nRefs: 3, nAnd: 0, nWiden: 4 }, $t, kind), $t(`confirmDelRefsDup${kind}`).split('{n}').join('3').split('{w}').join('4'))
+                    let t3 = getDelConfirmText({ nRefs: 3, nAnd: 2, nWiden: 4 }, $t, kind)
+                    assert.strict.equal(t3, $t(`confirmDelRefsAndDup${kind}`).split('{n}').join('3').split('{m}').join('2').split('{w}').join('4'))
+                    assert.strict.ok(!t3.includes('{'), `${lang} ${kind} 三者皆有: 佔位符皆已代入`)
+                    assert.strict.equal((t3.match(ask) || []).length, 1, `${lang} ${kind} 三者皆有: 只有一個問句`)
+                    //只有 nWiden(名稱仍有實體, 不清理): 既有 confirmDelDupRefs*, {n} 為 nWiden
+                    let t2 = getDelConfirmText({ nRefs: 0, nAnd: 0, nWiden: 4 }, $t, kind)
                     assert.strict.equal(t2, $t(`confirmDelDupRefs${kind}`).split('{n}').join('4'))
                     assert.strict.ok(t2.includes('4') && !t2.includes('{'), `${lang} ${kind} 只有 nWiden`)
-                    let t3 = getDelConfirmText({ n: 3, nWiden: 4 }, $t, kind)
-                    assert.strict.ok(t3.includes('3') && t3.includes('4') && !t3.includes('{'), `${lang} ${kind} 兩者皆有: 兩個數字皆代入`)
-                    let nAsk = lang === 'cht' ? (t3.match(/確定刪除？/g) || []).length : (t3.match(/Delete anyway\?/g) || []).length
-                    assert.strict.equal(nAsk, 1, `${lang} ${kind} 兩者皆有: 只有一個問句`)
+                    //nRefs 為 0 時 nAnd 不單獨成句(AND 引用者屬被清理者之子集); nAnd 超過 nRefs 以 nRefs 為上限
+                    assert.strict.equal(getDelConfirmText({ nRefs: 0, nAnd: 5, nWiden: 0 }, $t, kind), '')
+                    assert.strict.equal(getDelConfirmText({ nRefs: 2, nAnd: 9, nWiden: 0 }, $t, kind), $t(`confirmDelRefsAnd${kind}`).split('{n}').join('2').split('{m}').join('2'))
+                    //不再有「授權將被收回」(與連帶清理互斥)
+                    assert.strict.ok(!/revoked|收回/.test(t3), `${lang} ${kind} 不得再說授權被收回`)
                 }
             }
+        })
+
+        it('GN-048 getDelImpact(run06): nRefs 為連帶清理之引用端數(任何 mode、停用、陣列形式皆計), nAnd 為其中 AND 引用且名稱完全消失者, nWiden 同 getDelRefCount; 歷史同名只刪其一不清理(nRefs 為 0); 只算本次刪除; 輸入防呆', function() {
+            let AND = (n) => JSON.stringify({ [n]: { mode: 'AND', isActive: 'y' } })
+            let OR = (n) => JSON.stringify({ [n]: { mode: 'OR', isActive: 'y' } })
+            let grupsBase = [{ id: 'g1', name: 'G1' }, { id: 'g2', name: 'G2' }]
+            let users = [
+                { id: 'u1', cgrups: AND('G1') },
+                { id: 'u2', cgrups: OR('G1') },
+                { id: 'u3', cgrups: JSON.stringify({ G1: { mode: 'AND', isActive: 'n' } }) },
+                { id: 'u4', cgrups: JSON.stringify([{ name: 'G1', mode: 'AND', isActive: 'y' }]) },
+                { id: 'u5', cgrups: AND('G2') },
+                { id: 'u6', cgrups: '' },
+            ]
+            assert.strict.deepEqual(getDelImpact(['g1'], grupsBase, users, 'Grup', [grupsBase[1]]), { nRefs: 4, nAnd: 2, nWiden: 0 }, 'u1～u4 皆被清理(含 OR、停用、陣列形式); 其中 u1、u4 為啟用 AND')
+            assert.strict.deepEqual(getDelImpact(['g1', 'g2'], grupsBase, users, 'Grup', []), { nRefs: 5, nAnd: 3, nWiden: 0 })
+            assert.strict.deepEqual(getDelImpact([], grupsBase, users, 'Grup', grupsBase), { nRefs: 0, nAnd: 0, nWiden: 0 })
+
+            //歷史同名只刪其一: 名稱仍有實體, 引用不清理(nRefs 0), 但授權可能變多(nWiden)
+            let dup = [{ id: 'a', name: 'G1' }, { id: 'b', name: 'G1' }]
+            assert.strict.deepEqual(getDelImpact(['a'], dup, users, 'Grup', [dup[1]]), { nRefs: 0, nAnd: 0, nWiden: 3 }, 'nWiden 只計啟用之引用(u1、u2、u4), 停用之 u3 不計')
+
+            //只算本次刪除: 其他未儲存之編輯(如另一列之改名)不影響 nRefs; 被刪名稱以基準(已儲存)列為準, 即使目前清單已把該列改名
+            let cur = [{ id: 'g1', name: 'G1x' }] //g1 尚未儲存地改名; 本次刪 g2
+            assert.strict.deepEqual(getDelImpact(['g2'], grupsBase, users, 'Grup', cur), { nRefs: 1, nAnd: 1, nWiden: 0 }, '只有 u5 引用 G2')
+            assert.strict.deepEqual(getDelImpact(['g1'], grupsBase, users, 'Grup', []), { nRefs: 4, nAnd: 2, nWiden: 0 }, '以基準名稱 G1 計, 未儲存之改名不影響引用')
+
+            //尚未儲存之新增列(id 不在基準)刪除不影響他人
+            assert.strict.deepEqual(getDelImpact(['tmp-1'], grupsBase, [{ id: 'u1', cgrups: AND('NEW') }], 'Grup', grupsBase), { nRefs: 0, nAnd: 0, nWiden: 0 })
+
+            //nAnd 不得大於 nRefs: 歷史同名組(a、b 皆名 G)刪 a、另把 b 未儲存地改名 → 目前清單中 b 不再是同 id 同名之存續列, getDelRefCount 之 n 計 AND 引用者; 但 nRefs 只算本次刪除(基準中 b 仍同 id 同名存續 → G 不清理, G 之引用端不計入 nRefs)
+            let dupG = [{ id: 'a', name: 'G' }, { id: 'b', name: 'G' }]
+            let usersG = [{ id: 'u1', cgrups: AND('G') }, { id: 'u2', cgrups: AND('G') }, { id: 'u3', cgrups: OR('H') }]
+            let baseGH = [...dupG, { id: 'h', name: 'H' }]
+            let imp = getDelImpact(['a', 'h'], baseGH, usersG, 'Grup', [{ id: 'b', name: 'G2' }])
+            assert.strict.deepEqual(imp, { nRefs: 1, nAnd: 1, nWiden: 0 }, 'nRefs 只有 u3(H 被清理); 因 nAnd(2)大於 nRefs 取上限 1')
+
+            //權限頁: 引用端為群組之 cpemis
+            let pemisBase = [{ id: 'p1', name: 'P1' }]
+            let grups = [{ id: 'g1', cpemis: AND('P1') }, { id: 'g2', cpemis: OR('P1') }, { id: 'g3', cpemis: AND('PX') }]
+            assert.strict.deepEqual(getDelImpact(['p1'], pemisBase, grups, 'Pemi', []), { nRefs: 2, nAnd: 1, nWiden: 0 })
+
+            //輸入防呆: 種類不明、非陣列輸入皆回 0 不拋錯
+            assert.strict.deepEqual(getDelImpact(['g1'], grupsBase, users, 'Xxx', []), { nRefs: 0, nAnd: 0, nWiden: 0 })
+            assert.strict.deepEqual(getDelImpact(null, null, null, 'Grup', null), { nRefs: 0, nAnd: 0, nWiden: 0 })
         })
     })
 
@@ -657,14 +711,15 @@ describe('unit-getNameErrs (清單頁名稱／email 擋存與歷史警告判準,
             }
         })
 
-        it('SITE-GN-004 刪除確認: 群組頁／權限頁經 getDelRefCount＋getDelConfirmText＋showCheckYesNo(單一框, 兩種影響併入同一框), 無影響時不彈框; 不用原生 confirm／alert', function() {
-            for (let [fn, kind, arg] of [['LayoutContentGrups', 'Grup', `vo.grups, vo.users, 'cgrups'`], ['LayoutContentPemis', 'Pemi', `vo.pemis, vo.grups, 'cpemis'`]]) {
+        it('SITE-GN-004 刪除確認: 群組頁／權限頁經 getDelImpact＋getDelConfirmText＋showCheckYesNo(單一框, 多種影響併入同一框), 無影響時不彈框; 不用原生 confirm／alert(儲存前之引用連帶預覽另一個確認框見 unit-getCascadePreview SITE-GCP-001)', function() {
+            for (let [fn, kind, arg] of [['LayoutContentGrups', 'Grup', `vo.grups, vo.users, 'Grup'`], ['LayoutContentPemis', 'Pemi', `vo.pemis, vo.grups, 'Pemi'`]]) {
                 let c = code(`src/components/${fn}.vue`)
-                assert.strict.ok(c.includes(`let impact = getDelRefCount(delIds, ${arg}, getRowsRemain())`), `${fn} 影響人數`)
+                assert.strict.ok(c.includes(`let impact = getDelImpact(delIds, ${arg}, getRowsRemain())`), `${fn} 影響人數`)
                 assert.strict.ok(c.includes(`let confirmText = getDelConfirmText(impact, (k) => vo.$t(k), '${kind}')`), `${fn} 確認框文字`)
                 assert.strict.ok(c.includes(`vo.$dg.showCheckYesNo(confirmText)`), `${fn} 確認框`)
                 assert.strict.ok(/if \(confirmText === ''\) \{\s*doDelete\(\)\s*return\s*\}/.test(c), `${fn} 無影響時直接刪除`)
-                assert.strict.equal((c.match(/showCheckYesNo\(/g) || []).length, 1, `${fn} 只能一個確認框`)
+                assert.strict.equal((c.match(/showCheckYesNo\(confirmText\)/g) || []).length, 1, `${fn} 刪除流程只能一個確認框`)
+                assert.strict.equal((c.match(/showCheckYesNo\(/g) || []).length, 2, `${fn} 全檔只有兩個確認框: 刪除前一個、儲存前(改名預覽)一個`)
             }
             for (let fn of pages) {
                 let c = code(`src/components/${fn}.vue`)
@@ -672,11 +727,20 @@ describe('unit-getNameErrs (清單頁名稱／email 擋存與歷史警告判準,
             }
         })
 
-        it('SITE-GN-005 procLang: 使用者歷史警告 5 個與刪除確認(歷史同名)4 個語系鍵皆有 eng／cht; 含 {n}（Both 另含 {m}）者兩語系皆含', function() {
+        it('SITE-GN-005 procLang: 使用者歷史警告 5 個與刪除確認(連帶清理 4 組合＋歷史同名)之語系鍵皆有 eng／cht; 含 {n}（RefsAnd 另含 {m}、RefsDup 另含 {w}、RefsAndDup 三者皆含）者兩語系皆含; 舊鍵 confirmDelAndRefs*／confirmDelBothRefs* 已移除', function() {
             let lang = fs.readFileSync(path.join(projRoot, 'server', 'procLang.mjs'), 'utf8')
-            for (let k of ['confirmDelBothRefsGrup', 'confirmDelBothRefsPemi']) {
-                let m = lang.match(new RegExp(`${k}: \\{\\s*eng: \`([^\`]+)\`,\\s*cht: \`([^\`]+)\`,`))
-                assert.strict.ok(m && m[1].includes('{n}') && m[1].includes('{m}') && m[2].includes('{n}') && m[2].includes('{m}'), `${k} 兩語系皆須含 {n}、{m}`)
+            for (let [base, phs] of [['confirmDelRefs', ['{n}']], ['confirmDelRefsAnd', ['{n}', '{m}']], ['confirmDelRefsDup', ['{n}', '{w}']], ['confirmDelRefsAndDup', ['{n}', '{m}', '{w}']]]) {
+                for (let kind of ['Grup', 'Pemi']) {
+                    let k = `${base}${kind}`
+                    let m = lang.match(new RegExp(`${k}: \\{\\s*eng: \`([^\`]+)\`,\\s*cht: \`([^\`]+)\`,`))
+                    assert.strict.ok(m, `${k} 須有 eng／cht`)
+                    for (let ph of phs) {
+                        assert.strict.ok(m[1].includes(ph) && m[2].includes(ph), `${k} 兩語系皆須含 ${ph}`)
+                    }
+                }
+            }
+            for (let k of ['confirmDelAndRefsGrup', 'confirmDelAndRefsPemi', 'confirmDelBothRefsGrup', 'confirmDelBothRefsPemi']) {
+                assert.strict.ok(!lang.includes(`${k}:`), `${k} 已由 confirmDelRefs* 系列取代, 不應殘留`)
             }
             for (let [k, hasN] of [['confirmDelDupRefsGrup', true], ['confirmDelDupRefsPemi', true], ['warnUserNameHistDup', true], ['warnUserEmailHistDup', true], ['warnUserNameHistEmpty', false], ['warnUserEmailHistEmpty', false], ['warnUserEmailHistInvalid', false]]) {
                 let re = new RegExp(`${k}: \\{\\s*eng: \`([^\`]+)\`,\\s*cht: \`([^\`]+)\`,`)

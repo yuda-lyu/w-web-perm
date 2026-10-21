@@ -5,7 +5,7 @@
 //背景: 外部應用直接寫入「陣列形式」[{ "name": "A", "isActive": "y" }]，伺服端 getUserRules 相容並授權(UNIT-OI-006a)，五個編輯元件
 //  (VeCrules／VeCgrups／VeCpemis／VeGrupBlngUsers／VePemiBlngGrups)依名稱為鍵查值，查不到陣列元素 → 顯示停用 → 存檔即撤銷有效授權.
 //  外審(minimax#1、sol#4～#6)另指出: 缺 mode 之元素顯示啟用後存檔會補 OR 而增權、同名不同 mode 取末項會增權、物件值內 name 使關聯對話框改指另一項、crules 之鍵轉型.
-//CO-0xx: 函數契約; DF-0xx: 與伺服端 getUserRules 之差分(同一份資料，伺服端授權 ⇔ 編輯器顯示啟用); PR-0xx: 窮舉性質(編輯器存檔前後之授權相等, 唯一例外為 getKpLossy 判定之有損格);
+//CO-0xx: 函數契約; DF-0xx: 與伺服端 getUserRules 之差分(同一份資料，伺服端授權 ⇔ 編輯器顯示啟用); PR-0xx: 窮舉性質(編輯器存檔前後之授權相等, 唯一例外為 getKpLossy 判定之有損格; 存檔模型為方案 A);
 //SITE-AD-001: src 內每一處 JSON5.parse(授權資料) 皆分類(五元件已套、清單頁未套〔站點 37〕, 新增者即紅).
 //
 //授權合併規則(CLAUDE_rulebook.md R-AUTH-MERGE-00, 使用者 2026-10-21 裁示; 本檔 assertion 註解以「規則 N」指該條文之第 N 條):
@@ -16,7 +16,9 @@
 //  編輯器模型(存檔): 對話框之列 = 被引用表全部列 ∪ 啟用而查無列之引用(額外列, 原樣寫回); 名稱非字串之啟用元素無法表示 → getKpLossy 以 #序號 判定拒存.
 //  連帶: 同一項(crules 陣列形式)重複列同名規則時所有列皆 y 才 y(與列序無關; 舊規則為後者覆蓋前者);
 //  run02 之排序保護(keepKeyOrder／getKeyOrderLost／getKpWriteLost 與 getKpLossy 之 AND 相對順序判定)已隨規則 4 刪除, 本檔對應案例(KO／GL／WL／KL-003)隨之移除;
-//  保留者唯「同名同時有效 OR 與 AND」一格(物件形式一個名稱只有一個 mode, 無法無損表示), 由 getKpLossy 判定, 編輯器拒存(R-AUTH-LOSSY-01).
+//  保留者唯「同名同時有效 OR 與 AND」一格(物件形式一個名稱只有一個 mode, 無法無損表示), 由 getKpLossy 判定, 編輯器拒存(R-AUTH-LOSSY-01); 加上「啟用而名稱非字串」(run05 f)一格.
+//  〔run06〕原第三格「該層啟用項皆 mode 缺／非法 → 拒存」(ADR-035 決定 e)已放寬(使用者裁示, ADR-035 Update 2026-10-22): 方案 A(未改動之限制項原樣寫回原始 mode)使存檔前後授權相等, KL-007／PR-* 改為
+//  不判有損且方案 A 存檔授權相等(照列寫出為合法 AND 之舊寫法 saveLike 仍保留為對照, 證明放寬仰賴方案 A); 往返之完整證明(直接編輯器／反向關聯對話框, 含管理者改動)見 unit-editorRows RT-LOSSY3-*.
 //跑法: npx mocha test/unit-cvKpToObj.test.mjs --timeout 180000
 import assert from 'assert'
 import fs from 'fs'
@@ -271,30 +273,32 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
         }
     })
 
-    it('KL-007 getKpLossy 主責裁示之第三格: 該層啟用項皆 mode 缺或非法(無 mode 合法之啟用項; 陣列、物件、純量值 {"G1":"y"} 皆然)→ 回傳這些名稱(伺服端為限制項、全 n; 編輯器解碼為 AND 存檔即成基底而多給); 另有 mode 合法之啟用項 → 不判; 全停用 → 不判', function() {
+    it('KL-007 getKpLossy 第三格已放寬(run06 使用者裁示, ADR-035 Update 2026-10-22): 該層啟用項皆 mode 缺或非法(陣列、物件、純量值 {"G1":"y"} 皆然)→ 不判有損(回空陣列; 缺漏提示仍由 getAuthWarn 之 modeInvalid 警告圖示承擔); 第一格(同名 OR 與限制項並存)與第二格(名稱非字串之限制項)不受影響; 放寬之依據: 方案 A 原樣寫回使存檔前後授權不變, 而照列硬寫為合法 AND(方案 A 之前)會多給', function() {
         let L = (kp) => getKpLossy(kp)
-        assert.strict.deepEqual(L([{ name: 'A', isActive: 'y' }]), ['A'])
-        assert.strict.deepEqual(L([{ name: 'G1', mode: 'or', isActive: 'y' }, { name: 'G2', mode: 'XOR', isActive: 'y' }, { name: 'G3', mode: 'OR', isActive: 'n' }]), ['G1', 'G2'])
-        assert.strict.deepEqual(L([{ name: 'G1', mode: 'or', isActive: 'y' }, { name: 'G1', mode: null, isActive: 'y' }]), ['G1'], '同名皆非法: 不重複')
-        assert.strict.deepEqual(L({ G1: { mode: 'or', isActive: 'y' } }), ['G1'], '物件形式')
-        assert.strict.deepEqual(L({ G1: { isActive: 'y' }, G2: { mode: 'OR', isActive: 'n' } }), ['G1'], '物件形式, 合法者停用')
-        assert.strict.deepEqual(L({ G1: 'y' }), ['G1'], '純量值(舊式簡寫)')
-        //另有 mode 合法之啟用項 → 限制項與 AND 等價, 可無損寫出
+        //放寬: 以下六格於放寬前回傳這些名稱(拒存), 現回空陣列
+        assert.strict.deepEqual(L([{ name: 'A', isActive: 'y' }]), [], '單一缺 mode')
+        assert.strict.deepEqual(L([{ name: 'G1', mode: 'or', isActive: 'y' }, { name: 'G2', mode: 'XOR', isActive: 'y' }, { name: 'G3', mode: 'OR', isActive: 'n' }]), [], '多個限制項(合法者停用)')
+        assert.strict.deepEqual(L([{ name: 'G1', mode: 'or', isActive: 'y' }, { name: 'G1', mode: null, isActive: 'y' }]), [], '同名皆非法')
+        assert.strict.deepEqual(L({ G1: { mode: 'or', isActive: 'y' } }), [], '物件形式')
+        assert.strict.deepEqual(L({ G1: { isActive: 'y' }, G2: { mode: 'OR', isActive: 'n' } }), [], '物件形式, 合法者停用')
+        assert.strict.deepEqual(L({ G1: 'y' }), [], '純量值(舊式簡寫)')
+        //另有 mode 合法之啟用項(限制項與 AND 等價)、全停用: 本即不判
         assert.strict.deepEqual(L([{ name: 'A', isActive: 'y' }, { name: 'B', mode: 'OR', isActive: 'y' }]), [])
         assert.strict.deepEqual(L({ G1: 'y', G2: { mode: 'AND', isActive: 'y' } }), [])
-        assert.strict.deepEqual(L([{ name: 'A', mode: 'XOR', isActive: 'y' }, { mode: 'AND', isActive: 'y' }]), ['#2'], '合法項名稱非字串: 仍算合法項(只判 #序號)')
-        //全停用 → 不判
         assert.strict.deepEqual(L([{ name: 'A', mode: 'or', isActive: 'n' }, { name: 'B', isActive: 'n' }]), [])
         assert.strict.deepEqual(L({ A: { mode: 'or', isActive: 'n' }, B: 'n' }), [])
-        //名稱非字串之限制項(無合法項): 以 #序號 判(第二格)
-        assert.strict.deepEqual(L([{ mode: 'or', isActive: 'y' }]), ['#1'])
-        //伺服端與編輯器模型對照: 上列判有損之格, 伺服端全 n、編輯器硬寫則授權(判定確有必要)
+        //不受放寬影響之格: 第二格(名稱非字串)以 #序號 判; 第一格(同名有效 OR 與限制項〔視為 AND〕並存)判
+        assert.strict.deepEqual(L([{ mode: 'or', isActive: 'y' }]), ['#1'], '名稱非字串之限制項(無合法項)')
+        assert.strict.deepEqual(L([{ name: 'A', mode: 'XOR', isActive: 'y' }, { mode: 'AND', isActive: 'y' }]), ['#2'], '合法項名稱非字串: 只判 #序號, 限制項 A 不判')
+        assert.strict.deepEqual(L([{ name: 'G1', mode: 'OR', isActive: 'y' }, { name: 'G1', isActive: 'y' }]), ['G1'], '同名 OR 與缺 mode 並存')
+        //伺服端與編輯器模型對照(放寬之依據): 上列放寬之格, 伺服端全 n; 方案 A 之前之寫法(照列寫出為合法 AND)授權(多給, 即放寬前拒存之理由); 方案 A(未改動之限制項原樣寫回)仍全 n(不多給)
         let gs = [{ name: 'G1', cpemis: `{"P1":${ON}}` }, { name: 'G2', cpemis: `{"P1":${ON}}` }, { name: 'A', cpemis: `{"P1":${ON}}` }]
         let ps = [{ name: 'P1', crules: '{"T":"y"}' }]
         let eff = (cgrups) => getUserRules({ cgrups }, gs, ps, [{ id: 'T' }]).rules[0].isActive
         for (let raw of ['[{"name":"A","isActive":"y"}]', '{"G1":{"mode":"or","isActive":"y"}}', '{"G1":"y"}', '[{"name":"G1","mode":"or","isActive":"y"},{"name":"G2","mode":"XOR","isActive":"y"}]']) {
             assert.strict.equal(eff(raw), 'n', `伺服端全 n: ${raw}`)
-            assert.strict.equal(eff(saveLike(raw, ['G1', 'G2', 'A'])), 'y', `硬寫會授權(多給): ${raw}`)
+            assert.strict.equal(eff(saveLike(raw, ['G1', 'G2', 'A'])), 'y', `方案 A 之前之寫法硬寫會授權(多給): ${raw}`)
+            assert.strict.equal(eff(saveLikeA(raw, ['G1', 'G2', 'A'])), 'n', `方案 A 原樣寫回: 存檔後仍全 n(不多給): ${raw}`)
         }
     })
 
@@ -453,7 +457,7 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
     //  p1 只有 n: T 為 y ⇔ n 以合法 mode 參與(唯一項即基底; 限制項〔mode 非法〕無合法項時全 n)
     //  p2 n＋#H(OR, 空): T 為 y ⇔ n 為 OR(AND／限制項時 OR 聯集為空)
     //  p3 n＋#H2(OR, {T,U}): U 為 n ⇔ n 以 AND 或限制項參與(交集收斂); OR 或不參與時 U 為 y
-    //參與 ⇔ p1 或 p3 收斂; 編輯器: OR ⇔ p2, AND ⇔ p3 收斂(限制項顯示為 AND; 該層無合法項時由 getKpLossy 拒存, 見 KL-007)
+    //參與 ⇔ p1 或 p3 收斂; 編輯器: OR ⇔ p2, AND ⇔ p3 收斂(限制項顯示為 AND; 該層無合法項時存檔原樣寫回原始 mode, 不判有損, 見 KL-007)
     let serverRefView = (raw, n) => {
         let kp = JSON5.parse(raw)
         let only = Array.isArray(kp) ? kp.filter((e) => e !== null && typeof e === 'object' && e.name === n) : (Object.prototype.hasOwnProperty.call(kp, n) ? { [n]: kp[n] } : {})
@@ -522,11 +526,11 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
             }
         }
         assert.strict.deepEqual(bad, [], bad.join('\n'))
-        //純量 "y" 唯一項: 伺服端為限制項而該層無合法項 → 全 n(主責裁示); 編輯器顯示啟用(AND), 由 getKpLossy 判有損拒存
+        //純量 "y" 唯一項: 伺服端為限制項而該層無合法項 → 全 n(主責裁示); 編輯器顯示啟用(AND); 存檔原樣寫回原始 mode(方案 A), 不判有損(run06 放寬, 見 KL-007)
         assert.strict.equal(grantedByGroup('{"G1":"y"}').G1, false, '純量 "y" 唯一項 → 全 n')
-        assert.strict.deepEqual(getKpLossy(JSON5.parse('{"G1":"y"}')), ['G1'])
-        //對照組(本 batt 實得: 參與 19、OR 8、AND 4〔含另有合法項時之限制項 2〕、有損 7〔同名 OR＋AND、啟用項皆 mode 非法〕)
-        assert.strict.ok(nOn >= 12 && nOr >= 4 && nAnd >= 3 && nLossy >= 5, `對照組: 參與 ${nOn}、OR ${nOr}、AND ${nAnd}、有損 ${nLossy} 皆須出現`)
+        assert.strict.deepEqual(getKpLossy(JSON5.parse('{"G1":"y"}')), [])
+        //對照組(本 batt 實得: 參與 19、OR 8、AND 10〔含限制項; 其中該層啟用項皆 mode 非法者為原第三格, run06 放寬後不再入有損而入此欄: 伺服端解讀為限制項〔交集收斂〕＝ 編輯器 AND〕、有損 1〔同名 OR＋AND〕)
+        assert.strict.ok(nOn >= 12 && nOr >= 4 && nAnd >= 8 && nLossy >= 1, `對照組: 參與 ${nOn}、OR ${nOr}、AND ${nAnd}、有損 ${nLossy} 皆須出現`)
     })
 
     it('DF-004 cgrups 陣列形式之 mode 保留: 編輯器顯示之 mode = 元素之 mode(AND／OR), 存出後伺服端以相同 mode 合併(mode 影響授權: 改為 OR 結果不同)', function() {
@@ -597,13 +601,15 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
     })
 
 
-    // ===== 窮舉性質(R-AUTH-MERGE-00／R-AUTH-LOSSY-01): 編輯器存檔前後之授權相等, 唯一例外為 getKpLossy 判定之有損格; 且與陣列元素序／對話框列序無關 =====
+    // ===== 窮舉性質(R-AUTH-MERGE-00／R-AUTH-LOSSY-01): 編輯器存檔前後之授權相等, 唯一例外為 getKpLossy 判定之有損格(同名 OR／AND、名稱非字串); 且與陣列元素序／對話框列序無關 =====
 
-    //受測存檔模擬＝編輯器模型(run05; 同 VeCgrups／VeCpemis.doSave 的資料流, 與 U1 之實作一致): 解碼(cvKpToObj hasMode) → 對話框之列 =
+    //受測存檔模擬＝編輯器模型(run05; 同 VeCgrups／VeCpemis.doSave 的資料流, 與 U1 之實作一致; saveLikeA 為含方案 A 之編輯器實際存檔模型): 解碼(cvKpToObj hasMode) → 對話框之列 =
     //  (被引用表之全部列, 狀態取 refState) ∪ (啟用而名稱不在表中之引用〔懸空, 含名稱 ""〕, 各一列原樣保留其有效 mode; R-PRINCIPLE-00 c／f: 丟棄即改變授權)
     //  → 寫出 { 名稱: { mode, isActive } }(JSON.stringify; 物件鍵序 = 列序. 不保序: 規則 4, 結果與鍵序無關).
     //名稱非字串之啟用元素物件形式無法表示, 由 getKpLossy 判定(拒存), 此處不寫出
-    let saveLike = (raw, names) => {
+    //keepLim(方案 A, run05 外審後採納, R-EDIT-KEEP-01; run06 第三格放寬之依據): 「未被管理者改動」之限制項(該名稱所有啟用元素皆 mode 缺／非法, 列仍為啟用 AND)原樣寫回其原始 mode(缺則不寫 mode 鍵);
+    //  不給(預設)＝照列寫出, 為方案 A 之前之寫法(限制項被寫成合法 AND, 該層無合法項時成為唯一基底而多給). 本檔獨立寫出(不經 editorRefRows)以交叉驗證; 往返之完整證明見 unit-editorRows RT-LOSSY3-*
+    let saveLike = (raw, names, keepLim = false) => {
         let kp = cvKpToObj(JSON5.parse(raw), HM)
         let rows = names.map((n) => ({ name: n, ...refState(getOwn(kp, n, null)) }))
         if (kp !== null && typeof kp === 'object' && !Array.isArray(kp)) {
@@ -614,12 +620,32 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
                 }
             })
         }
+        let lim = Object.create(null) //限制項名稱 → 原始 mode(取該名稱第一個啟用元素)
+        if (keepLim) {
+            let byName = Object.create(null)
+            cvKpToArr(JSON5.parse(raw)).forEach((e) => {
+                if (e.isActive === 'y' && typeof e.name === 'string') {
+                    byName[e.name] = byName[e.name] || []
+                    byName[e.name].push(e)
+                }
+            })
+            Object.keys(byName).forEach((n) => {
+                if (byName[n].every((e) => e.mode !== 'OR' && e.mode !== 'AND')) {
+                    lim[n] = byName[n][0].mode
+                }
+            })
+        }
         let kpNew = Object.create(null)
         rows.forEach((r) => {
+            if (r.name in lim && r.enable === 'y' && r.mode === 'AND') {
+                kpNew[r.name] = lim[r.name] === undefined ? { isActive: 'y' } : { mode: lim[r.name], isActive: 'y' }
+                return
+            }
             kpNew[r.name] = { mode: r.mode, isActive: r.enable }
         })
         return JSON.stringify(kpNew)
     }
+    let saveLikeA = (raw, names) => saveLike(raw, names, true)
 
     //eff 字串 'T1=y,T2=n,…' → 授權為 y 之標的集合
     let ysOf = (s) => new Set(s.split(',').filter((x) => x.endsWith('=y')).map((x) => x.slice(0, -2)))
@@ -663,9 +689,10 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
         let ts = [{ id: 'T1' }, { id: 'T2' }, { id: 'T3' }]
         let pn = ['A', 'B', 'C']
         //st 四個互斥分類(total = equal + lossyNeed + lossyCons + leaks.length):
-        //  equal: 存檔前後授權相等且未判有損; lossyNeed: 判有損且硬寫真的改變授權(判定確有必要); lossyCons: 判有損但硬寫碰巧相等(保守側); leaks: 授權改變而未判有損(漏判, 須為 0)
+        //  equal: 存檔前後授權相等且未判有損(存檔模型為方案 A: 未改動之限制項原樣寫回; 含原第三格〔啟用項皆 mode 缺／非法〕, run06 放寬); lossyNeed: 判有損且硬寫真的改變授權(判定確有必要); lossyCons: 判有損但硬寫碰巧相等(保守側); leaks: 授權改變而未判有損(漏判, 須為 0)
         //  orderBad: 陣列元素序反轉／對話框列序反轉使授權改變者(規則 4, 須為 0); gain: 有損格硬寫後授權為 y 之標的多於寫前者(增權, 須為 0——硬寫取 AND 支, 只會收回)
-        let st = { total: 0, equal: 0, lossyNeed: 0, lossyCons: 0, leaks: [], orderBad: [], gain: [], unnamed: 0, allBad: 0 }
+        //  allBad: 啟用項皆 mode 缺／非法且未判有損之格數(原第三格); allBadNaive: 其中「照列寫出為合法 AND」(方案 A 之前之寫法)會改變授權者(證明放寬仰賴方案 A 而非巧合)
+        let st = { total: 0, equal: 0, lossyNeed: 0, lossyCons: 0, leaks: [], orderBad: [], gain: [], unnamed: 0, allBad: 0, allBadNaive: 0 }
         for (let fam of FAMS) {
             let eff
             if (level === 'cgrups') {
@@ -682,11 +709,21 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
                 let raw = JSON.stringify(arr)
                 let before = eff(raw)
                 let lossy = getKpLossy(JSON5.parse(raw))
-                let after = eff(saveLike(raw, names)) //有損格亦計算「硬寫」之授權(編輯器實際會拒存, 此處為驗證判定是否漏判／是否必要)
+                //有損格(同名 OR 與 AND、名稱非字串)編輯器實際會拒存, 此處計算「硬寫」之授權以驗證判定是否漏判／是否必要; 其餘格為編輯器實際存檔之模型(方案 A: 未改動之限制項原樣寫回)
+                let write = lossy.length > 0 ? saveLike : saveLikeA
+                let after = eff(write(raw, names))
+
+                //原第三格(啟用項皆 mode 缺／非法, 已放寬): 方案 A 存檔後授權相等; 若照列寫出為合法 AND(方案 A 之前)則改變——計數供靈敏度檢查
+                if (lossy.length === 0 && nValidOf(arr) === 0 && arr.some((e) => e !== null && typeof e === 'object' && e.isActive === 'y')) {
+                    st.allBad++
+                    if (eff(saveLike(raw, names)) !== before) {
+                        st.allBadNaive++
+                    }
+                }
 
                 //規則 4: 陣列元素序反轉、對話框列序反轉, 授權不變(寫前、寫後皆然)
                 let beforeRev = eff(JSON.stringify([...arr].reverse()))
-                let afterRev = eff(saveLike(raw, [...names].reverse()))
+                let afterRev = eff(write(raw, [...names].reverse()))
                 if (beforeRev !== before || afterRev !== after) {
                     st.orderBad.push(`${raw}: 元素序反轉 ${before} → ${beforeRev}; 列序反轉(寫後) ${after} → ${afterRev}`)
                 }
@@ -703,17 +740,13 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
                     st.lossyNeed++
                     let yb = ysOf(before)
                     let ya = ysOf(after)
-                    //增權檢查只對「同名 OR 與 AND 並存」之有損(硬寫取 AND 支只會收回); 名稱非字串之啟用元素(#序號, run05 f)硬寫即丟棄懸空引用而增權、
-                    //啟用項皆 mode 非法(nValid 0, 主責裁示之限制項)硬寫即成 AND 基底而增權——正是拒存之理由, 不在此列
-                    let allBad = nValidOf(arr) === 0
-                    if (!allBad && lossy.every((x) => !/^#\d+$/.test(x)) && [...ya].some((t) => !yb.has(t))) {
+                    //增權檢查只對「同名 OR 與 AND 並存」之有損(硬寫取 AND 支只會收回); 名稱非字串之啟用元素(#序號, run05 f)硬寫即丟棄懸空引用而增權, 正是拒存之理由, 不在此列
+                    //(原「啟用項皆 mode 非法」之第三格已放寬, 不再入有損, 見上 allBad)
+                    if (lossy.every((x) => !/^#\d+$/.test(x)) && [...ya].some((t) => !yb.has(t))) {
                         st.gain.push(`${raw}: ${before} → ${after}`)
                     }
                     if (lossy.some((x) => /^#\d+$/.test(x))) {
                         st.unnamed++
-                    }
-                    if (allBad) {
-                        st.allBad++
                     }
                 }
                 else {
@@ -737,13 +770,16 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
         if (opt.need) {
             assert.strict.ok(st.lossyNeed > 0, `${label} 靈敏度: 應有「判有損且硬寫真的改變授權」之格(判定非虛設), 實得 ${st.lossyNeed}`)
         }
+        if (opt.allBad) {
+            assert.strict.ok(st.allBad > 0 && st.allBadNaive > 0, `${label} 靈敏度: 啟用項皆 mode 缺／非法之格(原第三格, 已放寬, 方案 A 存檔授權相等)須出現, 且其中須有「照列寫出為合法 AND」會改變授權者(證明放寬仰賴方案 A), 實得 ${st.allBad}／${st.allBadNaive}`)
+        }
     }
 
     it('PR-001 cgrups 陣列形式窮舉(2 群組 × mode{OR,AND,缺,or} × isActive{y,n}, 長度 ≤ 3, 5 組規則集): 經編輯器流程重新寫出之授權 = 寫出前, 除非 getKpLossy 判定有損; 漏判 0; 與元素序／列序無關', function() {
         this.timeout(300000)
         let st = exhaust('cgrups', ['G1', 'G2'], ['OR', 'AND', undefined, 'or'], ['y', 'n'], 3)
         assert.strict.equal(st.total, 4369 * FAMS.length)
-        chk('PR-001', st, { lossy: true, need: true })
+        chk('PR-001', st, { lossy: true, need: true, allBad: true })
     })
 
     it('PR-001b cgrups: 3 群組(含整數式名稱 1／2, 幻影名稱) 各種組合: 重新寫出後授權相等, 除非判定為有損; 整數式名稱被 JS 屬性序排前不再改變授權(規則 4)', function() {
@@ -763,27 +799,27 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
         let st11 = exhaust('cgrups', ['G1', 'G2'], ['OR', 'AND', undefined], ['y', 'n'], 2, ['G9'], [{ mode: 'AND', isActive: 'y' }, { name: 7, mode: 'OR', isActive: 'y' }, 'y', { name: 8, mode: 'OR', isActive: 'n' }])
         chk('PR-001b-11', st11, { lossy: true, need: true })
         assert.strict.ok(st11.unnamed > 0, `靈敏度: 名稱非字串之啟用元素須被判有損(#序號), 實得 ${st11.unnamed}`)
-        //主責裁示之限制項維度: 只有 mode 缺／非法(全部格之啟用項皆非法)與混合合法 mode
+        //主責裁示之限制項維度: 只有 mode 缺／非法(全部格之啟用項皆非法)與混合合法 mode; 啟用項皆 mode 非法者原為第三格(有損), run06 放寬: 不判有損, 方案 A 存檔授權相等(allBad: 這些格)
         let st12 = exhaust('cgrups', ['G1', 'G2'], [undefined, 'XOR'], ['y', 'n'], 3, ['G9'])
-        chk('PR-001b-12', st12, { lossy: true, need: true })
-        assert.strict.ok(st12.allBad > 0, `靈敏度: 啟用項皆 mode 非法之格須被判有損, 實得 ${st12.allBad}`)
+        chk('PR-001b-12', st12, { allBad: true })
+        assert.strict.equal(st12.lossyNeed + st12.lossyCons, 0, `PR-001b-12: 此空間之元素有效模式皆 AND, 無同名 OR／AND 並存, 放寬後無任何有損格, 實得 ${st12.lossyNeed + st12.lossyCons}`)
         chk('PR-001b-13', exhaust('cgrups', ['G1', 'G2', ''], ['OR', 'or', null], ['y', 'n'], 3), { lossy: true, need: true })
     })
 
     it('PR-003 cpemis 窮舉(同 PR-001 之下一層: 一個群組含 2～3 個權限): 重新寫出後授權相等, 除非判定為有損(mergeRules 同一函數, 權限層與群組層同一規則)', function() {
         this.timeout(300000)
-        chk('PR-003-1', exhaust('cpemis', ['A', 'B'], ['OR', 'AND', undefined, 'or'], ['y', 'n'], 3), { lossy: true, need: true })
+        chk('PR-003-1', exhaust('cpemis', ['A', 'B'], ['OR', 'AND', undefined, 'or'], ['y', 'n'], 3), { lossy: true, need: true, allBad: true })
         chk('PR-003-2', exhaust('cpemis', ['A', 'B', 'C'], ['OR', 'AND', undefined], ['y', 'n'], 3), { lossy: true, need: true })
         chk('PR-003-3', exhaust('cpemis', ['1', '2', 'A'], ['OR', 'AND', undefined], ['y', 'n'], 3), { lossy: true })
         chk('PR-003-4', exhaust('cpemis', ['A', '2'], ['OR', 'AND', undefined], ['y', 'n'], 3, ['1']), { lossy: true, need: true })
         //run05 新維度: 名稱 ""、非法 mode、懸空(權限表查無)
         chk('PR-003-5', exhaust('cpemis', ['A', ''], ['OR', 'AND', 'or'], ['y', 'n'], 3, ['PX']), { lossy: true, need: true })
         let st6 = exhaust('cpemis', ['A', 'B'], ['or', undefined, 'AND'], ['y', 'n'], 3, ['PX'])
-        chk('PR-003-6', st6, { lossy: true, need: true })
-        assert.strict.ok(st6.allBad > 0, `靈敏度(權限層): 啟用項皆 mode 非法之格, 實得 ${st6.allBad}`)
+        chk('PR-003-6', st6, { allBad: true }) //權限層: 啟用項皆 mode 非法之格(原第三格, 已放寬; 元素有效模式皆 AND, 無有損格)
+        assert.strict.equal(st6.lossyNeed + st6.lossyCons, 0, `PR-003-6: 無有損格, 實得 ${st6.lossyNeed + st6.lossyCons}`)
     })
 
-    it('PR-004 物件形式窮舉(編輯器自己寫出之形式): 3 個名稱(三組: 純英數、含整數式名稱、含空字串名稱〔run05〕) × 各自 {缺席, (OR|AND|缺 mode|XOR) × (y|n)} × 全部鍵序排列 → getKpLossy 只在「啟用項皆 mode 非法」時非空(主責裁示之第三格), 其餘重新寫出後授權相等, 且同一組項目的 6 種鍵序授權完全相同(規則 4)', function() {
+    it('PR-004 物件形式窮舉(編輯器自己寫出之形式): 3 個名稱(三組: 純英數、含整數式名稱、含空字串名稱〔run05〕) × 各自 {缺席, (OR|AND|缺 mode|XOR) × (y|n)} × 全部鍵序排列 → getKpLossy 恆為空(原第三格「啟用項皆 mode 非法」已於 run06 放寬), 方案 A 重新寫出後授權恆相等, 且同一組項目的 6 種鍵序授權完全相同(規則 4)', function() {
         this.timeout(300000)
         let states = [null]
         for (let mode of ['OR', 'AND', undefined, 'XOR']) { //run05 e: 缺 mode 與非法 mode(XOR)皆視為 AND
@@ -799,8 +835,8 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
         let total = 0
         let nSets = 0
         let nMulti = 0 //項目 ≥ 2 個(鍵序排列才有實質差異)之組數
-        let nAllBad = 0 //啟用項皆 mode 非法(判有損)之格數
-        let nNeed = 0 //其中硬寫確實改變授權者(判定之必要性)
+        let nAllBad = 0 //啟用項皆 mode 非法(原第三格, 已放寬)之格數
+        let nNeed = 0 //其中照列寫出為合法 AND(方案 A 之前之寫法)確實改變授權者(放寬仰賴方案 A)
         //第二組名稱含整數式名稱: JSON.parse 後 JS 屬性序恆把 '2'、'1' 排到 G1 之前, 與文字序無關——規則 4 下授權仍相同
         for (let names of [['G1', 'G2', 'G3'], ['G1', '2', '1'], ['', 'G2', '1']]) { //第三組含空字串名稱(run05 f: 保留為鍵 "")
             for (let fam of FAMS) {
@@ -816,19 +852,19 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
                                 //以文字拼出該鍵序之物件(不經 JS 物件, 避免整數式鍵被重排而失去排列意義)
                                 let raw = '{' + pm.filter((i) => ss[i] !== null).map((i) => `${JSON.stringify(names[i])}:${JSON.stringify(ss[i])}`).join(',') + '}'
                                 total++
-                                //物件形式只有一格可判有損: 啟用項皆 mode 缺或非法(主責裁示之限制項, KL-007); 其餘恆為空
+                                //物件形式恆可無損表示(每個名稱只有一個值; 同名 OR／AND 並存、名稱非字串皆僅陣列形式可能): 恆為空; 原第三格(啟用項皆 mode 缺或非法, KL-007)已於 run06 放寬, 不再判有損
                                 let lossy = getKpLossy(JSON5.parse(raw))
+                                assert.strict.deepEqual(lossy, [], `物件形式之有損判定 ${raw}`)
                                 let act = ss.map((s, i) => [s, names[i]]).filter(([s]) => s !== null && s.isActive === 'y')
                                 let allBad = act.length > 0 && act.every(([s]) => s.mode !== 'OR' && s.mode !== 'AND')
-                                assert.strict.deepEqual([...lossy].sort(), allBad ? act.map(([, n]) => n).sort() : [], `物件形式之有損判定 ${raw}`)
                                 let before = eff(raw)
                                 effs.add(before)
-                                let after = eff(saveLike(raw, names))
-                                if (before !== after && lossy.length === 0) {
+                                let after = eff(saveLikeA(raw, names)) //編輯器實際存檔之模型(方案 A)
+                                if (before !== after) {
                                     leaks.push(`${raw}: ${before} → ${after}`)
                                 }
                                 nAllBad += allBad ? 1 : 0
-                                nNeed += (allBad && before !== after) ? 1 : 0
+                                nNeed += (allBad && before !== eff(saveLike(raw, names))) ? 1 : 0 //照列寫出為合法 AND(方案 A 之前)會改變授權者: 放寬仰賴方案 A 之證據
                             }
                             nSets++
                             nMulti += ss.filter((s) => s !== null).length >= 2 ? 1 : 0
@@ -845,7 +881,7 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
         assert.strict.ok(nMulti > nSets / 2, `對照組: 多數組合有 ≥ 2 個項目(鍵序排列才有意義), 實得 ${nMulti}／${nSets}`)
         assert.strict.deepEqual(leaks.slice(0, 5), [], `${leaks.length} 組寫出後授權改變(未判有損): ${leaks.slice(0, 5).join('\n')}`)
         assert.strict.deepEqual(orderBad.slice(0, 5), [], `${orderBad.length} 組授權隨鍵序改變: ${orderBad.slice(0, 5).join('\n')}`)
-        assert.strict.ok(nAllBad > 0 && nNeed > 0, `靈敏度: 啟用項皆 mode 非法之格 ${nAllBad}、硬寫確實改變授權者 ${nNeed}`)
+        assert.strict.ok(nAllBad > 0 && nNeed > 0, `靈敏度: 啟用項皆 mode 非法之格 ${nAllBad}、照列寫出為合法 AND(方案 A 之前)確實改變授權者 ${nNeed}`)
     })
 
     it('PR-006 編輯後之輸出(外審 minimax#2): 對任一非有損原資料與任一列狀態組合(停用／OR／AND, 含新增整數式名稱), 寫出之物件的授權 = 規則 3 逐字計算之授權(與陣列元素序無關); 新增整數式 AND 名稱(舊制易位而拒存之形狀)不再被拒存且授權符合預期', function() {
@@ -1079,6 +1115,8 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
         'src/components/LayoutContentPemis.vue': { all: 2, wrapped: 2, hasMode: 1, raw: 0 }, //站點 37(cpemis 帶 mode、crules 不帶)
         'src/components/LayoutContentUsers.vue': { all: 1, wrapped: 1, hasMode: 1, raw: 0 }, //站點 37
         'src/plugins/mShare.mjs': { all: 1, wrapped: 0, hasMode: 0, raw: 0 }, //getUserRules 之 cvStrToArr(伺服端解碼入口, 經 cvKpToArr)
+        'src/js/refCascade.mjs': { all: 1, wrapped: 0, hasMode: 0, raw: 0 }, //run06 引用連帶之 decodeKp(改名級聯／刪除連帶清理改寫引用字串前之解碼: 壞 JSON／空字串／純量視為空容器不動, 同伺服端 cvStrToArr 之容錯; 之後以 listEntries 依 cvKpToArr 同一名稱規則走訪, R-REF-CASCADE-01)
+        'src/js/refAudit.mjs': { all: 1, wrapped: 0, hasMode: 0, raw: 0 }, //run06 懸空引用稽核之解碼(經 cvKpToArr 取名稱, 壞 JSON 列入 badJson; 唯讀分析, 不寫入; R-REF-CASCADE-01 升級工具)
         'src/js/getAuthWarn.mjs': { all: 2, wrapped: 0, hasMode: 0, raw: 0 }, //run05 頁面提示之 parseKp(字串 → JSON5.parse, 損壞回 null; 其後經 cvKpToArr, 與伺服端同一解碼)與 isBadData(僅判定字串是否可解析為物件／陣列, 供 unparsable 提示, 不解碼授權內容)
     }
 

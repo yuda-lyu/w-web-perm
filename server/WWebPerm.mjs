@@ -37,7 +37,9 @@ import procStaInfor from './procStaInfor.mjs'
 import { maskTok, maskQuery, maskUrl } from './maskLog.mjs'
 import wrapInjected from './wrapInjected.mjs'
 import validateRowsBeforeWrite from './validateRows.mjs'
-import { findDupIndex, findKeyOtherFrom, tabWriteKey, mapKeyOf, checkMapKeyBatch, pickUniqueUser } from './keyCheck.mjs'
+import planRefChanges, { REF_OF, diffRefTargets } from '../src/js/refCascade.mjs'
+import { findDupIndex, findKeyOtherFrom, withTabLocks, mapKeyOf, checkMapKeyBatch, pickUniqueUser } from './keyCheck.mjs'
+import { checkCascadePlan, writeWithCascade, buildSyncRowsNew } from './cascadeWrite.mjs'
 import { createAuthorizeExec, wrapOperOrm } from './dataChannel.mjs'
 
 
@@ -59,6 +61,7 @@ import { createAuthorizeExec, wrapOperOrm } from './dataChannel.mjs'
  * @param {String} [opt.subfolder=''] 輸入站台所在子目錄字串，提供站台位於內網採反向代理進行服務時，故需支援位於子目錄情形，預設''
  * @param {String} [opt.urlRedirect=''] 輸入錯誤時自動轉址字串，提供站台例如無法登入或驗證失敗時須自動轉址，預設''
  * @param {String} [opt.mappingBy='id'] 輸入外部系統識別使用者token後所提供之資料物件，與權限系統之使用者資料物件，兩者間查找之對應欄位，可選'id'、'email'、'name'，未給或非此三者時為'id'，預設'id'。對應鍵須能唯一指出使用者：mappingBy為'email'或'name'時，外部同步(syncAndReplaceTabs)users之有效(isActive為'y')列，該欄位須為非空字串且與本批及其他from之有效列皆不重複(違規整批拒收invalidRows)；登入查找以對應鍵於權限系統users命中多於1筆有效使用者時一律拒絕(ambiguousUserFromPerm)，不取首筆；mappingBy為'id'(預設)時不另檢查
+ * @param {Boolean} [opt.cascadeRename=true] 輸入群組、權限改名時是否連帶更新引用它之授權字串(users.cgrups、grups.cpemis)，預設true。改名以主鍵id判定(同id異名)，後台整表儲存與外部同步(同一from內)皆適用，於同一次寫入內改寫並可能寫入外部來源之users列之cgrups；給false則不連帶(引用成為懸空，視同引用查無對象而收嚴並於頁面提示)。群組、權限、標的被刪除時之引用連帶清理(users.cgrups、grups.cpemis、pemis.crules)不受此設定影響
  * @param {String} [opt.logFd='./logs'] 輸入log紀錄儲存位置字串，預設'./logs'
  * @param {String} [opt.logInterval='hr'] 輸入log紀錄檔案拆檔時長字串，可選'hr'或'day'，預設'hr'
  * @param {Integer} [opt.logNumKeep=null] 輸入log檔保留數上限正整數，超出者自最舊刪除，未給採w-syslog預設(hr模式365*24、day模式365)，預設null
@@ -251,6 +254,10 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     // console.log('mappingBy', mappingBy)
 
 
+    //cascadeRename, 群組／權限改名時是否連帶更新引用它之授權字串(預設 true; 僅 false 關閉; 刪除連帶清理不受此設定影響, R-REF-CASCADE-01)
+    let cascadeRename = get(opt, 'cascadeRename', true) !== false
+
+
     //kpLangExt
     let kpLangExt = get(opt, 'kpLangExt', null)
 
@@ -317,7 +324,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
 
     //procCore: 整表批次 diff 寫入邏輯 (updateTabItems + updateTargets/Pemis/Grups/Users)
-    let pc = procCore(woItems, procOrm, { srLog, kmx, lockSave, mappingBy }) //mappingBy 供 users 整表寫入的對應鍵檢查(R-PRINCIPLE-00 適用表 h)
+    let pc = procCore(woItems, procOrm, { srLog, kmx, lockSave, mappingBy, cascadeRename }) //mappingBy 供 users 整表寫入的對應鍵檢查(R-PRINCIPLE-00 適用表 h); cascadeRename 供群組／權限改名之引用級聯(適用表 m)
 
 
     //procStaInfor: 統計資訊, fdLog 對齊 srLog 使用同一目錄(讀 settings.logFd, fallback 邏輯同 srLog.mjs); mock 由 settings.staEventMock 注入(e2e 統計圖穩定用)
@@ -353,6 +360,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             modeEditPemis,
             modeEditGrups,
             modeEditUsers,
+
+            cascadeRename, //改名是否連帶更新引用(opt.cascadeRename), 供清單頁儲存前預覽與伺服端一致(R-REF-CASCADE-01)
 
             widthTargetId,
             widthTargetDescription,
@@ -597,8 +606,9 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     let syncAndReplaceTabs = async (userId, inp, keyTable) => {
 
         //序列化同表之並行整表 delAll+insert: 防 lost update (同 keyTable 序列化, 不同表並行)
-        //與後台整表寫入(procCore.updateTabItems)共用同表互斥鍵 tabWriteKey: 兩者各自先檢查名稱／對應鍵唯一後寫入, 鍵不同則交錯可略過 F-02／F-14(外審 sol R10)
-        return await kmx(tabWriteKey(keyTable), async () => {
+        //與後台整表寫入(procCore.updateTabItems)共用同表互斥鍵 tabWriteKey: 兩者各自先檢查名稱／對應鍵唯一後寫入, 鍵不同則交錯可略過 F-02／F-14(外審 sol R10);
+        //有改名或刪除而須改寫引用端時, 於內層依階層再取引用端表之鎖(同步群組／權限／標的時, 被刪除或改名者之引用須連帶清理／更新, R-REF-CASCADE-01), 皆經單一取鎖函數(R-WRITE-LOCK-02)
+        return await withTabLocks(kmx, [keyTable], async () => {
 
             //from
             let from = get(inp, 'from', '')
@@ -753,21 +763,79 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                 }
             }
 
-            //delAll from, insert; ORM／I/O 失敗之原文只入 srLog, 外部應用收 saveWriteFail(規則帳本 R-ORM-02)
-            let r = null
-            try {
-                await woItems[keyTable].delAll({ from })
-                r = await procOrm(userId, keyTable, 'insert', rows) //須使用procOrm才有辦法自動給予相關欄位
+            //引用連帶(適用表 m／n, R-REF-CASCADE-01): 同步 grups／pemis／targets 時, 同一 from 內依穩定 id 判定——同 id 異名＝改名級聯、舊 id 不在本批＝刪除而連帶清理引用(寫入後仍存續之同名者不清理);
+            //未帶 id 之列(ORM 每次補隨機主鍵)改依名稱對應(見 buildSyncRowsNew). 預檢(新名撞懸空名、歷史同名組改名、容器內相撞、改寫後欄位驗證)於 delAll 之前, 被拒整批零變更;
+            //外部應用只收固定語系鍵 invalidRows／htmlMarkupNotAllowed(R-ORM-02), 動態原因入 srLog. select 失敗之處置同上段(toOutKey, 未寫入任何資料).
+            //是否須改寫引用端只依本表新舊列判定(diffRefTargets), 持有本表鎖之下即可決定是否再取引用端表之鎖(R-WRITE-LOCK-02); 取齊鎖之後才讀取引用端、規劃與預檢
+            let rowsPlan = null
+            let kind = null
+            if (Object.prototype.hasOwnProperty.call(REF_OF, keyTable)) {
+                try {
+                    let rowsOld = await woItems[keyTable].select()
+                    rowsPlan = { rowsOld, rowsNew: buildSyncRowsNew(keyTable, rowsOld, rows, from) }
+                }
+                catch (err) {
+                    let raw = (typeof err === 'string') ? err : ((err && err.message) || String(err))
+                    let key = toOutKey(err, 'anUnexpectedErrorOccurred')
+                    srLog.error({ event: 'syncAndReplaceTabs-error', msg: key, raw, keyTable, from, step: 'select' })
+                    return Promise.reject(key)
+                }
+                kind = diffRefTargets({ keyTable, rowsOld: rowsPlan.rowsOld, rowsNew: rowsPlan.rowsNew, opt: { cascadeRename } })
             }
-            catch (err) {
-                let raw = (typeof err === 'string') ? err : ((err && err.message) || String(err))
-                let key = toOutKey(err)
-                srLog.error({ event: 'syncAndReplaceTabs-error', msg: key, raw, keyTable, from })
-                return Promise.reject(key)
-            }
-            // console.log('r', r)
 
-            return r
+            //doWrite: delAll from, insert; ORM／I/O 失敗之原文只入 srLog, 外部應用收 saveWriteFail(規則帳本 R-ORM-02); 引用端先寫、失敗補償還原(cascadeWrite.mjs)
+            let doWrite = async (plan, holdersOld) => {
+                let r = null
+                try {
+                    r = await writeWithCascade({
+                        plan,
+                        holdersOld,
+                        woItems,
+                        procOrm,
+                        userId,
+                        srLog,
+                        writeMain: async () => {
+                            await woItems[keyTable].delAll({ from })
+                            return await procOrm(userId, keyTable, 'insert', rows) //須使用procOrm才有辦法自動給予相關欄位
+                        },
+                    })
+                }
+                catch (err) {
+                    let raw = (typeof err === 'string') ? err : ((err && err.message) || String(err))
+                    let key = toOutKey(err)
+                    srLog.error({ event: 'syncAndReplaceTabs-error', msg: key, raw, keyTable, from })
+                    return Promise.reject(key)
+                }
+                // console.log('r', r)
+                return r
+            }
+
+            //有改名或刪除: 再取引用端表之鎖, 讀取引用端、規劃、預檢後寫入
+            if (kind !== null && (kind.renames.length > 0 || kind.delNames.length > 0)) {
+                let holder = REF_OF[keyTable].holder
+                return await withTabLocks(kmx, [holder], async () => {
+                    let holdersOld = null
+                    try {
+                        holdersOld = await woItems[holder].select()
+                    }
+                    catch (err) {
+                        let raw = (typeof err === 'string') ? err : ((err && err.message) || String(err))
+                        let key = toOutKey(err, 'anUnexpectedErrorOccurred')
+                        srLog.error({ event: 'syncAndReplaceTabs-error', msg: key, raw, keyTable, from, step: 'select' })
+                        return Promise.reject(key)
+                    }
+                    let plan = planRefChanges({ keyTable, rowsOld: rowsPlan.rowsOld, rowsNew: rowsPlan.rowsNew, holdersOld, opt: { cascadeRename } })
+                    let errPlan = plan.err !== null ? plan.err : checkCascadePlan(plan)
+                    if (errPlan !== null) {
+                        let key = (errPlan === 'htmlMarkupNotAllowed') ? 'htmlMarkupNotAllowed' : 'invalidRows'
+                        srLog.error({ event: 'syncAndReplaceTabs-error', msg: key, reason: errPlan, keyTable, from })
+                        return Promise.reject(key)
+                    }
+                    return await doWrite(plan, holdersOld)
+                }, [keyTable])
+            }
+
+            return await doWrite(null, [])
 
         })
     }

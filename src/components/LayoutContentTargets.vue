@@ -251,6 +251,7 @@ import isnum from 'wsemi/src/isnum.mjs'
 import cdbl from 'wsemi/src/cdbl.mjs'
 import arrPull from 'wsemi/src/arrPull.mjs'
 import reuseDeletedIds from '../plugins/reuseDeletedIds.mjs'
+import { getSavePreview } from '../js/getCascadePreview.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
 import WSwitch from 'w-component-vue/src/components/WSwitch.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
@@ -872,10 +873,30 @@ export default {
                 //否則被後端當重送擋下(重新整理後重做仍被擋) (見 reuseDeletedIds)
                 let rowsSend = reuseDeletedIds(rows, vo.targets)
 
-                //2) 確定打 API 才開 loading
+                //2) 引用連帶預覽(ADR-036、R-REF-CASCADE-01; 與伺服端同一純函數 planRefChanges, 基準為 store 之 targets／pemis, 以實際送出之列 rowsSend 規劃, 筆數以伺服端實際為準):
+                //標的 id 即名稱, 可就地改寫, 改 id 對伺服端等同刪舊增新(不級聯), 引用該標的之 pemis.crules 項目於同一次寫入內被連帶清理(刪除亦同); 有權限之規則將被清理時先確認,
+                //確認框文字之判定見 src/js/getCascadePreview.mjs(標的頁只確認、不改成功訊息)
+                let pv = getSavePreview({ kind: 'Target', rowsOld: vo.targets, rowsNew: rowsSend, holdersOld: vo.pemis, $t: (k) => vo.$t(k) })
+                if (pv.confirmText !== '') {
+
+                    //先開確認框之流程: 開框前 unlockBtn() 釋放儲存鈕之 promiseUnlock 鎖(同上, 按鈕鎖只涵蓋請求期間); 流程狀態仍由 runSubmit 保持至本流程結束,
+                    //確認框與後續請求期間之重入(焦點仍在儲存鈕時 Enter)皆被略過 (ADR-025)
+                    unlockBtn()
+                    let isGo = await vo.$dg.showCheckYesNo(pv.confirmText)
+                        .then(() => true)
+                        .catch(() => false)
+
+                    //選否(或確認框被取代而視同選否): 中止儲存, 不送出; 尚未開 loading, 資料與 isModified 保留, 由 runSubmit 於回傳後結束流程
+                    if (!isGo) {
+                        return
+                    }
+
+                }
+
+                //3) 確定打 API 才開 loading
                 vo.$ui.updateLoading(true)
 
-                //3) updateTargets, 各自 catch + 旗標短路
+                //4) updateTargets, 各自 catch + 旗標短路
                 let okSave = false
                 await vo.$fapi.updateTargets(rowsSend)
                     .then(() => { okSave = true })
@@ -890,7 +911,7 @@ export default {
 
                 //alert（showCheckYes 前關 loading，避免 modal 等待期間 loading 疊在底下）
                 vo.$ui.updateLoading(false)
-                await vo.$dg.showCheckYes(vo.$t('targetSaveTargetsSuccess'), { type: 'success' })
+                await vo.$dg.showCheckYes(vo.$t('targetSaveTargetsSuccess'), { type: 'success' }) //標的頁之成功訊息不變(被清理之權限數已於確認框告知)
 
             }
 

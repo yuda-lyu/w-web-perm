@@ -7,7 +7,11 @@
 //
 //本檔: ①純函數契約(ER-*、RV-*); ②往返不變式(RT-*): 以「與 .vue 膠合碼逐行對應之編輯器模型」(SITE-ER-* 靜態守護兩者一致), 對窮舉＋隨機之引用字串,
 //  直接編輯器「開啟 → 不改值 → 存檔」後授權(getUserRules)與存檔前相等(有損者回原字串); 改一列者授權等於「只改該名稱」之參考構造(oracle);
-//  反向關聯對話框之改寫(putRefEntry)授權等於 oracle(其餘引用項之效果不變), 本項未變更者字串逐字元不動; ③靜態站點(SITE-ER-*).
+//  反向關聯對話框之改寫(putRefEntry)授權等於 oracle(其餘引用項之效果不變), 本項未變更者字串逐字元不動; ③靜態站點(SITE-ER-*);
+//  ④第三格放寬之證明(RT-LOSSY3-*、EX-LOSSY3-*; run06, ADR-035 Update 2026-10-22): 原 getKpLossy 第三格(該層啟用項皆 mode 缺／非法 → 拒存)改為可存; 依據為方案 A(未被管理者改動之限制項原樣寫回
+//  其原始 mode, getRawModeMap／putRowsToKp／putRefEntry). 本組以真 getUserRules 窮舉＋隨機(固定種子)證明: 凡「該層啟用項皆 mode 缺／非法」之輸入(物件與陣列形式、單一／多個啟用項、混停用項／懸空引用／
+//  名稱 ''／同名重複、含歷史同名表), 或「原層有合法項而管理者於同一次編輯停用之而使該層只剩限制項」者, 經直接編輯器與反向關聯對話框存檔後之授權: 未改動 → 等於存檔前; 有改動 → 等於同一編輯套用於
+//  原資料(oracleEdits; 未被改動之項逐字保留, 限制項不被升格為合法 AND), 且不多於「對話框所示狀態」之伺服端解讀(所見之上界). 變異驗證(≥5 個自植缺陷須使本組變紅)見 run06 報告.
 //跑法: node node_modules/mocha/bin/mocha.js test/unit-editorRows.test.mjs --timeout 300000
 import assert from 'assert'
 import path from 'path'
@@ -19,6 +23,7 @@ import cvKpToObj from '../src/js/cvKpToObj.mjs'
 import cvKpToArr from '../src/js/cvKpToArr.mjs'
 import getKpLossy from '../src/js/getKpLossy.mjs'
 import getOwn from '../src/js/getOwn.mjs'
+import { getRefWarns } from '../src/js/getAuthWarn.mjs'
 import { getRefState, getRefRowsExtra, getDupRowsInconsistent, getRawModeMap, putRowsToKp, putRefEntry, getRowIdxs } from '../src/js/editorRefRows.mjs'
 import { getUserRules } from '../src/plugins/mShare.mjs'
 import { sourceLines } from './tools/srcScan.mjs'
@@ -153,6 +158,69 @@ function oracle(c, name, enable, mode) {
     return JSON.stringify(arr)
 }
 
+//伺服端解碼(cvKpToArr; 解析失敗為空)
+function decodeArr(c) {
+    let raw
+    try {
+        raw = JSON5.parse(c)
+    }
+    catch (err) {}
+    return cvKpToArr(raw)
+}
+
+//參考構造(多列版, 不經編輯器任何函數): 同 oracle, 但一次套用多個名稱之編輯 edits [{ name, enable, mode }]: 原元素(cvKpToArr)去掉名稱為被編輯者, 被編輯而歸屬者再各加一個 { name, mode, isActive: 'y' };
+//未被編輯之元素(含 mode 缺／非法之限制項)逐字保留——此即「凡未被管理者改動之項目不得放寬」之判準(限制項不被升格為可當基底之合法 AND). 以陣列形式寫出
+function oracleEditsArr(arr0, edits) {
+    let names = new Set(edits.map((e) => e.name))
+    let arr = arr0.filter((e) => !names.has(e.name))
+    for (let e of edits) {
+        if (e.enable === 'y') {
+            arr.push({ name: e.name, mode: e.mode, isActive: 'y' })
+        }
+    }
+    return JSON.stringify(arr)
+}
+
+//對話框所示狀態(開啟時之列狀態; 與 editorOpen 之表列同: 解碼 → getRefState)
+function shownOf(c, name) {
+    let kp = Object.create(null)
+    try {
+        kp = cvKpToObj(JSON5.parse(c), HM)
+    }
+    catch (err) {}
+    return getRefState(getOwn(kp, name, null))
+}
+
+//該名稱之啟用元素(伺服端解碼)皆 mode 缺／非法 ＝ 限制項(獨立於 getRawModeMap 之寫法)
+function isLimName(c, name) {
+    let act = decodeArr(c).filter((e) => e.name === name && e.isActive === 'y')
+    return act.length > 0 && act.every((e) => e.mode !== 'OR' && e.mode !== 'AND')
+}
+
+//輸入字串所屬類別(獨立於 getKpLossy; 只看伺服端解碼之啟用元素): unnamed＝有啟用而名稱非字串者(第二格, 仍有損); both＝同名啟用元素之有效模式同時為 OR 與 AND(第一格, 仍有損);
+//allLim＝有啟用元素、其 mode 皆缺／非法(原第三格, 已放寬); mixed＝同時有合法與缺／非法; valid＝皆合法; none＝無啟用元素
+function classOf(c) {
+    let act = decodeArr(c).filter((e) => e.isActive === 'y')
+    if (act.some((e) => typeof e.name !== 'string')) {
+        return 'unnamed'
+    }
+    let kpEff = Object.create(null)
+    for (let e of act) {
+        kpEff[e.name] = (kpEff[e.name] || new Set()).add(e.mode === 'OR' ? 'OR' : 'AND')
+    }
+    if (Object.values(kpEff).some((s) => s.size > 1)) {
+        return 'both'
+    }
+    let nValid = act.filter((e) => e.mode === 'OR' || e.mode === 'AND').length
+    if (act.length === 0) {
+        return 'none'
+    }
+    return nValid === 0 ? 'allLim' : (nValid === act.length ? 'valid' : 'mixed')
+}
+
+//授權 a 為 y 之標的是否有不在 b 為 y 者(a 比 b 多給)
+let moreY = (a, b) => a.some((r, k) => r.isActive === 'y' && b[k].isActive !== 'y')
+
 
 // ===== 引用字串之產生 =====
 
@@ -164,16 +232,16 @@ const ARR_ACTS = ['y', 'n']
 //特殊字串: 空字串(新增列之預設)、壞 JSON、非物件 JSON
 const SPECIAL = ['', '{oops', '5', 'null', '[]', '{}', '"str"']
 
-function genObjForm(names) {
+function genObjForm(names, vals = OBJ_VALS) {
     let out = []
     let n = names.length
-    let total = OBJ_VALS.length ** n
+    let total = vals.length ** n
     for (let i = 0; i < total; i++) {
         let o = {}
         let x = i
         for (let k = 0; k < n; k++) {
-            let v = OBJ_VALS[x % OBJ_VALS.length]
-            x = Math.floor(x / OBJ_VALS.length)
+            let v = vals[x % vals.length]
+            x = Math.floor(x / vals.length)
             if (v !== undefined) {
                 o[names[k]] = v
             }
@@ -643,7 +711,14 @@ describe('unit-editorRows (編輯對話框之引用清單 ↔ 列, 存檔不丟�
                         else {
                             stat.rewritten++
                         }
-                        assert.deepStrictEqual(auth(tk)(s), auth(tk)(oracle(c, name, enable, mode)), `表 ${tk} ${c} 之 ${name}→${enable}/${mode}: ${s}`)
+                        //期望: 目標＝該名稱「限制項」(啟用而 mode 缺／非法)之對話框所示狀態(啟用、AND)者為未變更, 授權同原字串(run06 第三格放寬: 該層全為限制項時, 「所示之 AND」
+                        //若以真合法 AND 解讀, 會成為唯一基底而多給, 並非管理者之改動); 其餘照舊為同一編輯套用於原資料之 oracle
+                        let sh = shownOf(c, name)
+                        let sameLim = isLimName(c, name) && enable === 'y' && sh.enable === 'y' && mode === sh.mode
+                        if (sameLim) {
+                            assert.strictEqual(s, c, `限制項之目標同所示狀態: 字串逐字元不動 ${c} ${name}`)
+                        }
+                        assert.deepStrictEqual(auth(tk)(s), sameLim ? auth(tk)(c) : auth(tk)(oracle(c, name, enable, mode)), `表 ${tk} ${c} 之 ${name}→${enable}/${mode}: ${s}`)
                     }
                 }
             }
@@ -755,6 +830,494 @@ describe('unit-editorRows (編輯對話框之引用清單 ↔ 列, 存檔不丟�
     it('RT-004-混合層全編輯窮舉, 權限層(cpemis): 同 RT-003', function() {
         let stat = runMixed('P')
         assert.ok(stat.strings > 2000 && stat.edits > 15000 && stat.relCells > 10000 && stat.lossy > 0 && stat.bugWithoutMap > 0, JSON.stringify(stat))
+    })
+
+
+    // ===== run06 第三格放寬: 「該層啟用項皆 mode 缺／非法」存檔不多給之證明(窮舉＋隨機; ADR-035 Update 2026-10-22, 規則帳本 R-EDIT-KEEP-01 ③) =====
+    //放寬前 getKpLossy 對此格判有損而整格拒存(管理者無法存任何變更); 放寬後存檔須不多給. 判準(對 getUserRules 之真授權):
+    //  ①未改動(各列終態＝開啟時所示狀態): 存檔後授權＝存檔前(限制項原樣寫回, 不被升格為可當基底之合法 AND);
+    //  ②有改動: 授權＝同一編輯套用於原資料(oracleEditsArr: 被編輯之名稱以新狀態取代, 未被編輯之項逐字保留);
+    //  ③上界: 授權不多於「對話框所示狀態」之伺服端解讀(所示之限制項 ＝ 合法 AND, 為最寬之解讀);
+    //  ④開啟時不判有損、存檔不拒(直接編輯器回非 false; 反向關聯對話框回非 null).
+    //列終態: 每個對話框列(名稱為字串之相異列名)各取 { 停用, 啟用 OR, 啟用 AND }(含開啟時所示狀態＝不動)之組合: 單列改動、批次(全停用／全 OR／全 AND／反選)、全 3^k 組、固定種子隨機組.
+
+    const L3_OBJ_VALS = [undefined, { isActive: 'y' }, { mode: 'or', isActive: 'y' }, { mode: 'XOR', isActive: 'y' }, { mode: 1, isActive: 'y' }, { mode: null, isActive: 'y' }, 'y', { mode: 'OR', isActive: 'n' }, { mode: 'AND', isActive: 'n' }, { isActive: 'n' }, 'n']
+    const L3_MIX_VALS = [...L3_OBJ_VALS, { mode: 'OR', isActive: 'y' }, { mode: 'AND', isActive: 'y' }]
+    const L3_ARR_ELEMS = [{ isActive: 'y' }, { mode: 'or', isActive: 'y' }, { mode: 'XOR', isActive: 'y' }, { mode: null, isActive: 'y' }, { mode: 'OR', isActive: 'n' }, { mode: 'AND', isActive: 'n' }, { isActive: 'n' }]
+
+    let l3Targets = (r0) => [{ enable: 'n', mode: r0.mode }, { enable: 'y', mode: 'OR' }, { enable: 'y', mode: 'AND' }]
+    let l3Init = (r0s) => r0s.map((r) => ({ enable: r.enable, mode: r.mode }))
+    let l3Single = (r0s) => {
+        let out = [l3Init(r0s)]
+        r0s.forEach((r0, i) => {
+            for (let t of l3Targets(r0)) {
+                let v = l3Init(r0s)
+                v[i] = t
+                out.push(v)
+            }
+        })
+        return out
+    }
+    let l3Batch = (r0s) => [
+        r0s.map((r) => ({ enable: 'n', mode: r.mode })),
+        r0s.map(() => ({ enable: 'y', mode: 'OR' })),
+        r0s.map(() => ({ enable: 'y', mode: 'AND' })),
+        r0s.map((r) => ({ enable: r.enable === 'y' ? 'n' : 'y', mode: r.mode })),
+    ]
+    let l3Full = (r0s) => {
+        let out = [[]]
+        for (let r0 of r0s) {
+            let next = []
+            for (let v of out) {
+                for (let t of l3Targets(r0)) {
+                    next.push([...v, t])
+                }
+            }
+            out = next
+        }
+        return out
+    }
+    let l3Sample = (r, n) => (r0s) => {
+        let out = []
+        for (let k = 0; k < n; k++) {
+            out.push(r0s.map((r0) => (r() < 0.25 ? { enable: r0.enable, mode: r0.mode } : l3Targets(r0)[Math.floor(r() * 3)])))
+        }
+        return out
+    }
+    //單列改動＋批次＋隨機 2 組(窮舉字串多時用), 與全 3^k 組(字串少時用)
+    let l3Light = (seed) => {
+        let r = rng(seed)
+        return (r0s) => [...l3Single(r0s), ...l3Batch(r0s), ...l3Sample(r, 2)(r0s)]
+    }
+
+    let l3Strings = (kind, names, cls) => {
+        let all
+        if (kind === 'obj') {
+            all = genObjForm(names, L3_OBJ_VALS)
+        }
+        else if (kind === 'mix') {
+            all = genObjForm(names, L3_MIX_VALS)
+        }
+        else {
+            let pool = []
+            for (let nm of names) {
+                for (let e of L3_ARR_ELEMS) {
+                    pool.push({ name: nm, ...e })
+                }
+            }
+            all = []
+            let frontier = [[]]
+            for (let len = 1; len <= kind; len++) { //kind 為數字: 陣列形式之最大長度
+                let next = []
+                for (let c of frontier) {
+                    for (let e of pool) {
+                        next.push([...c, e])
+                    }
+                }
+                all.push(...next.map((a) => JSON.stringify(a)))
+                frontier = next
+            }
+        }
+        return all.filter((c) => classOf(c) === cls)
+    }
+
+    //固定種子隨機: 陣列(長 1～5)與物件(值內多餘欄位與值內 name), 名稱取自 names(不含非字串名稱: 其屬第二格仍有損); mode 缺／'or'／'XOR'／null／1／'and'／'' 為限制項, 另摻合法項
+    let l3Random = (names, n, seed) => {
+        let r = rng(seed)
+        let pick = (a) => a[Math.floor(r() * a.length)]
+        let limModes = [undefined, 'or', 'XOR', null, 1, 'and', '']
+        let out = []
+        for (let i = 0; i < n; i++) {
+            let mk = () => {
+                let o = {}
+                if (r() < 0.25) {
+                    o.mode = pick(['OR', 'AND'])
+                }
+                else {
+                    let m = pick(limModes)
+                    if (m !== undefined) {
+                        o.mode = m
+                    }
+                }
+                o.isActive = r() < 0.78 ? 'y' : 'n'
+                return o
+            }
+            if (r() < 0.5) {
+                let len = 1 + Math.floor(r() * 5)
+                let arr = []
+                for (let k = 0; k < len; k++) {
+                    arr.push({ name: pick(names), ...mk() })
+                }
+                out.push(JSON.stringify(arr))
+            }
+            else {
+                let o = {}
+                for (let nm of names) {
+                    if (r() < 0.7) {
+                        let v = r() < 0.12 ? pick(['y', 'n']) : mk()
+                        o[nm] = (r() < 0.15 && typeof v === 'object') ? { ...v, extra: 'x', name: pick(names) } : v
+                    }
+                }
+                out.push(JSON.stringify(o))
+            }
+        }
+        return out.filter((c) => !['unnamed', 'both'].includes(classOf(c))) //仍有損之第一、二格不在本組(由 RT-001 等涵蓋)
+    }
+
+    //斷言之訊息為函數, 僅於失敗時才組字串(窮舉數十萬格, 避免成功路徑之字串組裝成本)
+    let l3Ok = (cond, msg) => {
+        if (!cond) {
+            assert.fail(msg())
+        }
+    }
+    let l3Eq = (got, want, msg) => {
+        if (!isEqual(got, want)) {
+            assert.deepStrictEqual(got, want, msg())
+        }
+    }
+
+    let checkL3 = (ctx, c, vectors) => {
+        let { tk, tab, auth, stat, selfNames } = ctx
+        let cls = classOf(c)
+        stat.byClass[cls] = (stat.byClass[cls] || 0) + 1
+        stat.strings++
+        let arr0 = decodeArr(c)
+        let st0 = editorOpen(c, tab.rows)
+        l3Ok(st0.lossy.length === 0, () => `第三格已放寬, 開啟時不判有損: 表 ${tk} ${c} → ${JSON.stringify(st0.lossy)}`)
+        let names = [...new Set(st0.rows.map((v) => v.name).filter((n) => typeof n === 'string'))]
+        let r0s = names.map((n) => st0.rows.find((v) => v.name === n))
+        let init = l3Init(r0s)
+        let originHasValid = cls === 'mixed' || cls === 'valid'
+        let aOrig = auth(tk)(c)
+        //直接編輯器
+        for (let fin of vectors(r0s)) {
+            let st = { ...st0, rows: st0.rows.map((v) => ({ ...v })) }
+            let edits = []
+            names.forEach((name, i) => {
+                let f = fin[i]
+                editorToggle(st, name, f.enable, f.mode)
+                if (!(f.enable === init[i].enable && (f.enable !== 'y' || f.mode === init[i].mode))) {
+                    edits.push({ name, enable: f.enable, mode: f.mode })
+                }
+            })
+            let s = editorSave(c, st)
+            stat.direct++
+            let tag = () => `表 ${tk} ${c} 終態 ${names.map((n, i) => `${n}:${fin[i].enable}/${fin[i].mode}`).join(' ')}`
+            l3Ok(s !== false, () => `不得拒存(第三格已放寬): ${tag()}`)
+            let os = oracleEditsArr(arr0, edits)
+            let want = auth(tk)(os)
+            let got = auth(tk)(s)
+            l3Eq(got, want, () => `存檔後授權須等於同一編輯套用於原資料(未被改動之項逐字保留): ${tag()} → ${s}`)
+            if (edits.length === 0) {
+                stat.unchanged++
+                l3Eq(got, aOrig, () => `未改動: 存檔前後授權相等: ${tag()} → ${s}`)
+            }
+            else {
+                stat.changed++
+            }
+            //③上界: 不多於所示狀態(限制項視為合法 AND)之解讀
+            let shown = JSON.stringify(names.map((n) => st.rows.find((v) => v.name === n)).filter((v) => v.enable === 'y').map((v) => ({ name: v.name, mode: v.mode, isActive: 'y' })))
+            l3Ok(!moreY(got, auth(tk)(shown)), () => `授權不得多於對話框所示狀態之解讀: ${tag()} → ${s}`)
+            //空化: 原層有合法項, 管理者之編輯使該層啟用項皆為限制項
+            if (originHasValid) {
+                let act = JSON.parse(os).filter((e) => e.isActive === 'y')
+                if (act.length > 0 && act.every((e) => e.mode !== 'OR' && e.mode !== 'AND')) {
+                    stat.emptied++
+                }
+            }
+            //對照: 照列寫出而不還原原始 mode(修前之寫法)是否多給／偏離(證明本維度涵蓋該缺陷)
+            let aNo = auth(tk)(JSON.stringify(putRowsToKp(Object.create(null), st.rows)))
+            if (!isEqual(aNo, want)) {
+                stat.naiveDiff++
+            }
+            if (moreY(aNo, want)) {
+                stat.naiveGain++
+            }
+        }
+        //反向關聯對話框(本實體為表中字串名稱者)
+        for (let name of selfNames) {
+            let sh = shownOf(c, name)
+            for (let [en, md] of [['n', 'OR'], ['y', 'OR'], ['y', 'AND']]) {
+                let s = relSave(c, name, en, md)
+                stat.rel++
+                let tag = () => `表 ${tk} ${c} 之 ${name}→${en}/${md}`
+                l3Ok(s !== null, () => `第三格已放寬, 反向關聯對話框不得視為有損: ${tag()}`)
+                let same = en === sh.enable && (en !== 'y' || md === sh.mode)
+                if (same) {
+                    stat.relSame++
+                    l3Ok(s === c, () => `目標同所示狀態: 字串逐字元不動: ${tag()} → ${s}`)
+                }
+                else {
+                    stat.relRewritten++
+                }
+                let wantRel = same ? aOrig : auth(tk)(oracleEditsArr(arr0, [{ name, enable: en, mode: md }]))
+                l3Eq(auth(tk)(s), wantRel, () => `反向關聯對話框: ${tag()}: ${s}`)
+            }
+        }
+    }
+
+    //plans: [{ tk, strings, vectors }]; 回傳統計
+    let runLossy3 = (layer, plans) => {
+        let tabs = layer === 'G' ? TABS_G : TABS_P
+        let auth = layer === 'G' ? authG : authP
+        let stat = { strings: 0, direct: 0, unchanged: 0, changed: 0, emptied: 0, rel: 0, relSame: 0, relRewritten: 0, naiveDiff: 0, naiveGain: 0, byClass: {} }
+        for (let { tk, strings, vectors } of plans) {
+            let tab = tabs[tk]
+            let selfNames = [...new Set(tab.rows.map((v) => (v.name === undefined ? '' : v.name)).filter((n) => typeof n === 'string'))]
+            for (let c of strings) {
+                checkL3({ tk, tab, auth, stat, selfNames }, c, vectors)
+            }
+        }
+        return stat
+    }
+    let n3 = (tabs, tk, n) => tabs[tk].names.slice(0, n)
+
+    it('RT-LOSSY3-001-群組層(VeCgrups／VeGrupBlngUsers, cgrups)物件形式窮舉: 該層啟用項皆 mode 缺／非法(限制項: 缺／\'or\'／XOR／1／null／純量 y; 另混停用之合法／限制項、懸空 GX、名稱 \'\')之全部字串, 4 張群組表(含歷史同名、名稱 \'\' 之群組、無 name 欄之列) × 單列／批次／全 3^k 終態: 存檔不多給', function() {
+        let plans = [
+            { tk: 'A', strings: l3Strings('obj', TABS_G.A.names, 'allLim'), vectors: l3Light(11) }, //4 名稱 × 11 值: 11^4 − 5^4
+            ...['B', 'C', 'D'].map((tk) => ({ tk, strings: l3Strings('obj', n3(TABS_G, tk, 3), 'allLim'), vectors: l3Full })), //3 名稱: 11^3 − 5^3, 全 3^k 終態
+        ]
+        let stat = runLossy3('G', plans)
+        assert.strictEqual(stat.strings, (11 ** 4 - 5 ** 4) + 3 * (11 ** 3 - 5 ** 3), JSON.stringify(stat))
+        assert.strictEqual(stat.byClass.allLim, stat.strings, JSON.stringify(stat))
+        assert.ok(stat.unchanged > 15000 && stat.changed > 100000 && stat.rel > 50000 && stat.relSame > 5000 && stat.relRewritten > 20000, JSON.stringify(stat))
+        assert.ok(stat.naiveDiff > 0 && stat.naiveGain > 0, `對照(不還原原始 mode 之寫法)須有格偏離且多給(證明本維度涵蓋該缺陷): ${JSON.stringify(stat)}`)
+    })
+
+    it('RT-LOSSY3-002-權限層(VeCpemis／VePemiBlngGrups, cpemis)物件形式窮舉: 同 RT-LOSSY3-001, 3 張權限表(含歷史同名、名稱 \'\' 之權限)', function() {
+        let plans = [
+            { tk: 'A', strings: l3Strings('obj', TABS_P.A.names, 'allLim'), vectors: l3Light(12) },
+            ...['B', 'C'].map((tk) => ({ tk, strings: l3Strings('obj', n3(TABS_P, tk, 3), 'allLim'), vectors: l3Full })),
+        ]
+        let stat = runLossy3('P', plans)
+        assert.strictEqual(stat.strings, (11 ** 4 - 5 ** 4) + 2 * (11 ** 3 - 5 ** 3), JSON.stringify(stat))
+        assert.strictEqual(stat.byClass.allLim, stat.strings, JSON.stringify(stat))
+        assert.ok(stat.unchanged > 15000 && stat.changed > 100000 && stat.rel > 50000 && stat.relSame > 5000 && stat.relRewritten > 20000, JSON.stringify(stat))
+        assert.ok(stat.naiveDiff > 0 && stat.naiveGain > 0, JSON.stringify(stat))
+    })
+
+    it('RT-LOSSY3-003-群組層陣列形式窮舉: 元素 = 3 名稱 × {啟用限制項 4 種(缺／\'or\'／XOR／null), 停用 OR／AND／缺 mode}, 長度 ≤ 3(表 A)與 ≤ 2(表 B／C／D)之全部「啟用項皆限制項」序列(含同名重複、同名限制項與停用合法項並存)', function() {
+        let plans = [
+            { tk: 'A', strings: l3Strings(3, n3(TABS_G, 'A', 3), 'allLim'), vectors: l3Light(13) },
+            ...['B', 'C', 'D'].map((tk) => ({ tk, strings: l3Strings(2, n3(TABS_G, tk, 3), 'allLim'), vectors: l3Full })),
+        ]
+        let stat = runLossy3('G', plans)
+        assert.strictEqual(stat.byClass.allLim, stat.strings, JSON.stringify(stat))
+        assert.ok(stat.strings > 8000 && stat.unchanged > 8000 && stat.changed > 50000 && stat.rel > 40000 && stat.relSame > 4000, JSON.stringify(stat))
+        assert.ok(stat.naiveDiff > 0 && stat.naiveGain > 0, JSON.stringify(stat))
+    })
+
+    it('RT-LOSSY3-004-權限層陣列形式窮舉: 同 RT-LOSSY3-003, 3 張權限表', function() {
+        let plans = [
+            { tk: 'A', strings: l3Strings(3, n3(TABS_P, 'A', 3), 'allLim'), vectors: l3Light(14) },
+            ...['B', 'C'].map((tk) => ({ tk, strings: l3Strings(2, n3(TABS_P, tk, 3), 'allLim'), vectors: l3Full })),
+        ]
+        let stat = runLossy3('P', plans)
+        assert.strictEqual(stat.byClass.allLim, stat.strings, JSON.stringify(stat))
+        assert.ok(stat.strings > 8000 && stat.unchanged > 8000 && stat.changed > 50000 && stat.rel > 40000 && stat.relSame > 4000, JSON.stringify(stat))
+        assert.ok(stat.naiveDiff > 0 && stat.naiveGain > 0, JSON.stringify(stat))
+    })
+
+    it('RT-LOSSY3-005-群組層「原層有合法項, 管理者編輯後只剩限制項」窮舉(物件形式 3 名稱 × 13 值, 原字串為合法項與限制項並存; 全 3^k 終態含停用全部合法項): 存檔不多給, 授權＝同一編輯套用於原資料', function() {
+        let plans = [
+            { tk: 'A', strings: l3Strings('mix', n3(TABS_G, 'A', 3), 'mixed'), vectors: l3Full },
+            { tk: 'B', strings: l3Strings('mix', n3(TABS_G, 'B', 3), 'mixed'), vectors: l3Full },
+            { tk: 'C', strings: l3Strings('mix', n3(TABS_G, 'C', 3), 'mixed'), vectors: l3Full },
+        ]
+        let stat = runLossy3('G', plans)
+        assert.strictEqual(stat.strings, 3 * (13 ** 3 - 11 ** 3 - 7 ** 3 + 5 ** 3), JSON.stringify(stat)) //每表: 至少一合法啟用項(2 值)且至少一限制項(6 值)之 3 名稱組合
+        assert.strictEqual(stat.byClass.mixed, stat.strings, JSON.stringify(stat))
+        assert.ok(stat.emptied > 3000 && stat.changed > 50000 && stat.rel > 10000, JSON.stringify(stat))
+        assert.ok(stat.naiveDiff > 0 && stat.naiveGain > 0, JSON.stringify(stat))
+    })
+
+    it('RT-LOSSY3-006-權限層「原層有合法項, 管理者編輯後只剩限制項」窮舉: 同 RT-LOSSY3-005', function() {
+        let plans = [
+            { tk: 'A', strings: l3Strings('mix', n3(TABS_P, 'A', 3), 'mixed'), vectors: l3Full },
+            { tk: 'B', strings: l3Strings('mix', n3(TABS_P, 'B', 3), 'mixed'), vectors: l3Full },
+            { tk: 'C', strings: l3Strings('mix', n3(TABS_P, 'C', 3), 'mixed'), vectors: l3Full },
+        ]
+        let stat = runLossy3('P', plans)
+        assert.strictEqual(stat.strings, 3 * (13 ** 3 - 11 ** 3 - 7 ** 3 + 5 ** 3), JSON.stringify(stat))
+        assert.strictEqual(stat.byClass.mixed, stat.strings, JSON.stringify(stat))
+        assert.ok(stat.emptied > 3000 && stat.changed > 50000 && stat.rel > 10000, JSON.stringify(stat))
+        assert.ok(stat.naiveDiff > 0 && stat.naiveGain > 0, JSON.stringify(stat))
+    })
+
+    it('RT-LOSSY3-007-隨機(固定種子): 群組層 4 表 × 各 600 字串、權限層 3 表 × 各 600 字串(陣列長 1～5 與物件, 值內多餘欄位與值內 name, mode 含 \'and\'／\'\'／1／null, 摻合法項), 單列／批次／隨機 3 組終態', function() {
+        let mkPlans = (tabs, ks, seed0) => ks.map((tk, i) => ({ tk, strings: l3Random(tabs[tk].names, 600, seed0 + i), vectors: (r0s) => [...l3Single(r0s), ...l3Batch(r0s), ...l3Sample(rng(seed0 * 31 + i), 3)(r0s)] }))
+        let statG = runLossy3('G', mkPlans(TABS_G, ['A', 'B', 'C', 'D'], 6101))
+        let statP = runLossy3('P', mkPlans(TABS_P, ['A', 'B', 'C'], 6201))
+        for (let stat of [statG, statP]) {
+            assert.ok(stat.strings > 1500 && stat.byClass.allLim > 300 && stat.byClass.mixed > 300 && stat.changed > 5000 && stat.unchanged > 1500 && stat.rel > 8000 && stat.relSame > 800, JSON.stringify(stat))
+        }
+    })
+
+    it('RT-LOSSY3-008-陣列形式「原層有合法項, 管理者編輯後只剩限制項」窮舉(含同名重複: 同名限制項與合法項並存): 2 名稱 × {啟用限制項 4 種, 啟用 OR／AND, 停用 OR} 長度 ≤ 3 之全部「合法項與限制項並存」序列(表 A, 群組層與權限層) × 全 3^k 終態', function() {
+        let pool = []
+        for (let nm of ['G1', 'G2']) {
+            for (let e of [...L3_ARR_ELEMS.slice(0, 4), { mode: 'OR', isActive: 'y' }, { mode: 'AND', isActive: 'y' }, { mode: 'OR', isActive: 'n' }]) {
+                pool.push({ name: nm, ...e })
+            }
+        }
+        let strs = []
+        let frontier = [[]]
+        for (let len = 1; len <= 3; len++) {
+            let next = []
+            for (let c of frontier) {
+                for (let e of pool) {
+                    next.push([...c, e])
+                }
+            }
+            strs.push(...next.map((a) => JSON.stringify(a)))
+            frontier = next
+        }
+        strs = strs.filter((c) => classOf(c) === 'mixed') //同名之有效 OR 與限制項並存(視為 AND)者屬第一格(仍有損, 另測), 不在此
+        assert.strictEqual(strs.length, 984, '序列數(固定窮舉空間)')
+        //權限層名稱為 P1／P2: 同構造, 名稱代換
+        let strsP = strs.map((c) => c.split('"G1"').join('"P1"').split('"G2"').join('"P2"'))
+        let statG = runLossy3('G', [{ tk: 'A', strings: strs, vectors: l3Full }])
+        let statP = runLossy3('P', [{ tk: 'A', strings: strsP, vectors: l3Full }])
+        for (let stat of [statG, statP]) {
+            assert.strictEqual(stat.strings, strs.length, JSON.stringify(stat))
+            assert.strictEqual(stat.byClass.mixed, stat.strings, JSON.stringify(stat))
+            assert.ok(stat.emptied > 600 && stat.changed > 7000 && stat.rel > 5000 && stat.naiveGain > 0, JSON.stringify(stat))
+        }
+    })
+
+    it('RT-LOSSY3-009-原型鍵名(__proto__、constructor)為群組名稱之表(R-KEY-01): 陣列形式「啟用項皆限制項」長度 ≤ 2 之全部序列 × 全 3^k 終態, 存檔不多給(直接編輯器與反向關聯對話框)', function() {
+        let names = ['G1', '__proto__', 'constructor']
+        let rows = [G1, { name: '__proto__', cpemis: ref('P2') }, { name: 'constructor', cpemis: ref('P1') }]
+        let cache = new Map()
+        let auth = () => (c) => {
+            if (!cache.has(c)) {
+                cache.set(c, getUserRules({ cgrups: c }, rows, P_BASE, TGT).rules)
+            }
+            return cache.get(c)
+        }
+        let stat = { strings: 0, direct: 0, unchanged: 0, changed: 0, emptied: 0, rel: 0, relSame: 0, relRewritten: 0, naiveDiff: 0, naiveGain: 0, byClass: {} }
+        for (let c of l3Strings(2, names, 'allLim')) {
+            checkL3({ tk: 'X', tab: { rows, names }, auth, stat, selfNames: names }, c, l3Full)
+        }
+        assert.strictEqual(stat.byClass.allLim, stat.strings, JSON.stringify(stat))
+        assert.ok(stat.strings > 300 && stat.changed > 3000 && stat.rel > 3000 && stat.naiveGain > 0, JSON.stringify(stat))
+        //物件形式(以文字拼出, 避免 JS 物件字面值對 __proto__ 設原型而非建鍵): 單一／多個限制項之未改動存檔
+        for (let c of ['{"__proto__":{"isActive":"y"}}', '{"constructor":{"mode":"or","isActive":"y"},"G1":{"isActive":"y"}}', '{"__proto__":"y","constructor":{"mode":null,"isActive":"y"}}']) {
+            let st = editorOpen(c, rows)
+            assert.deepStrictEqual(st.lossy, [], c)
+            let s = editorSave(c, st)
+            assert.notStrictEqual(s, false, c)
+            assert.deepStrictEqual(auth()(s), auth()(c), `未改動存檔授權不變: ${c} → ${s}`)
+            assert.ok(c.includes('__proto__') ? s.includes('"__proto__":{"isActive":"y"}') : s.includes('"constructor":{"mode":"or","isActive":"y"}'), `限制項原樣保留(含原型鍵名): ${c} → ${s}`)
+        }
+    })
+
+
+    // ===== run06 第三格放寬: 具體例(使用者可讀; 以 TABS_G.A: G1＝P1{T1,T2}、G2＝P2{T2,T3}) =====
+
+    it('EX-LOSSY3-001-直接編輯器: 該層只有一個缺 mode 之限制項 { G1 } → 不判有損、可存; 警告圖示(modeInvalid)保留; 存檔後仍為缺 mode 之限制項, 授權仍全 n; 照列寫出為合法 AND(方案 A 之前)則 G1 成為唯一基底而多給 T1,T2', function() {
+        let c = '{"G1":{"isActive":"y"}}'
+        assert.deepStrictEqual(getKpLossy(JSON5.parse(c)), [], '第三格已放寬')
+        let st = editorOpen(c, TABS_G.A.rows)
+        assert.deepStrictEqual(st.lossy, [])
+        assert.deepStrictEqual(st.rows.find((r) => r.name === 'G1'), { name: 'G1', mode: 'AND', enable: 'y' }, '所示為啟用 AND')
+        assert.deepStrictEqual(getRefWarns(c, TABS_G.A.rows).byCode.modeInvalid, ['G1'], '警告圖示(modeInvalid)保留')
+        editorToggle(st, 'G2', 'y', 'OR') //管理者勾選 G2 又取消: 終態同開啟時, 視為未改動(列狀態為終態之函數, 不記操作歷程)
+        editorToggle(st, 'G2', 'n', 'OR')
+        let s = editorSave(c, st)
+        assert.notStrictEqual(s, false, '不拒存')
+        assert.deepStrictEqual(JSON.parse(s).G1, { isActive: 'y' }, '缺 mode 原樣保留')
+        assert.strictEqual(yOf(authG('A')(c)), '')
+        assert.strictEqual(yOf(authG('A')(s)), '', '存檔後授權不多給')
+        let sNo = JSON.stringify(putRowsToKp(Object.create(null), st.rows))
+        assert.strictEqual(yOf(authG('A')(sNo)), 'T1,T2', '照列寫出為合法 AND: 放寬前拒存之理由(現由方案 A 避免)')
+    })
+
+    it('EX-LOSSY3-002-直接編輯器: 兩個限制項 { G1 缺 mode, G2 \'or\' }, 管理者停用 G1 → 只剩限制項 G2, 授權全 n(不是 G2 之 T2,T3); G2 之 mode 原樣(\'or\')', function() {
+        let c = '{"G1":{"isActive":"y"},"G2":{"mode":"or","isActive":"y"}}'
+        let st = editorOpen(c, TABS_G.A.rows)
+        editorToggle(st, 'G1', 'n', 'AND')
+        let s = editorSave(c, st)
+        assert.deepStrictEqual(JSON.parse(s).G2, { mode: 'or', isActive: 'y' })
+        assert.deepStrictEqual(JSON.parse(s).G1, { mode: 'AND', isActive: 'n' })
+        assert.strictEqual(yOf(authG('A')(s)), '')
+        assert.deepStrictEqual(authG('A')(s), authG('A')(oracleEditsArr(decodeArr(c), [{ name: 'G1', enable: 'n', mode: 'AND' }])))
+        assert.strictEqual(yOf(authG('A')(JSON.stringify(putRowsToKp(Object.create(null), st.rows)))), 'T2,T3', '照列寫出: G2 成為唯一 AND 基底而多給')
+    })
+
+    it('EX-LOSSY3-003-直接編輯器: 限制項 { G1 } 之層, 管理者勾選 G2(OR 或 AND) → 授權＝G2 與 G1(限制項, 交集)之 T2, 等於同一編輯套用於原資料; G1 仍為缺 mode 之限制項', function() {
+        let c = '{"G1":{"isActive":"y"}}'
+        for (let md of ['OR', 'AND']) {
+            let st = editorOpen(c, TABS_G.A.rows)
+            editorToggle(st, 'G2', 'y', md)
+            let s = editorSave(c, st)
+            assert.deepStrictEqual(JSON.parse(s).G1, { isActive: 'y' }, md)
+            assert.deepStrictEqual(JSON.parse(s).G2, { mode: md, isActive: 'y' }, md)
+            assert.strictEqual(yOf(authG('A')(s)), 'T2', `勾選 G2(${md}): G2{T2,T3} ∩ G1{T1,T2}`)
+            assert.deepStrictEqual(authG('A')(s), authG('A')(oracleEditsArr(decodeArr(c), [{ name: 'G2', enable: 'y', mode: md }])), md)
+        }
+    })
+
+    it('EX-LOSSY3-004-直接編輯器: 管理者把限制項 G1 改為 OR → 照選擇寫出 OR(明確操作: 授予 T1,T2); 改成 OR 再改回 AND 視為未改, 仍寫回原始 mode(已知限制①: 無法由編輯器把限制項明確轉成合法 AND)', function() {
+        let c = '{"G1":{"isActive":"y"}}'
+        let st = editorOpen(c, TABS_G.A.rows)
+        editorToggle(st, 'G1', 'y', 'OR')
+        let s = editorSave(c, st)
+        assert.deepStrictEqual(JSON.parse(s).G1, { mode: 'OR', isActive: 'y' })
+        assert.strictEqual(yOf(authG('A')(s)), 'T1,T2')
+        editorToggle(st, 'G1', 'y', 'AND')
+        let s2 = editorSave(c, st)
+        assert.deepStrictEqual(JSON.parse(s2).G1, { isActive: 'y' }, '改回 AND: 終態同開啟時, 視為未改')
+        assert.strictEqual(yOf(authG('A')(s2)), '')
+    })
+
+    it('EX-LOSSY3-005-權限層(直接編輯器 VeCpemis, cpemis): 原層有合法項 P2(AND)與限制項 P1(\'or\'), 管理者停用 P2 → 只剩限制項 P1, 授權全 n; 照列寫出則 P1 成為唯一 AND 基底而多給 T1,T2', function() {
+        let c = '[{"name":"P1","mode":"or","isActive":"y"},{"name":"P2","mode":"AND","isActive":"y"}]'
+        assert.strictEqual(yOf(authP('A')(c)), 'T2', '原: P2 為基底{T2,T3} ∩ P1 限制項{T1,T2}')
+        let st = editorOpen(c, TABS_P.A.rows)
+        editorToggle(st, 'P2', 'n', 'AND')
+        let s = editorSave(c, st)
+        assert.deepStrictEqual(JSON.parse(s).P1, { mode: 'or', isActive: 'y' })
+        assert.strictEqual(yOf(authP('A')(s)), '')
+        assert.deepStrictEqual(authP('A')(s), authP('A')(oracleEditsArr(decodeArr(c), [{ name: 'P2', enable: 'n', mode: 'AND' }])))
+        assert.strictEqual(yOf(authP('A')(JSON.stringify(putRowsToKp(Object.create(null), st.rows)))), 'T1,T2')
+    })
+
+    it('EX-LOSSY3-006-反向關聯對話框(relSave): 限制項 { G1 } 之字串, 目標＝G1 所示狀態(啟用 AND)→ 字串逐字元不動; 本群組 G2 歸屬(OR)→ 只加 G2、G1 缺 mode 原樣, 授權 T2; 取消 G1 → { }; G1 改 OR → 授予 T1,T2', function() {
+        let c = '{"G1":{"isActive":"y"}}'
+        assert.strictEqual(relSave(c, 'G1', 'y', 'AND'), c, '未變更: 字串不動(原亦不判有損)')
+        let s = relSave(c, 'G2', 'y', 'OR')
+        assert.deepStrictEqual(JSON.parse(s), { G1: { isActive: 'y' }, G2: { mode: 'OR', isActive: 'y' } })
+        assert.strictEqual(yOf(authG('A')(s)), 'T2')
+        assert.strictEqual(relSave(c, 'G1', 'n', 'OR'), '{}')
+        assert.strictEqual(yOf(authG('A')(relSave(c, 'G1', 'y', 'OR'))), 'T1,T2')
+    })
+
+    it('EX-LOSSY3-007-懸空限制項與名稱 \'\' 之純量限制項 { GX 缺 mode, "": "y" }: 不判有損、未改動存檔原樣保留(含鍵 \'\'), 授權仍全 n; 陣列形式同名重複限制項＋停用合法項亦同', function() {
+        let c = '{"GX":{"isActive":"y"},"":"y"}'
+        let st = editorOpen(c, TABS_G.A.rows)
+        assert.deepStrictEqual(st.lossy, [])
+        assert.deepStrictEqual(st.rows.filter((r) => r.dangling).map((r) => `${r.name}:${r.mode}:${r.enable}`), ['GX:AND:y', ':AND:y'])
+        let s = editorSave(c, st)
+        assert.deepStrictEqual(JSON.parse(s).GX, { isActive: 'y' })
+        assert.deepStrictEqual(JSON.parse(s)[''], { isActive: 'y' })
+        assert.strictEqual(yOf(authG('A')(s)), '')
+        let c2 = '[{"name":"G1","isActive":"y"},{"name":"G1","mode":"or","isActive":"y"},{"name":"G2","mode":"AND","isActive":"n"}]'
+        let s2 = editorSave(c2, editorOpen(c2, TABS_G.A.rows))
+        assert.deepStrictEqual(JSON.parse(s2).G1, { isActive: 'y' }, '同名重複限制項: 取第一個之原始 mode(皆為限制項, 授權同)')
+        assert.deepStrictEqual(authG('A')(s2), authG('A')(c2))
+    })
+
+    it('EX-LOSSY3-008-放寬只限第三格: 同名 OR 與缺 mode 並存(第一格)、啟用而名稱非字串之限制項(第二格)仍判有損——直接編輯器未改動回原字串、有變更拒存; 反向關聯對話框不經改寫', function() {
+        for (let [c, names] of [['[{"name":"G1","mode":"OR","isActive":"y"},{"name":"G1","isActive":"y"}]', ['G1']], ['[{"mode":"or","isActive":"y"}]', ['#1']], ['[{"name":"G1","isActive":"y"},{"mode":"or","isActive":"y"}]', ['#2']]]) {
+            assert.deepStrictEqual(getKpLossy(JSON5.parse(c)), names, c)
+            let st = editorOpen(c, TABS_G.A.rows)
+            assert.deepStrictEqual(st.lossy, names, c)
+            assert.strictEqual(editorSave(c, st), c, `未改動: 回原字串 ${c}`)
+            editorToggle(st, 'G2', 'y', 'OR')
+            assert.strictEqual(editorSave(c, st), false, `有變更: 拒存 ${c}`)
+            assert.strictEqual(relSave(c, 'G2', 'y', 'OR'), null, `反向關聯對話框不經改寫 ${c}`)
+        }
     })
 
 

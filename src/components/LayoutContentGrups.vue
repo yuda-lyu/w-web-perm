@@ -277,7 +277,8 @@ import eachOwn from '../js/eachOwn.mjs'
 import cvKpToObj from '../js/cvKpToObj.mjs'
 import { getRefWarns, getRefWarnText, fmtWarn } from '../js/getAuthWarn.mjs'
 import { getNameErrs, mapNameKp } from '../js/getNameErrs.mjs'
-import { getDelRefCount, getDelConfirmText } from '../js/getDelRefCount.mjs'
+import { getDelImpact, getDelConfirmText } from '../js/getDelRefCount.mjs'
+import { getSavePreview } from '../js/getCascadePreview.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
 import WSwitch from 'w-component-vue/src/components/WSwitch.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
@@ -319,6 +320,7 @@ export default {
             firstLoading: true,
             firstSetting: true,
             systemProcing: false, //程式端載入/重載清單資料期間為 true, 用於排除非使用者操作之 rowsChange (見 $ui.markDataReload)
+            postSaving: false, //儲存成功後至成功訊息框關閉(再加短暫緩衝)期間為 true: 刪除或改名連帶更新引用端表(ADR-036), 一次儲存使 store 先後推播兩張表而多次重建清單, 其後非同步觸發之 rowsChange 不得視為使用者變更(markDataReload 之 1ms 窗口可能短於 ag-grid 渲染, 儲存鈕殘留的間歇現象); 成功訊息框期間使用者無從編輯
             showIsEditable: false,
             isEditable: false,
             isModified: false,
@@ -771,7 +773,7 @@ export default {
                         // console.log('rowsChange cloneDeep(vo.opt.rows)', cloneDeep(vo.opt.rows))
 
                         //check
-                        if (!vo.syncState || vo.firstLoading || vo.firstSetting || vo.systemProcing) {
+                        if (!vo.syncState || vo.firstLoading || vo.firstSetting || vo.systemProcing || vo.postSaving) {
                             return
                         }
 
@@ -1049,10 +1051,11 @@ export default {
 
             }
 
-            //impact, 對使用者授權之影響, 刪除前須提示: n 為以 AND 引用被刪群組且刪除後查無該群組之使用者數(授權將被收回, R-PRINCIPLE-00 c),
+            //impact, 對使用者(引用端)之影響, 刪除前須提示(單一框): nRefs 為儲存時將被連帶清理(自其 cgrups 移除對被刪群組之引用)之使用者數(任何 mode、含停用項目;
+            //與伺服端同一純函數 planRefChanges, 只算本次刪除, ADR-036、R-REF-CASCADE-01), nAnd 為其中以 AND 引用且刪除後查無該群組者(引用被移除後其限制解除, 授權可能變多, R-PRINCIPLE-00 c),
             //nWiden 為引用的群組名稱有多筆同名而只刪其一之使用者數(各候選之交集變寬, 授權可能變多, R-PRINCIPLE-00 d);
             //被刪名稱只取基準(store 之 grups, 已儲存)列中存在者: 尚未儲存的新增列刪除不影響他人
-            let impact = getDelRefCount(delIds, vo.grups, vo.users, 'cgrups', getRowsRemain())
+            let impact = getDelImpact(delIds, vo.grups, vo.users, 'Grup', getRowsRemain())
             let confirmText = getDelConfirmText(impact, (k) => vo.$t(k), 'Grup')
 
             //無影響他人之授權時維持現行流程(直接刪除, 不彈框)
@@ -1061,7 +1064,7 @@ export default {
                 return
             }
 
-            //有影響: 確認框(單一框, 兩種影響併入同一框); 使用者取消(No)則不刪除
+            //有影響: 確認框(單一框, 多種影響併入同一框); 使用者取消(No)則不刪除
             vo.$dg.showCheckYesNo(confirmText)
                 .then(() => {
                     doDelete()
@@ -1288,10 +1291,29 @@ export default {
                 //新增列之 transient 欄位 _isNew(addItem / copyItem 標記)隨列送後端: 後端據以拒絕「標為新增但 id 已存在」之列
                 //(同一包重送時不把剛建立之列當修改覆寫, 回 saveNewRowExists), 檢查後由 ltdtmapping 依 schema 取欄時剝除不入庫 (ADR-025)
 
-                //2) 確定打 API 才開 loading
+                //2) 引用連帶預覽(ADR-036、R-REF-CASCADE-01; 與伺服端同一純函數 planRefChanges, 基準為 store 之 grups／users, 筆數以伺服端實際為準): 群組改名時引用它之使用者 cgrups 於同一次寫入內連帶改名,
+                //有引用端將被更新時先確認(確認框文字與成功訊息之判定見 src/js/getCascadePreview.mjs); plan.err 非 null(新名撞懸空名等)不彈框、照常送出, 伺服端以固定語系鍵拒存並由下方 showCheckYes 顯示
+                let pv = getSavePreview({ kind: 'Grup', rowsOld: vo.grups, rowsNew: rows, holdersOld: vo.users, cascadeRename: get(vo, 'webInfor.cascadeRename', true), $t: (k) => vo.$t(k) })
+                if (pv.confirmText !== '') {
+
+                    //先開確認框之流程: 開框前 unlockBtn() 釋放儲存鈕之 promiseUnlock 鎖(同上, 按鈕鎖只涵蓋請求期間); 流程狀態仍由 runSubmit 保持至本流程結束,
+                    //確認框與後續請求期間之重入(焦點仍在儲存鈕時 Enter)皆被略過 (ADR-025)
+                    unlockBtn()
+                    let isGo = await vo.$dg.showCheckYesNo(pv.confirmText)
+                        .then(() => true)
+                        .catch(() => false)
+
+                    //選否(或確認框被取代而視同選否): 中止儲存, 不送出; 尚未開 loading, 資料與 isModified 保留, 由 runSubmit 於回傳後結束流程
+                    if (!isGo) {
+                        return
+                    }
+
+                }
+
+                //3) 確定打 API 才開 loading
                 vo.$ui.updateLoading(true)
 
-                //3) updateGrups, 各自 catch + 旗標短路
+                //4) updateGrups, 各自 catch + 旗標短路
                 let okSave = false
                 await vo.$fapi.updateGrups(rows)
                     .then(() => { okSave = true })
@@ -1301,12 +1323,20 @@ export default {
                     })
                 if (!okSave) return
 
-                //isModified
+                //isModified; postSaving 自此至成功訊息框關閉後 300ms 內排除 rowsChange(見 data 註解)
+                vo.postSaving = true
                 vo.isModified = false
 
                 //alert（showCheckYes 前關 loading，避免 modal 等待期間 loading 疊在底下）
                 vo.$ui.updateLoading(false)
-                await vo.$dg.showCheckYes(vo.$t('grupSaveGrupsSuccess'), { type: 'success' })
+                try {
+                    await vo.$dg.showCheckYes(pv.successText !== '' ? pv.successText : vo.$t('grupSaveGrupsSuccess'), { type: 'success' }) //只有改名且有使用者之引用被連帶更新才附筆數(刪除所致之清理不改, 已於刪除確認框告知), 否則維持原成功訊息
+                }
+                finally {
+                    setTimeout(() => {
+                        vo.postSaving = false
+                    }, 300)
+                }
 
             }
 

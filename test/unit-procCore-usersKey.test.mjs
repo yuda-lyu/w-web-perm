@@ -524,7 +524,7 @@ describe('unit-procCore-usersKey (後台整表寫入 users 之 email／對應鍵
             let code = readCode('server/procCore.mjs')
             assert.strict.ok(!/ckKey\(rows,\s*'email'/.test(code), '全表 email 檢查不得復活(歷史空值／重複會使所有存檔失敗)')
             assert.strict.equal((code.match(/checkUsersWrite\(/g) || []).length, 1, 'checkUsersWrite 呼叫點恰一處')
-            let iLock = code.indexOf('kmx(tabWriteKey(keyTable)')
+            let iLock = code.indexOf('withTabLocks(kmx, [keyTable]')
             let iOld = code.indexOf('let ltdtOld = await woItems[keyTable].select()')
             let iCk = code.indexOf('checkUsersWrite(rows, ltdtOld, mappingBy)')
             let iOrm = code.indexOf('procOrm(userId, keyTable')

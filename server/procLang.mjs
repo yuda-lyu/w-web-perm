@@ -150,9 +150,9 @@ let kpLang = {
         eng: `Not saved: the name is duplicated. Group names and permission names must be unique. Nothing was changed.`,
         cht: `未儲存：名稱重複。群組名稱與權限名稱不得重複。資料未變更。`,
     },
-    authLossyBlocked: { //編輯器對「物件形式無法無損表示」之授權資料拒存(規則帳本 R-AUTH-LOSSY-01, 主控複審 R4; run04 起「同名同時 OR 與 AND」, 順序部分隨 ADR-033 移除; run05 起另含「啟用而無字串名稱之項目」, R-PRINCIPLE-00 f); {names} 為受影響之名稱
-        eng: `Not saved: the authorization settings for {names} contain entries the editor cannot write without changing access (the same name set to both OR and AND, an entry without a usable name, or only entries whose merge mode is missing or invalid). Nothing was changed. Please correct the source data first.`,
-        cht: `未儲存：{names} 的授權設定含有編輯器無法在不改變授權下寫出的項目（同一名稱同時以 OR 與 AND 設定、項目沒有可用的名稱，或啟用的項目其合併模式皆缺漏或不合法）。資料未變更，請先修正資料來源。`,
+    authLossyBlocked: { //編輯器對「物件形式無法無損表示」之授權資料拒存(規則帳本 R-AUTH-LOSSY-01, 主控複審 R4; run04 起「同名同時 OR 與 AND」, 順序部分隨 ADR-033 移除; run05 起另含「啟用而無字串名稱之項目」, R-PRINCIPLE-00 f; run06 起「啟用的項目其合併模式皆缺漏或不合法」一格放寬為可存〔方案 A 原樣寫回, ADR-035 Update 2026-10-22〕, 文字去掉該項); {names} 為受影響之名稱
+        eng: `Not saved: the authorization settings for {names} contain entries the editor cannot write without changing access (the same name set to both OR and AND, or an entry without a usable name). Nothing was changed. Please correct the source data first.`,
+        cht: `未儲存：{names} 的授權設定含有編輯器無法在不改變授權下寫出的項目（同一名稱同時以 OR 與 AND 設定，或項目沒有可用的名稱）。資料未變更，請先修正資料來源。`,
     },
     //授權資料衝突之頁面提示(規則帳本 R-PRINCIPLE-00 原則 3「遇衝突:收嚴＋提示」、R-AUTH-WARN-01): 警告圖示(三角形驚嘆號)之 tooltip; 偵測與代入見 src/js/getAuthWarn.mjs; {names} 為受影響之名稱、{kind} 為被引用者種類(warnKindGrup／warnKindPemi)、{n} 為筆數
     warnKindGrup: {
@@ -203,14 +203,6 @@ let kpLang = {
         eng: `Not saved: rows with the same name have different settings ({names}). Nothing was changed. Please make them identical, or fix the duplicate names first.`,
         cht: `未儲存：同名的列設定不一致（{names}）。資料未變更，請先使其一致，或先修正同名資料。`,
     },
-    confirmDelAndRefsGrup: { //刪除群組前: 以 AND 引用者之授權將被收回(R-PRINCIPLE-00 c); {n} 為使用者數
-        eng: `{n} user(s) refer to the selected group(s) with AND. If you delete them, those users' authorization will be revoked. Delete anyway?`,
-        cht: `有 {n} 位使用者以 AND 引用所選群組，刪除後其授權將被收回。確定刪除？`,
-    },
-    confirmDelAndRefsPemi: { //刪除權限前: 以 AND 引用者之授權將被收回; {n} 為群組數
-        eng: `{n} group(s) refer to the selected permission(s) with AND. If you delete them, the authorization of those groups will be revoked. Delete anyway?`,
-        cht: `有 {n} 個群組以 AND 引用所選權限，刪除後其授權將被收回。確定刪除？`,
-    },
     //@@U1-KEYS
     //使用者清單頁: 歷史既有(庫內原樣、非本次編輯造成)之同名／同 email／空值／格式不符不擋存, 僅於該儲存格顯示警告圖示(規則帳本 R-PRINCIPLE-00 g、h); 本次造成者仍擋存並顯示 userNameEmpty／userNameDuplicate／userEmail* 既有文字. {n} 為共用該值之使用者數
     warnUserNameHistDup: {
@@ -233,8 +225,26 @@ let kpLang = {
         eng: `The email format of this user is invalid (existing data, not caused by this edit). This does not block saving.`,
         cht: `此使用者的 Email 格式錯誤（既有資料，並非本次編輯造成），不影響儲存。`,
     },
-    //刪除群組／權限前之確認(規則帳本 R-PRINCIPLE-00 d): 引用的名稱有多筆同名(歷史同名)而只刪其一, 其餘候選之交集變寬, 引用者授權可能變多. {n} 為引用者數(Both 者 {n} 為授權被收回數、{m} 為授權可能變多數);
-    //Both 為 confirmDelAndRefs*(授權被收回)與本類併於同一框、同一個問句
+    //刪除群組／權限前之確認(規則帳本 R-PRINCIPLE-00 c、d、原則 6、適用表 n; ADR-036; src/js/getDelRefCount.mjs:getDelConfirmText): 刪除時引用它之引用端(群組頁為使用者 cgrups、權限頁為群組 cpemis)於同一次寫入內被連帶清理(移除該引用),
+    //故不再是「授權被收回」: 其中以 AND 引用者, 引用被移除後其 AND 限制解除, 授權可能變多. 單一框、單一問句, 依下列三個數量組合選鍵:
+    //  {n} 為將被移除引用之引用端數(任何 mode、含停用項目); {m} 為其中以 AND 引用者(限制解除); {w} 為引用的名稱有多筆同名(歷史同名)而只刪其一(各候選之交集變寬)之引用端數(名稱仍有實體, 不清理, 不計入 {n})
+    //  confirmDelRefs(n)、confirmDelRefsAnd(n、m)、confirmDelRefsDup(n、w)、confirmDelRefsAndDup(n、m、w); confirmDelDupRefs 僅有 w, 其 {n} 即 w 之數量
+    confirmDelRefsGrup: {
+        eng: `The reference to the selected group(s) will be removed from {n} user(s). Delete anyway?`,
+        cht: `將自 {n} 位使用者移除對所選群組的引用。確定刪除？`,
+    },
+    confirmDelRefsPemi: {
+        eng: `The reference to the selected permission(s) will be removed from {n} group(s). Delete anyway?`,
+        cht: `將自 {n} 個群組移除對所選權限的引用。確定刪除？`,
+    },
+    confirmDelRefsAndGrup: {
+        eng: `The reference to the selected group(s) will be removed from {n} user(s). For the {m} user(s) that refer to it with AND, the restriction will be lifted and their authorization may increase. Delete anyway?`,
+        cht: `將自 {n} 位使用者移除對所選群組的引用；其中 {m} 位以 AND 引用，移除後其限制解除，授權可能變多。確定刪除？`,
+    },
+    confirmDelRefsAndPemi: {
+        eng: `The reference to the selected permission(s) will be removed from {n} group(s). For the {m} group(s) that refer to it with AND, the restriction will be lifted and their authorization may increase. Delete anyway?`,
+        cht: `將自 {n} 個群組移除對所選權限的引用；其中 {m} 個以 AND 引用，移除後其限制解除，授權可能變多。確定刪除？`,
+    },
     confirmDelDupRefsGrup: {
         eng: `{n} user(s) refer to a group name that is shared by several groups. If you delete one of them, those users' authorization may increase. Delete anyway?`,
         cht: `有 {n} 位使用者引用的群組名稱有多筆同名資料，刪除其中一筆後，其授權可能變多。確定刪除？`,
@@ -243,13 +253,57 @@ let kpLang = {
         eng: `{n} group(s) refer to a permission name that is shared by several permissions. If you delete one of them, the authorization of those groups may increase. Delete anyway?`,
         cht: `有 {n} 個群組引用的權限名稱有多筆同名資料，刪除其中一筆後，其授權可能變多。確定刪除？`,
     },
-    confirmDelBothRefsGrup: {
-        eng: `{n} user(s) refer to the selected group(s) with AND; if you delete them, those users' authorization will be revoked. Also, {m} user(s) refer to a group name that is shared by several groups; if you delete one of them, those users' authorization may increase. Delete anyway?`,
-        cht: `有 {n} 位使用者以 AND 引用所選群組，刪除後其授權將被收回；另有 {m} 位使用者引用的群組名稱有多筆同名資料，刪除其中一筆後，其授權可能變多。確定刪除？`,
+    confirmDelRefsDupGrup: {
+        eng: `The reference to the selected group(s) will be removed from {n} user(s). Also, {w} user(s) refer to a group name that is shared by several groups; if you delete one of them, those users' authorization may increase. Delete anyway?`,
+        cht: `將自 {n} 位使用者移除對所選群組的引用；另有 {w} 位使用者引用的群組名稱有多筆同名資料，刪除其中一筆後，其授權可能變多。確定刪除？`,
     },
-    confirmDelBothRefsPemi: {
-        eng: `{n} group(s) refer to the selected permission(s) with AND; if you delete them, the authorization of those groups will be revoked. Also, {m} group(s) refer to a permission name that is shared by several permissions; if you delete one of them, the authorization of those groups may increase. Delete anyway?`,
-        cht: `有 {n} 個群組以 AND 引用所選權限，刪除後其授權將被收回；另有 {m} 個群組引用的權限名稱有多筆同名資料，刪除其中一筆後，其授權可能變多。確定刪除？`,
+    confirmDelRefsDupPemi: {
+        eng: `The reference to the selected permission(s) will be removed from {n} group(s). Also, {w} group(s) refer to a permission name that is shared by several permissions; if you delete one of them, the authorization of those groups may increase. Delete anyway?`,
+        cht: `將自 {n} 個群組移除對所選權限的引用；另有 {w} 個群組引用的權限名稱有多筆同名資料，刪除其中一筆後，其授權可能變多。確定刪除？`,
+    },
+    confirmDelRefsAndDupGrup: {
+        eng: `The reference to the selected group(s) will be removed from {n} user(s). For the {m} user(s) that refer to it with AND, the restriction will be lifted and their authorization may increase. Also, {w} user(s) refer to a group name that is shared by several groups; if you delete one of them, those users' authorization may increase. Delete anyway?`,
+        cht: `將自 {n} 位使用者移除對所選群組的引用，其中 {m} 位以 AND 引用，移除後其限制解除，授權可能變多；另有 {w} 位使用者引用的群組名稱有多筆同名資料，刪除其中一筆後，其授權可能變多。確定刪除？`,
+    },
+    confirmDelRefsAndDupPemi: {
+        eng: `The reference to the selected permission(s) will be removed from {n} group(s). For the {m} group(s) that refer to it with AND, the restriction will be lifted and their authorization may increase. Also, {w} group(s) refer to a permission name that is shared by several permissions; if you delete one of them, the authorization of those groups may increase. Delete anyway?`,
+        cht: `將自 {n} 個群組移除對所選權限的引用，其中 {m} 個以 AND 引用，移除後其限制解除，授權可能變多；另有 {w} 個群組引用的權限名稱有多筆同名資料，刪除其中一筆後，其授權可能變多。確定刪除？`,
+    },
+    //儲存前之引用連帶預覽(ADR-036; src/js/getCascadePreview.mjs): 群組／權限改名時, 引用它之引用端(使用者 cgrups／群組 cpemis)於同一次寫入內連帶改名; 標的頁刪除或改 id 時, 引用它之權限 crules 項目被連帶清理(標的 id 即名稱, 改 id 不級聯).
+    //{n} 為受影響之引用端數、{list} 為名單(改名為「舊→新」, 至多 5 個, 其餘以 cascadeListMore 帶總數)、{e} 為其中來源為外部應用(from 非空)者
+    confirmSaveRenameRefsGrup: {
+        eng: `After saving, the group references of {n} user(s) will be updated to the new names of these renamed group(s): {list}. Continue?`,
+        cht: `儲存後將一併更新 {n} 位使用者對下列已改名群組的引用：{list}。是否繼續？`,
+    },
+    confirmSaveRenameRefsExtGrup: {
+        eng: `After saving, the group references of {n} user(s) will be updated to the new names of these renamed group(s): {list}. The source of {e} of them is an external application; their references may be overwritten by external data at the next external sync. Continue?`,
+        cht: `儲存後將一併更新 {n} 位使用者對下列已改名群組的引用：{list}。其中 {e} 位來源為外部應用，下次外部同步時可能被外部資料覆寫。是否繼續？`,
+    },
+    confirmSaveRenameRefsPemi: {
+        eng: `After saving, the permission references of {n} group(s) will be updated to the new names of these renamed permission(s): {list}. Continue?`,
+        cht: `儲存後將一併更新 {n} 個群組對下列已改名權限的引用：{list}。是否繼續？`,
+    },
+    confirmSaveRenameRefsExtPemi: {
+        eng: `After saving, the permission references of {n} group(s) will be updated to the new names of these renamed permission(s): {list}. The source of {e} of them is an external application; their references may be overwritten by external data at the next external sync. Continue?`,
+        cht: `儲存後將一併更新 {n} 個群組對下列已改名權限的引用：{list}。其中 {e} 個來源為外部應用，下次外部同步時可能被外部資料覆寫。是否繼續？`,
+    },
+    confirmSaveDelRefsTarget: {
+        eng: `The settings for the following target(s) (deleted or renamed) will be removed from the rules of {n} permission(s): {list}. Save anyway?`,
+        cht: `將自 {n} 個權限的規則移除對下列管控對象的設定（已刪除或已改名）：{list}。確定儲存？`,
+    },
+    cascadeListMore: { //名單超過 5 個時附於其後, {n} 為總數
+        eng: `… ({n} in total)`,
+        cht: `…等 {n} 個`,
+    },
+    //儲存成功且有引用端因改名被連帶更新時之成功訊息(只描述改名; 群組頁／權限頁): {n} 為前端 store 之預覽筆數(nRenameHolders, 伺服端以實際為準);
+    //無改名連帶時、刪除所致之連帶清理(筆數已於刪除確認框告知)與標的頁, 一律維持原成功訊息(grupSaveGrupsSuccess／pemiSavePemisSuccess／targetSaveTargetsSuccess)
+    grupSaveGrupsSuccessCascade: {
+        eng: `Save permission groups successfully. The group references of {n} user(s) were updated to the new name(s).`,
+        cht: `儲存權限群組數據成功，已將 {n} 位使用者對已改名群組的引用一併更新為新名稱。`,
+    },
+    pemiSavePemisSuccessCascade: {
+        eng: `Save permissions successfully. The permission references of {n} group(s) were updated to the new name(s).`,
+        cht: `儲存權限數據成功，已將 {n} 個群組對已改名權限的引用一併更新為新名稱。`,
     },
     //@@U2-KEYS
     //@@S-KEYS
@@ -279,6 +333,27 @@ let kpLang = {
     saveWriteFail: {
         eng: `Not all changes were written, and some may have taken effect. Please reload the page and check before making changes.`,
         cht: `資料寫入未全部完成，部分變更可能已生效，請重新整理頁面確認後再操作`,
+    },
+    //引用連帶(改名級聯／刪除連帶清理; R-PRINCIPLE-00 原則 6、適用表 m／n; R-REF-CASCADE-01): 伺服端預檢被拒(零變更)之固定訊息, 動態細節只入 srLog
+    renameCascadeDupGroup: {
+        eng: `Not saved: a renamed item shares its old name with other existing items, so the references to it cannot be updated safely. Nothing was changed. Please delete or rename the duplicates first (save them separately), then rename it.`,
+        cht: `未儲存：被改名的項目與其他既有項目同名，無法安全地連帶更新引用。資料未變更。請先清理同名項目（分次儲存）後再改名。`,
+    },
+    renameCascadeNameInUse: {
+        eng: `Not saved: a new name is still referenced by settings of items that no longer exist, so the renamed item would take over those references. Nothing was changed. Please clean up the dangling references first, or choose another name.`,
+        cht: `未儲存：新名稱仍被已不存在之項目的授權設定引用，改名後會被這些引用接管。資料未變更。請先清理懸空引用，或改用其他名稱。`,
+    },
+    renameCascadeConflict: {
+        eng: `Not saved: a setting contains both the old and the new name, so its references cannot be updated automatically. Nothing was changed.`,
+        cht: `未儲存：有授權設定同時含有舊名稱與新名稱，無法自動更新引用。資料未變更。`,
+    },
+    renameCascadeUnsupported: {
+        eng: `Not saved: a setting that refers to the renamed or deleted item contains a value that cannot be safely rewritten (such as a non-finite number), so its references cannot be updated automatically. Nothing was changed. Please fix that setting first.`,
+        cht: `未儲存：引用此項目之授權設定含有無法安全改寫的內容（如非有限數值），無法自動更新引用。資料未變更，請先修正該授權設定。`,
+    },
+    saveCascadePartial: {
+        eng: `The related references may be out of sync with this change (the automatic restore failed). Please do not make further changes and contact the system administrator to run the reference audit.`,
+        cht: `相關的授權引用可能與本次變更不一致（自動還原失敗）。請勿再變更資料，並通知系統管理者執行引用稽核。`,
     },
     cannotGetUserId: {
         eng: `Cannot get the user id`,

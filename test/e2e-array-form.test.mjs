@@ -19,13 +19,18 @@
 //run05(R-PRINCIPLE-00 c～h「遇衝突收嚴＋提示」; ADR-035; 2026-10-21): ①缺 mode 之啟用項由「不計入」改為「AND 限制項」(e), AF-000～008 之夾具與斷言隨之改寫(見 FIX 註解; 原斷言凍結舊語意);
 //  AF-014e 之 effectiveList 同步(缺 mode 視為 AND). ②檔尾新增 describe「run05 衝突提示」: AF-017～ 為各 spec 本輪新增之 E2E 案例之語意斷言(不產標準圖; 案名註明對應之 spec 與 E2E 編號),
 //  tooltip 文字有語系差異者各語系各跑一次(setLang), 期望文字一律由頁面 $t 取範本代入, 不寫死整句。歷史同名(g、d)以 restartBackend 之 seedExtra 於後端停止期間旁路寫庫, 收尾 reseed。
+//run06(引用連帶: 改名級聯＋刪除連帶清理; ADR-036、R-REF-CASCADE-01): ①AF-026／027 原斷言舊語系鍵 confirmDelAndRefs*(已移除)與「刪除後 and-u／M3 字串不變、授權為空」(舊語意: AND 引用變懸空而被收回), 改依新規格——確認框為 confirmDelRefs*(n＝全部引用端、m＝其中 AND),
+//  按是只自清單移除、儲存後引用被連帶清理(其餘項目逐字不動), 授權為 AND 限制解除之結果(期望由 base seed 規則集依 R-AUTH-MERGE-00 推導); expWarn 擴充為可代入 {m}／{w}／{e}／{list}(等價於 fmtWarn 單趟代入).
+//  ②檔尾新增 describe「run06 引用連帶」: AF-036／037 群組／權限改名之儲存前預覽確認框(筆數、舊→新名單、外部來源警示; 按否不送出、按是附筆數之成功訊息、引用端已改寫、各使用者授權不變)、AF-038／039 刪除確認之筆數(OR 與停用者計入 n、只有啟用之 AND 計入 m)與清理、
+//  AF-040 預檢被伺服端拒絕時不彈確認框而顯示失敗彈窗、AF-042 名單超過 5 個之截斷、AF-041 cascadeRename:false(restartBackend(genTempSettings(…)); 不彈框、引用未改寫而懸空、使用者頁出現警告圖示; 案後 restartBackend('./settings.json') 還原). 皆為語意斷言、不產標準圖;
+//  資料前置以管理者寫入 RPC(含 from 非空之外部來源列), 案後 restoreTables 還原並回驗筆數(R-E2E-ISO-01).
 //跑法: npx mocha test/e2e-array-form.test.mjs --timeout 300000
 import assert from 'assert'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import JSON5 from 'json5'
-import { startServersOnce, launchBrowser, openApp, saveAndWaitModal, assertModalMsg, dismissResultModal, gotoUsers, gotoGrups, gotoPemis, toggleDialogEnable, clickDialogSave, clickDialogClose, waitDialogClosed, openBelongDialog, saveBelongAndWaitModal, getResolvedActiveTargets, setDialogMode, apiBaseUrl, clickAdd, typeIntoCell, waitUntilExist, setLang, checkRow, iconBtn, MDI, DLG_MDI, dlgBtn, readDialogChipsRow, restartBackend, genTempSettings } from './tools/e2e-setup.mjs'
+import { startServersOnce, launchBrowser, openApp, saveAndWaitModal, clickSave, assertModalMsg, dismissResultModal, gotoUsers, gotoGrups, gotoPemis, toggleDialogEnable, clickDialogSave, clickDialogClose, waitDialogClosed, openBelongDialog, saveBelongAndWaitModal, getResolvedActiveTargets, setDialogMode, apiBaseUrl, clickAdd, typeIntoCell, waitUntilExist, setLang, checkRow, iconBtn, MDI, DLG_MDI, dlgBtn, readDialogChipsRow, restartBackend, genTempSettings } from './tools/e2e-setup.mjs'
 import { callRpc, TOKEN_ADMIN, TOKEN_APP, readTables, restoreTables } from './tools/api-setup.mjs'
 
 const FROM = 'appArrForm'
@@ -195,15 +200,19 @@ async function cellWarnTitle(page, k, c, scope = '') {
 async function dlgWarnTitle(page, k, c = 'name') {
     return await cellWarnTitle(page, k, c, SEL_MODAL)
 }
-//期望之提示文字: 以頁面語系之範本代入(同 src/js/getAuthWarn.mjs:fmtWarn; 名稱以「, 」串接), 不寫死整句(兩語系皆可)
+//期望之提示文字: 以頁面語系之範本代入(等價於 src/js/getAuthWarn.mjs:fmtWarn 之單趟代入——e2e 不得 import src／server, 故於此自寫: 只掃描原始範本一次, 代入結果不再解析,
+//  名稱可含 {n}、{kind} 等字樣而原樣顯示; 未給之佔位符原樣保留). 可代入 {names}(以「, 」串接, 呼叫端自行確保至多 5 個)、{kind}(vars.kindKey 之語系文字)、{n}、{m}、{w}、{e}、{list}(呼叫端已組好之字串, 原樣代入),
+//  不寫死整句(兩語系皆可); 範本文字一律經頁面 $t 取得(同產品之語系鍵)
 async function expWarn(page, key, vars = {}) {
     return await page.evaluate(([k, v]) => {
         const $t = window.$vo.$t
-        let s = String($t(k))
-        if (v.names) s = s.split('{names}').join(v.names.join(', '))
-        if (v.kindKey) s = s.split('{kind}').join($t(v.kindKey))
-        if ('n' in v) s = s.split('{n}').join(String(v.n))
-        return s
+        const kp = Object.create(null)
+        if (v.names) kp.names = v.names.join(', ')
+        if (v.kindKey) kp.kind = String($t(v.kindKey))
+        for (const x of ['n', 'm', 'w', 'e', 'list']) {
+            if (x in v) kp[x] = String(v[x])
+        }
+        return String($t(k)).replace(/\{(names|kind|n|m|w|e|list)\}/g, (hit, x) => (x in kp ? kp[x] : hit))
     }, [key, vars])
 }
 //解析某名稱於授權字串中之有效模式(啟用者: mode 為 OR 才是 OR, 缺或非法視為 AND; 停用或查無回 null)——run05 新語意(R-AUTH-MERGE-00 第 5 條修訂)
@@ -1154,6 +1163,9 @@ const T_C = '專案A/頁C'
 const PETER_TREE = ['專案A/頁A/區塊A', '專案A/頁C', '專案B/頁A/區塊A', '專案B/頁A/區塊B'] //M1 = P1 ∪ P2(種子; 數字隨種子變動)
 const M1_AND_M2 = ['專案A/頁C', '專案B/頁A/區塊A', '專案B/頁A/區塊B'] //M1 ∩ M2
 const JOHN_TREE = ['專案A/頁C', '專案B/頁A/區塊B'] //M3 = P2(OR) ∩ P3(AND)
+//run06(刪除連帶清理)之預期樹, 由 base seed 之規則集推導(P1 啟用 { 專案A/頁A/區塊A }; P2 啟用 { 專案A/頁C, 專案B/頁A/區塊A, 專案B/頁A/區塊B }; P3 啟用 { 專案A/頁C, 專案B/頁A/區塊B, 專案B/頁A/區塊C }; M2 = P2(OR) ∪ P3(OR)):
+const P2_TREE = ['專案A/頁C', '專案B/頁A/區塊A', '專案B/頁A/區塊B'] //P2 單獨(M3 刪 P3 後之 AND 限制解除; mary 之 M2 刪 P3 後)
+const M2_TREE = ['專案A/頁C', '專案B/頁A/區塊A', '專案B/頁A/區塊B', '專案B/頁A/區塊C'] //M2 = P2 ∪ P3(mary 之授權)
 const ON5 = (mode) => ({ mode, isActive: 'y' })
 const mkU = (id, name, cgrups, extra = {}) => ({ id, order: 200, name, email: `${name}@example.com`, isAdmin: 'n', isActive: 'y', cgrups: typeof cgrups === 'string' ? cgrups : JSON.stringify(cgrups), ...extra })
 //夾具(各案所需者見案例; 名稱與內容依各 spec 之「測試資料」)
@@ -1262,6 +1274,73 @@ async function selectAll(kt) {
     const r = await callRpc(`${kt}.select`, [], TOKEN_ADMIN)
     assert.ok(r.ok && Array.isArray(r.output), `${kt}.select 應成功, 實得 ${JSON.stringify(r).slice(0, 200)}`)
     return r.output
+}
+//run06: 最上層彈窗(確認框或結果框)之逐行文字(去首尾空白、略空行): 確認框為 [標題, 訊息, 否, 是]、結果框為 [標題, 訊息, 確認]; 無彈窗回 []
+async function topModalLines(page) {
+    return await page.evaluate(() => {
+        const els = [...document.querySelectorAll('div[style*="overscroll-behavior"]')]
+        const e = els[els.length - 1]
+        return e ? (e.innerText || '').split('\n').map((s) => s.trim()).filter((s) => s !== '') : []
+    })
+}
+//run06: 等確認框出現並斷言其整體形狀: 標題 systemMessage、單一訊息逐字等於期望(expText 由頁面語系範本代入)、按鈕為否／是(單一框、單一問句);
+//  frags 為獨立於語系範本之字面片段(各語系各給一組, 用以擋「範本之佔位符對調／筆數寫錯」——期望若全由範本代入則範本錯誤無從察覺)
+async function expectConfirm(page, label, expText, frags) {
+    await waitText(page, label, expText)
+    const t = await page.evaluate(() => ({ sys: window.$vo.$t('systemMessage'), no: window.$vo.$t('no'), yes: window.$vo.$t('yes') }))
+    assert.deepEqual(await topModalLines(page), [t.sys, expText, t.no, t.yes], `${label}: 確認框應為單一訊息＋否／是`)
+    for (const f of frags) {
+        assert.ok(expText.includes(f), `${label}: 確認框文字應含「${f}」, 實得 ${expText}`)
+    }
+}
+//run06: 等結果框(成功／失敗彈窗)出現並斷言其訊息逐字等於 expText(單一訊息＋確認鈕, 不是確認框)
+async function expectResult(page, label, expText) {
+    await waitText(page, label, expText)
+    const t = await page.evaluate(() => ({ sys: window.$vo.$t('systemMessage'), ok: window.$vo.$t('ok') }))
+    assert.deepEqual(await topModalLines(page), [t.sys, expText, t.ok], `${label}: 結果框應為單一訊息＋確認鈕`)
+}
+//run06: 確認框已消失(按否或按是之後)
+async function waitModalGone(page, label, text) {
+    await waitUntilExist(page, label, (t) => !(document.body.innerText || '').includes(t), { arg: text })
+    await page.waitForTimeout(500)
+}
+//run06: 三表(users／grups／pemis)現況快照(依 id 排序之整列, 含 order／更新者／時間欄), 供「零變更」與「未命中之列逐位元不動」比對
+async function snapAll() {
+    const out = {}
+    for (const kt of ['users', 'grups', 'pemis']) {
+        out[kt] = (await selectAll(kt)).slice().sort((a, b) => String(a.id).localeCompare(String(b.id)))
+    }
+    return out
+}
+//run06: 快照中某表某 id 之列
+function rowOfSnap(snapKt, id) {
+    const r = snapKt.find((v) => v.id === id)
+    assert.ok(r, `快照應有 ${id}`)
+    return r
+}
+//run06: 清單頁(群組頁／權限頁; 呼叫端已進該頁)刪除名稱為 name 之列之完整 UI 流程與其斷言(AF-026／027／038／039 共用; 單一實作, 不複製近似版):
+//  勾選列 → 垃圾桶 → 確認框(單一框、字面片段) → 按否: 確認框消失、列仍在、不出現儲存鈕、DB 零變更 → 再按垃圾桶 → 按是: 列自清單移除、出現儲存鈕、DB 仍零變更(只自清單移除, 要按儲存才寫入)
+//  → 按儲存 → 成功彈窗之訊息逐字等於原成功文字 okKey(不附改名筆數: 刪除所致之清理筆數已於確認框告知)。回傳按儲存前之 DB 快照(供呼叫端比對「未命中之列逐位元不動」)
+async function deleteRowFlow(page, { name, expConfirm, frags, okKey, label }) {
+    const dbBefore = await snapAll()
+    await checkRow(page, await rowIndexByName(page, name))
+    await iconBtn(page, MDI.trash).first().click()
+    await expectConfirm(page, `${label} 確認框`, expConfirm, frags)
+    await clickModalBtn(page, 'no')
+    await waitModalGone(page, `${label} 確認框(否)關閉`, expConfirm)
+    assert.strict.equal((await rowIndexesByName(page, name)).length, 1, `${label}: 按否後 ${name} 列仍在`)
+    assert.strict.equal(await pageSaveShown(page), false, `${label}: 按否後清單頁不出現儲存鈕`)
+    assert.deepEqual(await snapAll(), dbBefore, `${label}: 按否後 DB 零變更`)
+    await iconBtn(page, MDI.trash).first().click()
+    await expectConfirm(page, `${label} 確認框(第二次)`, expConfirm, frags)
+    await clickModalBtn(page, 'yes')
+    await waitUntilExist(page, `${name} 自清單移除`, (n) => ![...document.querySelectorAll('.ag-row[row-index] .ag-cell[col-id="name"]')].some((c) => (c.textContent || '').trim() === n), { arg: name })
+    await page.waitForTimeout(500)
+    assert.strict.equal(await pageSaveShown(page), true, `${label}: 按是後清單頁出現儲存鈕`)
+    assert.deepEqual(await snapAll(), dbBefore, `${label}: 按是只自清單移除, 未按儲存前 DB 零變更`)
+    await clickSave(page)
+    await expectResult(page, `${label} 成功彈窗`, await page.evaluate((k) => window.$vo.$t(k), okKey))
+    return dbBefore
 }
 
 describe('e2e-array-form run05 衝突之收嚴與提示 (R-PRINCIPLE-00; 語意斷言, 不產標準圖)', function() {
@@ -1735,35 +1814,36 @@ describe('e2e-array-form run05 衝突之收嚴與提示 (R-PRINCIPLE-00; 語意�
         })
     }
 
-    // ----- 刪除被 AND 引用者前確認: spec 流程_後台群組清單 E2E-014、流程_後台權限清單 E2E-014 -----
+    // ----- 刪除被引用之群組／權限前確認與連帶清理(run06, ADR-036; 原「刪除被 AND 引用者前確認」之 confirmDelAndRefs* 鍵已移除, 改為 confirmDelRefs*): spec 流程_後台群組清單 E2E-014、流程_後台權限清單 E2E-014 -----
+    //確認框為單一框: {n} 為將被移除引用之引用端數(任何 mode、含停用)、{m} 為其中以 AND 引用者(限制解除); 按否不刪; 按是只自清單移除(要按儲存才寫入); 儲存後引用被連帶清理, 成功彈窗為原文字
     for (const lang of LANGS) {
-        it(`AF-026-delete-grup-confirm [${lang}]: (spec 流程_後台群組清單 E2E-014) 刪除被 and-u 以 AND 引用之 M2 → 確認框(confirmDelAndRefsGrup, n=1); 取消則不刪; 確定後存檔 → M2 刪除、and-u 字串不變、授權為空`, async function() {
+        it(`AF-026-delete-grup-confirm [${lang}]: (spec 流程_後台群組清單 E2E-014) 刪除被 mary(OR)與 and-u(AND)引用之 M2 → 確認框(confirmDelRefsAndGrup, n=2、m=1); 按否不刪; 按是只自清單移除, 儲存後 M2 已刪、mary 之 cgrups 移除 M2、and-u 只剩 M1(OR 項逐字不變)且授權為 AND 限制解除之 M1 樹, 其餘使用者列逐位元不動, 成功彈窗為原文字`, async function() {
             await syncRows('users', [AND_U], F5)
             try {
                 await withPageLang(lang, async (page) => {
+                    //預期推導(R-AUTH-MERGE-00): and-u = M1(OR) ∩ M2(AND) = M1_AND_M2; mary = M2 = P2 ∪ P3 = M2_TREE; 刪除 M2 後 and-u 之 AND 項被移除(限制解除)→ 只剩 M1(OR)= PETER_TREE, mary 無任何群組 → 空
                     assert.deepEqual(await getResolvedActiveTargets(page, 'id-and-u'), M1_AND_M2, '刪除前 and-u: M1 ∩ M2')
+                    assert.deepEqual(await getResolvedActiveTargets(page, 'id-for-mary'), M2_TREE, '刪除前 mary: M2 = P2 ∪ P3')
                     await gotoGrups(page)
-                    const expConfirm = await expWarn(page, 'confirmDelAndRefsGrup', { n: 1 })
-                    await checkRow(page, await rowIndexByName(page, '權限群組M2'))
-                    await iconBtn(page, MDI.trash).first().click()
-                    await waitText(page, '確認框', expConfirm)
-                    assert.ok(await bodyHas(page, await page.evaluate(() => window.$vo.$t('systemMessage'))), '確認框標題為 systemMessage')
-                    await clickModalBtn(page, 'no')
-                    await waitUntilExist(page, '確認框關閉', (t) => !(document.body.innerText || '').includes(t), { arg: expConfirm })
-                    await page.waitForTimeout(500)
-                    assert.strict.equal((await rowIndexesByName(page, '權限群組M2')).length, 1, '取消後 M2 列仍在')
-                    assert.strict.equal(await pageSaveShown(page), false, '取消後清單頁不出現儲存鈕')
-                    await iconBtn(page, MDI.trash).first().click()
-                    await waitText(page, '確認框(第二次)', expConfirm)
-                    await clickModalBtn(page, 'yes')
-                    await waitUntilExist(page, 'M2 自清單移除', () => ![...document.querySelectorAll('.ag-row[row-index] .ag-cell[col-id="name"]')].some((c) => (c.textContent || '').trim() === '權限群組M2'))
-                    await page.waitForTimeout(500)
-                    assert.strict.equal(await pageSaveShown(page), true, '確定後清單頁出現儲存鈕')
-                    await saveAndWaitModal(page)
-                    await assertModalMsg(page, 'grupSaveGrupsSuccess')
-                    assert.ok(!(await selectAll('grups')).some((g) => g.name === '權限群組M2'), 'DB grups 無 M2')
-                    assert.strict.equal(await readDbField('users', 'id-and-u', 'cgrups'), AND_U.cgrups, 'and-u 之 cgrups 字串不變')
-                    assert.deepEqual(await getResolvedActiveTargets(page, 'id-and-u'), [], '刪除後 and-u 授權為空(AND 引用之群組查無, 內容全 n)')
+                    //引用 M2 者為 mary(OR, 外部來源 teamA)與 and-u(AND): n=2(OR 者計入 n)、m=1(只計 AND 者)
+                    const expConfirm = await expWarn(page, 'confirmDelRefsAndGrup', { n: 2, m: 1 })
+                    const frags = lang === 'eng' ? ['from 2 user(s)', '1 user(s) that refer to it with AND'] : ['自 2 位使用者', '其中 1 位以 AND 引用']
+                    const dbBefore = await deleteRowFlow(page, { name: '權限群組M2', expConfirm, frags, okKey: 'grupSaveGrupsSuccess', label: 'M2' })
+                    const after = await snapAll()
+                    assert.ok(!after.grups.some((g) => g.name === '權限群組M2'), 'DB grups 無 M2')
+                    assert.deepEqual(JSON5.parse(rowOfSnap(after.users, 'id-and-u').cgrups), { '權限群組M1': { mode: 'OR', isActive: 'y' } }, 'and-u 之 cgrups 只剩 M1 之 OR 項(M2 之 AND 項被清理, 其餘項目不變)')
+                    assert.deepEqual(JSON5.parse(rowOfSnap(after.users, 'id-for-mary').cgrups), {}, 'mary 之 cgrups 已移除 M2(無其他項目)')
+                    for (const id of ['id-for-peter', 'id-for-john', 'id-for-admin']) {
+                        assert.deepEqual(rowOfSnap(after.users, id), rowOfSnap(dbBefore.users, id), `${id} 未引用 M2: 整列逐位元不動(含 cgrups 字串與更新時間)`)
+                    }
+                    assert.deepEqual(after.pemis, dbBefore.pemis, 'pemis 表不動')
+                    //被編輯之主表(grups)走整表寫入: 剩餘列之 order 依新位置重給、更新時間隨之改寫(既有行為, 與連帶清理無關), 故只比內容欄位
+                    for (const g of after.grups) {
+                        assert.deepEqual(omitKeys(g, ['order', ...AUDIT6]), omitKeys(rowOfSnap(dbBefore.grups, g.id), ['order', ...AUDIT6]), `其餘群組 ${g.name} 內容不動`)
+                    }
+                    assert.deepEqual(await getResolvedActiveTargets(page, 'id-and-u'), PETER_TREE, '刪除後 and-u 授權 = M1(AND 限制解除, 效果等同舊版找不到即忽略)')
+                    assert.deepEqual(await getResolvedActiveTargets(page, 'id-for-mary'), [], '刪除後 mary 無任何群組 → 授權為空')
+                    assert.deepEqual(await getResolvedActiveTargets(page, 'id-for-peter'), PETER_TREE, 'peter 不受影響')
                 })
             }
             finally {
@@ -1773,32 +1853,28 @@ describe('e2e-array-form run05 衝突之收嚴與提示 (R-PRINCIPLE-00; 語意�
     }
 
     for (const lang of LANGS) {
-        it(`AF-027-delete-pemi-confirm [${lang}]: (spec 流程_後台權限清單 E2E-014) 刪除被 M3 以 AND 引用之 P3 → 確認框(confirmDelAndRefsPemi, n=1); 取消則不刪; 確定後存檔 → P3 刪除、M3 字串不變、john 授權為空`, async function() {
+        it(`AF-027-delete-pemi-confirm [${lang}]: (spec 流程_後台權限清單 E2E-014) 刪除被 M2(OR)、M3(AND)、M4(OR)引用之 P3 → 確認框(confirmDelRefsAndPemi, n=3、m=1); 按否不刪; 按是只自清單移除, 儲存後 P3 已刪、M2／M3／M4 之 cpemis 移除 P3(其餘項目不變)、john 授權為 AND 限制解除之 P2 樹, M1 逐位元不動, 成功彈窗為原文字`, async function() {
             try {
                 await withPageLang(lang, async (page) => {
+                    //預期推導(R-AUTH-MERGE-00): john(M3 = P2(OR) ∩ P3(AND)) = JOHN_TREE; 刪除 P3 後 M3 只剩 P2(OR)→ john = P2_TREE(限制解除); mary(M2 = P2 ∪ P3) = M2_TREE → 只剩 P2 = P2_TREE
                     assert.deepEqual(await getResolvedActiveTargets(page, 'id-for-john'), JOHN_TREE, '刪除前 john: P2 ∩ P3')
-                    const m3Before = snap.grups.find((g) => g.name === '權限群組M3').cpemis
+                    assert.deepEqual(await getResolvedActiveTargets(page, 'id-for-mary'), M2_TREE, '刪除前 mary: P2 ∪ P3')
                     await gotoPemis(page)
-                    const expConfirm = await expWarn(page, 'confirmDelAndRefsPemi', { n: 1 })
-                    await checkRow(page, await rowIndexByName(page, '權限P3'))
-                    await iconBtn(page, MDI.trash).first().click()
-                    await waitText(page, '確認框', expConfirm)
-                    await clickModalBtn(page, 'no')
-                    await waitUntilExist(page, '確認框關閉', (t) => !(document.body.innerText || '').includes(t), { arg: expConfirm })
-                    await page.waitForTimeout(500)
-                    assert.strict.equal((await rowIndexesByName(page, '權限P3')).length, 1, '取消後 P3 列仍在')
-                    assert.strict.equal(await pageSaveShown(page), false, '取消後清單頁不出現儲存鈕')
-                    await iconBtn(page, MDI.trash).first().click()
-                    await waitText(page, '確認框(第二次)', expConfirm)
-                    await clickModalBtn(page, 'yes')
-                    await waitUntilExist(page, 'P3 自清單移除', () => ![...document.querySelectorAll('.ag-row[row-index] .ag-cell[col-id="name"]')].some((c) => (c.textContent || '').trim() === '權限P3'))
-                    await page.waitForTimeout(500)
-                    assert.strict.equal(await pageSaveShown(page), true, '確定後清單頁出現儲存鈕')
-                    await saveAndWaitModal(page)
-                    await assertModalMsg(page, 'pemiSavePemisSuccess')
-                    assert.ok(!(await selectAll('pemis')).some((p) => p.name === '權限P3'), 'DB pemis 無 P3')
-                    assert.strict.equal((await selectAll('grups')).find((g) => g.name === '權限群組M3').cpemis, m3Before, 'M3 之 cpemis 字串不變')
-                    assert.deepEqual(await getResolvedActiveTargets(page, 'id-for-john'), [], '刪除後 john 授權為空')
+                    //引用 P3 之群組: M2(OR)、M3(AND)、M4(OR) → n=3、m=1
+                    const expConfirm = await expWarn(page, 'confirmDelRefsAndPemi', { n: 3, m: 1 })
+                    const frags = lang === 'eng' ? ['from 3 group(s)', '1 group(s) that refer to it with AND'] : ['自 3 個群組', '其中 1 個以 AND 引用']
+                    const dbBefore = await deleteRowFlow(page, { name: '權限P3', expConfirm, frags, okKey: 'pemiSavePemisSuccess', label: 'P3' })
+                    const after = await snapAll()
+                    assert.ok(!after.pemis.some((p) => p.name === '權限P3'), 'DB pemis 無 P3')
+                    const ON_OR = { mode: 'OR', isActive: 'y' }
+                    assert.deepEqual(JSON5.parse(rowOfSnap(after.grups, 'id-for-權限群組M2').cpemis), { '權限P2': ON_OR }, 'M2 之 cpemis 只剩 P2')
+                    assert.deepEqual(JSON5.parse(rowOfSnap(after.grups, 'id-for-權限群組M3').cpemis), { '權限P2': ON_OR }, 'M3 之 cpemis 只剩 P2(P3 之 AND 項被清理)')
+                    assert.deepEqual(JSON5.parse(rowOfSnap(after.grups, 'id-for-權限群組M4').cpemis), { '權限P4': ON_OR }, 'M4 之 cpemis 只剩 P4')
+                    assert.deepEqual(rowOfSnap(after.grups, 'id-for-權限群組M1'), rowOfSnap(dbBefore.grups, 'id-for-權限群組M1'), 'M1 未引用 P3: 整列逐位元不動(含 cpemis 字串)')
+                    assert.deepEqual(after.users, dbBefore.users, 'users 表不動')
+                    assert.deepEqual(await getResolvedActiveTargets(page, 'id-for-john'), P2_TREE, '刪除後 john 授權 = P2(AND 限制解除)')
+                    assert.deepEqual(await getResolvedActiveTargets(page, 'id-for-mary'), P2_TREE, '刪除後 mary 授權 = P2')
+                    assert.deepEqual(await getResolvedActiveTargets(page, 'id-for-peter'), PETER_TREE, 'peter(M1 = P1 ∪ P2)不受影響')
                 })
             }
             finally {
@@ -2144,6 +2220,493 @@ describe('e2e-array-form run05 衝突之收嚴與提示 (R-PRINCIPLE-00; 語意�
                 }
                 finally {
                     await restoreTables(snapMk)
+                }
+            })
+        }
+    })
+
+})
+
+
+// =====================================================================================================================
+// run06: 引用連帶(改名級聯＋刪除連帶清理; R-PRINCIPLE-00 原則 6、適用表 m／n; R-REF-CASCADE-01; ADR-036; 2026-10-22)——清單頁儲存前之改名預覽確認框、刪除確認框之筆數與連帶清理、
+// 預檢被伺服端拒絕時不彈確認框、cascadeRename:false 之行為(語意斷言, 不產標準圖; 各案之 spec 編號為暫定, spec 由主責撰寫).
+// 資料前置一律以管理者寫入 RPC(資料通道 updateUsers／updateGrups／updatePemis; 非使用者操作, 含 from 非空之外部來源列)推入本段專屬之 id-ren-*／id-del-*／id-rej-*／id-tr-* 列;
+// 操作走真 UI(雙擊名稱格改名、勾選＋垃圾桶刪除、儲存鈕、確認框之否／是); 每案後 restoreTables 還原並回驗筆數(R-E2E-ISO-01).
+// 期望之授權樹皆由 base seed 之規則集依 R-AUTH-MERGE-00 推導(OR 聯集、AND 交集、懸空引用內容全 n), 不抄實測值: 啟用之管控對象 P1 { A }、P2 { C, BA, BB }、P3 { C, BB, BC }、P4 { TODO }(A＝T_A、C＝T_C 見檔首常數);
+//   M1 = P1 ∪ P2 = PETER_TREE、M2 = P2 ∪ P3 = M2_TREE.
+// =====================================================================================================================
+
+const T_BA = '專案B/頁A/區塊A'
+const T_BB = '專案B/頁A/區塊B'
+const T_BC = '專案B/頁A/區塊C'
+const T_TODO = '專案B/頁B/區塊A/待辦事項清單'
+const srt = (a) => a.slice().sort()
+const BASE_UIDS6 = ['id-for-peter', 'id-for-mary', 'id-for-john', 'id-for-admin']
+const OFF5 = (mode) => ({ mode, isActive: 'n' })
+//整列夾具(供管理者寫入 RPC; order 由伺服器依陣列位置重給; from 非空者為外部來源)
+const rowU6 = (id, name, cgrups, o = {}) => ({ id, order: 0, name, email: `${id}@example.com`, description: '', from: '', cgrups: typeof cgrups === 'string' ? cgrups : JSON.stringify(cgrups), isAdmin: 'n', isActive: 'y', ...o })
+const rowG6 = (id, name, cpemis, o = {}) => ({ id, order: 0, name, description: `${name}說明`, from: '', cpemis: typeof cpemis === 'string' ? cpemis : JSON.stringify(cpemis), ...o })
+const rowP6 = (id, name, crules, o = {}) => ({ id, order: 0, name, description: `${name}說明`, from: '', crules: typeof crules === 'string' ? crules : JSON.stringify(crules), ...o })
+const omitKeys = (o, ks) => Object.fromEntries(Object.entries(o).filter(([k]) => !ks.includes(k)))
+const AUDIT6 = ['userIdUpdate', 'timeUpdate'] //寫入時由伺服器改寫之更新者欄位
+
+//以管理者寫入 RPC 在某表現況之上追加(或改)列: fn(現況列複本) → 新整表(回傳 undefined 視為就地修改); 失敗即拋錯
+async function editTable(kt, fn) {
+    const fnName = { users: 'updateUsers', grups: 'updateGrups', pemis: 'updatePemis' }[kt]
+    const rows = (await selectAll(kt)).slice().sort((a, b) => (a.order || 0) - (b.order || 0)).map((v) => JSON.parse(JSON.stringify(v)))
+    const res = await callRpc(fnName, [fn(rows) || rows], TOKEN_ADMIN)
+    assert.ok(res.ok, `夾具 ${fnName} 應成功, 實得 ${JSON.stringify(res).slice(0, 300)}`)
+}
+
+//AF-036／041 夾具: 群組 ren-g(cpemis 為 P3 與 P1, 啟用樹 G = P1 ∪ P3)、無人引用之 ren-lone; 使用者 ren-u(物件形式, OR 引用 ren-g)、ren-ua(陣列形式, OR 引用 ren-g 與 M1)、
+//  ren-ext(from=teamA 外部來源; OR 引用 M1、AND 引用 ren-g)——三者之授權互異, 且 ren-ext 之 AND 使「懸空 ⇒ 空」與「已更新 ⇒ M1 ∩ G」可分辨
+const REN_G_WANT = {
+    'id-ren-u': srt([T_A, T_C, T_BB, T_BC]), //G = P1 ∪ P3
+    'id-ren-ua': srt([T_A, T_C, T_BA, T_BB, T_BC]), //G ∪ M1
+    'id-ren-ext': srt([T_A, T_C, T_BB]), //M1 ∩ G
+}
+async function seedRenGrup() {
+    await editTable('grups', (rows) => [...rows,
+        rowG6('id-ren-g', 'ren-g', { '權限P3': ON5('OR'), '權限P1': ON5('OR') }),
+        rowG6('id-ren-lone', 'ren-lone', { '權限P4': ON5('OR') }),
+    ])
+    await editTable('users', (rows) => [...rows,
+        rowU6('id-ren-u', 'ren-u', { 'ren-g': ON5('OR') }),
+        rowU6('id-ren-ua', 'ren-ua', [{ name: 'ren-g', mode: 'OR', isActive: 'y' }, { name: '權限群組M1', mode: 'OR', isActive: 'y' }]),
+        rowU6('id-ren-ext', 'ren-ext', { '權限群組M1': ON5('OR'), 'ren-g': ON5('AND') }, { from: 'teamA' }),
+    ])
+}
+
+//AF-037 夾具: 權限 ren-p(啟用 { A, BB }); 群組 ren-g1(物件形式, OR 引用)、ren-gx(from=teamA 外部來源; OR 引用 P1、AND 引用 ren-p)、ren-gy(陣列形式, OR 引用 ren-p 與 P2); 各由一位使用者 OR 引用以觀察最終授權
+const REN_P_WANT = {
+    'id-ren-pu1': srt([T_A, T_BB]), //ren-p
+    'id-ren-pu2': srt([T_A]), //P1 ∩ ren-p
+    'id-ren-pu3': srt([T_A, T_C, T_BA, T_BB]), //ren-p ∪ P2
+}
+async function seedRenPemi() {
+    await editTable('pemis', (rows) => [...rows, rowP6('id-ren-p', 'ren-p', { [T_A]: 'y', [T_BB]: 'y' })])
+    await editTable('grups', (rows) => [...rows,
+        rowG6('id-ren-g1', 'ren-g1', { 'ren-p': ON5('OR') }),
+        rowG6('id-ren-gx', 'ren-gx', { '權限P1': ON5('OR'), 'ren-p': ON5('AND') }, { from: 'teamA' }),
+        rowG6('id-ren-gy', 'ren-gy', [{ name: 'ren-p', mode: 'OR', isActive: 'y' }, { name: '權限P2', mode: 'OR', isActive: 'y' }]),
+    ])
+    await editTable('users', (rows) => [...rows,
+        rowU6('id-ren-pu1', 'ren-pu1', { 'ren-g1': ON5('OR') }),
+        rowU6('id-ren-pu2', 'ren-pu2', { 'ren-gx': ON5('OR') }),
+        rowU6('id-ren-pu3', 'ren-pu3', { 'ren-gy': ON5('OR') }),
+    ])
+}
+
+//AF-038 夾具: 群組 del-g(P3); 引用者 del-uo(OR)、del-ua(AND)、del-ud(停用之 AND)、del-ue(from=teamA 外部來源, AND)——引用者共 4 位(停用者亦計), 其中啟用之 AND 者 2 位(停用之 AND 不計)
+const DEL_G_BEFORE = {
+    'id-del-uo': srt([T_A, T_C, T_BA, T_BB, T_BC]), //M1 ∪ P3
+    'id-del-ua': srt([T_C, T_BB]), //M1 ∩ P3
+    'id-del-ud': M2_TREE, //M2(停用之 del-g 不參與)
+    'id-del-ue': srt([T_C, T_BB]), //M1 ∩ P3
+}
+const DEL_G_AFTER = {
+    'id-del-uo': PETER_TREE, //M1(OR 項之 P3 隨 del-g 移除)
+    'id-del-ua': PETER_TREE, //M1(AND 限制解除, 授權變多)
+    'id-del-ud': M2_TREE, //不變
+    'id-del-ue': PETER_TREE, //M1(AND 限制解除)
+}
+async function seedDelGrup() {
+    await editTable('grups', (rows) => [...rows, rowG6('id-del-g', 'del-g', { '權限P3': ON5('OR') })])
+    await editTable('users', (rows) => [...rows,
+        rowU6('id-del-uo', 'del-uo', { 'del-g': ON5('OR'), '權限群組M1': ON5('OR') }),
+        rowU6('id-del-ua', 'del-ua', { '權限群組M1': ON5('OR'), 'del-g': ON5('AND') }),
+        rowU6('id-del-ud', 'del-ud', { '權限群組M2': ON5('OR'), 'del-g': OFF5('AND') }),
+        rowU6('id-del-ue', 'del-ue', { '權限群組M1': ON5('OR'), 'del-g': ON5('AND') }, { from: 'teamA' }),
+    ])
+}
+
+//AF-039 夾具: 權限 del-p(啟用 { C, TODO }); 引用之群組 del-go(OR)、del-ga(AND)、del-gd(停用之 AND)、del-ge(from=teamA 外部來源, AND); 使用者 del-pu-o／del-pu-a 各 OR 引用 del-go／del-ga 以觀察授權
+const DEL_P_BEFORE = {
+    'id-del-pu-o': srt([T_C, T_BA, T_BB, T_TODO]), //del-go = P2 ∪ del-p
+    'id-del-pu-a': [], //del-ga = P1 { A } ∩ del-p { C, TODO } = ∅
+}
+const DEL_P_AFTER = {
+    'id-del-pu-o': P2_TREE, //P2
+    'id-del-pu-a': srt([T_A]), //P1(AND 限制解除, 授權變多)
+}
+async function seedDelPemi() {
+    await editTable('pemis', (rows) => [...rows, rowP6('id-del-p', 'del-p', { [T_C]: 'y', [T_TODO]: 'y' })])
+    await editTable('grups', (rows) => [...rows,
+        rowG6('id-del-go', 'del-go', { 'del-p': ON5('OR'), '權限P2': ON5('OR') }),
+        rowG6('id-del-ga', 'del-ga', { '權限P1': ON5('OR'), 'del-p': ON5('AND') }),
+        rowG6('id-del-gd', 'del-gd', { '權限P2': ON5('OR'), 'del-p': OFF5('AND') }),
+        rowG6('id-del-ge', 'del-ge', { '權限P1': ON5('OR'), 'del-p': ON5('AND') }, { from: 'teamA' }),
+    ])
+    await editTable('users', (rows) => [...rows,
+        rowU6('id-del-pu-o', 'del-pu-o', { 'del-go': ON5('OR') }),
+        rowU6('id-del-pu-a', 'del-pu-a', { 'del-ga': ON5('OR') }),
+    ])
+}
+
+//AF-040 夾具: 群組 rej-g; 使用者 rej-u 以啟用引用不存在之 Ghost(懸空)並引用 rej-g(使「改名為 Ghost」之預檢被拒, 而非無事可做)
+async function seedRej() {
+    await editTable('grups', (rows) => [...rows, rowG6('id-rej-g', 'rej-g', { '權限P1': ON5('OR') })])
+    await editTable('users', (rows) => [...rows, rowU6('id-rej-u', 'rej-u', { Ghost: ON5('OR'), 'rej-g': ON5('OR') })])
+}
+
+//AF-042 夾具: 6 個權限 tr-p1～tr-p6(皆啟用 { A })與引用全部之群組 tr-g(名單超過 5 個之截斷)
+const TR_N = 6
+async function seedTrunc() {
+    const ps = Array.from({ length: TR_N }, (_, i) => `tr-p${i + 1}`)
+    await editTable('pemis', (rows) => [...rows, ...ps.map((nm, i) => rowP6(`id-tr-p${i + 1}`, nm, { [T_A]: 'y' }))])
+    await editTable('grups', (rows) => [...rows, rowG6('id-tr-g', 'tr-g', Object.fromEntries(ps.map((nm) => [nm, ON5('OR')])))])
+}
+
+describe('e2e-array-form run06 引用連帶: 改名預覽確認、刪除確認與清理、預檢被拒、cascadeRename:false (ADR-036; 語意斷言, 不產標準圖)', function() {
+    this.timeout(300000)
+
+    let snap6 = null
+
+    //案後還原三表為本段開頭之 base seed 並回驗筆數
+    async function restoreAndVerify6() {
+        await restoreTables(snap6)
+        const t = await readTables()
+        assert.deepEqual([t.users.length, t.grups.length, t.pemis.length], [snap6.users.length, snap6.grups.length, snap6.pemis.length], '收尾後三表筆數須回到 base seed')
+    }
+
+    before(async function() {
+        this.timeout(400000)
+        await startServersOnce()
+        snap6 = await readTables()
+        assert.deepEqual([snap6.users.length, snap6.grups.length, snap6.pemis.length], [4, 4, 4], '前提: 本段開頭為 base seed(上一段已還原)')
+    })
+
+    after(async function() {
+        this.timeout(120000)
+        if (snap6) {
+            await restoreTables(snap6)
+        }
+    })
+
+    // ----- 群組改名: 儲存前之預覽確認框(spec 流程_後台群組清單 E2E-015) -----
+    for (const lang of LANGS) {
+        it(`AF-036-rename-grup-preview [${lang}]: (spec 流程_後台群組清單 E2E-015) 改名 ren-g→ren-g-new(另改無人引用之 ren-lone)後按儲存 → 確認框(confirmSaveRenameRefsExtGrup: 3 位使用者、名單只列有人引用之 ren-g→ren-g-new、1 位外部來源之警示); 按否不送出(DB 零變更、改名與儲存鈕保留); 再儲存按是 → 成功彈窗附已一併更新 3 位使用者(grupSaveGrupsSuccessCascade)、引用端 cgrups 已改寫(物件仍物件、陣列仍陣列)、各使用者授權與改名前逐位相同`, async function() {
+            await seedRenGrup()
+            try {
+                await withPageLang(lang, async (page) => {
+                    //6 步 user path: ①群組頁 ②雙擊名稱格輸入新名(Enter 提交; 清單進入已修改) ③按儲存 ④看到確認框(筆數、舊→新名單、外部來源警示) ⑤按否／再儲存按是 ⑥看到結果彈窗, DB 與授權符合
+                    for (const [id, want] of Object.entries(REN_G_WANT)) {
+                        assert.deepEqual(await getResolvedActiveTargets(page, id), want, `改名前 ${id} 之授權(由 base seed 規則集推導)`)
+                    }
+                    const uids = [...BASE_UIDS6, ...Object.keys(REN_G_WANT)]
+                    const auth0 = await resolvedTargetsOf(page, uids)
+                    const db0 = await snapAll()
+                    await gotoGrups(page)
+                    await typeIntoCell(page, await rowIndexByName(page, 'ren-g'), 'name', 'ren-g-new')
+                    await typeIntoCell(page, await rowIndexByName(page, 'ren-lone'), 'name', 'ren-lone-new')
+                    assert.strict.equal(await pageSaveShown(page), true, '改名後清單頁出現儲存鈕(已修改)')
+                    await clickSave(page)
+                    //引用 ren-g 者: ren-u、ren-ua、ren-ext 共 3 位(base seed 之使用者皆未引用 ren-g), 其中 ren-ext 來源為 teamA(外部應用) → e=1; 名單只列有人引用之改名(ren-lone 無人引用不列)
+                    const expConfirm = await expWarn(page, 'confirmSaveRenameRefsExtGrup', { n: 3, e: 1, list: 'ren-g→ren-g-new' })
+                    const frags = lang === 'eng' ? ['3 user(s)', 'ren-g→ren-g-new', 'The source of 1 of them is an external application'] : ['3 位使用者', 'ren-g→ren-g-new', '其中 1 位來源為外部應用']
+                    await expectConfirm(page, '改名確認框', expConfirm, frags)
+                    assert.ok(!(await topModalLines(page))[1].includes('ren-lone'), '名單不列無人引用之 ren-lone 改名')
+                    //按否: 中止儲存、不送出; 資料與已修改狀態保留
+                    await clickModalBtn(page, 'no')
+                    await waitModalGone(page, '確認框(否)關閉', expConfirm)
+                    assert.deepEqual(await topModalLines(page), [], '按否後無任何彈窗(未送出, 無成功／失敗訊息)')
+                    assert.deepEqual(await snapAll(), db0, '按否: 不送出, 三表零變更')
+                    assert.strict.equal((await rowIndexesByName(page, 'ren-g-new')).length, 1, '按否後清單仍為已改名(ren-g-new)')
+                    assert.strict.equal((await rowIndexesByName(page, 'ren-lone-new')).length, 1, '按否後清單仍為已改名(ren-lone-new)')
+                    assert.strict.equal(await pageSaveShown(page), true, '按否後儲存鈕仍在(isModified 保留)')
+                    //再儲存、按是: 送出
+                    await clickSave(page)
+                    await expectConfirm(page, '改名確認框(第二次)', expConfirm, frags)
+                    await clickModalBtn(page, 'yes')
+                    await expectResult(page, '成功彈窗', await expWarn(page, 'grupSaveGrupsSuccessCascade', { n: 3 }))
+                    const okFrag = lang === 'eng' ? 'The group references of 3 user(s) were updated to the new name(s).' : '已將 3 位使用者對已改名群組的引用一併更新為新名稱'
+                    assert.ok((await topModalLines(page))[1].includes(okFrag), `成功彈窗含「${okFrag}」`)
+                    await dismissResultModal(page)
+                    assert.strict.equal(await pageSaveShown(page), false, '儲存成功後儲存鈕消失')
+                    const after = await snapAll()
+                    assert.strict.equal(rowOfSnap(after.grups, 'id-ren-g').name, 'ren-g-new', 'DB: ren-g 已更名')
+                    assert.strict.equal(rowOfSnap(after.grups, 'id-ren-g').cpemis, rowOfSnap(db0.grups, 'id-ren-g').cpemis, 'DB: ren-g 之 cpemis 不變')
+                    assert.strict.equal(rowOfSnap(after.grups, 'id-ren-lone').name, 'ren-lone-new', 'DB: ren-lone 已更名')
+                    //引用端: 引用字串之 ren-g 改為 ren-g-new, 物件仍物件、陣列仍陣列、其餘項目與欄位不變
+                    const ou = JSON.parse(rowOfSnap(after.users, 'id-ren-u').cgrups)
+                    assert.ok(!Array.isArray(ou) && typeof ou === 'object', 'ren-u 仍為物件形式')
+                    assert.deepEqual(ou, { 'ren-g-new': { mode: 'OR', isActive: 'y' } }, 'ren-u 之引用已改為 ren-g-new')
+                    const oa = JSON.parse(rowOfSnap(after.users, 'id-ren-ua').cgrups)
+                    assert.ok(Array.isArray(oa), 'ren-ua 仍為陣列形式')
+                    assert.deepEqual(oa, [{ name: 'ren-g-new', mode: 'OR', isActive: 'y' }, { name: '權限群組M1', mode: 'OR', isActive: 'y' }], 'ren-ua 之引用已改為 ren-g-new(M1 項與次序不變)')
+                    const oe = JSON.parse(rowOfSnap(after.users, 'id-ren-ext').cgrups)
+                    assert.ok(!Array.isArray(oe) && typeof oe === 'object', 'ren-ext 仍為物件形式')
+                    assert.deepEqual(oe, { '權限群組M1': { mode: 'OR', isActive: 'y' }, 'ren-g-new': { mode: 'AND', isActive: 'y' } }, 'ren-ext 之 AND 引用已改為 ren-g-new(M1 項不變)')
+                    for (const id of Object.keys(REN_G_WANT)) {
+                        assert.deepEqual(omitKeys(rowOfSnap(after.users, id), ['cgrups', ...AUDIT6]), omitKeys(rowOfSnap(db0.users, id), ['cgrups', ...AUDIT6]), `${id}: 除 cgrups 與更新者欄位外不變(含 from)`)
+                    }
+                    for (const id of BASE_UIDS6) {
+                        assert.deepEqual(rowOfSnap(after.users, id), rowOfSnap(db0.users, id), `${id} 未引用被改名者: 整列逐位元不動`)
+                    }
+                    assert.deepEqual(after.pemis, db0.pemis, 'pemis 表不動')
+                    //端到端不變式: 各使用者最終授權與改名前逐位相同(含 3 位引用者與 4 位 base seed 使用者)
+                    assert.deepEqual(await resolvedTargetsOf(page, uids), auth0, '改名前後各使用者之授權逐位相同')
+                })
+            }
+            finally {
+                await restoreAndVerify6()
+            }
+        })
+    }
+
+    // ----- 權限改名: 儲存前之預覽確認框(spec 流程_後台權限清單 E2E-015) -----
+    for (const lang of LANGS) {
+        it(`AF-037-rename-pemi-preview [${lang}]: (spec 流程_後台權限清單 E2E-015) 改名 ren-p→ren-p-new 後按儲存 → 確認框(confirmSaveRenameRefsExtPemi: 3 個群組、ren-p→ren-p-new、1 個外部來源群組之警示); 按否不送出(DB 零變更、改名與儲存鈕保留); 再儲存按是 → 成功彈窗附已一併更新 3 個群組(pemiSavePemisSuccessCascade)、群組 cpemis 已改寫(物件仍物件、陣列仍陣列)、各使用者授權與改名前逐位相同`, async function() {
+            await seedRenPemi()
+            try {
+                await withPageLang(lang, async (page) => {
+                    //6 步 user path 同 AF-036(權限頁; 引用端為群組之 cpemis)
+                    for (const [id, want] of Object.entries(REN_P_WANT)) {
+                        assert.deepEqual(await getResolvedActiveTargets(page, id), want, `改名前 ${id} 之授權(由 base seed 規則集推導)`)
+                    }
+                    const uids = [...BASE_UIDS6, ...Object.keys(REN_P_WANT)]
+                    const auth0 = await resolvedTargetsOf(page, uids)
+                    const db0 = await snapAll()
+                    await gotoPemis(page)
+                    await typeIntoCell(page, await rowIndexByName(page, 'ren-p'), 'name', 'ren-p-new')
+                    assert.strict.equal(await pageSaveShown(page), true, '改名後清單頁出現儲存鈕(已修改)')
+                    await clickSave(page)
+                    //引用 ren-p 者: 群組 ren-g1、ren-gx、ren-gy 共 3 個, 其中 ren-gx 來源為 teamA(外部應用) → e=1
+                    const expConfirm = await expWarn(page, 'confirmSaveRenameRefsExtPemi', { n: 3, e: 1, list: 'ren-p→ren-p-new' })
+                    const frags = lang === 'eng' ? ['3 group(s)', 'ren-p→ren-p-new', 'The source of 1 of them is an external application'] : ['3 個群組', 'ren-p→ren-p-new', '其中 1 個來源為外部應用']
+                    await expectConfirm(page, '改名確認框', expConfirm, frags)
+                    await clickModalBtn(page, 'no')
+                    await waitModalGone(page, '確認框(否)關閉', expConfirm)
+                    assert.deepEqual(await topModalLines(page), [], '按否後無任何彈窗(未送出)')
+                    assert.deepEqual(await snapAll(), db0, '按否: 不送出, 三表零變更')
+                    assert.strict.equal((await rowIndexesByName(page, 'ren-p-new')).length, 1, '按否後清單仍為已改名')
+                    assert.strict.equal(await pageSaveShown(page), true, '按否後儲存鈕仍在(isModified 保留)')
+                    await clickSave(page)
+                    await expectConfirm(page, '改名確認框(第二次)', expConfirm, frags)
+                    await clickModalBtn(page, 'yes')
+                    await expectResult(page, '成功彈窗', await expWarn(page, 'pemiSavePemisSuccessCascade', { n: 3 }))
+                    const okFrag = lang === 'eng' ? 'The permission references of 3 group(s) were updated to the new name(s).' : '已將 3 個群組對已改名權限的引用一併更新為新名稱'
+                    assert.ok((await topModalLines(page))[1].includes(okFrag), `成功彈窗含「${okFrag}」`)
+                    await dismissResultModal(page)
+                    assert.strict.equal(await pageSaveShown(page), false, '儲存成功後儲存鈕消失')
+                    const after = await snapAll()
+                    assert.strict.equal(rowOfSnap(after.pemis, 'id-ren-p').name, 'ren-p-new', 'DB: ren-p 已更名')
+                    assert.strict.equal(rowOfSnap(after.pemis, 'id-ren-p').crules, rowOfSnap(db0.pemis, 'id-ren-p').crules, 'DB: ren-p 之 crules 不變')
+                    const g1 = JSON.parse(rowOfSnap(after.grups, 'id-ren-g1').cpemis)
+                    assert.ok(!Array.isArray(g1) && typeof g1 === 'object', 'ren-g1 仍為物件形式')
+                    assert.deepEqual(g1, { 'ren-p-new': { mode: 'OR', isActive: 'y' } }, 'ren-g1 之引用已改為 ren-p-new')
+                    const gx = JSON.parse(rowOfSnap(after.grups, 'id-ren-gx').cpemis)
+                    assert.deepEqual(gx, { '權限P1': { mode: 'OR', isActive: 'y' }, 'ren-p-new': { mode: 'AND', isActive: 'y' } }, 'ren-gx(外部來源)之 AND 引用已改為 ren-p-new(P1 項不變)')
+                    assert.strict.equal(rowOfSnap(after.grups, 'id-ren-gx').from, 'teamA', 'ren-gx 之來源仍為 teamA')
+                    const gy = JSON.parse(rowOfSnap(after.grups, 'id-ren-gy').cpemis)
+                    assert.ok(Array.isArray(gy), 'ren-gy 仍為陣列形式')
+                    assert.deepEqual(gy, [{ name: 'ren-p-new', mode: 'OR', isActive: 'y' }, { name: '權限P2', mode: 'OR', isActive: 'y' }], 'ren-gy 之引用已改為 ren-p-new(P2 項與次序不變)')
+                    for (const g of after.grups.filter((v) => !['id-ren-g1', 'id-ren-gx', 'id-ren-gy'].includes(v.id))) {
+                        assert.deepEqual(g, rowOfSnap(db0.grups, g.id), `群組 ${g.name} 未引用 ren-p: 整列逐位元不動`)
+                    }
+                    assert.deepEqual(after.users, db0.users, 'users 表不動')
+                    assert.deepEqual(await resolvedTargetsOf(page, uids), auth0, '改名前後各使用者之授權逐位相同')
+                })
+            }
+            finally {
+                await restoreAndVerify6()
+            }
+        })
+    }
+
+    // ----- 群組刪除確認之筆數與連帶清理(spec 流程_後台群組清單 E2E-014 補強) -----
+    for (const lang of LANGS) {
+        it(`AF-038-delete-grup-counts [${lang}]: (spec 流程_後台群組清單 E2E-014 補強) 刪除被 4 位使用者引用之 del-g(OR 者、啟用之 AND 者 2 位、停用之 AND 者、外部來源 AND 者) → 確認框 n=4(OR 與停用者計入)、m=2(只計啟用之 AND); 按否保留; 按是只自清單移除; 儲存後 4 位使用者之 cgrups 已移除 del-g(其餘項目不變)、授權依 AND 限制解除重算、成功彈窗為原文字(grupSaveGrupsSuccess)`, async function() {
+            await seedDelGrup()
+            try {
+                await withPageLang(lang, async (page) => {
+                    for (const [id, want] of Object.entries(DEL_G_BEFORE)) {
+                        assert.deepEqual(await getResolvedActiveTargets(page, id), want, `刪除前 ${id} 之授權(由 base seed 規則集推導)`)
+                    }
+                    await gotoGrups(page)
+                    const expConfirm = await expWarn(page, 'confirmDelRefsAndGrup', { n: 4, m: 2 })
+                    const frags = lang === 'eng' ? ['from 4 user(s)', '2 user(s) that refer to it with AND'] : ['自 4 位使用者', '其中 2 位以 AND 引用']
+                    const db0 = await deleteRowFlow(page, { name: 'del-g', expConfirm, frags, okKey: 'grupSaveGrupsSuccess', label: 'del-g' })
+                    const after = await snapAll()
+                    assert.ok(!after.grups.some((g) => g.name === 'del-g'), 'DB grups 無 del-g')
+                    const M1_OR = { '權限群組M1': { mode: 'OR', isActive: 'y' } }
+                    assert.deepEqual(JSON.parse(rowOfSnap(after.users, 'id-del-uo').cgrups), M1_OR, 'del-uo(OR 引用者)之 cgrups 只剩 M1')
+                    assert.deepEqual(JSON.parse(rowOfSnap(after.users, 'id-del-ua').cgrups), M1_OR, 'del-ua(AND 引用者)之 cgrups 只剩 M1')
+                    assert.deepEqual(JSON.parse(rowOfSnap(after.users, 'id-del-ud').cgrups), { '權限群組M2': { mode: 'OR', isActive: 'y' } }, 'del-ud(停用之 AND 引用者)之 cgrups 只剩 M2(停用項亦被清理)')
+                    assert.deepEqual(JSON.parse(rowOfSnap(after.users, 'id-del-ue').cgrups), M1_OR, 'del-ue(外部來源之 AND 引用者)之 cgrups 只剩 M1')
+                    assert.strict.equal(rowOfSnap(after.users, 'id-del-ue').from, 'teamA', 'del-ue 之來源仍為 teamA')
+                    for (const id of BASE_UIDS6) {
+                        assert.deepEqual(rowOfSnap(after.users, id), rowOfSnap(db0.users, id), `${id} 未引用 del-g: 整列逐位元不動`)
+                    }
+                    assert.deepEqual(after.pemis, db0.pemis, 'pemis 表不動')
+                    for (const [id, want] of Object.entries(DEL_G_AFTER)) {
+                        assert.deepEqual(await getResolvedActiveTargets(page, id), want, `刪除後 ${id} 之授權(AND 限制解除者變多)`)
+                    }
+                })
+            }
+            finally {
+                await restoreAndVerify6()
+            }
+        })
+    }
+
+    // ----- 權限刪除確認之筆數與連帶清理(spec 流程_後台權限清單 E2E-014 補強) -----
+    for (const lang of LANGS) {
+        it(`AF-039-delete-pemi-counts [${lang}]: (spec 流程_後台權限清單 E2E-014 補強) 刪除被 4 個群組引用之 del-p(OR 者、啟用之 AND 者 2 個、停用之 AND 者、外部來源 AND 者) → 確認框 n=4、m=2; 按否保留; 按是只自清單移除; 儲存後 4 個群組之 cpemis 已移除 del-p(其餘項目不變)、授權依 AND 限制解除重算、成功彈窗為原文字(pemiSavePemisSuccess)`, async function() {
+            await seedDelPemi()
+            try {
+                await withPageLang(lang, async (page) => {
+                    for (const [id, want] of Object.entries(DEL_P_BEFORE)) {
+                        assert.deepEqual(await getResolvedActiveTargets(page, id), want, `刪除前 ${id} 之授權(由 base seed 規則集推導)`)
+                    }
+                    await gotoPemis(page)
+                    const expConfirm = await expWarn(page, 'confirmDelRefsAndPemi', { n: 4, m: 2 })
+                    const frags = lang === 'eng' ? ['from 4 group(s)', '2 group(s) that refer to it with AND'] : ['自 4 個群組', '其中 2 個以 AND 引用']
+                    const db0 = await deleteRowFlow(page, { name: 'del-p', expConfirm, frags, okKey: 'pemiSavePemisSuccess', label: 'del-p' })
+                    const after = await snapAll()
+                    assert.ok(!after.pemis.some((p) => p.name === 'del-p'), 'DB pemis 無 del-p')
+                    const P1_OR = { '權限P1': { mode: 'OR', isActive: 'y' } }
+                    const P2_OR = { '權限P2': { mode: 'OR', isActive: 'y' } }
+                    assert.deepEqual(JSON.parse(rowOfSnap(after.grups, 'id-del-go').cpemis), P2_OR, 'del-go(OR 引用者)之 cpemis 只剩 P2')
+                    assert.deepEqual(JSON.parse(rowOfSnap(after.grups, 'id-del-ga').cpemis), P1_OR, 'del-ga(AND 引用者)之 cpemis 只剩 P1')
+                    assert.deepEqual(JSON.parse(rowOfSnap(after.grups, 'id-del-gd').cpemis), P2_OR, 'del-gd(停用之 AND 引用者)之 cpemis 只剩 P2(停用項亦被清理)')
+                    assert.deepEqual(JSON.parse(rowOfSnap(after.grups, 'id-del-ge').cpemis), P1_OR, 'del-ge(外部來源之 AND 引用者)之 cpemis 只剩 P1')
+                    assert.strict.equal(rowOfSnap(after.grups, 'id-del-ge').from, 'teamA', 'del-ge 之來源仍為 teamA')
+                    for (const g of after.grups.filter((v) => !['id-del-go', 'id-del-ga', 'id-del-gd', 'id-del-ge'].includes(v.id))) {
+                        assert.deepEqual(g, rowOfSnap(db0.grups, g.id), `群組 ${g.name} 未引用 del-p: 整列逐位元不動`)
+                    }
+                    assert.deepEqual(after.users, db0.users, 'users 表不動')
+                    for (const [id, want] of Object.entries(DEL_P_AFTER)) {
+                        assert.deepEqual(await getResolvedActiveTargets(page, id), want, `刪除後 ${id} 之授權(AND 限制解除者變多)`)
+                    }
+                })
+            }
+            finally {
+                await restoreAndVerify6()
+            }
+        })
+    }
+
+    // ----- 改名被伺服端預檢拒絕: 不彈確認框、照常送出並顯示失敗彈窗(spec 流程_後台群組清單 E2E-016) -----
+    for (const lang of LANGS) {
+        it(`AF-040-rename-rejected [${lang}]: (spec 流程_後台群組清單 E2E-016) rej-u 以啟用引用不存在之 Ghost(懸空)並引用 rej-g; 把 rej-g 改名為 Ghost 後按儲存 → 不彈確認框、直接顯示失敗彈窗(grupSaveGrupsFail: renameCascadeNameInUse); DB 三表零變更、清單仍為已修改`, async function() {
+            await seedRej()
+            try {
+                await withPageLang(lang, async (page) => {
+                    const db0 = await snapAll()
+                    await gotoGrups(page)
+                    await typeIntoCell(page, await rowIndexByName(page, 'rej-g'), 'name', 'Ghost')
+                    assert.strict.equal(await pageSaveShown(page), true, '改名後清單頁出現儲存鈕(已修改)')
+                    await clickSave(page)
+                    //不點「是」即出現失敗彈窗 ⇒ 未彈確認框(確認框會停住儲存流程直到按鈕); 彈窗形狀為單一訊息＋確認鈕(非否／是)
+                    const t = await page.evaluate(() => ({ fail: window.$vo.$t('grupSaveGrupsFail'), why: window.$vo.$t('renameCascadeNameInUse') }))
+                    await expectResult(page, '失敗彈窗', `${t.fail}: ${t.why}`)
+                    await dismissResultModal(page)
+                    assert.deepEqual(await snapAll(), db0, '被拒: 三表零變更')
+                    assert.strict.equal((await rowIndexesByName(page, 'Ghost')).length, 1, '被拒後清單仍為已改名(Ghost)')
+                    assert.strict.equal(await pageSaveShown(page), true, '被拒後儲存鈕仍在(資料保留, 可修正後再存)')
+                })
+            }
+            finally {
+                await restoreAndVerify6()
+            }
+        })
+    }
+
+    // ----- 名單截斷: 一次改名 6 個權限, 確認框只列前 5 個並附總數(spec 流程_後台權限清單 E2E-015 補強) -----
+    for (const lang of LANGS) {
+        it(`AF-042-rename-pemi-list-truncated [${lang}]: (spec 流程_後台權限清單 E2E-015 補強) 一次改名被同一群組引用之 6 個權限(tr-p1～tr-p6 → tr-q1～tr-q6) → 確認框(confirmSaveRenameRefsPemi: 1 個群組)之名單只列前 5 個舊→新並附 cascadeListMore(共 6 個); 按是 → 成功彈窗附已更新 1 個群組, tr-g 之 6 個引用皆已改名`, async function() {
+            await seedTrunc()
+            try {
+                await withPageLang(lang, async (page) => {
+                    const db0 = await snapAll()
+                    await gotoPemis(page)
+                    for (let i = 1; i <= TR_N; i++) {
+                        await typeIntoCell(page, await rowIndexByName(page, `tr-p${i}`), 'name', `tr-q${i}`)
+                    }
+                    await clickSave(page)
+                    const first5 = Array.from({ length: 5 }, (_, i) => `tr-p${i + 1}→tr-q${i + 1}`)
+                    const list = `${first5.join(', ')} ${await expWarn(page, 'cascadeListMore', { n: TR_N })}`
+                    const expConfirm = await expWarn(page, 'confirmSaveRenameRefsPemi', { n: 1, list })
+                    const frags = lang === 'eng' ? ['1 group(s)', 'tr-p5→tr-q5 … (6 in total)'] : ['1 個群組', 'tr-p5→tr-q5 …等 6 個']
+                    await expectConfirm(page, '改名確認框', expConfirm, frags)
+                    assert.ok(!(await topModalLines(page))[1].includes('tr-p6→tr-q6'), '名單不列第 6 個(截斷)')
+                    await clickModalBtn(page, 'yes')
+                    await expectResult(page, '成功彈窗', await expWarn(page, 'pemiSavePemisSuccessCascade', { n: 1 }))
+                    await dismissResultModal(page)
+                    const after = await snapAll()
+                    const want = Object.fromEntries(Array.from({ length: TR_N }, (_, i) => [`tr-q${i + 1}`, { mode: 'OR', isActive: 'y' }]))
+                    assert.deepEqual(JSON.parse(rowOfSnap(after.grups, 'id-tr-g').cpemis), want, 'tr-g 之 6 個引用皆已改名(次序不變)')
+                    assert.deepEqual(Object.keys(JSON.parse(rowOfSnap(after.grups, 'id-tr-g').cpemis)), Object.keys(want), '引用鍵次序不變')
+                    assert.deepEqual(after.users, db0.users, 'users 表不動')
+                })
+            }
+            finally {
+                await restoreAndVerify6()
+            }
+        })
+    }
+
+    // ----- cascadeRename:false(伺服端 opt.cascadeRename:false; spec 流程_後台群組清單 E2E-017): 需特殊後端設定 -----
+    describe('run06 cascadeRename:false', function() {
+        this.timeout(300000)
+
+        before(async function() {
+            this.timeout(400000)
+            await restartBackend(genTempSettings({ cascadeRename: false })) //DB 保留
+        })
+
+        after(async function() {
+            this.timeout(400000)
+            try {
+                await restoreTables(snap6)
+            }
+            finally {
+                await restartBackend('./settings.json') //還原預設設定(DB 保留), 使本檔之後(單一 mocha 行程全跑時之其他檔)沿用預設後端
+            }
+            const t = await readTables()
+            assert.deepEqual([t.users.length, t.grups.length, t.pemis.length], [4, 4, 4], '收尾後三表筆數須為 base seed')
+        })
+
+        for (const lang of LANGS) {
+            it(`AF-041-cascade-off [${lang}]: (spec 流程_後台群組清單 E2E-017) 後端 cascadeRename:false(webInfor 帶旗標)下把 ren-g 改名為 ren-g-new 後按儲存 → 不彈改名確認框、成功彈窗為原文字(grupSaveGrupsSuccess, 不附筆數); DB 中使用者之引用未改寫(仍為 ren-g)、授權依懸空收嚴; 使用者頁三位引用者之 cgrups 儲存格出現懸空警告圖示`, async function() {
+                await seedRenGrup()
+                try {
+                    await withPageLang(lang, async (page) => {
+                        assert.strict.equal(await page.evaluate(() => window.$vo.$store.state.webInfor.cascadeRename), false, '前提: 前端取得之 webInfor.cascadeRename 為 false(後端已以 cascadeRename:false 重啟)')
+                        //改名前之授權同 AF-036(夾具相同)
+                        for (const [id, want] of Object.entries(REN_G_WANT)) {
+                            assert.deepEqual(await getResolvedActiveTargets(page, id), want, `改名前 ${id} 之授權`)
+                        }
+                        const db0 = await snapAll()
+                        await gotoGrups(page)
+                        await typeIntoCell(page, await rowIndexByName(page, 'ren-g'), 'name', 'ren-g-new')
+                        await clickSave(page)
+                        //不點「是」即出現成功彈窗 ⇒ 未彈改名確認框; 訊息逐字為原成功文字(單一訊息＋確認鈕)
+                        await expectResult(page, '成功彈窗', await page.evaluate(() => window.$vo.$t('grupSaveGrupsSuccess')))
+                        await dismissResultModal(page)
+                        const after = await snapAll()
+                        assert.strict.equal(rowOfSnap(after.grups, 'id-ren-g').name, 'ren-g-new', 'DB: ren-g 已更名')
+                        assert.deepEqual(after.users, db0.users, 'DB: 使用者之引用未改寫(cgrups 仍為 ren-g; users 表逐位元不動)')
+                        assert.deepEqual(after.pemis, db0.pemis, 'pemis 表不動')
+                        //授權(R-AUTH-MERGE-00; 引用名稱查無實體 ⇒ 懸空, 以其 mode 參與、內容全 n): ren-u(OR ren-g)→ ∅; ren-ua(OR ren-g ∪ M1)→ M1; ren-ext(M1 ∩ 懸空 AND)→ ∅
+                        assert.deepEqual(await getResolvedActiveTargets(page, 'id-ren-u'), [], '改名後 ren-u 之引用成為懸空 → 授權為空')
+                        assert.deepEqual(await getResolvedActiveTargets(page, 'id-ren-ua'), PETER_TREE, '改名後 ren-ua 只剩 M1 之授權')
+                        assert.deepEqual(await getResolvedActiveTargets(page, 'id-ren-ext'), [], '改名後 ren-ext 之 AND 引用懸空 → 授權為空(收嚴)')
+                        //使用者頁: 三位引用者之 cgrups 儲存格出現懸空警告圖示(warnRefDangling), base seed 四位無圖示
+                        await gotoUsers(page)
+                        const expDang = await expWarn(page, 'warnRefDangling', { names: ['ren-g'], kindKey: 'warnKindGrup' })
+                        for (const nm of ['ren-u', 'ren-ua', 'ren-ext']) {
+                            const k = await rowIndexByName(page, nm)
+                            await waitUntilExist(page, `${nm} 警告圖示`, (a) => !!document.querySelector(`.ag-row[row-index="${a.k}"] .ag-cell[col-id="cgrups"] img[src^="data:image/png;base64"]`), { arg: { k }, timeout: 20000 })
+                            assert.strict.equal(await cellWarnTitle(page, k, 'cgrups'), expDang, `${nm} 之 cgrups 儲存格警告 tooltip 為 warnRefDangling(ren-g)`)
+                        }
+                        await assertNoWarnRows(page, BASE_USERS, 'cgrups', 'base seed')
+                    })
+                }
+                finally {
+                    await restoreAndVerify6()
                 }
             })
         }

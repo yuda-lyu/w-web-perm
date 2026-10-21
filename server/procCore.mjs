@@ -13,7 +13,9 @@ import getOwn from '../src/js/getOwn.mjs'
 import ds from '../src/schema/index.mjs'
 import procLang from './procLang.mjs'
 import validateRowsBeforeWrite from './validateRows.mjs'
-import { findTouchedDup, findDupIndex, tabWriteKey, checkUsersWrite } from './keyCheck.mjs'
+import planRefChanges, { REF_OF, diffRefTargets, fillIdlessIds } from '../src/js/refCascade.mjs'
+import { findTouchedDup, findDupIndex, withTabLocks, checkUsersWrite } from './keyCheck.mjs'
+import { checkCascadePlan, writeWithCascade } from './cascadeWrite.mjs'
 
 
 //isRowObj: 待寫入之列須為至少有一個自有可列舉鍵之物件(非 null、非陣列; 不用依 toString 判型之 iseobj, 免被 Symbol.toStringTag 偽稱)
@@ -60,7 +62,8 @@ function mergePickKeysOnly(ltdtDb, rowsIn, keyDetect, pickKeys) {
 
 
 //mappingBy: 使用者對應鍵('id'｜'email'｜'name', WWebPerm 已正規化; 未給或其他值視同 'id'), 供 users 整表寫入的對應鍵檢查(R-PRINCIPLE-00 適用表 h, R-MAPKEY-03)
-function proc(woItems, procOrm, { srLog, kmx, lockSave, mappingBy = 'id' }) {
+//cascadeRename: 群組／權限改名時是否連帶更新引用(預設 true; 只管改名, 刪除連帶清理不受影響, R-REF-CASCADE-01)
+function proc(woItems, procOrm, { srLog, kmx, lockSave, mappingBy = 'id', cascadeRename = true }) {
 
 
     //updateTabItems
@@ -93,7 +96,8 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave, mappingBy = 'id' }) {
         //雙擊防護(後端): 同一操作者之同表寫入處理中再送出即拒絕 'saveInProgress'(不排隊, 見 lockSave.mjs, ADR-025);
         //占位包在 kmx 之外層, 不同操作者之並行寫入仍由 kmx 序列化、各自成功(ADR-012)
         //序列化同表之並行整表批次寫入: 防 lost update (同 keyTable 序列化, 不同表並行)
-        return await lockSave(`updateTabItems:${keyTable}`, userId, () => kmx(tabWriteKey(keyTable), async () => { //與外部同步(WWebPerm.syncAndReplaceTabs)共用同表互斥鍵(外審 sol R10)
+        //持鎖: 先取本表之鎖; 本表有改名或刪除而須改寫引用端時, 才於內層依階層再取引用端表之鎖(見下方「引用連帶」段). 皆經單一取鎖函數(R-WRITE-LOCK-02); 與外部同步(WWebPerm.syncAndReplaceTabs)共用同表互斥鍵(外審 sol R10)
+        return await lockSave(`updateTabItems:${keyTable}`, userId, () => withTabLocks(kmx, [keyTable], async () => {
 
         //pickKeysOnly, 須於 mutex 內讀取資料庫為基底, 避免與並行寫入 race
         if (isearr(pickKeysOnly)) {
@@ -259,29 +263,58 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave, mappingBy = 'id' }) {
             return Promise.reject(key)
         }
 
-        //del
-        if (size(r.del) > 0) {
-            await procOrm(userId, keyTable, 'del', r.del) //須使用procOrm才有辦法自動給予相關欄位
-            // .catch((err) => {
-            //     console.log('woItems[keyTable].del err', err)
-            // })
+        //writeMain
+        let writeMain = async () => {
+
+            //del
+            if (size(r.del) > 0) {
+                await procOrm(userId, keyTable, 'del', r.del) //須使用procOrm才有辦法自動給予相關欄位
+                // .catch((err) => {
+                //     console.log('woItems[keyTable].del err', err)
+                // })
+            }
+
+            //add
+            if (size(r.add) > 0) {
+                await procOrm(userId, keyTable, 'insert', r.add) //須使用procOrm才有辦法自動給予相關欄位
+                // .catch((err) => {
+                //     console.log('woItems[keyTable].insert err', err)
+                // })
+            }
+
+            //diff
+            if (size(r.diff) > 0) {
+                await procOrm(userId, keyTable, 'save', r.diff) //須使用procOrm才有辦法自動給予相關欄位
+                // .catch((err) => {
+                //     console.log('woItems[keyTable].save err', err)
+                // })
+            }
+
         }
 
-        //add
-        if (size(r.add) > 0) {
-            await procOrm(userId, keyTable, 'insert', r.add) //須使用procOrm才有辦法自動給予相關欄位
-            // .catch((err) => {
-            //     console.log('woItems[keyTable].insert err', err)
-            // })
+        //引用連帶(R-PRINCIPLE-00 原則 6、適用表 m／n, 規則帳本 R-REF-CASCADE-01, ADR-036): grups／pemis 改名(同 id 異名)與 grups／pemis／targets 刪除(舊 id 不在送入整表),
+        //須於同一次寫入內連帶更新／清理引用它之授權字串(users.cgrups、grups.cpemis、pemis.crules). 是否須改寫引用端只依本表新舊列判定(diffRefTargets), 故於持有本表鎖之下即可決定是否再取引用端表之鎖;
+        //取齊鎖之後才讀取引用端、規劃與預檢(新名撞懸空名、歷史同名組改名、容器內相撞、改寫後欄位驗證), 預檢與寫入涵蓋同一版本(外審 A.3), 被拒時資料表零變更.
+        //寫入為引用端先、主體後, 失敗時補償還原引用端(cascadeWrite.mjs)
+        //未帶 id 之列(API 直打; 寫入時 ORM 補隨機主鍵, 即舊列刪、新列增)改依名稱對應既有列, 同名即同一實體而不清空引用(fillIdlessIds)
+        let rowsPlan = arrHas(keyTable, ['targets', 'pemis', 'grups']) ? fillIdlessIds(keyTable, ltdtOld, ltdtNew) : ltdtNew
+        let kind = arrHas(keyTable, ['targets', 'pemis', 'grups']) ? diffRefTargets({ keyTable, rowsOld: ltdtOld, rowsNew: rowsPlan, opt: { cascadeRename } }) : null
+        if (kind !== null && (kind.renames.length > 0 || kind.delNames.length > 0)) {
+            let holder = REF_OF[keyTable].holder
+            return await withTabLocks(kmx, [holder], async () => {
+                let holdersOld = await woItems[holder].select()
+                let plan = planRefChanges({ keyTable, rowsOld: ltdtOld, rowsNew: rowsPlan, holdersOld, opt: { cascadeRename } })
+                let errPlan = plan.err !== null ? plan.err : checkCascadePlan(plan)
+                if (errPlan !== null) {
+                    srLog.error({ event: 'updateTabItems-refCascade-error', keyTable, msg: errPlan })
+                    return Promise.reject(errPlan)
+                }
+                await writeWithCascade({ plan, holdersOld, woItems, procOrm, userId, srLog, writeMain })
+                return ltdtNew
+            }, [keyTable])
         }
 
-        //diff
-        if (size(r.diff) > 0) {
-            await procOrm(userId, keyTable, 'save', r.diff) //須使用procOrm才有辦法自動給予相關欄位
-            // .catch((err) => {
-            //     console.log('woItems[keyTable].save err', err)
-            // })
-        }
+        await writeMain()
 
         return ltdtNew
 

@@ -110,6 +110,42 @@ function tabWriteKey(keyTable) {
 }
 
 
+//取鎖階層(規則帳本 R-WRITE-LOCK-02, ADR-036): 引用鏈序「被引用者先、引用端後」targets → pemis → grups → users(引用端之階層恆高於被引用者); 所有需持多把表鎖之路徑(後台整表寫入、外部同步、日後之外部列保護／清源)只能經 withTabLocks 取鎖,
+//同一把鎖不巢狀(pmKeyMutex 非可重入, 巢狀同鍵與相反次序皆死結, D1 設計稿 probe-mutex 實測); 持鎖後才讀取、預檢與寫入, 使預檢與寫入涵蓋同一版本(外審 A.3)
+let TAB_LOCK_RANK = { targets: 0, pemis: 1, grups: 2, users: 3 }
+
+
+/**
+ * 依取鎖階層取齊指定表鎖後執行 fn(單一取鎖函數): 表名去重、依 targets → pemis → grups → users 排序(階層外之表名排最後、彼此依字典序), 由外而內巢狀取 kmx(tabWriteKey(表));
+ * 各路徑取鎖次序一致故不成環.
+ * 分段取鎖: 先取被引用表之鎖、依該表之新舊資料判定須改寫引用端後, 才在內層以 held 指明已持之表再取引用端表之鎖(寫入引用端表不涉改名／刪除者免取, 免無謂之互等);
+ * held 非空時, keyTables 之階層須全數高於 held(否則拋錯, 即違反階層, 不嘗試取鎖).
+ *
+ * @param {Function} kmx 輸入 pmKeyMutex 實例
+ * @param {Array} keyTables 輸入須持鎖之表名陣列
+ * @param {Function} fn 輸入持鎖後執行之 async 函數
+ * @param {Array} [held=[]] 輸入呼叫端已持有鎖之表名陣列(內層分段取鎖用)
+ * @returns {Promise} 回傳 fn 之結果
+ */
+function withTabLocks(kmx, keyTables, fn, held = []) {
+    let rank = (t) => (Object.prototype.hasOwnProperty.call(TAB_LOCK_RANK, t) ? TAB_LOCK_RANK[t] : Infinity)
+    let ts = [...new Set(keyTables)].sort((a, b) => (rank(a) - rank(b)) || (a < b ? -1 : (a > b ? 1 : 0)))
+    if (held.length > 0) {
+        let maxHeld = Math.max(...held.map(rank))
+        if (ts.some((t) => rank(t) <= maxHeld)) {
+            throw new Error('tab lock order violation')
+        }
+    }
+    let run = fn
+    for (let k = ts.length - 1; k >= 0; k--) {
+        let inner = run
+        let key = tabWriteKey(ts[k])
+        run = () => kmx(key, inner)
+    }
+    return run()
+}
+
+
 /**
  * 使用者對應鍵(mappingBy)所指之 users 欄位: 'email'／'name' 回該欄位名, 其餘(含預設 'id')回 null(不另檢查: id 為主鍵, 既有 idOtherFrom 已涵蓋跨 from)
  */
@@ -242,4 +278,4 @@ function pickUniqueUser(rs) {
 }
 
 
-export { findDupIndex, hasDupKey, findKeyOtherFrom, findTouchedDup, tabWriteKey, mapKeyOf, checkMapKeyBatch, checkUsersWrite, pickUniqueUser }
+export { findDupIndex, hasDupKey, findKeyOtherFrom, findTouchedDup, tabWriteKey, withTabLocks, mapKeyOf, checkMapKeyBatch, checkUsersWrite, pickUniqueUser }

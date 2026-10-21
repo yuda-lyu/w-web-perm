@@ -310,14 +310,16 @@ describe('unit-keyCheck (名稱唯一與對應鍵檢查之純函數, F-02／F-14
             assert.strict.ok(/findDupIndex\(rows, 'id'/.test(code), 'pemis／grups 須先拒送入整表內重複之 id(NU-044; 空字串 id 視為未給不參與, NU-046)')
         })
 
-        it('SITE-KC-007 外部同步與後台整表寫入共用同表互斥鍵 tabWriteKey(外審 sol R10): 兩處皆 kmx(tabWriteKey(keyTable), …), 不得再以各自的字面鍵取鎖(鍵不同則「先檢查唯一、後寫入」可交錯而略過 F-02／F-14)', function() {
+        it('SITE-KC-007 外部同步與後台整表寫入共用同表互斥鍵 tabWriteKey(外審 sol R10; R-WRITE-LOCK-02): 兩處皆經單一取鎖函數 withTabLocks(kmx, [keyTable], …) 取本表鎖(其內才 kmx(tabWriteKey(表))), 不得再以各自的字面鍵或直接 kmx( 取鎖(鍵不同則「先檢查唯一、後寫入」可交錯而略過 F-02／F-14; 直接取鎖則可能違反階層而死結)', function() {
             let sync = readCode('server/WWebPerm.mjs')
             let upd = readCode('server/procCore.mjs')
-            assert.strict.ok(/kmx\(tabWriteKey\(keyTable\)/.test(sync), 'syncAndReplaceTabs 須以 tabWriteKey 取鎖')
-            assert.strict.ok(/kmx\(tabWriteKey\(keyTable\)/.test(upd), 'updateTabItems 須以 tabWriteKey 取鎖')
+            let kc = readCode('server/keyCheck.mjs')
+            assert.strict.ok(/withTabLocks\(kmx,\s*\[keyTable\]/.test(sync), 'syncAndReplaceTabs 須以 withTabLocks 取本表鎖')
+            assert.strict.ok(/withTabLocks\(kmx,\s*\[keyTable\]/.test(upd), 'updateTabItems 須以 withTabLocks 取本表鎖')
             assert.strict.ok(!/kmx\(\s*['`]syncAndReplaceTabs:/.test(sync) && !/kmx\(\s*['`]updateTabItems:/.test(upd), '不得保留各自字面鍵')
-            let n = (sync.match(/kmx\(/g) || []).length
-            assert.strict.equal(n, 1, 'WWebPerm.mjs 內 kmx( 取鎖點只有 syncAndReplaceTabs 一處(多一處即須檢查是否與 tabWriteKey 巢狀而死結)')
+            assert.strict.equal((sync.match(/\bkmx\(/g) || []).length, 0, 'WWebPerm.mjs 不得直接 kmx( 取鎖(一律經 withTabLocks)')
+            assert.strict.equal((upd.match(/\bkmx\(/g) || []).length, 0, 'procCore.mjs 不得直接 kmx( 取鎖(一律經 withTabLocks)')
+            assert.strict.equal((kc.match(/\bkmx\(key,/g) || []).length, 1, 'keyCheck.mjs 內以 kmx 取表鎖之站點只有 withTabLocks 一處')
             //兩入口須共用「同一個」pmKeyMutex 實例: 鍵字面相同而實例不同時互斥即失效(增量外審 mmd-N2)。server 內 pmKeyMutex() 恰一處, 且 procCore(...) 之選項 kmx 為該實例
             let serverDir = path.join(projRoot, 'server')
             let nInst = fs.readdirSync(serverDir).filter((f) => f.endsWith('.mjs')).reduce((a, f) => a + (readCode(`server/${f}`).match(/pmKeyMutex\(\)/g) || []).length, 0)
