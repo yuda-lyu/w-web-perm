@@ -8,8 +8,8 @@
 //對應 server/procCore.mjs 之 updateTabItems()，其寫入由外而內兩層（spec/設計要點與取捨.md ADR-025、ADR-012）：
 //  ① lockSave(`updateTabItems:${keyTable}`, 操作者 id, …)（server/lockSave.mjs，cacheSt 原子占位）：同一操作者之同表寫入處理中
 //     再送出 → reject 'saveInProgress'（不排隊）；
-//  ② kmx('updateTabItems:'+keyTable, …)（pmKeyMutex 單例，建立於 server/WWebPerm.mjs 並傳入 procCore）：不同操作者之同表並行寫入
-//     「序列化」、不同表並行；
+//  ② kmx(tabWriteKey(keyTable), …)（鍵 'tabWrite:{表}'，與外部同步 syncAndReplaceTabs 共用同鍵〔2026-10-21 起，原為 'updateTabItems:{表}'〕；
+//     pmKeyMutex 單例，建立於 server/WWebPerm.mjs 並傳入 procCore）：不同操作者之同表並行寫入「序列化」、不同表並行；
 //  另於 kmx 內 select 之後：前端標為新增（transient _isNew）之列 id 已存在 → reject 'saveNewRowExists'（擋依序重送；pickKeysOnly 模式不檢查）。
 //
 //【契約】

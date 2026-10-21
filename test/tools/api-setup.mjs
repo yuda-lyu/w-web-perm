@@ -102,6 +102,34 @@ export async function callRpc(funcName, args, token, opt = {}) {
     return { ok: false, state: 'error', msg: `unparseable response: ${JSON.stringify(respObj)}`, raw }
 }
 
+//readTables／restoreTables：讀三表(users／grups／pemis)現況並於收尾原樣寫回(供不用 resetDb 的 e2e／api 檔做「擷取 ↔ 還原」對稱收尾; 規則帳本 R-E2E-ISO-01)。
+//  收斂自 e2e-array-form 原本檔內的一份(2026-10-21 run03: api-keyProp 與 e2e-array-form 共用, 不複製第二份)。
+//  讀三表現況(經資料通道 select), 依 order 排序: select 依主鍵排序(users 為 admin／john／mary／peter), 而 updateXxx 以陣列位置重給 order,
+//  直接送 select 順序會使 users 列序反轉(base seed 為 peter／mary／john／admin), 後續 e2e 檔擷取到的 BASE_SEED 列序與標準圖相反(多檔合跑後端污染之「列序相反」現象, 見規則帳本 R-E2E-ISO-01、ADR-030)
+const TABLE_FN = [['users', 'updateUsers'], ['grups', 'updateGrups'], ['pemis', 'updatePemis']]
+export async function readTables() {
+    const out = {}
+    for (const [kt] of TABLE_FN) {
+        const r = await callRpc(`${kt}.select`, [], TOKEN_ADMIN)
+        //select 失敗(r.ok 為 false)時不得當成空表而於收尾送出整表清空(外審 sol#3)
+        if (!(r.ok && Array.isArray(r.output) && r.output.length > 0)) {
+            throw new Error(`${kt}.select 應成功且非空, 實得 ${JSON.stringify(r).slice(0, 200)}`)
+        }
+        out[kt] = r.output.slice().sort((a, b) => (a.order || 0) - (b.order || 0))
+    }
+    return out
+}
+//收尾(與 readTables 對稱): 把三表還原為擷取時之現況(含夾具以外各列之原文欄位), 不留測試加入的列, 也不改動 base seed 列之序與原文
+//(經管理者寫入 RPC, 與 api-updateTabs 之 restoreBaseSeed 同法; sync 端點拒絕空 rows 故不能用它清)
+export async function restoreTables(snap) {
+    for (const [kt, fn] of TABLE_FN) {
+        const res = await callRpc(fn, [snap[kt]], TOKEN_ADMIN)
+        if (!res.ok) {
+            throw new Error(`收尾 ${fn} 應成功, 實得 ${JSON.stringify(res)}`)
+        }
+    }
+}
+
 //readSrLogSince：讀本專案後端 srLog 中 time ≥ t0 之各行（已 JSON.parse；解析失敗之行略過；_raw 為原始行文字）。
 //  目錄＝settings.json 之 logFd（相對專案根＝後端 cwd；未給同 server/srLog.mjs 預設 './logs'）；只讀 mtime ≥ t0 − 2s 之檔。
 //  srLog 經 pino transport 非同步落檔，呼叫端須以哨兵事件等待（見 api-tokenSafety），不得讀到空集合即斷言「無外洩」。

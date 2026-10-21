@@ -352,13 +352,15 @@ const cases = [
             assert.ok(cgrups && typeof cgrups === 'object' && cgrups['權限群組M1'], 'mary.cgrups 應含 權限群組M1 鍵（已歸屬本群組）')
             assert.equal(cgrups['權限群組M1'].isActive, 'y', 'mary 對 權限群組M1 isActive 應為 y')
             assert.equal(cgrups['權限群組M1'].mode, 'AND', 'mary 對 權限群組M1 mode 應為所選 AND')
-            //spec 語意：顯示端把本項標籤排第 1 顆只改顯示、不改儲存字串之鍵序（原有 M2 仍在 M1 之前）
-            assert.deepEqual(Object.keys(cgrups), ['權限群組M2', '權限群組M1'],
-                `儲存字串鍵序應維持原順序（實得 ${JSON.stringify(Object.keys(cgrups))}）`)
+            //spec 語意：既有的 權限群組M2 鍵仍為 { mode: 'OR', isActive: 'y' }（只改本群組一項）。
+            //run05（2026-10-21）移除原「儲存字串鍵序維持 M2、M1」之斷言：授權與鍵序無關（R-AUTH-MERGE-00 第 4 條、R-PRINCIPLE-00 原則 2），鍵序不是規格（spec E2E-005 已同步）；
+            //顯示端標籤排序（上方 r4.titles）屬顯示順序，維持
+            assert.deepEqual(cgrups['權限群組M2'], { mode: 'OR', isActive: 'y' }, `mary 既有之 權限群組M2 須不變（實得 ${JSON.stringify(cgrups['權限群組M2'])}）`)
             //【端到端核心不變式：權限變更 → 解析後權限樹】mary 從 {M2(OR)} 變 {M2(OR), M1(AND)}，群組層 M2 聯集後與 M1 交集。
-            //預期 active 4 個（getUserRules 算出）；驗 getPermUserInfor 回傳的 resolved 權限樹符合此合併結果。
+            //預期 active 3 個（getUserRules 算出；新規則 R-AUTH-MERGE-00 下 AND 群組 M1 未列之 專案B/頁A/區塊C 視同 n 而被收回，2026-10-21 起；舊規則「AND 未列不約束」為 4 個）；
+            //驗 getPermUserInfor 回傳的 resolved 權限樹符合此合併結果（單元層見 test/unit-authMerge.test.mjs SP-REAL-004）。
             const tree = await getResolvedActiveTargets(page, 'id-for-mary')
-            assert.deepEqual(tree, ['專案A/頁C', '專案B/頁A/區塊A', '專案B/頁A/區塊B', '專案B/頁A/區塊C'],
+            assert.deepEqual(tree, ['專案A/頁C', '專案B/頁A/區塊A', '專案B/頁A/區塊B'],
                 `mary 解析後權限樹應反映 +=M1(AND) 之群組層合併（實得 ${JSON.stringify(tree)}）`)
         },
     },

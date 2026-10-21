@@ -285,7 +285,7 @@ const CASES = [
         },
     },
     {
-        //E2E-009：點某列 belongGrups 欄按鈕 → 開啟所屬權限群組檢視對話框（VePemiBlngGrups）。僅驗本流程可觀察事實：對話框出現。
+        //E2E-009：點某列 belongGrups 欄按鈕 → 開啟所屬權限群組對話框（VePemiBlngGrups；編輯態可勾選並自行儲存，唯讀態為純檢視，ADR-014）。僅驗本流程可觀察事實：對話框出現。
         name: 'E2E-009-blnggrups-dialog',
         stages: ['E2E-009-1-source-row', 'E2E-009-2-dialog-open'],
         run: async (page) => {
@@ -309,7 +309,7 @@ const CASES = [
         semantic: async (page) => {
             const label = await page.evaluate(() => window.$vo.$t('pemiBlngEditGrups'))
             const txt = await page.evaluate(() => document.body.innerText)
-            assert.ok(txt.includes(label), `所屬權限群組檢視對話框標題應顯示（${label}）`)
+            assert.ok(txt.includes(label), `所屬權限群組對話框標題應顯示（${label}）`)
         },
     },
     {

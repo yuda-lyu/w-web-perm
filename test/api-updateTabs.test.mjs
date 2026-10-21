@@ -20,7 +20,7 @@
 //DB 斷言一律 getWoItems() 唯讀 select（跨進程唯讀實測可行；寫入一律走 backend RPC，測試進程不寫 DB）。
 
 import assert from 'assert'
-import { startApi, TOKEN_ADMIN, getWoItems, callRpc } from './tools/api-setup.mjs'
+import { startApi, TOKEN_ADMIN, TOKEN_APP, getWoItems, callRpc, urlSync } from './tools/api-setup.mjs'
 
 
 //4 個寫入 RPC 對照表：RPC 名 ↔ keyTable ↔ diff/去重 鍵
@@ -140,6 +140,97 @@ describe('api-updateTabs（寫入 RPC：add / del / diff / order / 去重鍵）'
     })
 
 
+    // ===== run05（R-PRINCIPLE-00 適用表 h；規則帳本 R-MAPKEY-03）：users 之 email 檢查只擋「本次造成或觸及」者 =====
+    //run05 新增，待主責於全套結束後實跑（尚未執行）。unit 版見 unit-procCore-usersKey（同一組規格句，含 mappingBy × 情境全格；mappingBy=email／name 之真後端案例見 api-mapKey MK-020／021）。
+    //歷史資料以外部同步造成：預設 mappingBy='id' 時同步不檢查 email（API-sync-027、api-mapKey MK-010），故可先造出「重複／空 email 的 active 列」，
+    //再以後台整表寫入驗證：原樣送回可存（修正前：整表任一列 email 空或重複即整次 saveRowFieldInvalid／saveRowFieldDuplicate，已有歷史資料之庫連群組指派以外的編修都存不了）；
+    //本次新增／改動造成空值或重複者仍擋，且被拒時 DB 零變更。
+    let postSync = async (body) => {
+        let url = urlSync.replace('{keyTable}', 'users').replace('{token}', TOKEN_APP)
+        let res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify(body) })
+        return await res.json()
+    }
+    let usersSorted = async () => (await readTable('users')).sort((a, b) => (a.order || 0) - (b.order || 0))
+    let snapUsers = async () => JSON.stringify((await readTable('users')).sort((a, b) => String(a.id).localeCompare(String(b.id))))
+    let uSync = (id, name, email, from, isActive = 'y') => ({ id, order: 0, name, email, from, cgrups: '{}', isAdmin: 'n', isActive })
+
+    it('API-updateUsers-004-legacy-dup-email-roundtrip：歷史重複 email（外部同步造成）原樣送回並編修他列 → 成功、兩列皆在；修復可存；新增第三列／他列併入／重複列改成第三者已用值 → saveRowFieldDuplicate、DB 不變（run05 新增，待實跑）', async function() {
+        await restoreBaseSeed('users')
+        const F = 'appTest-uk4'
+        let peter = (await usersSorted()).find((u) => u.id === 'id-for-peter')
+        let rs = await postSync({ from: F, rows: [uSync('id-uk4-dup', 'dupper4', peter.email, F)] })
+        assert.strict.equal(rs.state, 'success', `前置：mappingBy=id 下同步重複 email 應成功，實得: ${JSON.stringify(rs)}`)
+        let rows0 = await usersSorted()
+        assert.strict.equal(rows0.filter((u) => u.email === peter.email).length, 2, '前置：兩列 active 使用者同 email')
+
+        //(1) 原樣送回，只編修無關列 → 成功，重複兩列皆仍在
+        let sent1 = rows0.map((u) => (u.id === 'id-for-john' ? { ...u, description: 'uk4-edited' } : { ...u }))
+        let r1 = await callRpc('updateUsers', [sent1], TOKEN_ADMIN)
+        assert.strict.ok(r1.ok, `歷史重複 email 原樣送回應成功（修正前整表拒存），實得: ${JSON.stringify(r1)}`)
+        let after1 = await usersSorted()
+        assert.strict.equal(after1.filter((u) => u.email === peter.email).length, 2, '重複兩列皆仍在')
+        assert.strict.equal(after1.find((u) => u.id === 'id-for-john').description, 'uk4-edited', '無關列之編修已落地')
+
+        //(2) 本次造成或觸及者仍擋：新增第三列使用該 email／無關列改成該 email／重複中一列改成第三者（john）已用之 email → saveRowFieldDuplicate，DB 零變更
+        let snap2 = await snapUsers()
+        let john = after1.find((u) => u.id === 'id-for-john')
+        let mut = [
+            (rows) => [...rows, { ...rows[0], id: 'id-uk4-third', name: 'third4', email: peter.email, from: F }],
+            (rows) => rows.map((u) => (u.id === 'id-for-john' ? { ...u, email: peter.email } : u)),
+            (rows) => rows.map((u) => (u.id === 'id-for-peter' ? { ...u, email: john.email } : u)),
+        ]
+        for (let [k, f] of mut.entries()) {
+            let sent = f(after1.map((u) => ({ ...u })))
+            let r = await callRpc('updateUsers', [sent], TOKEN_ADMIN)
+            assert.strict.equal(r.ok, false, `#${k} 應被拒，實得: ${JSON.stringify(r)}`)
+            assert.strict.equal(r.msg, 'saveRowFieldDuplicate', `#${k} 應回 saveRowFieldDuplicate，實得: ${r.msg}`)
+            assert.strict.equal(await snapUsers(), snap2, `#${k} DB 須零變更`)
+        }
+
+        //(3) 修復：重複中一列改成唯一新 email → 成功且落地
+        let sent3 = after1.map((u) => (u.id === 'id-uk4-dup' ? { ...u, email: 'uk4-fixed@example.com' } : { ...u }))
+        let r3 = await callRpc('updateUsers', [sent3], TOKEN_ADMIN)
+        assert.strict.ok(r3.ok, `重複中一列改成唯一 email 應成功，實得: ${JSON.stringify(r3)}`)
+        assert.strict.equal((await usersSorted()).find((u) => u.id === 'id-uk4-dup').email, 'uk4-fixed@example.com')
+    })
+
+    it('API-updateUsers-005-legacy-empty-email-roundtrip：歷史空 email（外部同步造成）原樣送回並編修他列 → 成功；新增空 email 列／既有有效列改為空 → saveRowFieldInvalid、DB 不變；空 email 列自行改成有效 email → 成功（run05 新增，待實跑）', async function() {
+        await restoreBaseSeed('users')
+        const F = 'appTest-uk5'
+        let rs = await postSync({ from: F, rows: [uSync('id-uk5-empty', 'empty5', '', F), uSync('id-uk5-inact', 'inact5', '', F, 'n')] })
+        assert.strict.equal(rs.state, 'success', `前置：mappingBy=id 下同步空 email 應成功，實得: ${JSON.stringify(rs)}`)
+        let rows0 = await usersSorted()
+        assert.strict.equal(rows0.filter((u) => u.email === '').length, 2, '前置：兩列空 email（一 active 一 inactive）')
+
+        //(1) 原樣送回並編修他列 → 成功
+        let sent1 = rows0.map((u) => (u.id === 'id-for-john' ? { ...u, description: 'uk5-edited' } : { ...u }))
+        let r1 = await callRpc('updateUsers', [sent1], TOKEN_ADMIN)
+        assert.strict.ok(r1.ok, `歷史空 email 原樣送回應成功（修正前整表拒存），實得: ${JSON.stringify(r1)}`)
+        let after1 = await usersSorted()
+        assert.strict.equal(after1.filter((u) => u.email === '').length, 2, '歷史空 email 列原樣仍在')
+
+        //(2) 新增空 email 列（active／inactive 皆是）、既有有效列 email 改為空 → saveRowFieldInvalid，DB 零變更
+        let snap2 = await snapUsers()
+        let mut = [
+            (rows) => [...rows, { ...rows[0], id: 'id-uk5-new', name: 'new5', email: '', from: F }],
+            (rows) => [...rows, { ...rows[0], id: 'id-uk5-new', name: 'new5', email: '', from: F, isActive: 'n' }],
+            (rows) => rows.map((u) => (u.id === 'id-for-john' ? { ...u, email: '' } : u)),
+        ]
+        for (let [k, f] of mut.entries()) {
+            let r = await callRpc('updateUsers', [f(after1.map((u) => ({ ...u })))], TOKEN_ADMIN)
+            assert.strict.equal(r.ok, false, `#${k} 應被拒，實得: ${JSON.stringify(r)}`)
+            assert.strict.equal(r.msg, 'saveRowFieldInvalid', `#${k} 應回 saveRowFieldInvalid，實得: ${r.msg}`)
+            assert.strict.equal(await snapUsers(), snap2, `#${k} DB 須零變更`)
+        }
+
+        //(3) 空 email 列自行改成有效 email → 成功
+        let sent3 = after1.map((u) => (u.id === 'id-uk5-empty' ? { ...u, email: 'uk5-fixed@example.com' } : { ...u }))
+        let r3 = await callRpc('updateUsers', [sent3], TOKEN_ADMIN)
+        assert.strict.ok(r3.ok, `空 email 列改成有效 email 應成功，實得: ${JSON.stringify(r3)}`)
+        assert.strict.equal((await usersSorted()).find((u) => u.id === 'id-uk5-empty').email, 'uk5-fixed@example.com')
+    })
+
+
     // ============ updateGrups（detect/去重 key=name）============
 
     it('API-updateGrups-001-add-del-diff-order：新增/刪除/修改列 + order 重給', async function() {
@@ -179,8 +270,9 @@ describe('api-updateTabs（寫入 RPC：add / del / diff / order / 去重鍵）'
 
         let res = await callRpc('updateGrups', [sent], TOKEN_ADMIN)
         assert.strict.equal(res.ok, false, `同 name 重複應被拒，實得: ${JSON.stringify(res)}`)
-        assert.strict.ok(String(res.msg).includes('saveRowFieldDuplicate'),
-            `reject msg 應為 err key saveRowFieldDuplicate（去重撞重複；欄位細節改記 srLog），實得: ${res.msg}`)
+        //2026-10-21 F-02(ADR-034): 群組／權限之名稱重複改回專用語系鍵 nameDuplicate(原 saveRowFieldDuplicate; users 之 email、targets 之 id 不變)
+        assert.strict.ok(String(res.msg).includes('nameDuplicate'),
+            `reject msg 應為 err key nameDuplicate（名稱重複；欄位細節改記 srLog），實得: ${res.msg}`)
 
         let after = await readTable('grups')
         assert.strict.equal(after.length, before.length, '去重檢測拒絕後筆數不變')
@@ -227,8 +319,9 @@ describe('api-updateTabs（寫入 RPC：add / del / diff / order / 去重鍵）'
 
         let res = await callRpc('updatePemis', [sent], TOKEN_ADMIN)
         assert.strict.equal(res.ok, false, `同 name 重複應被拒，實得: ${JSON.stringify(res)}`)
-        assert.strict.ok(String(res.msg).includes('saveRowFieldDuplicate'),
-            `reject msg 應為 err key saveRowFieldDuplicate（去重撞重複；欄位細節改記 srLog），實得: ${res.msg}`)
+        //2026-10-21 F-02(ADR-034): 同 API-updateGrups-002, 名稱重複回 nameDuplicate
+        assert.strict.ok(String(res.msg).includes('nameDuplicate'),
+            `reject msg 應為 err key nameDuplicate（名稱重複；欄位細節改記 srLog），實得: ${res.msg}`)
 
         let after = await readTable('pemis')
         assert.strict.equal(after.length, before.length, '去重檢測拒絕後筆數不變')

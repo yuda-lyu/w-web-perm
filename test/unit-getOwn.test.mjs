@@ -133,7 +133,8 @@ describe('unit-getOwn (R-AUTH-PATH-01)', function() {
         assert.strict.ok(/Object\.defineProperty\(kpRule, name,/.test(pm), 'perm.mjs 應以 defineProperty 設規則名(__proto__ 亦為自有屬性), _kpRule 維持一般物件以保留 getKpRule() 之型別')
         //編輯對話框寫出端(外審 minimax#1): 存檔用之 JSON 容器 kpRule／kpGrup／kpPemi／kpGrupNew／kpPemiNew 為無原型容器,
         //否則名稱為 __proto__ 之標的／群組／權限在介面顯示已啟用、存檔卻被靜默丟棄(字串指派被忽略, 物件指派改了容器的原型)
-        let vues = { 'src/components/VeCrules.vue': 2, 'src/components/VeCgrups.vue': 2, 'src/components/VeCpemis.vue': 2, 'src/components/VeGrupBlngUsers.vue': 1, 'src/components/VePemiBlngGrups.vue': 1 }
+        //2026-10-21 run03(R-REL-PARSE-01): 兩個關聯對話框各 +3(genItems／revRows／doSave 之 `try { kpGrup|kpPemi = cvKpToObj(JSON5.parse(…)) }` 前之空容器初值, 解碼失敗時沿用), 基線 1 → 4
+        let vues = { 'src/components/VeCrules.vue': 2, 'src/components/VeCgrups.vue': 2, 'src/components/VeCpemis.vue': 2, 'src/components/VeGrupBlngUsers.vue': 4, 'src/components/VePemiBlngGrups.vue': 4 }
         for (let [rel, n] of Object.entries(vues)) {
             let c = codeOf(rel)
             assert.strict.ok(!/let (kpRule|kpGrup|kpPemi|kpGrupNew|kpPemiNew) = \{\}/.test(c), `${rel} 之 JSON 容器不得為一般物件`)

@@ -46,6 +46,8 @@ const fdTest = join(__dir, '..') //= test
 const projRoot = join(__dir, '..', '..') //= 專案根
 //本專案後端一律以絕對路徑啟動, 使行程命令列可辨識為本 repo 所屬(reseed 前只殺本 repo 之殘留後端, 見 killOwnSrvProcesses)
 const SRV_PATH = join(projRoot, 'srv.mjs')
+//種子旁路追加列之子行程腳本(restartBackend 之 opts.seedExtra; run05)
+const SEED_EXTRA_PATH = join(__dir, 'seedExtraRows.mjs')
 
 const BACKEND_PORT = 11006
 //perm e2e 用獨立的 8090（避開常駐於 8080 的其他專案 dev server），以 --port 顯式指定確保確定性
@@ -147,12 +149,19 @@ const services = createServiceManager({
                 if (phase === 'start') {
                     await seedDb()
                 }
-                else if (hookArg && hookArg.reseed) {
-                    //reseed 前另殺本 repo 之殘留後端(只比對本 repo srv.mjs 絕對路徑, 不及他 repo; 見 killOwnSrvProcesses)
-                    killOwnSrvProcesses()
-                    //strict:false——本路徑為 api 測試之 after-hook 還原, 持有 lmdb 者為 mocha 進程自身（見 wipeDbVerified 註解）,
-                    //  刪除必然失敗且 upsert 已足夠；不得把此寬鬆度帶到會產製標準圖的 startServersOnce 路徑。
-                    await seedDb({ strict: false })
+                else {
+                    if (hookArg && hookArg.reseed) {
+                        //reseed 前另殺本 repo 之殘留後端(只比對本 repo srv.mjs 絕對路徑, 不及他 repo; 見 killOwnSrvProcesses)
+                        killOwnSrvProcesses()
+                        //strict:false——本路徑為 api 測試之 after-hook 還原, 持有 lmdb 者為 mocha 進程自身（見 wipeDbVerified 註解）,
+                        //  刪除必然失敗且 upsert 已足夠；不得把此寬鬆度帶到會產製標準圖的 startServersOnce 路徑。
+                        await seedDb({ strict: false })
+                    }
+                    if (hookArg && hookArg.seedExtra) {
+                        //種子旁路追加列(run05; 見 restartBackend 之 opts.seedExtra): 後端已停止、尚未 spawn, 殘留之舊後端仍持有 lmdb 時先殺(同 reseed)
+                        killOwnSrvProcesses()
+                        await runSeedChild({ args: [SEED_EXTRA_PATH, hookArg.seedExtra], cwd: projRoot, timeoutMs: 60000 })
+                    }
                 }
             },
             spawn: ({ args, env }) => spawnSrv('node', [SRV_PATH, ...args], { env }),
@@ -216,12 +225,15 @@ function killOwnSrvProcesses() {
 //用法：before restartBackend(genTempSettings({ language })), after restartBackend('./settings.json') 還原預設。
 //opts.reseed=true：port 釋放後、spawn 前重跑 hermetic base seed（刪 ./db 重建），供「測試把資料弄到 UI/RPC 無法還原之狀態」
 //（如 admin 自己 isActive='n' 後所有通道皆拒）的 api 測試還原用；seed 須在後端開 lmdb 前完成，故只能在此時機做。
+//opts.seedExtra=<json 檔路徑>（run05）：port 釋放後、spawn 前（reseed 之後）以子行程 test/tools/seedExtraRows.mjs 對 ./db 追加完整列
+//（{ pemis?, grups?, users? }; 檔案放 test/_tmp/<案名>/, 由呼叫端刪除）。供「現行寫入入口皆拒而須旁路造出」之資料（歷史同名, R-PRINCIPLE-00 d／g）；
+//  收尾一律 restartBackend(…, { reseed: true }) 重建 base seed 並回驗筆數。
 export async function restartBackend(pathSettings = './settings.json', opts = {}) {
     //殺自建後端樹並等 port 釋放；無自建而 11006 被佔用（reuse / 外部啟動之同專案後端）→ 殺其監聽者並等釋放（明文例外）；
-    //reseed 於 spawn 前執行（見 services.backend.beforeSpawn）
-    const { reseed = false } = opts
+    //reseed／seedExtra 於 spawn 前執行（見 services.backend.beforeSpawn）
+    const { reseed = false, seedExtra = null } = opts
     markExpectedExit(true) //重啟所殺之舊後端不印尾段(見 spawnSrv)
-    await services.restart('backend', { args: [pathSettings], hookArg: { reseed } })
+    await services.restart('backend', { args: [pathSettings], hookArg: { reseed, seedExtra } })
 }
 
 export function cleanup() {

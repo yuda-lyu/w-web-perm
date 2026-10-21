@@ -1,8 +1,9 @@
 import iseobj from 'wsemi/src/iseobj.mjs'
-import isestr from 'wsemi/src/isestr.mjs'
 import eachOwn from './eachOwn.mjs'
 import cvKpToArr from './cvKpToArr.mjs'
 import isAuthMode from './isAuthMode.mjs'
+import getEffMode from './getEffMode.mjs'
+import getPropKey from './getPropKey.mjs'
 
 
 /**
@@ -12,19 +13,21 @@ import isAuthMode from './isAuthMode.mjs'
  * 編輯對話框若依名稱為鍵查值會查不到陣列元素 → 顯示停用 → 管理者存檔即撤銷有效授權. 本函數與伺服端共用 cvKpToArr 之解碼(單一擁有者),
  * 並使「編輯器顯示啟用 ⇔ 該元素被伺服端採納(納入合併; 元素層級, 非最終權限樹)」.
  *
- * 存檔後授權不變(複審 R3／R4, 規則帳本 R-AUTH-ORDER-01／R-AUTH-LOSSY-01): 解碼後之鍵序即伺服端序, 編輯器以 keepKeyOrder 保留原鍵序後寫出;
- * 物件形式無法無損表示之格(同名有效 OR／AND 並存; 有效 AND 名稱 ≥ 2 且第一個 AND 名稱因整數式鍵先排而易位)由 getKpLossy 判定,
- * 編輯器對之拒存並顯示固定訊息(authLossyBlocked), 不寫出. 其餘格(含兩個以上 AND 群組)在保序下存檔前後授權相等(unit-cvKpToObj PR-001／PR-001b／PR-003／PR-004 窮舉).
+ * 存檔後授權不變(複審 R3／R4, 規則帳本 R-AUTH-LOSSY-01): 合併規則與項目之儲存順序、物件鍵序、陣列元素序無關(R-AUTH-MERGE-00 第 4 條), 故編輯器不需保留原鍵序;
+ * 物件形式無法無損表示之格(同名有效 OR／AND 並存)由 getKpLossy 判定, 編輯器對之拒存並顯示固定訊息(authLossyBlocked), 不寫出.
+ * 其餘格(含兩個以上 AND 群組)存檔前後授權相等(unit-cvKpToObj PR-001／PR-001b／PR-003／PR-004 窮舉).
  *
- * - opt.hasMode 為 false(預設, crules): 伺服端 mergeRules 以 kpRule[vv.name] = vv.isActive 收斂, 鍵經 JS 屬性鍵轉型(true → 'true'、['T1'] → 'T1'、非物件元素之索引 → '0'),
- *   同名後者覆蓋前者; 本函數以同一個指派式 o[r.name] = … 取得相同鍵與相同覆蓋順序(crules 之合併與順序無關, 無有損格).
- * - opt.hasMode 為 true(cgrups／cpemis): 伺服端 arrFinder 以 === 比對名稱(非字串名稱不授權), 且 isActive 為 'y' 而 mode 非 OR／AND 者不納入合併(不授權).
- *   故僅名稱為非空字串者保留; isActive 為 'y' 而 mode 不合法者改為 'n'(顯示停用——否則存檔會補預設 OR 而把「不授權」變成「授權」); 同名重複者, 各「有效啟用元素」(isActive 'y' 且 mode 合法)
- *   模式一致時合為一個啟用項(與伺服端逐項合併等價: 同模式同規則之重複不改變結果); 無有效啟用元素時為 'n'; 同名 AND 與 OR 並存者(物件形式無法無損表示, 由 getKpLossy 判定並拒存)
- *   此處僅取 AND 支作為顯示值. 鍵序: 有效啟用元素首次出現之序在前(伺服端 AND 合併之第一個 AND 項依此序), 其後為無有效元素之名稱(首次出現之序);
- *   整數式名稱(如 '1')受 JS 屬性序影響恆排前面, 該格由 getKpLossy 判定.
+ * - opt.hasMode 為 false(預設, crules): 伺服端 mergeRules 以 kpRule[vv.name] 收斂, 鍵經 JS 屬性鍵轉型(true → 'true'、['T1'] → 'T1'、非物件元素之索引 → '0'),
+ *   同名重複列所有列皆 y 才 y(任一列非 y 即 n, 與列序無關; 舊規則為後者覆蓋前者); 本函數以同一個鍵轉型(getPropKey)取得相同鍵與相同收斂結果;
+ *   屬性鍵轉型必拋者(name 為 { toString: null } 等物件, 伺服端 mergeRules 同樣略過)略過該元素, 不拋 TypeError(R-KEY-PROP-01).
+ * - opt.hasMode 為 true(cgrups／cpemis): 伺服端 findRefRows 以 === 比對名稱, isActive 為 'y' 之引用一律參與合併(R-PRINCIPLE-00 c／e／f): 查無實體(懸空)者內容全 n、
+ *   mode 缺或非法者視為 AND 限制項(只當交集項、不單獨當基底;該層無合法 mode 之啟用項時全 n,見 getKpLossy)、名稱為空字串者照常(與名稱為 '' 之列相符, 否則為懸空). 故名稱為字串者(含 '')保留; isActive 為 'y' 而 mode 不合法者改為 mode 'AND'(與伺服端同解讀,
+ *   存檔後授權不變——改為停用會丟掉 AND 限制而放寬, 補預設 OR 則多給); 同名重複者, 各啟用元素之有效模式一致時合為一個啟用項(與伺服端逐項合併等價: 同模式同名之重複不改變結果);
+ *   無啟用元素時為 'n'; 同名 AND 與 OR 並存者(物件形式無法無損表示, 由 getKpLossy 判定並拒存)此處僅取 AND 支作為顯示值. 名稱非字串之元素(物件形式無法表示)略過, 由 getKpLossy 判定並拒存.
+ *   鍵序: 名稱首次出現之序(僅供顯示, 不影響授權).
  *
- * 物件形式: 值為物件者去掉值內 name(外層鍵為名, 規則帳本 R-AUTH-PATH-01: 否則關聯對話框存檔會把授權改指到值內 name 所指之項目); hasMode 時另把 isActive 'y' 而 mode 不合法者改為 'n'.
+ * 物件形式: 值為物件者去掉值內 name(外層鍵為名, 規則帳本 R-AUTH-PATH-01: 否則關聯對話框存檔會把授權改指到值內 name 所指之項目); hasMode 時另把 isActive 'y' 而 mode 不合法者改為 mode 'AND'
+ * (伺服端以之為限制項; 該層無任何合法 mode 之啟用項時 getKpLossy 判有損而拒存); hasMode 時非物件值(舊式簡寫 { G1: 'y' })改為 { isActive: 值 }(值為 'y' 者另加 mode 'AND').
  * 無需修改時原樣回傳(同一參考, 既有行為不變). 陣列形式一律回傳無原型物件(原型鍵名〔__proto__、constructor、toString〕可為一般鍵).
  *
  * @param {Object|Array} kp 輸入 JSON5.parse(cgrups／cpemis／crules) 之結果
@@ -37,7 +40,7 @@ import isAuthMode from './isAuthMode.mjs'
  * console.log(kp.A)
  * // => { mode: 'OR', isActive: 'y' }
  * console.log(cvKpToObj([{ name: 'A', isActive: 'y' }], { hasMode: true }).A)
- * // => { isActive: 'n' }  (缺 mode: 伺服端不授權)
+ * // => { isActive: 'y', mode: 'AND' }  (缺 mode: 伺服端視為 AND 限制項, R-PRINCIPLE-00 e)
  *
  */
 function cvKpToObj(kp, opt = {}) {
@@ -56,9 +59,17 @@ function cvKpToObj(kp, opt = {}) {
                 nv = { ...v }
                 delete nv.name
                 if (hasMode && nv.isActive === 'y' && !isAuthMode(nv.mode)) {
-                    nv.isActive = 'n'
+                    nv.mode = getEffMode(nv.mode) //伺服端視 mode 缺或非法者為 AND(R-PRINCIPLE-00 e): 編輯器同樣顯示並存為 AND, 存檔後授權不變(改為停用或 OR 皆會改變授權)
                 }
-                changed = changed || ('name' in v) || (nv.isActive !== v.isActive)
+                changed = changed || ('name' in v) || (nv.isActive !== v.isActive) || (nv.mode !== v.mode)
+            }
+            else if (hasMode) {
+                //非物件值(舊式簡寫 { G1: 'y' }): 伺服端 cvKpToArr 解為 { name, isActive: 值 }(無 mode)——啟用者 mode 缺, 與 mode 非法同解讀; 編輯器以物件值統一表示
+                nv = { isActive: v }
+                if (v === 'y') {
+                    nv.mode = 'AND'
+                }
+                changed = true
             }
             o[k] = nv
         })
@@ -70,39 +81,39 @@ function cvKpToObj(kp, opt = {}) {
     let o = Object.create(null)
     if (!hasMode) {
         eachOwn(arr, (r) => {
+            let k = getPropKey(r.name) //同伺服端 mergeRules: 屬性鍵轉型必拋者(如 { toString: null })不對應任何規則, 略過而非拋 TypeError(R-KEY-PROP-01)
+            if (k === null) {
+                return true //跳出換下一個
+            }
             let rest = { ...r }
             delete rest.name
-            o[r.name] = rest //同伺服端 kpRule[vv.name] = vv.isActive: 鍵轉型與覆蓋順序相同
+            if (k in o) {
+                rest.isActive = (o[k].isActive === 'y' && rest.isActive === 'y') ? 'y' : 'n' //同伺服端 mergeRules: 同名重複列所有列皆 y 才 y(與列序無關)
+            }
+            o[k] = rest
         })
         return o
     }
     let seen = [] //名稱之首次出現序(kpG 為物件, 整數式鍵會被 JS 屬性序重排, 故另存陣列)
-    let kpG = Object.create(null) //名稱 → { acts: 有效啟用元素, last: 最後一個元素, effAt: 首個有效啟用元素之位置(無則 -1) }
-    eachOwn(arr, (r, i) => {
-        if (!isestr(r.name)) { //伺服端 arrFinder 以 === 比對, 非字串(含元素非物件之索引名稱)不授權
+    let kpG = Object.create(null) //名稱 → { acts: 有效啟用元素, last: 最後一個元素 }
+    eachOwn(arr, (r) => {
+        if (typeof r.name !== 'string') { //非字串名稱(含元素非物件之索引名稱)物件形式無法表示: 以 === 比對不到任何群組／權限, 但啟用者仍以懸空引用參與合併, 由 getKpLossy 判定並拒存(R-PRINCIPLE-00 f)
             return true //跳出換下一個
         }
         let rest = { ...r }
         delete rest.name
         if (!(r.name in kpG)) {
-            kpG[r.name] = { acts: [], last: null, effAt: -1 }
+            kpG[r.name] = { acts: [], last: null }
             seen.push(r.name)
         }
         kpG[r.name].last = rest
-        if (rest.isActive === 'y' && isAuthMode(rest.mode)) {
-            kpG[r.name].acts.push(rest)
-            if (kpG[r.name].effAt < 0) {
-                kpG[r.name].effAt = i
-            }
+        if (rest.isActive === 'y') { //啟用元素一律參與合併: mode 缺或非法者視為 AND 限制項(R-PRINCIPLE-00 e; 有合法項時與 AND 等價), 空字串名稱亦保留(R-PRINCIPLE-00 f)
+            kpG[r.name].acts.push({ ...rest, mode: getEffMode(rest.mode) })
         }
     })
 
-    //鍵序(R-AUTH-ORDER-01): 有效啟用元素首次出現之序在前(停用或缺 mode 之元素不算, 否則停用在前者會使伺服端之第一個 AND 項易位), 其後為無有效元素之名稱(首次出現之序)
-    let names = [
-        ...seen.filter((n) => kpG[n].effAt >= 0).sort((a, b) => kpG[a].effAt - kpG[b].effAt),
-        ...seen.filter((n) => kpG[n].effAt < 0),
-    ]
-    eachOwn(names, (name) => {
+    //鍵序無關授權(R-AUTH-MERGE-00 第 4 條), 依名稱首次出現之序輸出
+    eachOwn(seen, (name) => {
         let g = kpG[name]
         let modes = []
         eachOwn(g.acts, (a) => {

@@ -220,13 +220,15 @@ const cases = [
             assert.equal(cpemis['權限P3'].mode, 'AND', 'M1 對 權限P3 mode 應為所選 AND')
             //【端到端核心不變式：權限變更 → 解析後權限樹】驗的是外部應用 getPermUserInfor 實際查到的 resolved 權限，
             //非只驗 cpemis 設定存對。peter 屬 M1；M1 加 P3(AND) 後，peter 樹反映 AND 交集：baseline (P1∪P2)=4 個
-            //（A/頁A/區塊A,A/頁C,B/頁A/區塊A,B/頁A/區塊B）∩ P3 → B/頁A/區塊A 被交集掉，剩 3 個（A/頁A/區塊A 不在 P3 故保留）。
+            //（A/頁A/區塊A,A/頁C,B/頁A/區塊A,B/頁A/區塊B）∩ P3 → 新規則（R-AUTH-MERGE-00，AND 項未列之管理對象視同 n）下
+            //B/頁A/區塊A 被交集掉（P3 明列 n 或未列皆同），A/頁A/區塊A 亦因 P3 未列而被收回，剩 2 個
+            //（2026-10-21 起；舊規則「AND 未列不約束」保留 A/頁A/區塊A 而剩 3 個）。
             //預期值由 getUserRules 演算法算出（實作 src/plugins/mShare.mjs 之 getUserRules，
-            //經 server/WWebPerm.mjs 之 getPermUserInfor 呼叫；該演算法之單元層驗證見 test/getUserRules.test.mjs）；
+            //經 server/WWebPerm.mjs 之 getPermUserInfor 呼叫；該演算法之單元層驗證見 test/unit-getUserRules.test.mjs、test/unit-authMerge.test.mjs SP-REAL-004）；
             //若 AND 交集邏輯或 UI→DB→解析任一環壞掉，此斷言會抓到。
             const tree = await getResolvedActiveTargets(page, 'id-for-peter')
-            assert.deepEqual(tree, ['專案A/頁A/區塊A', '專案A/頁C', '專案B/頁A/區塊B'],
-                `peter 解析後權限樹應反映 M1+=P3(AND) 之交集效果（baseline 4→3；實得 ${JSON.stringify(tree)}）`)
+            assert.deepEqual(tree, ['專案A/頁C', '專案B/頁A/區塊B'],
+                `peter 解析後權限樹應反映 M1+=P3(AND) 之交集效果（baseline 4→2；實得 ${JSON.stringify(tree)}）`)
         },
     },
 

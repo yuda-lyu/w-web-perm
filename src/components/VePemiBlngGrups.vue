@@ -140,16 +140,32 @@
                             :opt="opt"
                         >
                             <template v-slot:cell-render="props">
+                                <!-- 警告圖示: 該列群組之 cpemis 有衝突時於「所屬權限名稱」儲存格最左顯示, 理由與版面同 VeGrupBlngUsers 該處註解(無警告者與修前同一節點) -->
+                                <div
+                                    style="display:flex; align-items:center; height:100%;"
+                                    v-if="props.key==='pemisNames' && props.row.warnText"
+                                >
+                                    <span style="flex:0 0 auto; display:flex; align-items:center;" :title="props.row.warnText"><img style="vertical-align:sub; width:16px; height:16px; margin-right:4px;" :src="$ui.getIcon('warning')" /></span>
+                                    <RelationChips
+                                        style="flex:1 1 auto;"
+                                        :items="props.row.pemis"
+                                        :editable="isEditable"
+                                        :popupTitle="$t('belongPemisNames')"
+                                        :tooltipAll="$t('chipsShowAll')"
+                                        :labelContent="'modeSelect'"
+                                        @input="(item)=>{showVePemiBlngGrupsToggleItemModeByName(props.row.name, item, props.row.id)}"
+                                    ></RelationChips>
+                                </div>
                                 <RelationChips
-                                    v-if="props.key==='pemisNames'"
+                                    v-else-if="props.key==='pemisNames'"
                                     :items="props.row.pemis"
                                     :editable="isEditable"
                                     :popupTitle="$t('belongPemisNames')"
                                     :tooltipAll="$t('chipsShowAll')"
                                     :labelContent="'modeSelect'"
-                                    @input="(item)=>{showVePemiBlngGrupsToggleItemModeByName(props.row.name, item)}"
+                                    @input="(item)=>{showVePemiBlngGrupsToggleItemModeByName(props.row.name, item, props.row.id)}"
                                 ></RelationChips>
-                                <input v-else-if="props.key==='enable'" type="checkbox" :checked="props.value === 'y'" @click="showVePemiBlngGrupsToggleItemEnableByName(props.row.name)" :disabled="!isEditable" />
+                                <input v-else-if="props.key==='enable'" type="checkbox" :checked="props.value === 'y'" @click="showVePemiBlngGrupsToggleItemEnableByName(props.row.name, props.row.id)" :disabled="!isEditable" />
                                 <span v-else>{{ props.value }}</span>
                             </template>
                         </WAggridVue>
@@ -181,7 +197,6 @@ import size from 'lodash-es/size.js'
 import filter from 'lodash-es/filter.js'
 import join from 'lodash-es/join.js'
 import sortBy from 'lodash-es/sortBy.js'
-import isEqual from 'lodash-es/isEqual.js'
 import cloneDeep from 'lodash-es/cloneDeep.js'
 import genPm from 'wsemi/src/genPm.mjs'
 import haskey from 'wsemi/src/haskey.mjs'
@@ -192,8 +207,10 @@ import eachOwn from '../js/eachOwn.mjs'
 import getOwn from '../js/getOwn.mjs'
 import cvKpToObj from '../js/cvKpToObj.mjs'
 import getKpLossy from '../js/getKpLossy.mjs'
-import getKpWriteLost from '../js/getKpWriteLost.mjs'
 import fmtLossyMsg from '../js/fmtLossyMsg.mjs'
+import pairRowsToSnapshot from '../js/pairRowsToSnapshot.mjs'
+import { getRefState, getRawModeMap, putRefEntry } from '../js/editorRefRows.mjs'
+import { getRefWarns, getRefWarnText } from '../js/getAuthWarn.mjs'
 import WDialog from 'w-component-vue/src/components/WDialog.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
 import WAggridVue from 'w-aggrid-vue/src/components/WAggridVue.vue'
@@ -548,6 +565,23 @@ export default {
             return rows
         },
 
+        getDisplayRows: function() {
+            let vo = this
+
+            //cmp
+            let cmp = get(vo, '$refs.rftable')
+            // console.log('cmp', cmp)
+
+            //getDisplayData 只回傳顯示中之欄位(name／enable／pemisNames), 不含 id; 批次勾選須以 id 定位列(群組表可有歷史同名), 故另以 ag-grid api 取篩選排序後之完整列(含 id), 同 VeGrupBlngUsers
+            let api = cmp.getApi()
+            let rows = []
+            api.forEachNodeAfterFilterAndSort((node) => {
+                rows.push(node.data)
+            })
+
+            return rows
+        },
+
         fltKpPemi: function(kp) {
             // console.log('fltKpPemi', kp)
 
@@ -579,8 +613,12 @@ export default {
             //items
             let items = map(grups, (g) => {
 
-                //kpPemi
-                let kpPemi = cvKpToObj(JSON5.parse(g.cpemis), { hasMode: true })
+                //kpPemi, 空字串(新增列之 funNew 預設值)與壞 JSON 視為空容器, 同 VeCpemis／清單頁／伺服端(R-REL-PARSE-01: 任一列解碼失敗不得使對話框打不開)
+                let kpPemi = Object.create(null)
+                try {
+                    kpPemi = cvKpToObj(JSON5.parse(g.cpemis), { hasMode: true })
+                }
+                catch (err) {}
                 // console.log(g.name, 'kpPemi', kpPemi)
 
                 //fltKpPemi
@@ -594,16 +632,12 @@ export default {
                 eachOwn(kpPemi, (v, k) => {
                     // console.log(k, 'v', v)
 
-                    //_isActive, 此為使用者cpemis內設定, 可為y或n, 僅提取y, 再判斷此使用者是否有使用此pemi
-                    let _isActive = get(v, 'isActive', '')
-                    if (_isActive !== 'y') {
+                    //st, 此為使用者cpemis內設定, 可為y或n, 僅提取y, 再判斷此使用者是否有使用此pemi; 與伺服端同解讀(getRefState, 理由同 VeGrupBlngUsers.genItems)
+                    let st = getRefState(v)
+                    if (st.enable !== 'y') {
                         return true //跳出換下一個
                     }
-                    // console.log(k, '_isActive', _isActive)
-
-                    //_mode
-                    let _mode = get(v, 'mode', '')
-                    // console.log(k, '_mode', _mode)
+                    // console.log(k, 'st', st)
 
                     //b, 使用者是否擁有指定權限群組
                     let b = k === pemi.name
@@ -612,14 +646,15 @@ export default {
                     //mode, isActive
                     if (b) {
                         enable = 'y'
-                        mode = _mode //使用使用者給予cpemis內指定權限群組之合併權限模式
+                        mode = st.mode //使用使用者給予cpemis內指定權限群組之合併權限模式
                         // console.log('使用使用者給予cpemis內指定權限群組之合併權限模式 pemi', pemi)
                     }
 
-                    //push
+                    //push, 僅供 RelationChips 顯示(name／mode／enable); 存檔不讀本陣列(doSave 以 putRefEntry 自快照字串只改本權限一項)
                     pemis.push({
                         name: k,
-                        ...v,
+                        mode: st.mode,
+                        isActive: 'y',
                         enable: b ? 'y' : 'n', //給render使用
                     })
 
@@ -631,13 +666,19 @@ export default {
                 pemisNames = join(pemisNames, ' ')
                 // console.log(g.name, 'pemisNames', pemisNames)
 
+                //warnText: 該群組 cpemis 之衝突提示(理由同 VeGrupBlngUsers.genItems; revRows 不回寫本欄, 警告反映開啟時之已儲存資料)
+                let resWarn = getRefWarns(g.cpemis, vo.pemis)
+                let warnText = resWarn.hasWarn ? getRefWarnText(resWarn, vo.$t, 'warnKindPemi') : ''
+
                 return {
+                    id: g.id, //列識別: 存檔時以 id(並驗 name)配對存檔當下之群組快照, 不以列索引(R-REL-PAIR-01)
                     name: g.name,
                     pemisNames,
                     mode,
                     enable,
                     // kpPemi,
                     pemis,
+                    warnText,
                 }
             })
             // console.log(g.name, 'items', items)
@@ -662,11 +703,20 @@ export default {
             let rows = get(vo, 'opt.rows', [])
             // console.log('rows', rows)
 
-            //grups
-            grups = map(grups, (g, kg) => {
+            //以列身分(id)配對: 對話框之列 ↔ 目前 store 中同一個群組(R-REL-PAIR-01; 不得以列索引配對——store 於對話框開啟期間可被更新〔他人增刪、改 order〕而錯位), 並驗 name 相同(改名視為過期)
+            //krs, grupsRev: 對話框有列且 store 仍存在之群組(grupsRev[k] 即第 krs[k] 列所配到者; 配對不到者不更新其顯示, 存檔時由 doSave 整次拒存)
+            let { krs, matched: grupsRev } = pairRowsToSnapshot(rows, grups, { verifyKeys: ['name'] })
 
-                //kpPemi
-                let kpPemi = cvKpToObj(JSON5.parse(g.cpemis), { hasMode: true })
+            //grups
+            grups = map(grupsRev, (g, kg) => {
+                let row = get(rows, krs[kg], {})
+
+                //kpPemi, 空字串與壞 JSON 視為空容器(R-REL-PARSE-01)
+                let kpPemi = Object.create(null)
+                try {
+                    kpPemi = cvKpToObj(JSON5.parse(g.cpemis), { hasMode: true })
+                }
+                catch (err) {}
                 // console.log(g.name, 'kpPemi', kpPemi)
 
                 //fltKpPemi
@@ -674,7 +724,7 @@ export default {
                 // console.log(g.name, 'kpPemi(fltKpPemi)', kpPemi)
 
                 //mode
-                let mode = get(rows, `${kg}.mode`, '')
+                let mode = get(row, 'mode', '')
                 if (mode !== 'OR' && mode !== 'AND') {
                     console.log(`非預期: mode應該皆已指定不應觸發`, mode)
                     mode = 'OR'
@@ -682,7 +732,7 @@ export default {
                 // console.log(g.name, 'mode', mode)
 
                 //enable
-                let enable = get(rows, `${kg}.enable`, '')
+                let enable = get(row, 'enable', '')
                 if (enable !== 'y' && enable !== 'n') {
                     console.log(`非預期: enable應該皆已指定不應觸發`, enable)
                     enable = 'n'
@@ -715,8 +765,8 @@ export default {
             let items = vo.genItems(pemi, grups)
             // console.log('items', items)
 
-            //update pemisNames, pemis
-            each(items, (r, kr) => {
+            //update pemisNames, pemis, items 與 krs 同序(item k 對應對話框第 krs[k] 列)
+            each(items, (r, k) => {
                 // name: g.name,
                 // pemisNames,
                 // mode,
@@ -724,6 +774,7 @@ export default {
                 // pemis,
 
                 //set
+                let kr = krs[k]
                 set(vo, `opt.rows[${kr}].pemisNames`, r.pemisNames)
                 set(vo, `opt.rows[${kr}].pemis`, r.pemis)
                 // console.log('vo.opt.rows[kr]', cloneDeep(vo.opt.rows[kr]))
@@ -735,8 +786,8 @@ export default {
 
         },
 
-        showVePemiBlngGrupsToggleItemModeByName: function(name, mode) {
-            // console.log('showVePemiBlngGrupsToggleItemModeByName', name, mode)
+        showVePemiBlngGrupsToggleItemModeByName: function(name, mode, id) {
+            // console.log('showVePemiBlngGrupsToggleItemModeByName', name, mode, id)
 
             let vo = this
 
@@ -749,11 +800,11 @@ export default {
             //rows
             let rows = get(vo, 'opt.rows', [])
 
-            //find
+            //find, 有 id 以 id 找列(群組表可有歷史同名〔外部同步〕, 以 name 會改到第一個同名群組、存檔依 id 寫入錯列; 同 VeGrupBlngUsers); 未給 id 之既有 $dg 呼叫端維持以 name 找
             let r = null
             let kr = null
             each(rows, (v, k) => {
-                if (get(v, 'name', '') === name) {
+                if (isestr(id) ? get(v, 'id', '') === id : get(v, 'name', '') === name) {
                     r = v
                     kr = k
                     return false //跳出
@@ -782,8 +833,8 @@ export default {
 
         },
 
-        showVePemiBlngGrupsToggleItemEnableByName: function(name) {
-            // console.log('showVePemiBlngGrupsToggleItemEnableByName', name)
+        showVePemiBlngGrupsToggleItemEnableByName: function(name, id) {
+            // console.log('showVePemiBlngGrupsToggleItemEnableByName', name, id)
 
             let vo = this
 
@@ -796,11 +847,11 @@ export default {
             //rows
             let rows = get(vo, 'opt.rows', [])
 
-            //find
+            //find, 理由同 showVePemiBlngGrupsToggleItemModeByName: 有 id 以 id 找列
             let r = null
             let kr = null
             each(rows, (v, k) => {
-                if (get(v, 'name', '') === name) {
+                if (isestr(id) ? get(v, 'id', '') === id : get(v, 'name', '') === name) {
                     r = v
                     kr = k
                     return false //跳出
@@ -839,21 +890,21 @@ export default {
             let rows = get(vo, 'opt.rows', [])
             // console.log('rows', rows)
 
-            //kpRow
+            //kpRow, 以群組 id 為鍵(群組表可有歷史同名, 以 name 會使同名者互相錯位、存檔依 id 寫入錯列; 同 VeGrupBlngUsers)
             let kpRow = Object.create(null)
             each(rows, (r, kr) => {
-                kpRow[r.name] = kr
+                kpRow[r.id] = kr
             })
 
-            //rowsEff
-            let rowsEff = vo.getDisplayData()
+            //rowsEff, 篩選排序後之完整列(含 id; getDisplayData 不含 id)
+            let rowsEff = vo.getDisplayRows()
             // console.log('rowsEff', rowsEff)
 
             //toggle
             each(rowsEff, (r) => {
 
                 //kr
-                let kr = kpRow[r.name]
+                let kr = kpRow[r.id]
 
                 //set
                 set(vo, `opt.rows[${kr}].enable`, 'y')
@@ -878,21 +929,21 @@ export default {
             let rows = get(vo, 'opt.rows', [])
             // console.log('rows', rows)
 
-            //kpRow
+            //kpRow, 以群組 id 為鍵(群組表可有歷史同名, 以 name 會使同名者互相錯位、存檔依 id 寫入錯列; 同 VeGrupBlngUsers)
             let kpRow = Object.create(null)
             each(rows, (r, kr) => {
-                kpRow[r.name] = kr
+                kpRow[r.id] = kr
             })
 
-            //rowsEff
-            let rowsEff = vo.getDisplayData()
+            //rowsEff, 篩選排序後之完整列(含 id; getDisplayData 不含 id)
+            let rowsEff = vo.getDisplayRows()
             // console.log('rowsEff', rowsEff)
 
             //toggle
             each(rowsEff, (r) => {
 
                 //kr
-                let kr = kpRow[r.name]
+                let kr = kpRow[r.id]
 
                 //set
                 set(vo, `opt.rows[${kr}].enable`, 'n')
@@ -917,21 +968,21 @@ export default {
             let rows = get(vo, 'opt.rows', [])
             // console.log('rows', rows)
 
-            //kpRow
+            //kpRow, 以群組 id 為鍵(群組表可有歷史同名, 以 name 會使同名者互相錯位、存檔依 id 寫入錯列; 同 VeGrupBlngUsers)
             let kpRow = Object.create(null)
             each(rows, (r, kr) => {
-                kpRow[r.name] = kr
+                kpRow[r.id] = kr
             })
 
-            //rowsEff
-            let rowsEff = vo.getDisplayData()
+            //rowsEff, 篩選排序後之完整列(含 id; getDisplayData 不含 id)
+            let rowsEff = vo.getDisplayRows()
             // console.log('rowsEff', rowsEff)
 
             //toggle
             each(rowsEff, (r) => {
 
                 //kr
-                let kr = kpRow[r.name]
+                let kr = kpRow[r.id]
 
                 //enable
                 let _enable = get(r, 'enable', 'n')
@@ -1018,10 +1069,21 @@ export default {
                 //本對話框所管之歸屬／模式有變更 → 整次儲存拒絕並點名(原子, 其餘列亦不寫); 未變更 → 該列字串逐字元不動(見下方 kpLossyIdx)
                 //群組列之快照只取這一次: 有損檢查之值即下方寫入之值(外審 sol#2: 兩次讀取之間 store 可能被伺服器推送更新, 檢查與寫入看到不同資料)
                 let grups = cloneDeep(vo.grups)
+
+                //1a) 以列身分(id, 並驗 name)配對快照(R-REL-PAIR-01, 主控 run02 F-24): 修前以開框時的列索引取快照列, store 於對話框開啟期間被更新(他人增刪、改 order)時關聯寫到另一個群組;
+                //對話框有列所對應的群組已被刪除或改名者 → 整次拒存(原子, 不寫任何列)並提示重新整理, 不得退而配到其他列
+                let { pairs, missing } = pairRowsToSnapshot(rows, grups, { verifyKeys: ['name'] })
+                if (size(missing) > 0) {
+                    unlockBtn()
+                    await vo.$dg.showCheckYes(fmtLossyMsg(vo.$t('relationRowsStale'), map(missing, 'name')))
+                    return false
+                }
+
                 let kpLossyIdx = Object.create(null)
+                let kpRawModes = Object.create(null) //列索引 → 該列快照字串之限制項原始 mode(getRawModeMap), 供下方 putRefEntry 寫回未改之限制項
                 let lossyNames = []
                 each(rows, (r, kr) => {
-                    let g = get(grups, kr, {})
+                    let g = pairs[kr]
                     let kpRaw = null
                     try {
                         kpRaw = JSON5.parse(get(g, 'cpemis', ''))
@@ -1029,6 +1091,7 @@ export default {
                     catch (err) {
                         return true //無法解析者交由下方原流程處理
                     }
+                    kpRawModes[kr] = getRawModeMap(kpRaw)
                     if (size(getKpLossy(kpRaw)) === 0) {
                         return true //跳出換下一個
                     }
@@ -1056,14 +1119,13 @@ export default {
 
                 //grups: 沿用 1b 之快照(見上)
 
-                //grupsNew, lostRows: 欲寫出之鍵序被 JS 屬性序改變而使有效 AND 項易位之群組(整次拒絕, 見下)
-                let lostRows = []
+                //grupsNew
                 let grupsNew = map(rows, (r, kr) => {
 
-                    //g
-                    let g = get(grups, kr, {})
+                    //g, 以列身分配對之快照列(見 1a)
+                    let g = pairs[kr]
 
-                    //有損列(kpLossyIdx): 歸屬未變更, 字串逐字元不動(含 isEqual 判定為「不同」時之重寫)
+                    //有損列(kpLossyIdx): 歸屬未變更, 字串逐字元不動
                     if (kpLossyIdx[kr] === true) {
                         return g
                     }
@@ -1071,47 +1133,26 @@ export default {
                     //cpemis
                     let cpemis = get(g, 'cpemis', '')
 
-                    //kpPemi
-                    let kpPemi = cvKpToObj(JSON5.parse(cpemis), { hasMode: true })
+                    //kpPemi, 空字串與壞 JSON 視為空容器(R-REL-PARSE-01)
+                    let kpPemi = Object.create(null)
+                    try {
+                        kpPemi = cvKpToObj(JSON5.parse(cpemis), { hasMode: true })
+                    }
+                    catch (err) {}
                     // console.log('kpGrup', kpGrup)
 
-                    //pemis
-                    let pemis = get(r, 'pemis', [])
-
-                    //kpPemiNew
+                    //kpPemiNew: 只改本權限對應之一項(依列之 enable／mode), 其餘引用項(含懸空、名稱 ''、mode 缺/非法、停用項、純量值)原樣保留, 授權效果不變(putRefEntry; 理由同 VeGrupBlngUsers.doSave)
+                    //本項未變更 → 回 false, 字串逐字元不動; 其餘項中之限制項寫回原始 mode(kpRawModes[kr]; 理由同 VeGrupBlngUsers.doSave)
                     let kpPemiNew = Object.create(null)
-                    if (true) {
-                        each(pemis, (p) => {
-                            if (p.isActive === 'y') {
-                                kpPemiNew[p.name] = {
-                                    mode: p.mode,
-                                    isActive: p.isActive,
-                                }
-                            }
-                        })
-                    }
+                    if (putRefEntry(kpPemiNew, kpPemi, get(vo, 'pemi.name', ''), get(r, 'enable', ''), get(r, 'mode', ''), kpRawModes[kr])) {
 
-                    //check
-                    if (!isEqual(kpPemi, kpPemiNew)) {
-
-                        //欲寫出之鍵序被 JS 屬性序改變而使有效 AND 項易位(如新啟用整數式名稱之 AND 權限) → 授權會改變, 不寫出(外審 minimax#2)
-                        if (size(getKpWriteLost(kpPemi, kpPemiNew)) > 0) { //預期序由 kpPemi(解碼後之原資料)與 kpPemiNew 於函數內導出——不可用本處已套用 JS 屬性序之物件序(外審 minimax 第二輪#1)
-                            lostRows.push(get(g, 'name', ''))
-                            return g
-                        }
-
-                        //cpemis
+                        //cpemis(鍵序無關授權, R-AUTH-MERGE-00 第 4 條: 不需保留原鍵序, 亦無整數式名稱易位之拒存)
                         g.cpemis = JSON.stringify(kpPemiNew)
 
                     }
 
                     return g
                 })
-                if (size(lostRows) > 0) {
-                    vo.$ui.updateLoading(false) //showCheckYes 前關 loading
-                    await vo.$dg.showCheckYes(fmtLossyMsg(vo.$t('authLossyBlocked'), lostRows))
-                    return false
-                }
                 console.log('grupsNew', grupsNew)
 
                 // //check

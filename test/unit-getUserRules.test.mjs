@@ -296,10 +296,10 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'A'), 'n')
         })
 
-        it('UNIT-005b-AND 非對稱性：key 只存在於 obj1 → 保留 obj1 的值', function() {
+        it('UNIT-005b-AND 對稱性（R-AUTH-MERGE-00，取代 ADR-001 非對稱）：key 只存在於 obj1 → 視 obj2 為未給＝n，結果為 n', function() {
             // P1 有 A 和 B，P2 只有 A
-            // AND 以 P1 為基底，P2 只影響 A
-            // B 不在 P2 中，保留 P1 的值
+            // 新規則：每一項「未給」＝ n，AND 為所有項之交集；B 在 P2 未給 → n
+            // （舊規則：以 P1 為基底、B 不在 P2 → 保留 P1 的 y）
             let targets = [t('A'), t('B')]
             let pemis = [
                 p('P1', { A: 'y', B: 'y' }),
@@ -310,14 +310,12 @@ describe('getUserRules - 權限樹組裝', function() {
 
             let { rules } = getUserRules(user, grups, pemis, targets)
             assert.strictEqual(ruleOf(rules, 'A'), 'y')
-            assert.strictEqual(ruleOf(rules, 'B'), 'y') // B 保留自 P1
+            assert.strictEqual(ruleOf(rules, 'B'), 'n') // B 在 P2 未給 → n
         })
 
-        it('UNIT-005c-AND 非對稱性：key 只存在於 obj2 → 強制為 n', function() {
+        it('UNIT-005c-AND 對稱性（R-AUTH-MERGE-00）：key 只存在於 obj2 → 視 obj1 為未給＝n，結果為 n（與 005b 對調順序同結果）', function() {
             // P1 只有 A，P2 有 A 和 B
-            // AND 以 P1 為基底 {A:'y'}，遍歷 P2：
-            //   A: 都是 y → y
-            //   B: 不在 P1 → 加入為 n
+            // B 在 P1 未給 → n（舊規則亦為 n；本案例保留以固定「兩種儲存順序結果相同」）
             let targets = [t('A'), t('B')]
             let pemis = [
                 p('P1', { A: 'y' }),
@@ -328,7 +326,19 @@ describe('getUserRules - 權限樹組裝', function() {
 
             let { rules } = getUserRules(user, grups, pemis, targets)
             assert.strictEqual(ruleOf(rules, 'A'), 'y')
-            assert.strictEqual(ruleOf(rules, 'B'), 'n') // B 不在 P1，強制 n
+            assert.strictEqual(ruleOf(rules, 'B'), 'n') // B 在 P1 未給 → n
+        })
+
+        it('UNIT-005g-AND 交換律：P1、P2 在 cpemis 之順序對調，結果相同（R-AUTH-MERGE-00 第 4 條；舊規則：P1 在前得 {A,B}、P2 在前得 {A}）', function() {
+            let targets = [t('A'), t('B')]
+            let pemis = [
+                p('P1', { A: 'y', B: 'y' }),
+                p('P2', { A: 'y' }),
+            ]
+            let r12 = getUserRules(u({ G1: OR }), [g('G1', { P1: AND, P2: AND })], pemis, targets).rules
+            let r21 = getUserRules(u({ G1: OR }), [g('G1', { P2: AND, P1: AND })], pemis, targets).rules
+            assert.deepStrictEqual(rulesToMap(r12), { A: 'y', B: 'n' })
+            assert.deepStrictEqual(rulesToMap(r21), { A: 'y', B: 'n' })
         })
 
     })
@@ -365,6 +375,261 @@ describe('getUserRules - 權限樹組裝', function() {
 
             let { rules } = getUserRules(user, grups, pemis, targets)
             assert.strictEqual(ruleOf(rules, 'A'), 'n')
+        })
+
+    })
+
+
+    // ===========================================================
+    // 授權合併規則 R-AUTH-MERGE-00(使用者裁示 2026-10-21; ADR-033 取代 ADR-001 非對稱條)
+    // 每一項「未給」＝ n; 全對象 n 起點 → 所有 OR 聯集(無 OR 時第一個 AND 為基底)→ 與所有 AND 交集; 結果與排列順序無關
+    // ===========================================================
+    describe('UNIT-AM 授權合併規則(R-AUTH-MERGE-00)', function() {
+
+        // 使用者之例: 管理對象 a～e; x = { a:y, b:y, c:n }(d、e 未給), y = { b:y, d:y, e:y }(a、c 未給)
+        let targets = ['a', 'b', 'c', 'd', 'e'].map(t)
+        let pemis = [
+            p('PX', { a: 'y', b: 'y', c: 'n' }),
+            p('PY', { b: 'y', d: 'y', e: 'y' }),
+        ]
+        let yOf = (rules) => rules.filter((v) => v.isActive === 'y').map((v) => v.name).sort().join('')
+
+        // [x 模式, y 模式, 預期有權限之管理對象]
+        let cases = [
+            ['OR', 'OR', 'abde'], // x OR y = {a,b,d,e}
+            ['AND', 'AND', 'b'], // x AND y = y AND x = {b}
+            ['OR', 'AND', 'b'], // x OR + y AND: {a,b} ∩ {b,d,e} = {b}
+            ['AND', 'OR', 'b'], // y OR + x AND: {b,d,e} ∩ {a,b} = {b}
+        ]
+
+        it('UNIT-AM-001-權限層: 使用者之例——兩個權限四種模式組合，cpemis 之兩種儲存順序結果相同', function() {
+            cases.forEach(([mx, my, exp]) => {
+                let M = { OR, AND }
+                let xy = getUserRules(u({ G1: OR }), [g('G1', { PX: M[mx], PY: M[my] })], pemis, targets).rules
+                let yx = getUserRules(u({ G1: OR }), [g('G1', { PY: M[my], PX: M[mx] })], pemis, targets).rules
+                assert.strictEqual(yOf(xy), exp, `x ${mx} / y ${my} (x 先)`)
+                assert.strictEqual(yOf(yx), exp, `x ${mx} / y ${my} (y 先)`)
+            })
+        })
+
+        it('UNIT-AM-002-群組層: 同一組項目放在使用者下（兩個群組各含單一 OR 權限），cgrups 之兩種儲存順序結果相同', function() {
+            cases.forEach(([mx, my, exp]) => {
+                let M = { OR, AND }
+                let grups = [g('GX', { PX: OR }), g('GY', { PY: OR })]
+                let xy = getUserRules(u({ GX: M[mx], GY: M[my] }), grups, pemis, targets).rules
+                let yx = getUserRules(u({ GY: M[my], GX: M[mx] }), grups, pemis, targets).rules
+                assert.strictEqual(yOf(xy), exp, `x ${mx} / y ${my} (x 先)`)
+                assert.strictEqual(yOf(yx), exp, `x ${mx} / y ${my} (y 先)`)
+            })
+        })
+
+        it('UNIT-AM-003-陣列形式之元素順序、crules 物件鍵序皆不影響結果', function() {
+            let arr = (items) => JSON.stringify(items)
+            let grupsA = (order) => [{ name: 'G1', cpemis: arr(order.map(([n, m]) => ({ name: n, mode: m, isActive: 'y' }))) }]
+            let userA = { cgrups: arr([{ name: 'G1', mode: 'OR', isActive: 'y' }]) }
+            let a = getUserRules(userA, grupsA([['PX', 'AND'], ['PY', 'AND']]), pemis, targets).rules
+            let b = getUserRules(userA, grupsA([['PY', 'AND'], ['PX', 'AND']]), pemis, targets).rules
+            assert.strictEqual(yOf(a), 'b')
+            assert.strictEqual(yOf(b), 'b')
+            //crules 物件鍵序對調
+            let pemisRev = [
+                { name: 'PX', crules: '{"c":"n","b":"y","a":"y"}' },
+                { name: 'PY', crules: '{"e":"y","d":"y","b":"y"}' },
+            ]
+            let c = getUserRules(u({ G1: OR }), [g('G1', { PX: AND, PY: AND })], pemisRev, targets).rules
+            assert.strictEqual(yOf(c), 'b')
+        })
+
+        it('UNIT-AM-004-空 AND 項（未給任何對象）＝ 全 n: 與 OR 並存時把 OR 聯集全部收回，且與儲存順序無關（舊規則: 排前全 n、排後無影響）', function() {
+            let ps = [p('PE', {}), p('PO', { a: 'y', b: 'y' })]
+            let tg = [t('a'), t('b')]
+            let ao = getUserRules(u({ G1: OR }), [g('G1', { PE: AND, PO: OR })], ps, tg).rules
+            let oa = getUserRules(u({ G1: OR }), [g('G1', { PO: OR, PE: AND })], ps, tg).rules
+            assert.strictEqual(yOf(ao), '')
+            assert.strictEqual(yOf(oa), '')
+            //只有 AND（空 AND 與有授權 AND）
+            let ps2 = [p('PE', {}), p('PR', { a: 'y', b: 'y' })]
+            let e1 = getUserRules(u({ G1: OR }), [g('G1', { PE: AND, PR: AND })], ps2, tg).rules
+            let e2 = getUserRules(u({ G1: OR }), [g('G1', { PR: AND, PE: AND })], ps2, tg).rules
+            assert.strictEqual(yOf(e1), '')
+            assert.strictEqual(yOf(e2), '')
+        })
+
+        it('UNIT-AM-007-群組層: 內無有效權限之 AND 群組（其權限皆停用，或只引用查無之權限）＝ 全部 n，與 cgrups 儲存順序無關（spec E2E-014 ③④；外審 minimax R9: 原僅權限層有守護）', function() {
+            let tg = ['a', 'b'].map(t)
+            let ps = [p('PO', { a: 'y', b: 'y' })]
+            let gO = g('GO', { PO: OR })
+            //③ GE 內 PE 停用（pemis 表有 PE，但 cpemis 內 isActive=n）④ GE 只引用查無之權限 PX
+            let psAll = [...ps, p('PE', { a: 'y', b: 'y' })]
+            let gE3 = g('GE', { PE: { mode: 'OR', isActive: 'n' } })
+            let gE4 = g('GE', { PX: OR })
+            for (let [label, gE, pemisTbl] of [['③停用', gE3, psAll], ['④查無', gE4, ps]]) {
+                let ao = getUserRules(u({ GE: AND, GO: OR }), [gE, gO], pemisTbl, tg).rules
+                let oa = getUserRules(u({ GO: OR, GE: AND }), [gO, gE], pemisTbl, tg).rules
+                assert.strictEqual(yOf(ao), '', `${label} GE(AND) 在前`)
+                assert.strictEqual(yOf(oa), '', `${label} GE(AND) 在後`)
+                //對照：GE 為 OR 時不收回
+                let orGE = getUserRules(u({ GE: OR, GO: OR }), [gE, gO], pemisTbl, tg).rules
+                assert.strictEqual(yOf(orGE), 'ab', `${label} 對照: GE 為 OR 時由 GO 決定`)
+            }
+        })
+
+        it('UNIT-AM-008-整數式名稱（spec E2E-013 ④）: 權限名 "2"（a、b）與 "10"（只 a）皆 AND，物件形式與陣列形式、兩種元素序皆只有 a 為 y（外審 minimax R9）', function() {
+            let tg = ['a', 'b'].map(t)
+            let ps = [p('2', { a: 'y', b: 'y' }), p('10', { a: 'y' })]
+            let user = { cgrups: JSON.stringify({ G1: OR }) }
+            let run = (cpemis) => yOf(getUserRules(user, [{ name: 'G1', cpemis }], ps, tg).rules)
+            assert.strictEqual(run('{"10":{"mode":"AND","isActive":"y"},"2":{"mode":"AND","isActive":"y"}}'), 'a', '物件形式（JS 屬性序恆 2 在前）')
+            assert.strictEqual(run('{"2":{"mode":"AND","isActive":"y"},"10":{"mode":"AND","isActive":"y"}}'), 'a')
+            assert.strictEqual(run('[{"name":"10","mode":"AND","isActive":"y"},{"name":"2","mode":"AND","isActive":"y"}]'), 'a', '陣列形式 10 在前')
+            assert.strictEqual(run('[{"name":"2","mode":"AND","isActive":"y"},{"name":"10","mode":"AND","isActive":"y"}]'), 'a', '陣列形式 2 在前')
+        })
+
+        it('UNIT-AM-005-同一 crules（陣列形式）重複列同名規則: 所有列皆 y 才 y，與列之順序無關（舊規則: 後者覆蓋前者，順序相依）', function() {
+            let mk = (items) => [{ name: 'PA', crules: JSON.stringify(items.map((s) => ({ name: 'a', isActive: s }))) }]
+            let tg = [t('a')]
+            let run = (items) => getUserRules(u({ G1: OR }), [g('G1', { PA: OR })], mk(items), tg).rules
+            assert.strictEqual(yOf(run(['y', 'n'])), '')
+            assert.strictEqual(yOf(run(['n', 'y'])), '')
+            assert.strictEqual(yOf(run(['y', 'y'])), 'a')
+            assert.strictEqual(yOf(run(['n', 'n'])), '')
+        })
+
+        it('UNIT-AM-006-只會收回不會多給: 三個項目（OR／AND 任意組合）之全部排列，結果等於 (OR 聯集) ∩ (所有 AND)', function() {
+            let ps = [p('P1', { a: 'y', b: 'y' }), p('P2', { b: 'y', c: 'y' }), p('P3', { a: 'y', c: 'y', d: 'y' })]
+            let tg = ['a', 'b', 'c', 'd'].map(t)
+            let sets = { P1: ['a', 'b'], P2: ['b', 'c'], P3: ['a', 'c', 'd'] }
+            let names = ['P1', 'P2', 'P3']
+            let perms = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]]
+            for (let m1 of ['OR', 'AND']) {
+                for (let m2 of ['OR', 'AND']) {
+                    for (let m3 of ['OR', 'AND']) {
+                        let modes = { P1: m1, P2: m2, P3: m3 }
+                        let ors = names.filter((n) => modes[n] === 'OR')
+                        let ands = names.filter((n) => modes[n] === 'AND')
+                        let exp = tg.map((x) => x.id).filter((k) => (ors.length > 0 ? ors.some((n) => sets[n].includes(k)) : true) && ands.every((n) => sets[n].includes(k))).join('')
+                        perms.forEach((pm) => {
+                            let perm = {}
+                            pm.forEach((i) => { perm[names[i]] = { mode: modes[names[i]], isActive: 'y' } })
+                            let got = yOf(getUserRules(u({ G1: OR }), [g('G1', perm)], ps, tg).rules)
+                            assert.strictEqual(got, exp, `${m1}${m2}${m3} 順序 ${pm}`)
+                        })
+                    }
+                }
+            }
+        })
+
+    })
+
+
+    // ===========================================================
+    // UNIT-CDE: R-PRINCIPLE-00 適用表 c(懸空)／d(同名多列)／e(mode 非法)(run05; R-AUTH-MERGE-00 第 5 條之修改)
+    // c: 引用之群組／權限查無 → 該項以其 mode 參與、內容全 n; d: 名稱對到多筆 → 內容取各筆之交集; e: mode 缺或非 OR／AND → 視為 AND
+    // isActive 非 'y' 之引用不參與(不變)
+    // ===========================================================
+    describe('UNIT-CDE 懸空／同名多列／mode 非法(run05)', function() {
+
+        let tg = ['A', 'B', 'C'].map(t)
+        let yOf = (rules) => rules.filter((v) => v.isActive === 'y').map((v) => v.name).join('')
+        let pemis = [p('PAB', { A: 'y', B: 'y' }), p('PBC', { B: 'y', C: 'y' }), p('PA', { A: 'y' }), p('PALL', { A: 'y', B: 'y', C: 'y' })]
+        let grups = [g('GAB', { PAB: OR }), g('GBC', { PBC: OR }), g('GALL', { PALL: OR })]
+        let run = (user, gs = grups, ps = pemis) => yOf(getUserRules(user, gs, ps, tg).rules)
+
+        it('UNIT-CDE-c01-懸空 AND 使結果為空: 使用者 GALL(OR)＋GX(AND, 群組表查無) → 全 n(run04: GX 不計入 → ABC)', function() {
+            assert.strictEqual(run(u({ GALL: OR, GX: AND })), '')
+            assert.strictEqual(run(u({ GX: AND, GALL: OR })), '', '順序對調')
+        })
+
+        it('UNIT-CDE-c02-懸空 OR 無影響: GAB(OR)＋GX(OR, 查無) → AB, 與無 GX 者相同; 另有 AND GBC → B', function() {
+            assert.strictEqual(run(u({ GAB: OR, GX: OR })), 'AB')
+            assert.strictEqual(run(u({ GX: OR, GAB: OR, GBC: AND })), 'B')
+        })
+
+        it('UNIT-CDE-c03-OR 懸空＋AND X(無其他 OR) → 空: 有 OR 項使基底為 OR 聯集(懸空 OR 貢獻空集合)而非第一個 AND(run04: 以 GAB 為基底 → AB)', function() {
+            assert.strictEqual(run(u({ GX: OR, GAB: AND })), '')
+            assert.strictEqual(run(u({ GAB: AND, GX: OR })), '')
+        })
+
+        it('UNIT-CDE-c04-權限層同形: 群組內 PX(AND, 權限表查無) → 群組內容為空; PX(OR) → 不影響', function() {
+            assert.strictEqual(run(u({ G1: OR }), [g('G1', { PALL: OR, PX: AND })]), '')
+            assert.strictEqual(run(u({ G1: OR }), [g('G1', { PAB: OR, PX: OR })]), 'AB')
+            assert.strictEqual(run(u({ G1: OR }), [g('G1', { PX: OR, PAB: AND })]), '', 'OR 懸空＋AND PAB')
+        })
+
+        it('UNIT-CDE-c05-isActive 為 n 之懸空引用仍不參與(不收回): GALL(OR)＋GX(AND, 停用, 查無) → ABC; 權限層同', function() {
+            assert.strictEqual(run(u({ GALL: OR, GX: AND_OFF })), 'ABC')
+            assert.strictEqual(run(u({ G1: OR }), [g('G1', { PALL: OR, PX: AND_OFF })]), 'ABC')
+        })
+
+        it('UNIT-CDE-d01-同名兩群組列(歷史同名)取交集: G1 兩列(含 PAB、含 PBC) → B, 兩種表列順序相同(run04: 取第一列 → AB 或 BC)', function() {
+            let r1 = g('G1', { PAB: OR })
+            let r2 = g('G1', { PBC: OR })
+            assert.strictEqual(run(u({ G1: OR }), [r1, r2]), 'B')
+            assert.strictEqual(run(u({ G1: OR }), [r2, r1]), 'B')
+            assert.strictEqual(run(u({ GALL: OR, G1: AND }), [g('GALL', { PALL: OR }), r1, r2]), 'B', 'AND 引用同名兩列: ABC ∩ (AB ∩ BC)')
+        })
+
+        it('UNIT-CDE-d02-同名兩權限列取交集(權限層): P1 兩列 {A,B}、{B,C} → B, 兩種表列順序相同; 三列 {A,B,C}、{A,B}、{B,C} → B', function() {
+            let gs = [g('G1', { P1: OR })]
+            assert.strictEqual(run(u({ G1: OR }), gs, [p('P1', { A: 'y', B: 'y' }), p('P1', { B: 'y', C: 'y' })]), 'B')
+            assert.strictEqual(run(u({ G1: OR }), gs, [p('P1', { B: 'y', C: 'y' }), p('P1', { A: 'y', B: 'y' })]), 'B')
+            assert.strictEqual(run(u({ G1: OR }), gs, [p('P1', { A: 'y', B: 'y', C: 'y' }), p('P1', { A: 'y', B: 'y' }), p('P1', { B: 'y', C: 'y' })]), 'B')
+        })
+
+        it('UNIT-CDE-d03-同名多列其一內容為空 → 該項內容為空: 群組 G1 兩列(含 PAB、無權限) → 全 n; 權限 P1 兩列({A,B}、{}) → 全 n; 內容相同之兩列 → 同單一列', function() {
+            assert.strictEqual(run(u({ G1: OR }), [g('G1', { PAB: OR }), g('G1', {})]), '')
+            assert.strictEqual(run(u({ G1: OR }), [g('G1', { P1: OR })], [p('P1', { A: 'y', B: 'y' }), p('P1', {})]), '')
+            assert.strictEqual(run(u({ G1: OR }), [g('G1', { PAB: OR }), g('G1', { PAB: OR })]), 'AB')
+        })
+
+        it('UNIT-CDE-e01-mode 缺 → 視為 AND: 群組內 PALL(OR)＋PA({ isActive: y }, 無 mode) → A(run04: PA 不計入 → ABC)', function() {
+            assert.strictEqual(run(u({ G1: OR }), [g('G1', { PALL: OR, PA: { isActive: 'y' } })]), 'A')
+        })
+
+        it('UNIT-CDE-e02-mode 為 "or"(小寫)、"XOR"、"" → 視為 AND(群組層與權限層)', function() {
+            for (let m of ['or', 'XOR', '']) {
+                assert.strictEqual(run(u({ G1: OR }), [g('G1', { PALL: OR, PA: { mode: m, isActive: 'y' } })]), 'A', `權限層 mode=${m}`)
+                assert.strictEqual(run(u({ GALL: OR, GAB: { mode: m, isActive: 'y' } })), 'AB', `群組層 mode=${m}`)
+            }
+        })
+
+        it('UNIT-CDE-e03-mode 為數字 1、null、true → 視為 AND; 停用者(isActive n)仍不參與', function() {
+            for (let m of [1, null, true]) {
+                assert.strictEqual(run(u({ GALL: OR, GAB: { mode: m, isActive: 'y' } })), 'AB', `mode=${String(m)}`)
+                assert.strictEqual(run(u({ GALL: OR, GAB: { mode: m, isActive: 'n' } })), 'ABC', `停用 mode=${String(m)}`)
+            }
+        })
+
+        it('UNIT-CDE-e04-mode 非法之項為該層唯一(或全部)啟用項: 限制項不當基底, 該層無 mode 合法之項 → 全 n(主責裁示, 與 run04「不計入」同, 不多給); 另有合法項則與 AND 等價', function() {
+            assert.strictEqual(run(u({ GAB: { mode: 'or', isActive: 'y' } })), '', '使用者唯一群組 mode=or')
+            assert.strictEqual(run(u({ GAB: { isActive: 'y' }, GBC: { mode: 'XOR', isActive: 'y' } })), '', '兩個群組皆 mode 非法')
+            assert.strictEqual(run(u({ G1: OR }), [g('G1', { PA: { isActive: 'y' } })]), '', '群組內唯一權限缺 mode')
+            assert.strictEqual(run(u({ GALL: OR, G1: AND }), [g('GALL', { PALL: OR }), g('G1', { PA: { mode: 1, isActive: 'y' } })]), '', 'AND 群組內唯一權限 mode 非法 → 群組內容為空 → 收回')
+            assert.strictEqual(run(u({ GAB: 'y' })), '', '物件形式純量值 {"GAB":"y"}')
+            assert.strictEqual(run(u({ GAB: { isActive: 'y' }, GBC: AND })), 'B', '另有合法 AND 項(基底) → 限制項交集')
+        })
+
+        it('UNIT-CDE-f01-空字串名稱之引用: 與名稱為 "" 之列相符(照常參與); 列無 name 欄亦視為 ""; 無此列則懸空(AND → 全 n)', function() {
+            let gE = { name: '', cpemis: JSON.stringify({ PAB: OR }) }
+            assert.strictEqual(run(u({ '': OR }), [gE]), 'AB')
+            assert.strictEqual(run(u({ '': OR }), [{ cpemis: gE.cpemis }]), 'AB', '列無 name 欄')
+            assert.strictEqual(run(u({ 'GALL': OR, '': AND })), '', '查無名稱 "" 之列 → 懸空 AND')
+            assert.strictEqual(run(u({ 'GALL': OR, '': AND }), [...grups, gE]), 'AB', '有名稱 "" 之列 → ABC ∩ AB')
+        })
+
+        it('UNIT-CDE-m01-不改動輸入之表列(舊版就地寫入 grups 列之 _pemis 與 pemis 列之 _rules; 新版回傳複本): 含懸空與同名多列', function() {
+            let gs = [g('G1', { PAB: OR, PX: AND }), g('G1', { PBC: OR }), g('G2', { P1: OR })]
+            let ps = [...pemis, p('P1', { A: 'y' }), p('P1', { A: 'y', B: 'y' })]
+            let user = u({ G1: OR, G2: AND, GX: OR })
+            let before = JSON.stringify([user, gs, ps, tg])
+            let out = getUserRules(user, gs, ps, tg)
+            assert.strictEqual(JSON.stringify([user, gs, ps, tg]), before, '輸入四者逐字元不變')
+            gs.forEach((x) => assert.ok(!('_pemis' in x), '群組列無 _pemis'))
+            ps.forEach((x) => assert.ok(!('_rules' in x), '權限列無 _rules'))
+            //回傳之 grups 樹: 只含查得之群組(GX 懸空不列), 同名多列以第一列為代表; data 為複本(非輸入列本身)
+            assert.deepStrictEqual(out.grups.map((x) => x.name), ['G1', 'G2'])
+            assert.notStrictEqual(out.grups[0].data, gs[0])
+            assert.strictEqual(yOf(out.rules), '', 'G1 兩列: 第一列含懸空 AND → 空, 交集為空; AND G2 → 空')
         })
 
     })
@@ -541,7 +806,8 @@ describe('getUserRules - 權限樹組裝', function() {
     // ===========================================================
     describe('名稱匹配失敗', function() {
 
-        it('UNIT-008-使用者引用不存在的群組 — 被忽略', function() {
+        //run05(R-PRINCIPLE-00 c): 查無之引用不再「被忽略」, 而是以其 mode 參與、內容全 n——下列三案皆為 OR 引用, 結果與修前相同; AND 懸空見 UNIT-CDE-c01／c04
+        it('UNIT-008-使用者引用不存在的群組(OR) — run05: 懸空 OR 內容全 n, 不增加授權', function() {
             let targets = [t('A')]
             let pemis = [p('P1', { A: 'y' })]
             let grups = [g('G1', { P1: OR })]
@@ -551,7 +817,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'A'), 'n')
         })
 
-        it('UNIT-008a-群組引用不存在的權限 — 被忽略', function() {
+        it('UNIT-008a-群組引用不存在的權限(OR) — run05: 懸空 OR 內容全 n, 群組內容為空', function() {
             let targets = [t('A')]
             let pemis = [p('P1', { A: 'y' })]
             let grups = [g('G1', { P_NOT_EXIST: OR })]
@@ -561,7 +827,7 @@ describe('getUserRules - 權限樹組裝', function() {
             assert.strictEqual(ruleOf(rules, 'A'), 'n')
         })
 
-        it('UNIT-008b-部分匹配 — 只有匹配到的生效', function() {
+        it('UNIT-008b-部分匹配(OR) — run05: 匹配到者照常, 懸空 OR 不增加', function() {
             let targets = [t('A'), t('B')]
             let pemis = [p('P1', { A: 'y' })]
             let grups = [g('G1', { P1: OR, P_NOT_EXIST: OR })]
@@ -1116,6 +1382,88 @@ describe('getUserRules - 權限樹組裝', function() {
             let gs = [{ name: 'G1', cpemis: '{"P1":{"mode":"OR","isActive":"y"}}' }, { name: 'G2', cpemis: '{"P2":{"mode":"OR","isActive":"y"}}' }]
             let r2 = getUserRules({ cgrups: '{"G1":{"name":"G2","mode":"OR","isActive":"y"}}' }, gs, ps, [t('A'), t('B')])
             assert.deepStrictEqual(r2.rules, [{ name: 'A', isActive: 'y' }, { name: 'B', isActive: 'n' }])
+        })
+
+    })
+
+
+    // ===========================================================
+    // R-KEY-PROP-01(ADR-032, 來源 run02 F-25): 資料驅動之規則名轉屬性鍵須安全轉型, 轉不了者略過而非拋 TypeError
+    // ===========================================================
+    // 缺陷(修前): 陣列形式 crules 元素之 name 為合法 JSON 但屬性鍵轉型必拋者(如 { "toString": null })時,
+    // mergeRules 之 kpRule[vv.name] = vv.isActive(位於 cvStrToArr 之 try 之外)拋 TypeError: Cannot convert object to primitive value,
+    // 使所有使用該權限之使用者的權限評估整個失敗; 壞 JSON('{oops')則降級為全 n(容錯成立)。
+    describe('R-KEY-PROP-01 資料驅動之規則名轉屬性鍵', function() {
+
+        let grupsKp = [g('G1', { P1: OR })]
+        let userKp = u({ G1: OR })
+        //pemi(crules 為陣列形式字串)
+        let pemiOf = (crulesArr, name = 'P1') => ({ name, crules: JSON.stringify(crulesArr) })
+        //rulesOf: 'name=isActive' 以逗號串接(依 targets 順序)
+        let rulesOf = (ps, ids, grs = grupsKp, usr = userKp) => {
+            let { rules } = getUserRules(usr, grs, ps, ids.map((id) => t(id)))
+            return rules.map((v) => v.name + '=' + v.isActive).join(',')
+        }
+        //不可轉為屬性鍵之 name(JSON.stringify 對 { toString: null } 輸出 {"toString":null}, 解析後屬性鍵轉型必拋)
+        const POISON = [{ toString: null }, { toString: 5 }, [{ toString: null }], { valueOf: null, toString: 'x' }]
+
+        it('UNIT-KP-001-crules 含不可轉鍵 name 的元素 — 不拋錯, 其餘規則照常授權(修前拋 TypeError: Cannot convert object to primitive value)', function() {
+            for (let poison of POISON) {
+                let ps = [pemiOf([{ name: 'T', isActive: 'y' }, { name: poison, isActive: 'y' }])]
+                let out = null
+                assert.doesNotThrow(() => { out = rulesOf(ps, ['T', 'U']) }, `name=${JSON.stringify(poison)}`)
+                assert.strictEqual(out, 'T=y,U=n', `name=${JSON.stringify(poison)}: 不可轉者不授權任何標的`)
+            }
+        })
+
+        it('UNIT-KP-002-不可轉鍵 name 排在前面、中間、最後、全部皆是 — 結果與「刪掉該元素」相同', function() {
+            let P = { toString: null }
+            let ok = [{ name: 'A', isActive: 'y' }, { name: 'B', isActive: 'n' }, { name: 'C', isActive: 'y' }]
+            let base = rulesOf([pemiOf(ok)], ['A', 'B', 'C', 'D'])
+            assert.strictEqual(base, 'A=y,B=n,C=y,D=n')
+            for (let k = 0; k <= ok.length; k++) {
+                let withP = ok.slice(0, k).concat([{ name: P, isActive: 'y' }], ok.slice(k))
+                assert.strictEqual(rulesOf([pemiOf(withP)], ['A', 'B', 'C', 'D']), base, `插在位置 ${k}`)
+            }
+            assert.strictEqual(rulesOf([pemiOf([{ name: P, isActive: 'y' }, { name: P, isActive: 'y' }])], ['A']), 'A=n', '全部不可轉 → 全 n')
+        })
+
+        it('UNIT-KP-003-可轉為鍵的非字串 name 維持修前行為(迴歸): 5 → "5"、true → "true"、["T"] → "T"、{} → "[object Object]"、null → "null"', function() {
+            let ps = [pemiOf([{ name: 5, isActive: 'y' }, { name: true, isActive: 'y' }, { name: ['T'], isActive: 'y' }, { name: {}, isActive: 'y' }, { name: null, isActive: 'y' }])]
+            assert.strictEqual(rulesOf(ps, ['5', 'true', 'T', '[object Object]', 'null', 'X']), '5=y,true=y,T=y,[object Object]=y,null=y,X=n')
+        })
+
+        it('UNIT-KP-004-AND／OR 合併下含不可轉鍵 name — 不拋錯, 結果與刪掉該元素相同(ADR-001 合併規則不變)', function() {
+            let P = { toString: null }
+            let r1 = [{ name: 'A', isActive: 'y' }, { name: 'B', isActive: 'y' }]
+            let r2 = [{ name: 'A', isActive: 'y' }, { name: 'B', isActive: 'n' }]
+            let withP = (r) => r.concat([{ name: P, isActive: 'y' }])
+            for (let [m1, m2] of [['OR', 'OR'], ['OR', 'AND'], ['AND', 'AND'], ['AND', 'OR']]) {
+                let md = (m) => ({ mode: m, isActive: 'y' })
+                let gs = [g('G1', { P1: md(m1), P2: md(m2) })]
+                let base = rulesOf([pemiOf(r1, 'P1'), pemiOf(r2, 'P2')], ['A', 'B'], gs)
+                let poisoned = rulesOf([pemiOf(withP(r1), 'P1'), pemiOf(withP(r2), 'P2')], ['A', 'B'], gs)
+                assert.strictEqual(poisoned, base, `${m1}/${m2}`)
+            }
+        })
+
+        it('UNIT-KP-005-同一使用者其他權限不受影響: 一個權限含不可轉鍵 name, 另一個權限(OR)的授權照常', function() {
+            let P = { toString: null }
+            let ps = [pemiOf([{ name: P, isActive: 'y' }], 'P1'), pemiOf([{ name: 'A', isActive: 'y' }], 'P2')]
+            let gs = [g('G1', { P1: OR, P2: OR })]
+            assert.strictEqual(rulesOf(ps, ['A', 'B'], gs), 'A=y,B=n')
+        })
+
+        it('UNIT-KP-006-cgrups／cpemis 陣列元素的 name 為不可轉鍵物件 — 不拋錯(以 === 比對名稱, 不授權); 其餘元素照常', function() {
+            let P = { toString: null }
+            let ps = [{ name: 'P1', crules: JSON.stringify({ A: 'y' }) }]
+            let gs = [{ name: 'G1', cpemis: JSON.stringify([{ name: P, ...OR }, { name: 'P1', ...OR }]) }]
+            let usr = { cgrups: JSON.stringify([{ name: P, ...OR }, { name: 'G1', ...OR }]) }
+            assert.strictEqual(rulesOf(ps, ['A', 'B'], gs, usr), 'A=y,B=n')
+        })
+
+        it('UNIT-KP-007-壞 JSON 仍降級為全 n(容錯成立, 迴歸)', function() {
+            assert.strictEqual(rulesOf([{ name: 'P1', crules: '{oops' }], ['A']), 'A=n')
         })
 
     })

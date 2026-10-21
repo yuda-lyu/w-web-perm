@@ -146,9 +146,117 @@ let kpLang = {
         eng: `Duplicate field value in saved data`,
         cht: `儲存資料的欄位值重複`,
     },
-    authLossyBlocked: { //編輯器對「物件形式無法無損表示」之授權資料拒存(規則帳本 R-AUTH-LOSSY-01, 主控複審 R4); {names} 為受影響之名稱
-        eng: `Not saved: the authorization settings for {names} contain entries the editor cannot write without changing access (the same name set to both OR and AND, or an order that cannot be kept). Nothing was changed. Please correct the source data first.`,
-        cht: `未儲存：{names} 的授權設定含有編輯器無法在不改變授權下寫出的項目（同一名稱同時以 OR 與 AND 設定，或順序無法保留）。資料未變更，請先修正資料來源。`,
+    nameDuplicate: { //後台整表寫入: 群組／權限之名稱重複(本次造成或觸及者; 歷史既有重複原樣送回不拒), 整次拒存、資料未變更(規則帳本 R-NAME-UNIQ-02, ADR-034)
+        eng: `Not saved: the name is duplicated. Group names and permission names must be unique. Nothing was changed.`,
+        cht: `未儲存：名稱重複。群組名稱與權限名稱不得重複。資料未變更。`,
+    },
+    authLossyBlocked: { //編輯器對「物件形式無法無損表示」之授權資料拒存(規則帳本 R-AUTH-LOSSY-01, 主控複審 R4; run04 起「同名同時 OR 與 AND」, 順序部分隨 ADR-033 移除; run05 起另含「啟用而無字串名稱之項目」, R-PRINCIPLE-00 f); {names} 為受影響之名稱
+        eng: `Not saved: the authorization settings for {names} contain entries the editor cannot write without changing access (the same name set to both OR and AND, an entry without a usable name, or only entries whose merge mode is missing or invalid). Nothing was changed. Please correct the source data first.`,
+        cht: `未儲存：{names} 的授權設定含有編輯器無法在不改變授權下寫出的項目（同一名稱同時以 OR 與 AND 設定、項目沒有可用的名稱，或啟用的項目其合併模式皆缺漏或不合法）。資料未變更，請先修正資料來源。`,
+    },
+    //授權資料衝突之頁面提示(規則帳本 R-PRINCIPLE-00 原則 3「遇衝突:收嚴＋提示」、R-AUTH-WARN-01): 警告圖示(三角形驚嘆號)之 tooltip; 偵測與代入見 src/js/getAuthWarn.mjs; {names} 為受影響之名稱、{kind} 為被引用者種類(warnKindGrup／warnKindPemi)、{n} 為筆數
+    warnKindGrup: {
+        eng: `permission group`,
+        cht: `權限群組`,
+    },
+    warnKindPemi: {
+        eng: `permission`,
+        cht: `權限`,
+    },
+    warnRefDangling: { //c: 引用之名稱查無實體
+        eng: `Not found in the {kind} list: {names}. Each is still counted as an entry with no authorization (an OR entry adds nothing; an AND entry leaves nothing granted). Restore it or remove it.`,
+        cht: `在{kind}清單中找不到：{names}。仍視為一個沒有任何授權的項目（OR 項目不增加授權；AND 項目使結果為空）。請還原或移除。`,
+    },
+    warnRefAmbiguous: { //d: 引用之名稱對到多筆(歷史同名)
+        eng: `Matches several {kind}s with the same name: {names}. Only the authorization they all share is used (intersection). Rename or delete the duplicates.`,
+        cht: `對到多筆同名的{kind}：{names}。僅採用它們共同擁有的授權（交集）。請將同名項目改名或刪除。`,
+    },
+    warnRefModeInvalid: { //e: mode 缺或非 OR／AND
+        eng: `The merge mode is missing or invalid: {names}. It is treated as AND, but only as a restriction: it never grants access on its own.`,
+        cht: `合併模式缺漏或不合法：{names}。系統視為 AND，且僅作為限制，不會單獨授予任何授權。`,
+    },
+    warnRefBothModes: { //b: 同名同時有 OR 與 AND
+        eng: `Set as both OR and AND: {names}. The editor cannot save this without changing access, so saving is refused until the source data is fixed.`,
+        cht: `同時以 OR 與 AND 設定：{names}。編輯器無法在不改變授權下儲存，於資料來源修正前將拒絕儲存。`,
+    },
+    warnRefEmptyName: { //f: 名稱為空字串
+        eng: `An entry has an empty name. It is kept as it is and matches only a {kind} whose name is empty.`,
+        cht: `有項目的名稱為空字串。照原樣保留，且僅與名稱為空字串的{kind}相符。`,
+    },
+    warnRefNoName: { //f: 名稱不是字串
+        eng: `An entry has no usable name ({names}). The editor cannot keep it, so saving is refused until the source data is fixed.`,
+        cht: `有項目沒有可用的名稱（{names}）。編輯器無法保留，於資料來源修正前將拒絕儲存。`,
+    },
+    warnDataUnparsable: { //格式無法判讀(JSON5 解析失敗或非物件／陣列): 伺服端視為沒有任何授權(收嚴)
+        eng: `The authorization data cannot be parsed (invalid format). It is treated as granting nothing. Correct the source data or set it again and save.`,
+        cht: `授權資料的格式無法解析，系統視為沒有任何授權。請修正資料來源，或重新設定後儲存。`,
+    },
+    warnRuleConflict: { //a: crules 同一管理對象重複列且有勾與沒勾並存
+        eng: `Listed more than once, with both checked and unchecked: {names}. It is treated as unchecked (n).`,
+        cht: `重複列出且有勾與沒勾並存：{names}。系統視為沒勾選（n）。`,
+    },
+    warnNameHistDup: { //g: 歷史同名列(非本次編輯造成)
+        eng: `This name is shared by {n} rows (existing duplicates, not caused by this edit). Anything that refers to it by name uses only what the rows share. Rename or delete the extra rows.`,
+        cht: `此名稱由 {n} 筆資料共用（既有的重複，並非本次編輯造成）。以名稱引用它的授權僅採用各筆共同的部分。請將多餘的資料改名或刪除。`,
+    },
+    warnDupRowsInconsistent: { //編輯器: 同名之列設定不一致而拒存
+        eng: `Not saved: rows with the same name have different settings ({names}). Nothing was changed. Please make them identical, or fix the duplicate names first.`,
+        cht: `未儲存：同名的列設定不一致（{names}）。資料未變更，請先使其一致，或先修正同名資料。`,
+    },
+    confirmDelAndRefsGrup: { //刪除群組前: 以 AND 引用者之授權將被收回(R-PRINCIPLE-00 c); {n} 為使用者數
+        eng: `{n} user(s) refer to the selected group(s) with AND. If you delete them, those users' authorization will be revoked. Delete anyway?`,
+        cht: `有 {n} 位使用者以 AND 引用所選群組，刪除後其授權將被收回。確定刪除？`,
+    },
+    confirmDelAndRefsPemi: { //刪除權限前: 以 AND 引用者之授權將被收回; {n} 為群組數
+        eng: `{n} group(s) refer to the selected permission(s) with AND. If you delete them, the authorization of those groups will be revoked. Delete anyway?`,
+        cht: `有 {n} 個群組以 AND 引用所選權限，刪除後其授權將被收回。確定刪除？`,
+    },
+    //@@U1-KEYS
+    //使用者清單頁: 歷史既有(庫內原樣、非本次編輯造成)之同名／同 email／空值／格式不符不擋存, 僅於該儲存格顯示警告圖示(規則帳本 R-PRINCIPLE-00 g、h); 本次造成者仍擋存並顯示 userNameEmpty／userNameDuplicate／userEmail* 既有文字. {n} 為共用該值之使用者數
+    warnUserNameHistDup: {
+        eng: `This name is shared by {n} users (existing duplicates, not caused by this edit). This does not block saving. If name is the sign-in key, signing in with it is refused until the duplicates are fixed.`,
+        cht: `此名稱由 {n} 位使用者共用（既有的重複，並非本次編輯造成），不影響儲存。若以名稱作為登入對應鍵，在重複修正前該名稱將無法登入。`,
+    },
+    warnUserEmailHistDup: {
+        eng: `This email is shared by {n} users (existing duplicates, not caused by this edit). This does not block saving. If email is the sign-in key, signing in with it is refused until the duplicates are fixed.`,
+        cht: `此 Email 由 {n} 位使用者共用（既有的重複，並非本次編輯造成），不影響儲存。若以 Email 作為登入對應鍵，在重複修正前該 Email 將無法登入。`,
+    },
+    warnUserNameHistEmpty: {
+        eng: `This user has no valid name (existing data, not caused by this edit). This does not block saving.`,
+        cht: `此使用者尚未給予有效名稱（既有資料，並非本次編輯造成），不影響儲存。`,
+    },
+    warnUserEmailHistEmpty: {
+        eng: `This user has no email (existing data, not caused by this edit). This does not block saving. If email is the sign-in key, this user cannot sign in.`,
+        cht: `此使用者尚未給予 Email（既有資料，並非本次編輯造成），不影響儲存。若以 Email 作為登入對應鍵，此使用者將無法登入。`,
+    },
+    warnUserEmailHistInvalid: {
+        eng: `The email format of this user is invalid (existing data, not caused by this edit). This does not block saving.`,
+        cht: `此使用者的 Email 格式錯誤（既有資料，並非本次編輯造成），不影響儲存。`,
+    },
+    //刪除群組／權限前之確認(規則帳本 R-PRINCIPLE-00 d): 引用的名稱有多筆同名(歷史同名)而只刪其一, 其餘候選之交集變寬, 引用者授權可能變多. {n} 為引用者數(Both 者 {n} 為授權被收回數、{m} 為授權可能變多數);
+    //Both 為 confirmDelAndRefs*(授權被收回)與本類併於同一框、同一個問句
+    confirmDelDupRefsGrup: {
+        eng: `{n} user(s) refer to a group name that is shared by several groups. If you delete one of them, those users' authorization may increase. Delete anyway?`,
+        cht: `有 {n} 位使用者引用的群組名稱有多筆同名資料，刪除其中一筆後，其授權可能變多。確定刪除？`,
+    },
+    confirmDelDupRefsPemi: {
+        eng: `{n} group(s) refer to a permission name that is shared by several permissions. If you delete one of them, the authorization of those groups may increase. Delete anyway?`,
+        cht: `有 {n} 個群組引用的權限名稱有多筆同名資料，刪除其中一筆後，其授權可能變多。確定刪除？`,
+    },
+    confirmDelBothRefsGrup: {
+        eng: `{n} user(s) refer to the selected group(s) with AND; if you delete them, those users' authorization will be revoked. Also, {m} user(s) refer to a group name that is shared by several groups; if you delete one of them, those users' authorization may increase. Delete anyway?`,
+        cht: `有 {n} 位使用者以 AND 引用所選群組，刪除後其授權將被收回；另有 {m} 位使用者引用的群組名稱有多筆同名資料，刪除其中一筆後，其授權可能變多。確定刪除？`,
+    },
+    confirmDelBothRefsPemi: {
+        eng: `{n} group(s) refer to the selected permission(s) with AND; if you delete them, the authorization of those groups will be revoked. Also, {m} group(s) refer to a permission name that is shared by several permissions; if you delete one of them, the authorization of those groups may increase. Delete anyway?`,
+        cht: `有 {n} 個群組以 AND 引用所選權限，刪除後其授權將被收回；另有 {m} 個群組引用的權限名稱有多筆同名資料，刪除其中一筆後，其授權可能變多。確定刪除？`,
+    },
+    //@@U2-KEYS
+    //@@S-KEYS
+    //@@M-KEYS
+    relationRowsStale: { //反向關聯對話框存檔時, 對話框內有列所對應的使用者／群組已被刪除或改名而整次拒存(規則帳本 R-REL-PAIR-01, ADR-032); {names} 為受影響之名稱
+        eng: `Not saved: the list changed while this dialog was open (removed or renamed: {names}). Nothing was changed. Please close this dialog, reload the page and try again.`,
+        cht: `未儲存：此對話框開啟期間清單已有異動（已刪除或改名：{names}）。資料未變更，請關閉對話框並重新整理頁面後再操作。`,
     },
     saveInProgress: { //同一操作者之同表儲存處理中再送出 (ADR-025)
         eng: `The previous save is still in progress. Please do not submit again.`,
@@ -199,6 +307,10 @@ let kpLang = {
     cannotGetUserFromPerm: {
         eng: `Cannot find the user in permission system`,
         cht: `無法於權限系統取得使用者`,
+    },
+    ambiguousUserFromPerm: { //登入查找: 以對應鍵(mappingBy)查 perm users(isActive='y')命中多於 1 筆, 拒絕而不取首筆(規則帳本 R-MAPKEY-02, ADR-034); 訊息不含使用者之對應值
+        eng: `Cannot identify the user in permission system: more than one active user matches`,
+        cht: `無法於權限系統確認使用者：有多位有效使用者符合`,
     },
     userNoPermission: {
         eng: `User does not have permission`,

@@ -140,8 +140,25 @@
                             :opt="opt"
                         >
                             <template v-slot:cell-render="props">
+                                <!-- 警告圖示(R-PRINCIPLE-00 原則 3「提示」): 該列使用者之 cgrups 有衝突時(warnText, genItems 由 getRefWarns 取得)於儲存格最左顯示; 以外層 flex 容器與 RelationChips 並排,
+                                     RelationChips 根元素寬＝儲存格寬−圖示寬, 其量測(v-domresize 監聽根元素尺寸)與「+K」溢出計算(可用寬取自根元素)不變; 無警告者不渲染外層容器與圖示, 與修前同一節點 -->
+                                <div
+                                    style="display:flex; align-items:center; height:100%;"
+                                    v-if="props.key==='grupsNames' && props.row.warnText"
+                                >
+                                    <span style="flex:0 0 auto; display:flex; align-items:center;" :title="props.row.warnText"><img style="vertical-align:sub; width:16px; height:16px; margin-right:4px;" :src="$ui.getIcon('warning')" /></span>
+                                    <RelationChips
+                                        style="flex:1 1 auto;"
+                                        :items="props.row.grups"
+                                        :editable="isEditable"
+                                        :popupTitle="$t('belongGrupsNames')"
+                                        :tooltipAll="$t('chipsShowAll')"
+                                        :labelContent="'modeSelect'"
+                                        @input="(item)=>{showVeGrupBlngUsersToggleItemModeByName(props.row.name, item, props.row.id)}"
+                                    ></RelationChips>
+                                </div>
                                 <RelationChips
-                                    v-if="props.key==='grupsNames'"
+                                    v-else-if="props.key==='grupsNames'"
                                     :items="props.row.grups"
                                     :editable="isEditable"
                                     :popupTitle="$t('belongGrupsNames')"
@@ -181,7 +198,6 @@ import size from 'lodash-es/size.js'
 import filter from 'lodash-es/filter.js'
 import join from 'lodash-es/join.js'
 import sortBy from 'lodash-es/sortBy.js'
-import isEqual from 'lodash-es/isEqual.js'
 import cloneDeep from 'lodash-es/cloneDeep.js'
 import genPm from 'wsemi/src/genPm.mjs'
 import haskey from 'wsemi/src/haskey.mjs'
@@ -192,8 +208,10 @@ import eachOwn from '../js/eachOwn.mjs'
 import getOwn from '../js/getOwn.mjs'
 import cvKpToObj from '../js/cvKpToObj.mjs'
 import getKpLossy from '../js/getKpLossy.mjs'
-import getKpWriteLost from '../js/getKpWriteLost.mjs'
 import fmtLossyMsg from '../js/fmtLossyMsg.mjs'
+import pairRowsToSnapshot from '../js/pairRowsToSnapshot.mjs'
+import { getRefState, getRawModeMap, putRefEntry } from '../js/editorRefRows.mjs'
+import { getRefWarns, getRefWarnText } from '../js/getAuthWarn.mjs'
 import WDialog from 'w-component-vue/src/components/WDialog.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
 import WAggridVue from 'w-aggrid-vue/src/components/WAggridVue.vue'
@@ -550,6 +568,23 @@ export default {
             return rows
         },
 
+        getDisplayRows: function() {
+            let vo = this
+
+            //cmp
+            let cmp = get(vo, '$refs.rftable')
+            // console.log('cmp', cmp)
+
+            //getDisplayData 只回傳顯示中之欄位(name／enable／grupsNames), 不含 id; 批次勾選須以 id 定位列(使用者 name 允許重複), 故另以 ag-grid api 取篩選排序後之完整列(含 id)
+            let api = cmp.getApi()
+            let rows = []
+            api.forEachNodeAfterFilterAndSort((node) => {
+                rows.push(node.data)
+            })
+
+            return rows
+        },
+
         fltKpGrup: function(kp) {
             // console.log('fltKpGrup', kp)
 
@@ -581,8 +616,12 @@ export default {
             //items
             let items = map(users, (u) => {
 
-                //kpGrup
-                let kpGrup = cvKpToObj(JSON5.parse(u.cgrups), { hasMode: true })
+                //kpGrup, 空字串(新增列之 funNew 預設值)與壞 JSON 視為空容器, 同 VeCgrups／清單頁／伺服端(R-REL-PARSE-01: 任一列解碼失敗不得使對話框打不開)
+                let kpGrup = Object.create(null)
+                try {
+                    kpGrup = cvKpToObj(JSON5.parse(u.cgrups), { hasMode: true })
+                }
+                catch (err) {}
                 // console.log(u.name, 'kpGrup', kpGrup)
 
                 //fltKpGrup
@@ -596,16 +635,12 @@ export default {
                 eachOwn(kpGrup, (v, k) => {
                     // console.log(k, 'v', v)
 
-                    //_isActive, 此為使用者cgrups內設定, 可為y或n, 僅提取y, 再判斷此使用者是否有使用此grup
-                    let _isActive = get(v, 'isActive', '')
-                    if (_isActive !== 'y') {
+                    //st, 此為使用者cgrups內設定, 可為y或n, 僅提取y, 再判斷此使用者是否有使用此grup; 與伺服端同解讀(getRefState: 純量值 { "G1": "y" } 為啟用 AND, 啟用者 mode 缺/非法為 AND)
+                    let st = getRefState(v)
+                    if (st.enable !== 'y') {
                         return true //跳出換下一個
                     }
-                    // console.log(k, '_isActive', _isActive)
-
-                    //_mode
-                    let _mode = get(v, 'mode', '')
-                    // console.log(k, '_mode', _mode)
+                    // console.log(k, 'st', st)
 
                     //b, 使用者是否擁有指定權限群組
                     let b = k === grup.name
@@ -614,14 +649,15 @@ export default {
                     //mode, isActive
                     if (b) {
                         enable = 'y'
-                        mode = _mode //使用使用者給予cgrups內指定權限群組之合併權限模式
+                        mode = st.mode //使用使用者給予cgrups內指定權限群組之合併權限模式
                         // console.log('使用使用者給予cgrups內指定權限群組之合併權限模式 grup', grup)
                     }
 
-                    //push
+                    //push, 僅供 RelationChips 顯示(name／mode／enable); 存檔不讀本陣列(doSave 以 putRefEntry 自快照字串只改本群組一項)
                     grups.push({
                         name: k,
-                        ...v,
+                        mode: st.mode,
+                        isActive: 'y',
                         enable: b ? 'y' : 'n', //給render使用
                     })
 
@@ -633,6 +669,11 @@ export default {
                 grupsNames = join(grupsNames, ' ')
                 // console.log(u.name, 'grupsNames', grupsNames)
 
+                //warnText: 該使用者 cgrups 之衝突提示(R-PRINCIPLE-00 原則 3; 偵測同伺服端判準, getRefWarns 以該列字串), 「所屬權限群組名稱」儲存格最左之警告圖示與 tooltip, 無衝突為 ''
+                //  revRows 只回寫 grupsNames／grups 不回寫本欄(其複本字串經 fltKpGrup 已去掉懸空項), 故警告反映開啟時之已儲存資料; 存檔只改本群組一項, 其餘衝突項於存檔後仍在
+                let resWarn = getRefWarns(u.cgrups, vo.grups)
+                let warnText = resWarn.hasWarn ? getRefWarnText(resWarn, vo.$t, 'warnKindGrup') : ''
+
                 return {
                     id: u.id, //列識別: 使用者 name 允許重複(僅前端警告、後端不擋), 切換處理須以 id 找列, 不可以 name(否則同名者會改到第一位)
                     name: u.name,
@@ -641,6 +682,7 @@ export default {
                     enable,
                     // kpGrup,
                     grups,
+                    warnText,
                 }
             })
             // console.log(u.name, 'items', items)
@@ -665,11 +707,20 @@ export default {
             let rows = get(vo, 'opt.rows', [])
             // console.log('rows', rows)
 
-            //users
-            users = map(users, (u, ku) => {
+            //以列身分(id)配對: 對話框之列 ↔ 目前 store 中同一位使用者(R-REL-PAIR-01; 不得以列索引配對——store 於對話框開啟期間可被更新〔他人增刪、改 order〕而錯位)
+            //krs, usersRev: 對話框有列且 store 仍存在之使用者(usersRev[k] 即第 krs[k] 列所配到者; 配對不到者不更新其顯示, 存檔時由 doSave 整次拒存)
+            let { krs, matched: usersRev } = pairRowsToSnapshot(rows, users)
 
-                //kpGrup
-                let kpGrup = cvKpToObj(JSON5.parse(u.cgrups), { hasMode: true })
+            //users
+            users = map(usersRev, (u, ku) => {
+                let row = get(rows, krs[ku], {})
+
+                //kpGrup, 空字串與壞 JSON 視為空容器(R-REL-PARSE-01)
+                let kpGrup = Object.create(null)
+                try {
+                    kpGrup = cvKpToObj(JSON5.parse(u.cgrups), { hasMode: true })
+                }
+                catch (err) {}
                 // console.log(u.name, 'kpGrup', kpGrup)
 
                 //fltKpGrup
@@ -677,7 +728,7 @@ export default {
                 // console.log(u.name, 'kpGrup(fltKpGrup)', kpGrup)
 
                 //mode
-                let mode = get(rows, `${ku}.mode`, '')
+                let mode = get(row, 'mode', '')
                 if (mode !== 'OR' && mode !== 'AND') {
                     console.log(`非預期: mode應該皆已指定不應觸發`, mode)
                     mode = 'OR'
@@ -685,7 +736,7 @@ export default {
                 // console.log(u.name, 'mode', mode)
 
                 //enable
-                let enable = get(rows, `${ku}.enable`, '')
+                let enable = get(row, 'enable', '')
                 if (enable !== 'y' && enable !== 'n') {
                     console.log(`非預期: enable應該皆已指定不應觸發`, enable)
                     enable = 'n'
@@ -718,8 +769,8 @@ export default {
             let items = vo.genItems(grup, users)
             // console.log('items', items)
 
-            //update grupsNames, grups
-            each(items, (r, kr) => {
+            //update grupsNames, grups, items 與 krs 同序(item k 對應對話框第 krs[k] 列)
+            each(items, (r, k) => {
                 // name: u.name,
                 // grupsNames,
                 // mode,
@@ -727,6 +778,7 @@ export default {
                 // grups,
 
                 //set
+                let kr = krs[k]
                 set(vo, `opt.rows[${kr}].grupsNames`, r.grupsNames)
                 set(vo, `opt.rows[${kr}].grups`, r.grups)
                 // console.log('vo.opt.rows[kr]', cloneDeep(vo.opt.rows[kr]))
@@ -842,21 +894,21 @@ export default {
             let rows = get(vo, 'opt.rows', [])
             // console.log('rows', rows)
 
-            //kpRow
+            //kpRow, 以使用者 id 為鍵(使用者 name 允許重複, 以 name 會使同名者互相錯位; 單列切換早已以 id, 見 showVeGrupBlngUsersToggleItemEnableByName)
             let kpRow = Object.create(null)
             each(rows, (r, kr) => {
-                kpRow[r.name] = kr
+                kpRow[r.id] = kr
             })
 
-            //rowsEff
-            let rowsEff = vo.getDisplayData()
+            //rowsEff, 篩選排序後之完整列(含 id)
+            let rowsEff = vo.getDisplayRows()
             // console.log('rowsEff', rowsEff)
 
             //toggle
             each(rowsEff, (r) => {
 
                 //kr
-                let kr = kpRow[r.name]
+                let kr = kpRow[r.id]
 
                 //set
                 set(vo, `opt.rows[${kr}].enable`, 'y')
@@ -881,21 +933,21 @@ export default {
             let rows = get(vo, 'opt.rows', [])
             // console.log('rows', rows)
 
-            //kpRow
+            //kpRow, 以使用者 id 為鍵(使用者 name 允許重複, 以 name 會使同名者互相錯位; 單列切換早已以 id, 見 showVeGrupBlngUsersToggleItemEnableByName)
             let kpRow = Object.create(null)
             each(rows, (r, kr) => {
-                kpRow[r.name] = kr
+                kpRow[r.id] = kr
             })
 
-            //rowsEff
-            let rowsEff = vo.getDisplayData()
+            //rowsEff, 篩選排序後之完整列(含 id)
+            let rowsEff = vo.getDisplayRows()
             // console.log('rowsEff', rowsEff)
 
             //toggle
             each(rowsEff, (r) => {
 
                 //kr
-                let kr = kpRow[r.name]
+                let kr = kpRow[r.id]
 
                 //set
                 set(vo, `opt.rows[${kr}].enable`, 'n')
@@ -920,21 +972,21 @@ export default {
             let rows = get(vo, 'opt.rows', [])
             // console.log('rows', rows)
 
-            //kpRow
+            //kpRow, 以使用者 id 為鍵(使用者 name 允許重複, 以 name 會使同名者互相錯位; 單列切換早已以 id, 見 showVeGrupBlngUsersToggleItemEnableByName)
             let kpRow = Object.create(null)
             each(rows, (r, kr) => {
-                kpRow[r.name] = kr
+                kpRow[r.id] = kr
             })
 
-            //rowsEff
-            let rowsEff = vo.getDisplayData()
+            //rowsEff, 篩選排序後之完整列(含 id)
+            let rowsEff = vo.getDisplayRows()
             // console.log('rowsEff', rowsEff)
 
             //toggle
             each(rowsEff, (r) => {
 
                 //kr
-                let kr = kpRow[r.name]
+                let kr = kpRow[r.id]
 
                 //enable
                 let _enable = get(r, 'enable', 'n')
@@ -1021,10 +1073,21 @@ export default {
                 //本對話框所管之歸屬／模式有變更 → 整次儲存拒絕並點名(原子, 其餘列亦不寫); 未變更 → 該列字串逐字元不動(見下方 kpLossyIdx)
                 //使用者列之快照只取這一次: 有損檢查之值即下方寫入之值(外審 sol#2: 兩次讀取之間 store 可能被伺服器推送更新, 檢查與寫入看到不同資料)
                 let users = cloneDeep(vo.users)
+
+                //1a) 以列身分(id)配對快照(R-REL-PAIR-01, 主控 run02 F-24): 修前以開框時的列索引取快照列, store 於對話框開啟期間被更新(他人增刪、改 order)時關聯寫到另一位使用者;
+                //對話框有列所對應的使用者已被刪除者 → 整次拒存(原子, 不寫任何列)並提示重新整理, 不得退而配到其他列
+                let { pairs, missing } = pairRowsToSnapshot(rows, users)
+                if (size(missing) > 0) {
+                    unlockBtn()
+                    await vo.$dg.showCheckYes(fmtLossyMsg(vo.$t('relationRowsStale'), map(missing, 'name')))
+                    return false
+                }
+
                 let kpLossyIdx = Object.create(null)
+                let kpRawModes = Object.create(null) //列索引 → 該列快照字串之限制項原始 mode(getRawModeMap), 供下方 putRefEntry 寫回未改之限制項
                 let lossyNames = []
                 each(rows, (r, kr) => {
-                    let u = get(users, kr, {})
+                    let u = pairs[kr]
                     let kpRaw = null
                     try {
                         kpRaw = JSON5.parse(get(u, 'cgrups', ''))
@@ -1032,6 +1095,7 @@ export default {
                     catch (err) {
                         return true //無法解析者交由下方原流程處理
                     }
+                    kpRawModes[kr] = getRawModeMap(kpRaw)
                     if (size(getKpLossy(kpRaw)) === 0) {
                         return true //跳出換下一個
                     }
@@ -1059,14 +1123,13 @@ export default {
 
                 //users: 沿用 1b 之快照(見上)
 
-                //usersNew, lostRows: 欲寫出之鍵序被 JS 屬性序改變而使有效 AND 項易位之使用者(整次拒絕, 見下)
-                let lostRows = []
+                //usersNew
                 let usersNew = map(rows, (r, kr) => {
 
-                    //u
-                    let u = get(users, kr, {})
+                    //u, 以列身分配對之快照列(見 1a)
+                    let u = pairs[kr]
 
-                    //有損列(kpLossyIdx): 歸屬未變更, 字串逐字元不動(含 isEqual 判定為「不同」時之重寫)
+                    //有損列(kpLossyIdx): 歸屬未變更, 字串逐字元不動
                     if (kpLossyIdx[kr] === true) {
                         return u
                     }
@@ -1074,47 +1137,28 @@ export default {
                     //cgrups
                     let cgrups = get(u, 'cgrups', '')
 
-                    //kpGrup
-                    let kpGrup = cvKpToObj(JSON5.parse(cgrups), { hasMode: true })
+                    //kpGrup, 空字串與壞 JSON 視為空容器(R-REL-PARSE-01)
+                    let kpGrup = Object.create(null)
+                    try {
+                        kpGrup = cvKpToObj(JSON5.parse(cgrups), { hasMode: true })
+                    }
+                    catch (err) {}
                     // console.log('kpGrup', kpGrup)
 
-                    //grups
-                    let grups = get(r, 'grups', [])
-
-                    //kpGrupNew
+                    //kpGrupNew: 只改本群組對應之一項(依列之 enable／mode), 其餘引用項(含懸空、名稱 ''、mode 缺/非法〔已解碼為 AND〕、停用項、純量值)原樣保留, 授權效果不變(putRefEntry; R-PRINCIPLE-00 c／e／f)——
+                    //修前以列上之 grups(genItems 經 fltKpGrup 只剩查得之群組、且只取啟用者)重組並以 isEqual 判定改寫, 啟用中之懸空 AND 引用被丟棄即放寬(例: { G1: OR, GX〔已刪〕: AND } 原授權為空, 未改 G1 存檔後得 G1 之授權)
+                    //本項未變更 → 回 false, 字串逐字元不動(含其他項為陣列形式／含停用項者, 修前會正規化改寫)
+                    //其餘項中之限制項(mode 缺或非法之啟用引用)寫回原始 mode(kpRawModes[kr]), 不寫成可當基底之合法 AND(否則本群組為該層唯一合法項而被取消時多給, R-PRINCIPLE-00 e)
                     let kpGrupNew = Object.create(null)
-                    if (true) {
-                        each(grups, (g) => {
-                            if (g.isActive === 'y') {
-                                kpGrupNew[g.name] = {
-                                    mode: g.mode,
-                                    isActive: g.isActive,
-                                }
-                            }
-                        })
-                    }
+                    if (putRefEntry(kpGrupNew, kpGrup, get(vo, 'grup.name', ''), get(r, 'enable', ''), get(r, 'mode', ''), kpRawModes[kr])) {
 
-                    //check
-                    if (!isEqual(kpGrup, kpGrupNew)) {
-
-                        //欲寫出之鍵序被 JS 屬性序改變而使有效 AND 項易位(如新啟用整數式名稱之 AND 群組) → 授權會改變, 不寫出(外審 minimax#2)
-                        if (size(getKpWriteLost(kpGrup, kpGrupNew)) > 0) { //預期序由 kpGrup(解碼後之原資料)與 kpGrupNew 於函數內導出——不可用本處已套用 JS 屬性序之物件序(外審 minimax 第二輪#1)
-                            lostRows.push(get(u, 'name', ''))
-                            return u
-                        }
-
-                        //cgrups
+                        //cgrups(鍵序無關授權, R-AUTH-MERGE-00 第 4 條: 不需保留原鍵序, 亦無整數式名稱易位之拒存)
                         u.cgrups = JSON.stringify(kpGrupNew)
 
                     }
 
                     return u
                 })
-                if (size(lostRows) > 0) {
-                    vo.$ui.updateLoading(false) //showCheckYes 前關 loading
-                    await vo.$dg.showCheckYes(fmtLossyMsg(vo.$t('authLossyBlocked'), lostRows))
-                    return false
-                }
                 console.log('usersNew', usersNew)
 
                 // //check

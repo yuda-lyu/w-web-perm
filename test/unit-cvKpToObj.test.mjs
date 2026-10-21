@@ -5,9 +5,19 @@
 //背景: 外部應用直接寫入「陣列形式」[{ "name": "A", "isActive": "y" }]，伺服端 getUserRules 相容並授權(UNIT-OI-006a)，五個編輯元件
 //  (VeCrules／VeCgrups／VeCpemis／VeGrupBlngUsers／VePemiBlngGrups)依名稱為鍵查值，查不到陣列元素 → 顯示停用 → 存檔即撤銷有效授權.
 //  外審(minimax#1、sol#4～#6)另指出: 缺 mode 之元素顯示啟用後存檔會補 OR 而增權、同名不同 mode 取末項會增權、物件值內 name 使關聯對話框改指另一項、crules 之鍵轉型.
-//CO-0xx: 函數契約; DF-0xx: 與伺服端 getUserRules 之差分(同一份資料，伺服端授權 ⇔ 編輯器顯示啟用); PR-0xx: 窮舉性質(編輯器存檔後之授權 ⊆ 存檔前, 且除不可無損表示者外相等);
+//CO-0xx: 函數契約; DF-0xx: 與伺服端 getUserRules 之差分(同一份資料，伺服端授權 ⇔ 編輯器顯示啟用); PR-0xx: 窮舉性質(編輯器存檔前後之授權相等, 唯一例外為 getKpLossy 判定之有損格);
 //SITE-AD-001: src 內每一處 JSON5.parse(授權資料) 皆分類(五元件已套、清單頁未套〔站點 37〕, 新增者即紅).
-//跑法: npx mocha test/unit-cvKpToObj.test.mjs --timeout 120000
+//
+//授權合併規則(CLAUDE_rulebook.md R-AUTH-MERGE-00, 使用者 2026-10-21 裁示; 本檔 assertion 註解以「規則 N」指該條文之第 N 條):
+//  規則 1: 每一項之值有勾=y, 給 n 或未給一律視同 n; 規則 2: 起點全部管理對象皆為 n;
+//  規則 3: 先將所有 OR 項聯集(無 OR 時以第一個 AND 項為基底), 再與所有 AND 項交集(AND 項未列之對象視同 n);
+//  規則 4: 結果與項目之儲存順序、物件鍵序、陣列元素序無關; 規則 5: isActive 為 n 之項不參與;
+//  〔run05, R-PRINCIPLE-00 c／e／f〕mode 缺或非 OR／AND 之項視為 AND; 引用查無實體(懸空)者以其 mode 參與、內容全 n; 空字串名稱之引用照常(編輯器保留為鍵 "");
+//  編輯器模型(存檔): 對話框之列 = 被引用表全部列 ∪ 啟用而查無列之引用(額外列, 原樣寫回); 名稱非字串之啟用元素無法表示 → getKpLossy 以 #序號 判定拒存.
+//  連帶: 同一項(crules 陣列形式)重複列同名規則時所有列皆 y 才 y(與列序無關; 舊規則為後者覆蓋前者);
+//  run02 之排序保護(keepKeyOrder／getKeyOrderLost／getKpWriteLost 與 getKpLossy 之 AND 相對順序判定)已隨規則 4 刪除, 本檔對應案例(KO／GL／WL／KL-003)隨之移除;
+//  保留者唯「同名同時有效 OR 與 AND」一格(物件形式一個名稱只有一個 mode, 無法無損表示), 由 getKpLossy 判定, 編輯器拒存(R-AUTH-LOSSY-01).
+//跑法: npx mocha test/unit-cvKpToObj.test.mjs --timeout 180000
 import assert from 'assert'
 import fs from 'fs'
 import path from 'path'
@@ -17,10 +27,7 @@ import cvKpToArr from '../src/js/cvKpToArr.mjs'
 import cvKpToObj from '../src/js/cvKpToObj.mjs'
 import getRuleEnable from '../src/js/getRuleEnable.mjs'
 import getOwn from '../src/js/getOwn.mjs'
-import keepKeyOrder, { keyOrderOf } from '../src/js/keepKeyOrder.mjs'
 import getKpLossy from '../src/js/getKpLossy.mjs'
-import getKeyOrderLost from '../src/js/getKeyOrderLost.mjs'
-import getKpWriteLost from '../src/js/getKpWriteLost.mjs'
 import joinNames from '../src/js/joinNames.mjs'
 import fmtLossyMsg from '../src/js/fmtLossyMsg.mjs'
 import { getUserRules } from '../src/plugins/mShare.mjs'
@@ -31,10 +38,11 @@ const HM = { hasMode: true }
 
 describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function() {
 
-    it('CO-001 非陣列且無需修改 → 原樣回傳(同一參考): 物件形式、null、字串、數字、布林、undefined', function() {
+    it('CO-001 非陣列且無需修改 → 原樣回傳(同一參考): 物件形式、null、字串、數字、布林、undefined(hasMode 之純量值須轉換, 見 CO-011)', function() {
         let o = { A: 'y', B: { mode: 'OR', isActive: 'y' } }
         assert.strict.equal(cvKpToObj(o), o)
-        assert.strict.equal(cvKpToObj(o, HM), o)
+        let oM = { B: { mode: 'OR', isActive: 'y' }, C: { mode: 'AND', isActive: 'n' } }
+        assert.strict.equal(cvKpToObj(oM, HM), oM)
         let np = Object.create(null)
         assert.strict.equal(cvKpToObj(np), np)
         for (let v of [null, undefined, 'y', 5, true]) {
@@ -62,18 +70,23 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
         assert.strict.equal(getRuleEnable(kp, 'T1'), 'y')
     })
 
-    it('CO-004 hasMode(cgrups／cpemis): 僅名稱為非空字串者保留(伺服端 arrFinder 以 === 比對, 非字串名稱不授權); 元素非物件略過', function() {
-        let kp = cvKpToObj(['G', 5, null, true, [], {}, { mode: 'OR', isActive: 'y' }, { name: 5, mode: 'OR', isActive: 'y' }, { name: true, mode: 'OR', isActive: 'y' }, { name: null, mode: 'OR', isActive: 'y' }, { name: ['G1'], mode: 'OR', isActive: 'y' }, { name: {}, mode: 'OR', isActive: 'y' }, { name: '', mode: 'OR', isActive: 'y' }, { name: 'OK', mode: 'OR', isActive: 'y' }], HM)
-        assert.strict.deepEqual(Object.keys(kp), ['OK'])
+    it('CO-004 hasMode(cgrups／cpemis) run05 f: 名稱為字串者保留(含空字串 "": 伺服端 findRefRows 與名稱為 "" 之列相符, 否則為懸空——丟棄即改變授權); 名稱非字串(含元素非物件之索引名稱)者物件形式無法表示而略過, 啟用者由 getKpLossy 以 #序號 判定並拒存', function() {
+        let arr = ['G', 5, null, true, [], {}, { mode: 'OR', isActive: 'y' }, { name: 5, mode: 'OR', isActive: 'y' }, { name: true, mode: 'OR', isActive: 'y' }, { name: null, mode: 'OR', isActive: 'y' }, { name: ['G1'], mode: 'OR', isActive: 'y' }, { name: {}, mode: 'OR', isActive: 'y' }, { name: '', mode: 'OR', isActive: 'y' }, { name: 'OK', mode: 'OR', isActive: 'y' }]
+        let kp = cvKpToObj(arr, HM)
+        assert.strict.deepEqual(Object.keys(kp), ['', 'OK'])
+        assert.strict.deepEqual({ ...kp[''] }, { mode: 'OR', isActive: 'y' }, '空字串名稱保留為鍵 ""')
+        assert.strict.deepEqual(getKpLossy(arr), ['#7', '#8', '#9', '#10', '#11', '#12'], '啟用而名稱非字串之元素(第 7～12 個)→ 拒存; 非物件元素(isActive 非 y)不計')
         assert.strict.deepEqual(Object.keys(cvKpToObj([], HM)), [])
     })
 
-    it('CO-005 hasMode: isActive 為 y 而 mode 缺漏或不合法(含小寫 or、數字、null)者改為 n(伺服端不納入合併 = 不授權; 否則存檔補預設 OR 而增權); 陣列與物件形式一致', function() {
+    it('CO-005 hasMode run05 e: isActive 為 y 而 mode 缺漏或不合法(含小寫 or、數字、null)者解碼為 mode AND(isActive 仍為 y; 與伺服端視為 AND 同解讀——改為停用會丟掉 AND 限制而放寬, 補預設 OR 則多給); 陣列與物件形式一致', function() {
         for (let m of [undefined, null, 'or', 'Or', '', 'AND ', 1, true, 'XOR']) {
             let a = { name: 'G1', isActive: 'y', ...(m === undefined ? {} : { mode: m }) }
             let o = { isActive: 'y', ...(m === undefined ? {} : { mode: m }) }
-            assert.strict.equal(getOwn(getOwn(cvKpToObj([a], HM), 'G1'), 'isActive'), 'n', `陣列 mode=${String(m)}`)
-            assert.strict.equal(getOwn(getOwn(cvKpToObj({ G1: o }, HM), 'G1'), 'isActive'), 'n', `物件 mode=${String(m)}`)
+            assert.strict.deepEqual({ ...getOwn(cvKpToObj([a], HM), 'G1') }, { isActive: 'y', mode: 'AND' }, `陣列 mode=${String(m)}`)
+            assert.strict.deepEqual({ ...getOwn(cvKpToObj({ G1: o }, HM), 'G1') }, { isActive: 'y', mode: 'AND' }, `物件 mode=${String(m)}`)
+            //停用者 mode 不變(不參與合併)
+            assert.strict.equal(getOwn(cvKpToObj({ G1: { ...o, isActive: 'n' } }, HM), 'G1').isActive, 'n')
         }
         //合法 mode 且 y → 保留; n 者不變
         assert.strict.deepEqual({ ...getOwn(cvKpToObj([{ name: 'G1', mode: 'AND', isActive: 'y' }], HM), 'G1') }, { mode: 'AND', isActive: 'y' })
@@ -82,20 +95,71 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
         assert.strict.equal(getRuleEnable(cvKpToObj([{ name: 'A', isActive: 'y' }]), 'A'), 'y')
     })
 
-    it('CO-006 同名重複: crules 後者覆蓋前者(伺服端 kpRule 亦然); hasMode 以「有效啟用元素」為準——模式一致合為一個啟用項, AND／OR 並存時保留 AND 支, 無有效啟用元素時為 n', function() {
-        let c = cvKpToObj([{ name: 'A', isActive: 'y' }, { name: 'A', isActive: 'n' }, { name: 'B', isActive: 'n' }, { name: 'B', isActive: 'y' }])
+    it('CO-011 hasMode 物件形式之純量值(舊式簡寫 { G1: "y" }): 解為 { isActive: 值 }, 值為 "y" 者另加 mode AND(與伺服端 cvKpToArr 之 { isActive: 值 }、無 mode 同解讀); 回傳新物件(無原型), 不改動輸入; 不帶 hasMode(crules)時純量值原樣', function() {
+        let src = { G1: 'y', G2: 'n', G3: 5, G4: {}, G5: { mode: 'OR', isActive: 'y' } }
+        let kp = cvKpToObj(src, HM)
+        assert.strict.notEqual(kp, src)
+        assert.strict.equal(Object.getPrototypeOf(kp), null)
+        assert.strict.deepEqual({ ...kp.G1 }, { isActive: 'y', mode: 'AND' })
+        assert.strict.deepEqual({ ...kp.G2 }, { isActive: 'n' })
+        assert.strict.deepEqual({ ...kp.G3 }, { isActive: 5 })
+        assert.strict.deepEqual({ ...kp.G4 }, { isActive: {} }, '空物件(iseobj 為 false)亦為純量值: 伺服端解為 isActive:{}(停用)')
+        assert.strict.deepEqual({ ...kp.G5 }, { mode: 'OR', isActive: 'y' })
+        assert.strict.equal(src.G1, 'y', '不改動輸入')
+        //伺服端解讀一致: cvKpToArr 之 isActive 與 mode
+        assert.strict.deepEqual(cvKpToArr({ G1: 'y' }), [{ name: 'G1', isActive: 'y' }])
+        //crules(不帶 hasMode): 純量值即規則值, 原樣(同一參考)
+        let rules = { T1: 'y', T2: 'n' }
+        assert.strict.equal(cvKpToObj(rules), rules)
+        assert.strict.equal(getRuleEnable(cvKpToObj(rules), 'T1'), 'y')
+    })
+
+    it('CO-006 同名重複: crules 所有列皆 y 才 y(任一列非 y 即 n, 與列序無關; 編輯器與伺服端 mergeRules 一致); hasMode 以「有效啟用元素」為準——模式一致合為一個啟用項, AND／OR 並存時保留 AND 支, 無有效啟用元素時為 n', function() {
+        //crules 同名重複列: 每一列為一個「項值」; 規則 1(只有 y 才是 y, 其餘視同 n)＋規則 4(與列序無關) ⇒ 所有列皆 y 才 y(舊規則為後者覆蓋前者, 結果隨列序而異)
+        //undefined 代表該列無 isActive(未給 ⇒ n)
+        let mk = (name, isActive) => (isActive === undefined ? { name } : { name, isActive })
+        let srv = (arr, id) => {
+            let r = getUserRules({ cgrups: `{"G1":${ON}}` }, [{ name: 'G1', cpemis: `{"P1":${ON}}` }], [{ name: 'P1', crules: JSON.stringify(arr) }], [{ id }])
+            return r.rules[0].isActive
+        }
+        let dup = [
+            [['y', 'y'], 'y'], //全 y
+            [['y', 'y', 'y'], 'y'],
+            [['y', 'n'], 'n'], //任一列 n
+            [['n', 'y'], 'n'], //與列序無關(上一列之反序)
+            [['n', 'n'], 'n'],
+            [['y', 'y', 'n'], 'n'],
+            [['n', 'y', 'y'], 'n'],
+            [['y', 'n', 'y'], 'n'],
+            [['y', 'yes'], 'n'], //非 y 之值視同 n(規則 1)
+            [['yes', 'y'], 'n'],
+            [['y', undefined], 'n'], //未給 ⇒ n(規則 1)
+            [[undefined, 'y'], 'n'],
+        ]
+        for (let [seq, exp] of dup) {
+            for (let s of [seq, [...seq].reverse()]) {
+                let arr = s.map((a) => mk('A', a))
+                assert.strict.equal(getRuleEnable(cvKpToObj(arr), 'A'), exp, `編輯器 ${JSON.stringify(arr)}`)
+                assert.strict.equal(srv(arr, 'A'), exp, `伺服端 ${JSON.stringify(arr)}`)
+            }
+        }
+        //不同名稱互不影響: A 重複列混合、B 全 y
+        let c = cvKpToObj([{ name: 'A', isActive: 'y' }, { name: 'A', isActive: 'n' }, { name: 'B', isActive: 'y' }, { name: 'B', isActive: 'y' }])
         assert.strict.equal(getRuleEnable(c, 'A'), 'n')
         assert.strict.equal(getRuleEnable(c, 'B'), 'y')
+        //hasMode: 同名重複以「有效啟用元素」為準
         let g = cvKpToObj([
             { name: 'S1', mode: 'OR', isActive: 'y' }, { name: 'S1', mode: 'OR', isActive: 'n' }, //一啟用一停用 → 啟用(OR)
             { name: 'S2', mode: 'AND', isActive: 'y' }, { name: 'S2', mode: 'AND', isActive: 'y' }, //模式一致 → 啟用(AND)
             { name: 'C1', mode: 'OR', isActive: 'y' }, { name: 'C1', mode: 'AND', isActive: 'y' }, //AND 與 OR 並存 → 保留 AND 支
-            { name: 'N1', mode: 'OR', isActive: 'n' }, { name: 'N1', isActive: 'y' }, //無有效啟用元素 → n
+            { name: 'N1', mode: 'OR', isActive: 'n' }, { name: 'N1', isActive: 'y' }, //run05 e: 缺 mode 之啟用元素視為 AND → 啟用(AND)
+            { name: 'N2', mode: 'OR', isActive: 'n' }, { name: 'N2', mode: 'AND', isActive: 'n' }, //無啟用元素 → n
         ], HM)
         assert.strict.deepEqual({ ...g.S1 }, { mode: 'OR', isActive: 'y' })
         assert.strict.deepEqual({ ...g.S2 }, { mode: 'AND', isActive: 'y' })
         assert.strict.deepEqual({ ...g.C1 }, { mode: 'AND', isActive: 'y' })
-        assert.strict.equal(g.N1.isActive, 'n')
+        assert.strict.deepEqual({ ...g.N1 }, { mode: 'AND', isActive: 'y' })
+        assert.strict.equal(g.N2.isActive, 'n')
     })
 
     it('CO-007 物件形式: 值內 name 不得改名(外層鍵為名, R-AUTH-PATH-01)——去掉值內 name; 無需修改者仍同一參考', function() {
@@ -138,78 +202,54 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
     })
 
 
-    it('CO-010 hasMode 陣列形式之鍵序 = 有效啟用元素首次出現之序, 其後為無有效元素之名稱(首次出現序); 伺服端 AND 合併之「第一個 AND 項」依此序(R-AUTH-ORDER-01)', function() {
+    it('CO-010 hasMode 陣列形式之鍵序 = 名稱首次出現之序(僅供顯示); 鍵序與元素序不影響授權(規則 4; 以 getUserRules 實證)', function() {
+        //鍵序: 名稱首次出現之序——停用在前者、無有效啟用元素者亦照首次出現序(舊: 有效啟用元素排前面, 隨保序機制刪除而不再如此)
         let kp = cvKpToObj([
-            { name: 'G1', mode: 'AND', isActive: 'n' }, //停用在前: 不得使 G1 排在 G2 之前
-            { name: 'G9', isActive: 'y' }, //缺 mode: 無有效元素
+            { name: 'G1', mode: 'AND', isActive: 'n' }, //停用: 仍依首次出現序排第一
+            { name: 'G9', isActive: 'y' }, //缺 mode: run05 e 視為 AND(啟用)
             { name: 'G2', mode: 'AND', isActive: 'y' },
             { name: 'G1', mode: 'AND', isActive: 'y' },
             { name: 'G2', mode: 'AND', isActive: 'y' },
         ], HM)
-        assert.strict.deepEqual(Object.keys(kp), ['G2', 'G1', 'G9'])
+        assert.strict.deepEqual(Object.keys(kp), ['G1', 'G9', 'G2'])
+        assert.strict.equal(kp.G1.isActive, 'y', 'G1 有一個有效啟用元素 → 啟用')
+        assert.strict.deepEqual({ ...kp.G9 }, { isActive: 'y', mode: 'AND' }, 'G9 缺 mode → 啟用、AND(run05 e)')
         //物件形式維持原鍵序
         assert.strict.deepEqual(Object.keys(cvKpToObj({ B: { name: 'x', mode: 'OR', isActive: 'y' }, A: { mode: 'OR', isActive: 'n' } }, HM)), ['B', 'A'])
-    })
 
-    it('KO-001 keepKeyOrder: 參考中已有之名稱維持參考序、新增名稱附加於後(依 kpNew 序); 參考有而 kpNew 沒有者不出現; 值取 kpNew; 回傳無原型物件; 不改動輸入', function() {
-        let ref = { B: 1, A: 2, C: 3 }
-        let nw = { A: 'a', D: 'd', C: 'c', B: 'b', E: 'e' }
-        let r = keepKeyOrder(ref, nw)
-        assert.strict.deepEqual(Object.keys(r), ['B', 'A', 'C', 'D', 'E'])
-        assert.strict.equal(r.A, 'a')
-        assert.strict.equal(Object.getPrototypeOf(r), null)
-        assert.strict.deepEqual(Object.keys(ref), ['B', 'A', 'C'])
-        assert.strict.deepEqual(Object.keys(nw), ['A', 'D', 'C', 'B', 'E'])
-        assert.strict.deepEqual(Object.keys(keepKeyOrder({ B: 1, X: 2, A: 3 }, { A: 1, B: 2 })), ['B', 'A'], '參考有而 kpNew 沒有之 X(刪除)不出現')
-    })
-
-    it('KO-002 keepKeyOrder: 參考為 null／undefined／陣列／字串／數字時等同 kpNew 序; 原型鍵名(__proto__、constructor)為一般鍵', function() {
-        let nw = { b: 1, a: 2 }
-        for (let ref of [null, undefined, [], 'str', 5, true]) {
-            assert.strict.deepEqual(Object.keys(keepKeyOrder(ref, nw)), ['b', 'a'], String(ref))
+        //規則 4: 同一組項目不論陣列元素序、物件鍵序, 授權相同; 規則 3: 結果 = (所有 OR 聯集) ∩ (所有 AND)
+        //4 個群組各含一個權限(OR): G1→{T1,T2}、G2→{T2,T3}、G3→{T2}、G4→{T3}
+        let perms = (a) => (a.length <= 1 ? [a] : a.flatMap((x, i) => perms([...a.slice(0, i), ...a.slice(i + 1)]).map((p) => [x, ...p])))
+        let gs = ['G1', 'G2', 'G3', 'G4'].map((n, i) => ({ name: n, cpemis: `{"P${i + 1}":${ON}}` }))
+        let ps = [{ T1: 'y', T2: 'y' }, { T2: 'y', T3: 'y' }, { T2: 'y' }, { T3: 'y' }].map((r, i) => ({ name: `P${i + 1}`, crules: JSON.stringify(r) }))
+        let ts = [{ id: 'T1' }, { id: 'T2' }, { id: 'T3' }]
+        let ys = (cgrups) => getUserRules({ cgrups }, gs, ps, ts).rules.filter((v) => v.isActive === 'y').map((v) => v.name).join(',')
+        let items = (s) => s.split(' ').map((x) => ({ name: x.slice(0, 2), mode: x.slice(2) === 'a' ? 'AND' : 'OR', isActive: 'y' }))
+        let table = [
+            ['G1a G2a', 'T2'], //AND×2: {T1,T2}∩{T2,T3}(舊規則依先後得 T1,T2 或 T2,T3)
+            ['G1a G2a G3a', 'T2'], //AND×3
+            ['G3o G1a G2a', 'T2'], //OR {T2} 為基底, 再交集兩個 AND
+            ['G1o G2o', 'T1,T2,T3'], //OR×2: 聯集
+            ['G1o G2a G3a', 'T2'], //{T1,T2}∩{T2,T3}∩{T2}
+            ['G4o G1o G2a', 'T2,T3'], //({T3}∪{T1,T2})∩{T2,T3}
+            ['G1a G4a', ''], //AND×2 無交集: {T1,T2}∩{T3} = ∅(不得因先後而殘留 G1 獨有之 T1、T2)
+        ]
+        let nPerm = 0
+        for (let [s, exp] of table) {
+            let its = items(s)
+            for (let p of perms(its)) {
+                nPerm++
+                assert.strict.equal(ys(JSON.stringify(p)), exp, `陣列元素序 ${JSON.stringify(p.map((x) => x.name + x.mode))}`)
+                let o = {}
+                for (let x of p) {
+                    o[x.name] = { mode: x.mode, isActive: x.isActive }
+                }
+                assert.strict.equal(ys(JSON.stringify(o)), exp, `物件鍵序 ${Object.keys(o).join(',')}`)
+                //編輯器解碼後寫出(JSON.stringify(cvKpToObj(…))): 不論來源元素序, 授權不變
+                assert.strict.equal(ys(JSON.stringify(cvKpToObj(p, HM))), exp, `解碼後寫出 ${JSON.stringify(p.map((x) => x.name + x.mode))}`)
+            }
         }
-        let r = keepKeyOrder(JSON.parse('{"__proto__":1,"constructor":2}'), JSON.parse('{"constructor":"c","x":"x","__proto__":"p"}'))
-        assert.strict.deepEqual(Object.keys(r), ['__proto__', 'constructor', 'x'])
-        assert.strict.equal(Object.getOwnPropertyDescriptor(r, '__proto__').value, 'p')
-        assert.strict.equal(Object.getPrototypeOf(r), null)
-    })
-
-    it('KO-003 keyOrderOf: 與 keepKeyOrder 同序(參考中已有者依參考序、新增者依 kpNew 序附加); 整數式名稱仍依意圖序列出(JS 屬性序無法改變輸出物件, 見 getKeyOrderLost)', function() {
-        assert.strict.deepEqual(keyOrderOf({ B: 1, A: 2 }, { A: 'a', C: 'c', B: 'b' }), ['B', 'A', 'C'])
-        assert.strict.deepEqual(keyOrderOf({ A: 1 }, JSON.parse('{"1":"x","A":"a"}')), ['A', '1'], '整數式名稱新增: 意圖序為既有 A 在前、新增 1 附加於後')
-        assert.strict.deepEqual(Object.keys(keepKeyOrder({ A: 1 }, JSON.parse('{"1":"x","A":"a"}'))), ['1', 'A'], 'JS 屬性序把整數式鍵排前面——這正是需 getKeyOrderLost 的原因')
-        assert.strict.deepEqual(keyOrderOf(null, { b: 1, a: 2 }), ['b', 'a'])
-        assert.strict.deepEqual(keyOrderOf({ a: 1 }, null), [])
-        assert.strict.deepEqual(keyOrderOf({ a: 1 }, [1]), [])
-    })
-
-    it('GL-001 getKeyOrderLost: 欲寫出之物件因 JS 屬性序(整數式鍵先)使有效 AND 名稱易位 → 回傳該些 AND 名稱(依預期序); 順序一致、少於 2 個 AND、非 AND／停用者不計 → 空陣列', function() {
-        let and = { mode: 'AND', isActive: 'y' }
-        let or = { mode: 'OR', isActive: 'y' }
-        let off = { mode: 'AND', isActive: 'n' }
-        let out = (o) => keepKeyOrder({}, o) //keepKeyOrder 輸出為 JS 屬性序
-        assert.strict.deepEqual(getKeyOrderLost(out({ A: and, 1: and }), ['A', '1']), ['A', '1'], '新增整數式 AND 名稱被排到既有 A 之前')
-        assert.strict.deepEqual(getKeyOrderLost(out({ 1: and, A: and }), ['1', 'A']), [], '預期序即 JS 序')
-        assert.strict.deepEqual(getKeyOrderLost(out({ A: and, 1: or }), ['A', '1']), [], '整數式名稱為 OR 不影響第一個 AND 項')
-        assert.strict.deepEqual(getKeyOrderLost(out({ A: and, 1: off }), ['A', '1']), [], '停用者不算')
-        assert.strict.deepEqual(getKeyOrderLost(out({ A: and }), ['A']), [], '只一個 AND')
-        assert.strict.deepEqual(getKeyOrderLost(out({ A: and, B: and, 2: and, 1: and }), ['A', 'B', '1', '2']), ['A', 'B', '1', '2'], '整數式名稱 1、2 被排到 A、B 前面')
-        assert.strict.deepEqual(getKeyOrderLost(out({ 1: and, B: and, 2: and }), ['1', 'B', '2']), [], '第一個 AND 項不變(其後 B 與 2 的相對順序改變不影響授權, 不需拒存)')
-        assert.strict.deepEqual(getKeyOrderLost(out({ A: and, 1: and, X: or }), ['A', '1', 'X']), [], '有任何有效 OR 項時 AND 項順序與授權無關(OR 聯集為基底), 不需拒存(外審 minimax 第二輪#2)')
-        assert.strict.deepEqual(getKeyOrderLost(out({ A: and, 1: and, X: { mode: 'OR', isActive: 'n' } }), ['A', '1', 'X']), ['A', '1'], '停用的 OR 項不算')
-        assert.strict.deepEqual(getKeyOrderLost(null, ['A']), [])
-        assert.strict.deepEqual(getKeyOrderLost({ A: and }, null), [])
-    })
-
-    it('WL-001 getKpWriteLost: 預期序由參考與欲寫出之物件於函數內導出(呼叫端不傳序, 外審 minimax 第二輪#1: 關聯對話框曾以已套用 JS 屬性序之物件序當預期序而守門恆空)', function() {
-        let and = { mode: 'AND', isActive: 'y' }
-        let or = { mode: 'OR', isActive: 'y' }
-        assert.strict.deepEqual(getKpWriteLost({ A: and }, { A: and, 1: and }), ['A', '1'], '新啟用整數式 AND 名稱排到既有 A 之前')
-        assert.strict.deepEqual(getKpWriteLost({ A: and }, { A: and, B: and }), [], '新增非整數式名稱附加於後')
-        assert.strict.deepEqual(getKpWriteLost({ A: and }, { A: and, 1: or }), [], '整數式名稱為 OR')
-        assert.strict.deepEqual(getKpWriteLost({ A: and }, { A: and, 1: and, X: or }), [], '有有效 OR 項')
-        assert.strict.deepEqual(getKpWriteLost(JSON.parse('{"1":{"mode":"AND","isActive":"y"},"A":{"mode":"AND","isActive":"y"}}'), JSON.parse('{"1":{"mode":"AND","isActive":"y"},"A":{"mode":"AND","isActive":"y"}}')), [], '原資料即整數式 AND 在前(伺服端序即 JS 序): 未變更不拒存')
-        assert.strict.deepEqual(getKpWriteLost(null, { A: and, 1: and }), [], '無參考(全新資料)時預期序即 kpNew 的 key 序(JS 序 1, A), 無既有 AND 項可易位')
+        assert.strict.equal(nPerm, 2 + 6 + 6 + 2 + 6 + 6 + 2, '對照組: 7 組項目的全部排列數(2!×3 + 3!×4), 確實走過多種排列')
     })
 
     it('FM-001 fmtLossyMsg: 名稱含 $&、$$、$ 接單引號、$ 接反引號等字樣時原樣代入(不被 String.replace 展開); 範本無 {names} 時原樣; 超過 5 個加省略號', function() {
@@ -225,43 +265,58 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
         assert.strict.equal(fmtLossyMsg(tpl, ['1', '2', '3', '4', '5', '6']), 'Not saved: 1, 2, 3, 4, 5 … end')
     })
 
-    it('KL-001 getKpLossy: 物件形式、null、字串、數字、空陣列、無有效元素之陣列 → 空陣列(物件形式永遠可無損表示)', function() {
-        for (let kp of [{ A: { mode: 'OR', isActive: 'y' }, B: { mode: 'AND', isActive: 'y' } }, null, undefined, 'x', 5, true, [], [{ name: 'A', mode: 'OR', isActive: 'n' }], [{ name: 'A', isActive: 'y' }]]) {
+    it('KL-001 getKpLossy: 每個名稱有合法 mode 之物件形式、null、字串、數字、空陣列、無啟用元素之陣列 → 空陣列(啟用項皆 mode 非法之格見 KL-007)', function() {
+        for (let kp of [{ A: { mode: 'OR', isActive: 'y' }, B: { mode: 'AND', isActive: 'y' } }, null, undefined, 'x', 5, true, [], [{ name: 'A', mode: 'OR', isActive: 'n' }], [{ name: 'A', isActive: 'n' }]]) {
             assert.strict.deepEqual(getKpLossy(kp), [], JSON.stringify(kp))
         }
     })
 
-    it('KL-002 getKpLossy: 同名有效啟用元素同時為 OR 與 AND → 該名稱有損; 同模式重複、一邊停用、一邊缺 mode 或名稱不同 → 不是', function() {
+    it('KL-007 getKpLossy 主責裁示之第三格: 該層啟用項皆 mode 缺或非法(無 mode 合法之啟用項; 陣列、物件、純量值 {"G1":"y"} 皆然)→ 回傳這些名稱(伺服端為限制項、全 n; 編輯器解碼為 AND 存檔即成基底而多給); 另有 mode 合法之啟用項 → 不判; 全停用 → 不判', function() {
+        let L = (kp) => getKpLossy(kp)
+        assert.strict.deepEqual(L([{ name: 'A', isActive: 'y' }]), ['A'])
+        assert.strict.deepEqual(L([{ name: 'G1', mode: 'or', isActive: 'y' }, { name: 'G2', mode: 'XOR', isActive: 'y' }, { name: 'G3', mode: 'OR', isActive: 'n' }]), ['G1', 'G2'])
+        assert.strict.deepEqual(L([{ name: 'G1', mode: 'or', isActive: 'y' }, { name: 'G1', mode: null, isActive: 'y' }]), ['G1'], '同名皆非法: 不重複')
+        assert.strict.deepEqual(L({ G1: { mode: 'or', isActive: 'y' } }), ['G1'], '物件形式')
+        assert.strict.deepEqual(L({ G1: { isActive: 'y' }, G2: { mode: 'OR', isActive: 'n' } }), ['G1'], '物件形式, 合法者停用')
+        assert.strict.deepEqual(L({ G1: 'y' }), ['G1'], '純量值(舊式簡寫)')
+        //另有 mode 合法之啟用項 → 限制項與 AND 等價, 可無損寫出
+        assert.strict.deepEqual(L([{ name: 'A', isActive: 'y' }, { name: 'B', mode: 'OR', isActive: 'y' }]), [])
+        assert.strict.deepEqual(L({ G1: 'y', G2: { mode: 'AND', isActive: 'y' } }), [])
+        assert.strict.deepEqual(L([{ name: 'A', mode: 'XOR', isActive: 'y' }, { mode: 'AND', isActive: 'y' }]), ['#2'], '合法項名稱非字串: 仍算合法項(只判 #序號)')
+        //全停用 → 不判
+        assert.strict.deepEqual(L([{ name: 'A', mode: 'or', isActive: 'n' }, { name: 'B', isActive: 'n' }]), [])
+        assert.strict.deepEqual(L({ A: { mode: 'or', isActive: 'n' }, B: 'n' }), [])
+        //名稱非字串之限制項(無合法項): 以 #序號 判(第二格)
+        assert.strict.deepEqual(L([{ mode: 'or', isActive: 'y' }]), ['#1'])
+        //伺服端與編輯器模型對照: 上列判有損之格, 伺服端全 n、編輯器硬寫則授權(判定確有必要)
+        let gs = [{ name: 'G1', cpemis: `{"P1":${ON}}` }, { name: 'G2', cpemis: `{"P1":${ON}}` }, { name: 'A', cpemis: `{"P1":${ON}}` }]
+        let ps = [{ name: 'P1', crules: '{"T":"y"}' }]
+        let eff = (cgrups) => getUserRules({ cgrups }, gs, ps, [{ id: 'T' }]).rules[0].isActive
+        for (let raw of ['[{"name":"A","isActive":"y"}]', '{"G1":{"mode":"or","isActive":"y"}}', '{"G1":"y"}', '[{"name":"G1","mode":"or","isActive":"y"},{"name":"G2","mode":"XOR","isActive":"y"}]']) {
+            assert.strict.equal(eff(raw), 'n', `伺服端全 n: ${raw}`)
+            assert.strict.equal(eff(saveLike(raw, ['G1', 'G2', 'A'])), 'y', `硬寫會授權(多給): ${raw}`)
+        }
+    })
+
+    it('KL-002 getKpLossy: 同名啟用元素之有效模式同時為 OR 與 AND → 該名稱有損(run05 e: 缺 mode／非法視為 AND, 故 OR＋缺 mode 亦有損); 同模式重複、一邊停用、名稱不同 → 不是', function() {
         let L = (arr) => getKpLossy(arr).sort()
         assert.strict.deepEqual(L([{ name: 'G1', mode: 'OR', isActive: 'y' }, { name: 'G1', mode: 'AND', isActive: 'y' }]), ['G1'])
         assert.strict.deepEqual(L([{ name: 'G1', mode: 'AND', isActive: 'y' }, { name: 'G2', mode: 'AND', isActive: 'y' }, { name: 'G2', mode: 'OR', isActive: 'y' }]), ['G2'], 'sol R3#2')
         assert.strict.deepEqual(L([{ name: 'G1', mode: 'OR', isActive: 'y' }, { name: 'G1', mode: 'OR', isActive: 'y' }]), [])
         assert.strict.deepEqual(L([{ name: 'G1', mode: 'OR', isActive: 'y' }, { name: 'G1', mode: 'AND', isActive: 'n' }]), [])
-        assert.strict.deepEqual(L([{ name: 'G1', mode: 'OR', isActive: 'y' }, { name: 'G1', isActive: 'y' }]), [], '缺 mode 之 y 不是有效啟用元素')
+        assert.strict.deepEqual(L([{ name: 'G1', mode: 'OR', isActive: 'y' }, { name: 'G1', isActive: 'y' }]), ['G1'], 'run05 e: 缺 mode 之啟用元素視為 AND → 與 OR 並存即有損')
+        assert.strict.deepEqual(L([{ name: 'G1', mode: 'AND', isActive: 'y' }, { name: 'G1', mode: 'XOR', isActive: 'y' }]), [], 'AND 與非法(視為 AND)同模式 → 不是')
         assert.strict.deepEqual(L([{ name: 'G1', mode: 'OR', isActive: 'y' }, { name: 'G2', mode: 'AND', isActive: 'y' }]), [])
         assert.strict.deepEqual(L([{ name: 'G1', mode: 'OR', isActive: 'y' }, { name: 'G1', mode: 'or', isActive: 'y' }, { name: 'G1', mode: 'AND', isActive: 'y' }]), ['G1'])
     })
 
-    it('KL-003 getKpLossy: 有效 AND 名稱 ≥ 2 且其相對順序於伺服端序與物件鍵序(整數式鍵先、遞增)不同 → 有損(該些 AND 名稱; 因查無實體之名稱會被伺服端丟棄, 須整個相對順序一致, 不只第一個); 序相同、只一個 AND → 不是', function() {
-        let L = (arr) => getKpLossy(arr).sort()
-        let a = (name) => ({ name, mode: 'AND', isActive: 'y' })
-        assert.strict.deepEqual(L([a('2'), a('1')]), ['1', '2'], '伺服端以 2 為首, 物件序以 1 為首')
-        assert.strict.deepEqual(L([a('1'), a('2')]), [])
-        assert.strict.deepEqual(L([a('G1'), a('1')]), ['1', 'G1'], 'G1 先於整數式名稱 1, 物件序 1 在前')
-        assert.strict.deepEqual(L([a('1'), a('G1')]), [])
-        assert.strict.deepEqual(L([a('2')]), [], '只一個 AND')
-        assert.strict.deepEqual(L([a('2'), { name: '1', mode: 'OR', isActive: 'y' }]), [], '1 為 OR 非 AND')
-        assert.strict.deepEqual(L([{ name: '1', mode: 'AND', isActive: 'n' }, a('2'), a('3')]), [], '停用之 1 不算; 2、3 序相同')
-        assert.strict.deepEqual(L([a('2'), a('3'), a('1')]), ['1', '2', '3'], '首個 AND 為 2, 物件序為 1')
-        //外審 sol#1／minimax#1: 首項相同但其後易位——查無實體之首項(幻影名稱 '1')被伺服端丟棄後, 實際首個 AND 從 G 變成 2
-        assert.strict.deepEqual(L([a('1'), a('G'), a('2')]), ['1', '2', 'G'], '首項同為 1, 但 G 與 2 易位')
-        assert.strict.deepEqual(L([a('1'), a('2'), a('G')]), [], '整個相對順序相同')
-    })
-
-    it('KL-004 getKpLossy: 名稱非字串或空字串、元素非物件者不計(伺服端 arrFinder 以 === 比對)', function() {
+    it('KL-004 getKpLossy run05 f: 啟用而名稱非字串之元素(數字、null、陣列元素無 name、非物件元素 "y")→ 以 #序號(1 起算)判定有損(物件形式無法表示; 伺服端以懸空引用參與, 丟棄即放寬); 空字串名稱為一般名稱(同名 OR 與 AND 並存才有損); 停用或非 y 之非物件元素不計', function() {
         let a = (name) => ({ name, mode: 'AND', isActive: 'y' })
         let o = (name) => ({ name, mode: 'OR', isActive: 'y' })
-        assert.strict.deepEqual(getKpLossy([a(2), o(2), a(''), o(''), a(null), o(null), 'x', 5, null]), [])
+        assert.strict.deepEqual(getKpLossy([a(2), o(2), a(''), o(''), a(null), o(null), 'x', 5, null]), ['', '#1', '#2', '#5', '#6'])
+        assert.strict.deepEqual(getKpLossy([o(''), o('A')]), [], '空字串名稱單一模式 → 可原樣保留')
+        assert.strict.deepEqual(getKpLossy(['y', { mode: 'AND', isActive: 'y' }, { name: 'A', isActive: 'y' }]), ['#1', '#2'], '非物件元素 "y"(名稱為索引)、無 name 之元素')
+        assert.strict.deepEqual(getKpLossy([{ name: 3, mode: 'AND', isActive: 'n' }, 'n']), [], '停用者不計')
     })
 
     it('KL-005 getKpLossy: 回傳不重複之名稱陣列, 不改動輸入', function() {
@@ -269,6 +324,22 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
         let before = JSON.stringify(arr)
         assert.strict.deepEqual(getKpLossy(arr), ['G1'])
         assert.strict.equal(JSON.stringify(arr), before)
+    })
+
+    it('KL-006 getKpLossy 不再判定 AND 名稱之相對順序(規則 4: 結果與順序無關; 原 KL-003 的格〔整數式名稱使伺服端序與物件鍵序不同〕全部回空陣列)', function() {
+        //原 KL-003 判為有損之輸入: 有效 AND 名稱 ≥ 2 且其相對順序於「陣列元素序」與「JS 物件鍵序(整數式鍵先、遞增)」不同——規則 4 下兩種序的授權相同, 故不是有損
+        let a = (name) => ({ name, mode: 'AND', isActive: 'y' })
+        for (let arr of [
+            [a('2'), a('1')],
+            [a('G1'), a('1')],
+            [a('2'), a('3'), a('1')],
+            [a('1'), a('G'), a('2')],
+            [a('G'), a('2'), a('1'), a('B')],
+        ]) {
+            assert.strict.deepEqual(getKpLossy(arr), [], JSON.stringify(arr))
+        }
+        //有損格唯一: 同名同時有效 OR 與 AND(KL-002); 名稱為整數式不改變此判定
+        assert.strict.deepEqual(getKpLossy([a('2'), a('1'), { name: '1', mode: 'OR', isActive: 'y' }]), ['1'])
     })
 
     it('JN-001 joinNames: 逗號分隔, 超過上限者截斷並加省略號; 非字串轉字串; 空陣列為空字串', function() {
@@ -292,7 +363,7 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
         return Object.fromEntries(r.rules.map((v) => [v.name, v.isActive]))
     }
 
-    it('DF-001 crules 各種陣列形式: 伺服端授權之標的 = 編輯器顯示啟用之標的(含停用元素、同名後者覆蓋、數字／布林／null／陣列／物件 name、非物件元素、無 name 元素)', function() {
+    it('DF-001 crules 各種陣列形式: 伺服端授權之標的 = 編輯器顯示啟用之標的(含停用元素、同名重複列所有列皆 y 才 y〔與列序無關〕、數字／布林／null／陣列／物件 name、非物件元素、無 name 元素)', function() {
         let batt = [
             '[{"name":"A","isActive":"y"}]',
             '[{"name":"A","isActive":"y"},{"name":"B","isActive":"n"},{"name":"C","isActive":"y"}]',
@@ -300,6 +371,9 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
             '[{"name":"A"}]',
             '[{"name":"A","isActive":"y"},{"name":"A","isActive":"n"}]',
             '[{"name":"A","isActive":"n"},{"name":"A","isActive":"y"}]',
+            '[{"name":"A","isActive":"y"},{"name":"A","isActive":"y"}]',
+            '[{"name":"A","isActive":"y"},{"name":"A","isActive":"y"},{"name":"A","isActive":"n"}]',
+            '[{"name":"A","isActive":"n"},{"name":"A","isActive":"y"},{"name":"A","isActive":"y"}]',
             '[{"name":"A.0","isActive":"y"}]',
             '[{"isActive":"y"},"A",5,null,{"name":"B","isActive":"y"}]',
             '[{"name":"A","isActive":"yes"},{"name":"B","isActive":true}]',
@@ -324,6 +398,19 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
         }
         assert.strict.deepEqual(bad, [], bad.join('\n'))
         assert.strict.ok(nOn >= 12, `對照組: 伺服端授權之格數須夠多(含鍵轉型格), 實得 ${nOn}`)
+
+        //絕對期望(差分只證明兩端一致, 兩端若同錯〔如皆為後者覆蓋〕仍會過): 同名重複列所有列皆 y 才 y(規則 1＋規則 4), 兩種列序皆然
+        let exp = [
+            ['[{"name":"A","isActive":"y"},{"name":"A","isActive":"n"}]', 'n'],
+            ['[{"name":"A","isActive":"n"},{"name":"A","isActive":"y"}]', 'n'],
+            ['[{"name":"A","isActive":"y"},{"name":"A","isActive":"y"}]', 'y'],
+            ['[{"name":"A","isActive":"y"},{"name":"A","isActive":"y"},{"name":"A","isActive":"n"}]', 'n'],
+            ['[{"name":"A","isActive":"n"},{"name":"A","isActive":"y"},{"name":"A","isActive":"y"}]', 'n'],
+        ]
+        for (let [crules, v] of exp) {
+            assert.strict.equal(serverRules(crules).A, v, `伺服端 ${crules}`)
+            assert.strict.equal(getRuleEnable(cvKpToObj(JSON5.parse(crules)), 'A'), v, `編輯器 ${crules}`)
+        }
     })
 
     it('DF-002 crules 物件形式: 伺服端授權之標的 = 編輯器顯示啟用之標的(含值內 name)', function() {
@@ -341,7 +428,7 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
         assert.strict.deepEqual(bad, [], bad.join('\n'))
     })
 
-    //cgrups: 伺服端使用者是否經群組 N 取得授權 ⇔ 編輯器(VeCgrups 之讀法: getOwn(kp, N) 之 isActive 為 y)顯示 N 啟用
+    //cgrups: 伺服端使用者是否經群組 N 取得授權(群組表只有 N, 單一群組) ⇔ 編輯器顯示 N 啟用
     let groupNames = ['G1', 'G2', '5', 'G.0']
     let grantedByGroup = (cgrups) => {
         let out = {}
@@ -351,12 +438,37 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
         }
         return out
     }
-    let editorOn = (kp, n) => {
-        let ed = getOwn(kp, n, null)
-        return !!ed && getOwn(ed, 'isActive', '') === 'y'
+
+    //編輯器模型(VeCgrups／VeCpemis 之讀法, 與 U1 src/js/editorRefRows.mjs 之 getRefState 同解讀; 本檔獨立寫出以交叉驗證):
+    //  getOwn(cvKpToObj 之結果, 名稱) 之值——物件: isActive 為 y 者啟用, 啟用者之 mode 取有效值(OR 為 OR, 其餘 AND), 停用者 mode 合法則沿用否則 OR;
+    //  純量(物件形式 { "G1": "y" }, cvKpToArr 解為 { isActive: 值 }): 視為 { isActive: 值 }; 無此名稱: 停用、OR
+    let refState = (pv) => {
+        let o = (pv !== null && typeof pv === 'object') ? pv : { isActive: pv }
+        let on = getOwn(o, 'isActive', '') === 'y'
+        let m = getOwn(o, 'mode', '')
+        return { enable: on ? 'y' : 'n', mode: on ? (m === 'OR' ? 'OR' : 'AND') : ((m === 'OR' || m === 'AND') ? m : 'OR') }
     }
 
-    it('DF-003 cgrups 陣列／物件形式: 伺服端經群組授權 ⇔ 編輯器顯示該群組啟用(含停用元素、缺 mode、不合法 mode、非字串 name、非物件元素、同名重複、值內 name)', function() {
+    //伺服端對「名稱 n 之引用」之解讀(只留名稱為 n 之元素; 群組 n 授予 {T}; 輔助群組 #H 內容為空、#H2 授予 {T,U}), 三個探針:
+    //  p1 只有 n: T 為 y ⇔ n 以合法 mode 參與(唯一項即基底; 限制項〔mode 非法〕無合法項時全 n)
+    //  p2 n＋#H(OR, 空): T 為 y ⇔ n 為 OR(AND／限制項時 OR 聯集為空)
+    //  p3 n＋#H2(OR, {T,U}): U 為 n ⇔ n 以 AND 或限制項參與(交集收斂); OR 或不參與時 U 為 y
+    //參與 ⇔ p1 或 p3 收斂; 編輯器: OR ⇔ p2, AND ⇔ p3 收斂(限制項顯示為 AND; 該層無合法項時由 getKpLossy 拒存, 見 KL-007)
+    let serverRefView = (raw, n) => {
+        let kp = JSON5.parse(raw)
+        let only = Array.isArray(kp) ? kp.filter((e) => e !== null && typeof e === 'object' && e.name === n) : (Object.prototype.hasOwnProperty.call(kp, n) ? { [n]: kp[n] } : {})
+        let plus = (h) => (Array.isArray(only) ? [...only, { name: h, mode: 'OR', isActive: 'y' }] : { ...only, [h]: { mode: 'OR', isActive: 'y' } })
+        let gs = [{ name: n, cpemis: `{"P1":${ON}}` }, { name: '#H', cpemis: '{}' }, { name: '#H2', cpemis: `{"P2":${ON}}` }]
+        let ps = [{ name: 'P1', crules: '{"T":"y"}' }, { name: 'P2', crules: '{"T":"y","U":"y"}' }]
+        let ev = (c) => Object.fromEntries(getUserRules({ cgrups: JSON.stringify(c) }, gs, ps, [{ id: 'T' }, { id: 'U' }]).rules.map((v) => [v.name, v.isActive]))
+        let p1 = ev(only)
+        let p2 = ev(plus('#H'))
+        let p3 = ev(plus('#H2'))
+        let and = p3.U === 'n'
+        return { on: p1.T === 'y' || and, or: p2.T === 'y', and }
+    }
+
+    it('DF-003 cgrups 陣列／物件形式 run05: 伺服端對每個名稱之解讀(參與與否、OR／AND)⇔ 編輯器顯示(啟用與否、mode)(含停用元素、缺 mode、不合法 mode、非字串 name、非物件元素、同名重複、值內 name、純量值); 同名同時 OR 與 AND 者由 getKpLossy 判定(拒存)', function() {
         let batt = [
             '[{"name":"G1","mode":"OR","isActive":"y"}]',
             '[{"name":"G1","mode":"AND","isActive":"y"},{"name":"G2","mode":"OR","isActive":"n"}]',
@@ -373,21 +485,48 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
             '{"G1":{"mode":"OR","isActive":"y"},"G2":{"mode":"xor","isActive":"y"}}',
             '{"G1":{"name":"G2","mode":"OR","isActive":"y"}}',
             '{"G1":"y"}',
+            '[{"name":"G1","mode":"OR","isActive":"y"},{"name":"G1","isActive":"y"}]',
+            '[{"name":"G1","mode":"XOR","isActive":"y"},{"name":"G2","mode":null,"isActive":"y"},{"name":"5","mode":1,"isActive":"y"}]',
         ]
         let bad = []
         let nOn = 0
+        let nOr = 0
+        let nAnd = 0
+        let nLossy = 0
         for (let cgrups of batt) {
-            let srv = grantedByGroup(cgrups)
-            let kp = cvKpToObj(JSON5.parse(cgrups), HM)
+            let kpRaw = JSON5.parse(cgrups)
+            let kp = cvKpToObj(kpRaw, HM)
+            let lossy = getKpLossy(kpRaw)
             for (let n of groupNames) {
-                nOn += srv[n] ? 1 : 0
-                if (srv[n] !== editorOn(kp, n)) {
-                    bad.push(`${cgrups} 群組 ${n}: 伺服端 ${srv[n]}、編輯器 ${editorOn(kp, n)}`)
+                let srv = serverRefView(cgrups, n)
+                let ed = refState(getOwn(kp, n, null))
+                nOn += srv.on ? 1 : 0
+                if (srv.on !== (ed.enable === 'y')) {
+                    bad.push(`${cgrups} 群組 ${n}: 伺服端參與 ${srv.on}、編輯器啟用 ${ed.enable}`)
+                }
+                if (!srv.on) {
+                    continue
+                }
+                if (lossy.includes(n)) {
+                    nLossy++ //同名 OR 與 AND 並存: 伺服端兩支皆參與(加輔助 OR 後仍授權), 物件形式無法表示 → 拒存
+                    continue
+                }
+                if (srv.or === srv.and) {
+                    bad.push(`${cgrups} 群組 ${n}: 伺服端解讀不唯一(OR ${srv.or}、AND ${srv.and})`)
+                }
+                nOr += srv.or ? 1 : 0
+                nAnd += srv.and ? 1 : 0
+                if ((srv.or ? 'OR' : 'AND') !== ed.mode) {
+                    bad.push(`${cgrups} 群組 ${n}: 伺服端 ${srv.or ? 'OR' : 'AND'}、編輯器 ${ed.mode}`)
                 }
             }
         }
         assert.strict.deepEqual(bad, [], bad.join('\n'))
-        assert.strict.ok(nOn >= 8, `對照組: 伺服端授權之格數須夠多, 實得 ${nOn}`)
+        //純量 "y" 唯一項: 伺服端為限制項而該層無合法項 → 全 n(主責裁示); 編輯器顯示啟用(AND), 由 getKpLossy 判有損拒存
+        assert.strict.equal(grantedByGroup('{"G1":"y"}').G1, false, '純量 "y" 唯一項 → 全 n')
+        assert.strict.deepEqual(getKpLossy(JSON5.parse('{"G1":"y"}')), ['G1'])
+        //對照組(本 batt 實得: 參與 19、OR 8、AND 4〔含另有合法項時之限制項 2〕、有損 7〔同名 OR＋AND、啟用項皆 mode 非法〕)
+        assert.strict.ok(nOn >= 12 && nOr >= 4 && nAnd >= 3 && nLossy >= 5, `對照組: 參與 ${nOn}、OR ${nOr}、AND ${nAnd}、有損 ${nLossy} 皆須出現`)
     })
 
     it('DF-004 cgrups 陣列形式之 mode 保留: 編輯器顯示之 mode = 元素之 mode(AND／OR), 存出後伺服端以相同 mode 合併(mode 影響授權: 改為 OR 結果不同)', function() {
@@ -442,32 +581,48 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
         }
     })
 
-    it('DF-006 缺 mode 之群組元素: 伺服端不授權、編輯器顯示停用、存檔不增權(陣列與物件形式一致; 修前物件形式顯示啟用而存檔補 OR 增權, 為既有缺陷, 此處一併收緊)', function() {
-        for (let cgrups of ['[{"name":"G1","isActive":"y"}]', '{"G1":{"isActive":"y"}}']) {
-            assert.strict.equal(grantedByGroup(cgrups).G1, false, cgrups)
+    it('DF-006 缺 mode 之群組元素 run05 e: 伺服端視為 AND 參與、編輯器顯示啟用且 mode 為 AND、存檔後授權不變(陣列、物件、純量三種形式一致; 修前為「不授權、顯示停用」, run04 之前物件形式顯示啟用而存檔補 OR 增權)', function() {
+        let gs = [{ name: 'G1', cpemis: `{"P1":${ON}}` }, { name: 'G2', cpemis: `{"P2":${ON}}` }]
+        let ps = [{ name: 'P1', crules: '{"T1":"y"}' }, { name: 'P2', crules: '{"T1":"y","T2":"y"}' }]
+        let ts = [{ id: 'T1' }, { id: 'T2' }]
+        let eff = (cgrups) => getUserRules({ cgrups }, gs, ps, ts).rules.map((v) => `${v.name}=${v.isActive}`).join(',')
+        for (let cgrups of ['[{"name":"G1","isActive":"y"},{"name":"G2","mode":"OR","isActive":"y"}]', '{"G1":{"isActive":"y"},"G2":{"mode":"OR","isActive":"y"}}', '{"G1":"y","G2":{"mode":"OR","isActive":"y"}}']) {
+            assert.strict.equal(eff(cgrups), 'T1=y,T2=n', `${cgrups}: G2(OR){T1,T2} ∩ G1(缺 mode → AND){T1}`)
             let kp = cvKpToObj(JSON5.parse(cgrups), HM)
-            assert.strict.equal(editorOn(kp, 'G1'), false, cgrups)
-            //存檔(VeCgrups.doSave 形式)後仍不授權
-            let p = getOwn(kp, 'G1')
-            let saved = { G1: { mode: (p.mode === 'AND' || p.mode === 'OR') ? p.mode : 'OR', isActive: p.isActive === 'y' ? 'y' : 'n' } }
-            assert.strict.equal(grantedByGroup(JSON.stringify(saved)).G1, false, `存檔後 ${cgrups}`)
+            assert.strict.deepEqual(refState(getOwn(kp, 'G1', null)), { enable: 'y', mode: 'AND' }, cgrups)
+            //存檔(編輯器模型: 對話框列 → { 名稱: { mode, isActive } })後授權不變——若顯示停用或補 OR, 存檔即放寬為 T1、T2
+            assert.strict.equal(eff(saveLike(cgrups, ['G1', 'G2'])), 'T1=y,T2=n', `存檔後 ${cgrups}`)
+            assert.strict.equal(eff('{"G1":{"mode":"OR","isActive":"n"},"G2":{"mode":"OR","isActive":"y"}}'), 'T1=y,T2=y', '對照組: 若存成停用則放寬')
         }
     })
 
 
-    // ===== 窮舉性質(R-AUTH-ORDER-01／R-AUTH-LOSSY-01): 編輯器存檔後之授權 = 存檔前, 除非解碼判定為「無法無損表示」(此時編輯器拒存) =====
+    // ===== 窮舉性質(R-AUTH-MERGE-00／R-AUTH-LOSSY-01): 編輯器存檔前後之授權相等, 唯一例外為 getKpLossy 判定之有損格; 且與陣列元素序／對話框列序無關 =====
 
-    //受測存檔模擬(同 VeCgrups／VeCpemis.doSave 的資料流): 解碼 → 對話框每個名稱一列(mode 缺漏預設 OR, 啟用與否取解碼結果) → keepKeyOrder(解碼為參考) → 字串
-    let saveLike = (raw, names, keep = true) => {
+    //受測存檔模擬＝編輯器模型(run05; 同 VeCgrups／VeCpemis.doSave 的資料流, 與 U1 之實作一致): 解碼(cvKpToObj hasMode) → 對話框之列 =
+    //  (被引用表之全部列, 狀態取 refState) ∪ (啟用而名稱不在表中之引用〔懸空, 含名稱 ""〕, 各一列原樣保留其有效 mode; R-PRINCIPLE-00 c／f: 丟棄即改變授權)
+    //  → 寫出 { 名稱: { mode, isActive } }(JSON.stringify; 物件鍵序 = 列序. 不保序: 規則 4, 結果與鍵序無關).
+    //名稱非字串之啟用元素物件形式無法表示, 由 getKpLossy 判定(拒存), 此處不寫出
+    let saveLike = (raw, names) => {
         let kp = cvKpToObj(JSON5.parse(raw), HM)
-        let kpNew = Object.create(null)
-        for (let n of names) {
-            let p = getOwn(kp, n, null)
-            let mode = getOwn(p, 'mode', '')
-            kpNew[n] = { mode: (mode === 'OR' || mode === 'AND') ? mode : 'OR', isActive: getOwn(p, 'isActive', '') === 'y' ? 'y' : 'n' }
+        let rows = names.map((n) => ({ name: n, ...refState(getOwn(kp, n, null)) }))
+        if (kp !== null && typeof kp === 'object' && !Array.isArray(kp)) {
+            Object.keys(kp).forEach((k) => {
+                let st = refState(kp[k])
+                if (!names.includes(k) && st.enable === 'y') {
+                    rows.push({ name: k, ...st })
+                }
+            })
         }
-        return JSON.stringify(keep ? keepKeyOrder(kp, kpNew) : kpNew)
+        let kpNew = Object.create(null)
+        rows.forEach((r) => {
+            kpNew[r.name] = { mode: r.mode, isActive: r.enable }
+        })
+        return JSON.stringify(kpNew)
     }
+
+    //eff 字串 'T1=y,T2=n,…' → 授權為 y 之標的集合
+    let ysOf = (s) => new Set(s.split(',').filter((x) => x.endsWith('=y')).map((x) => x.slice(0, -2)))
 
     //規則集家族: 標的集合彼此不同使順序／模式差異可觀察; 含 'n' 值(AND 合併對 n 敏感)
     let FAMS = [
@@ -478,10 +633,14 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
         { A: { T1: 'y', T3: 'n' }, B: { T2: 'y', T1: 'n' }, C: { T3: 'y', T1: 'y', T2: 'n' } },
     ]
 
+    //nValidOf: 陣列形式中 mode 合法(OR／AND)之啟用元素數(0 ＝ 該層啟用項皆 mode 非法或無啟用項)
+    let nValidOf = (arr) => arr.filter((e) => e !== null && typeof e === 'object' && e.isActive === 'y' && (e.mode === 'OR' || e.mode === 'AND')).length
+
     //窮舉: names × mode × isActive, 長度 ≤ maxLen 之全部陣列; level 為 'cgrups'(使用者層, 名稱即群組) 或 'cpemis'(群組層, 名稱即權限)
-    //ghosts: 出現在陣列元素中、但不在群組(權限)表內之名稱(已刪除或外部多給; 伺服端 arrFinder 查無實體即丟棄, 編輯器對話框亦不列, 存檔時被丟棄)
-    let exhaust = (level, names, modes, actives, maxLen, ghosts = []) => {
-        let elems = []
+    //ghosts: 出現在陣列元素中、但不在群組(權限)表內之名稱(已刪除或外部多給; run05 c: 伺服端以懸空引用參與〔內容全 n〕, 編輯器以額外列保留、存檔原樣寫回)
+    //extras: 另加之元素(如名稱非字串、非物件元素; 物件形式無法表示, 由 getKpLossy 判定)
+    let exhaust = (level, names, modes, actives, maxLen, ghosts = [], extras = []) => {
+        let elems = [...extras]
         for (let name of [...names, ...ghosts]) {
             for (let mode of modes) {
                 for (let isActive of actives) {
@@ -503,7 +662,10 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
         }
         let ts = [{ id: 'T1' }, { id: 'T2' }, { id: 'T3' }]
         let pn = ['A', 'B', 'C']
-        let st = { total: 0, equal: 0, lossy: 0, leaks: [], naiveBroken: 0, keepFixed: 0 }
+        //st 四個互斥分類(total = equal + lossyNeed + lossyCons + leaks.length):
+        //  equal: 存檔前後授權相等且未判有損; lossyNeed: 判有損且硬寫真的改變授權(判定確有必要); lossyCons: 判有損但硬寫碰巧相等(保守側); leaks: 授權改變而未判有損(漏判, 須為 0)
+        //  orderBad: 陣列元素序反轉／對話框列序反轉使授權改變者(規則 4, 須為 0); gain: 有損格硬寫後授權為 y 之標的多於寫前者(增權, 須為 0——硬寫取 AND 支, 只會收回)
+        let st = { total: 0, equal: 0, lossyNeed: 0, lossyCons: 0, leaks: [], orderBad: [], gain: [], unnamed: 0, allBad: 0 }
         for (let fam of FAMS) {
             let eff
             if (level === 'cgrups') {
@@ -520,74 +682,111 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
                 let raw = JSON.stringify(arr)
                 let before = eff(raw)
                 let lossy = getKpLossy(JSON5.parse(raw))
-                let after = eff(saveLike(raw, names))
-                if (lossy.length > 0) {
-                    st.lossy++
-                    continue //有損: 編輯器拒存(此格不寫出), 不比較
+                let after = eff(saveLike(raw, names)) //有損格亦計算「硬寫」之授權(編輯器實際會拒存, 此處為驗證判定是否漏判／是否必要)
+
+                //規則 4: 陣列元素序反轉、對話框列序反轉, 授權不變(寫前、寫後皆然)
+                let beforeRev = eff(JSON.stringify([...arr].reverse()))
+                let afterRev = eff(saveLike(raw, [...names].reverse()))
+                if (beforeRev !== before || afterRev !== after) {
+                    st.orderBad.push(`${raw}: 元素序反轉 ${before} → ${beforeRev}; 列序反轉(寫後) ${after} → ${afterRev}`)
                 }
+
                 if (before === after) {
-                    st.equal++
+                    if (lossy.length > 0) {
+                        st.lossyCons++
+                    }
+                    else {
+                        st.equal++
+                    }
+                }
+                else if (lossy.length > 0) {
+                    st.lossyNeed++
+                    let yb = ysOf(before)
+                    let ya = ysOf(after)
+                    //增權檢查只對「同名 OR 與 AND 並存」之有損(硬寫取 AND 支只會收回); 名稱非字串之啟用元素(#序號, run05 f)硬寫即丟棄懸空引用而增權、
+                    //啟用項皆 mode 非法(nValid 0, 主責裁示之限制項)硬寫即成 AND 基底而增權——正是拒存之理由, 不在此列
+                    let allBad = nValidOf(arr) === 0
+                    if (!allBad && lossy.every((x) => !/^#\d+$/.test(x)) && [...ya].some((t) => !yb.has(t))) {
+                        st.gain.push(`${raw}: ${before} → ${after}`)
+                    }
+                    if (lossy.some((x) => /^#\d+$/.test(x))) {
+                        st.unnamed++
+                    }
+                    if (allBad) {
+                        st.allBad++
+                    }
                 }
                 else {
                     st.leaks.push(`${raw}: ${before} → ${after}`)
-                }
-                //靈敏度: 不保序之舊式存檔(對話框序重寫)在此格是否改變授權、保序後是否修正
-                let naive = eff(saveLike(raw, names, false))
-                if (naive !== before) {
-                    st.naiveBroken++
-                    if (after === before) {
-                        st.keepFixed++
-                    }
                 }
             }
         }
         return st
     }
     let chk = (label, st, opt = {}) => {
+        //R-AUTH-LOSSY-01: 凡存檔前後授權不相等者皆被 getKpLossy 判定(漏判 0)
         assert.strict.deepEqual(st.leaks.slice(0, 5), [], `${label} ${st.leaks.length} 組授權改變而未被判定為有損: ${st.leaks.slice(0, 5).join('\n')}`)
-        assert.strict.equal(st.equal + st.lossy, st.total, `${label} 分佈`)
+        assert.strict.equal(st.equal + st.lossyNeed + st.lossyCons, st.total, `${label} 分佈`)
+        //規則 4: 順序無關
+        assert.strict.deepEqual(st.orderBad.slice(0, 5), [], `${label} ${st.orderBad.length} 組授權隨元素序／列序改變: ${st.orderBad.slice(0, 5).join('\n')}`)
+        assert.strict.deepEqual(st.gain.slice(0, 5), [], `${label} ${st.gain.length} 組有損格硬寫後增權`)
         assert.strict.ok(st.equal > 0, `${label} 相等格數`)
         if (opt.lossy) {
-            assert.strict.ok(st.lossy > 0, `${label} 應有被判有損之格(靈敏度)`)
+            assert.strict.ok(st.lossyNeed + st.lossyCons > 0, `${label} 應有被判有損之格(靈敏度)`)
         }
-        if (opt.naive) {
-            assert.strict.ok(st.naiveBroken > 0 && st.keepFixed > 0, `${label} 靈敏度: 舊式存檔改變授權 ${st.naiveBroken} 格, 保序後修正 ${st.keepFixed} 格`)
+        if (opt.need) {
+            assert.strict.ok(st.lossyNeed > 0, `${label} 靈敏度: 應有「判有損且硬寫真的改變授權」之格(判定非虛設), 實得 ${st.lossyNeed}`)
         }
     }
 
-    it('PR-001 cgrups 陣列形式窮舉(2 群組 × mode{OR,AND,缺,or} × isActive{y,n}, 長度 ≤ 3, 5 組規則集): 保序存檔後授權相等, 除非判定為有損; 靈敏度: 舊式(不保序)存檔在多格改變授權', function() {
+    it('PR-001 cgrups 陣列形式窮舉(2 群組 × mode{OR,AND,缺,or} × isActive{y,n}, 長度 ≤ 3, 5 組規則集): 經編輯器流程重新寫出之授權 = 寫出前, 除非 getKpLossy 判定有損; 漏判 0; 與元素序／列序無關', function() {
         this.timeout(300000)
         let st = exhaust('cgrups', ['G1', 'G2'], ['OR', 'AND', undefined, 'or'], ['y', 'n'], 3)
         assert.strict.equal(st.total, 4369 * FAMS.length)
-        chk('PR-001', st, { lossy: true, naive: true })
+        chk('PR-001', st, { lossy: true, need: true })
     })
 
-    it('PR-001b cgrups: 3 群組(含整數式名稱 1／2, JS 屬性序使其永遠排前面) 各種組合: 保序存檔後授權相等, 除非判定為有損', function() {
+    it('PR-001b cgrups: 3 群組(含整數式名稱 1／2, 幻影名稱) 各種組合: 重新寫出後授權相等, 除非判定為有損; 整數式名稱被 JS 屬性序排前不再改變授權(規則 4)', function() {
         this.timeout(300000)
         chk('PR-001b-1', exhaust('cgrups', ['1', '2'], ['OR', 'AND', undefined], ['y', 'n'], 3), { lossy: true })
         chk('PR-001b-2', exhaust('cgrups', ['G1', '2', '1'], ['OR', 'AND'], ['y'], 3), { lossy: true })
         chk('PR-001b-3', exhaust('cgrups', ['G1', '2', '1'], ['OR', 'AND', undefined], ['y', 'n'], 3), { lossy: true })
-        chk('PR-001b-4', exhaust('cgrups', ['G1', 'G2', 'G3'], ['OR', 'AND', undefined], ['y', 'n'], 3), { lossy: true, naive: true })
-        chk('PR-001b-5', exhaust('cgrups', ['G1', 'G2', 'G3'], ['OR', 'AND'], ['y', 'n'], 4), { lossy: true, naive: true })
-        //幻影名稱(外審 sol#1／minimax#1: 首項為查無實體之整數式名稱時, 丟棄後實際首個 AND 項易位)
-        chk('PR-001b-6', exhaust('cgrups', ['G1', '2'], ['OR', 'AND', undefined], ['y', 'n'], 3, ['1']), { lossy: true })
+        chk('PR-001b-4', exhaust('cgrups', ['G1', 'G2', 'G3'], ['OR', 'AND', undefined], ['y', 'n'], 3), { lossy: true, need: true })
+        chk('PR-001b-5', exhaust('cgrups', ['G1', 'G2', 'G3'], ['OR', 'AND'], ['y', 'n'], 4), { lossy: true, need: true })
+        //幻影名稱(外審 sol#1／minimax#1: 首項為查無實體之整數式名稱): 元素中出現、但不在群組表內之名稱——run05 c: 伺服端以懸空引用參與(內容全 n), 編輯器以額外列保留
+        chk('PR-001b-6', exhaust('cgrups', ['G1', '2'], ['OR', 'AND', undefined], ['y', 'n'], 3, ['1']), { lossy: true, need: true })
         chk('PR-001b-7', exhaust('cgrups', ['G1', 'G2'], ['OR', 'AND'], ['y'], 3, ['3', 'G9']), { lossy: true })
         chk('PR-001b-8', exhaust('cgrups', ['2', '3'], ['OR', 'AND'], ['y', 'n'], 3, ['1', 'G']), { lossy: true })
+        //run05 新維度: 名稱 ""(表中有／無名稱為 "" 之列)、非法 mode(XOR、null)、名稱非字串之元素(無 name、數字 name、非物件元素 "y")
+        chk('PR-001b-9', exhaust('cgrups', ['G1', ''], ['OR', 'AND', undefined, 'XOR'], ['y', 'n'], 3, ['G9']), { lossy: true, need: true })
+        chk('PR-001b-10', exhaust('cgrups', ['G1', 'G2'], ['OR', 'AND', null], ['y', 'n'], 3, ['']), { lossy: true, need: true })
+        let st11 = exhaust('cgrups', ['G1', 'G2'], ['OR', 'AND', undefined], ['y', 'n'], 2, ['G9'], [{ mode: 'AND', isActive: 'y' }, { name: 7, mode: 'OR', isActive: 'y' }, 'y', { name: 8, mode: 'OR', isActive: 'n' }])
+        chk('PR-001b-11', st11, { lossy: true, need: true })
+        assert.strict.ok(st11.unnamed > 0, `靈敏度: 名稱非字串之啟用元素須被判有損(#序號), 實得 ${st11.unnamed}`)
+        //主責裁示之限制項維度: 只有 mode 缺／非法(全部格之啟用項皆非法)與混合合法 mode
+        let st12 = exhaust('cgrups', ['G1', 'G2'], [undefined, 'XOR'], ['y', 'n'], 3, ['G9'])
+        chk('PR-001b-12', st12, { lossy: true, need: true })
+        assert.strict.ok(st12.allBad > 0, `靈敏度: 啟用項皆 mode 非法之格須被判有損, 實得 ${st12.allBad}`)
+        chk('PR-001b-13', exhaust('cgrups', ['G1', 'G2', ''], ['OR', 'or', null], ['y', 'n'], 3), { lossy: true, need: true })
     })
 
-    it('PR-003 cpemis 窮舉(同 PR-001 之下一層: 一個群組含 2～3 個權限): 保序存檔後授權相等, 除非判定為有損(mergeRules 同一函數, 權限層同有順序依賴)', function() {
+    it('PR-003 cpemis 窮舉(同 PR-001 之下一層: 一個群組含 2～3 個權限): 重新寫出後授權相等, 除非判定為有損(mergeRules 同一函數, 權限層與群組層同一規則)', function() {
         this.timeout(300000)
-        chk('PR-003-1', exhaust('cpemis', ['A', 'B'], ['OR', 'AND', undefined, 'or'], ['y', 'n'], 3), { lossy: true, naive: true })
-        chk('PR-003-2', exhaust('cpemis', ['A', 'B', 'C'], ['OR', 'AND', undefined], ['y', 'n'], 3), { lossy: true, naive: true })
+        chk('PR-003-1', exhaust('cpemis', ['A', 'B'], ['OR', 'AND', undefined, 'or'], ['y', 'n'], 3), { lossy: true, need: true })
+        chk('PR-003-2', exhaust('cpemis', ['A', 'B', 'C'], ['OR', 'AND', undefined], ['y', 'n'], 3), { lossy: true, need: true })
         chk('PR-003-3', exhaust('cpemis', ['1', '2', 'A'], ['OR', 'AND', undefined], ['y', 'n'], 3), { lossy: true })
-        chk('PR-003-4', exhaust('cpemis', ['A', '2'], ['OR', 'AND', undefined], ['y', 'n'], 3, ['1']), { lossy: true })
+        chk('PR-003-4', exhaust('cpemis', ['A', '2'], ['OR', 'AND', undefined], ['y', 'n'], 3, ['1']), { lossy: true, need: true })
+        //run05 新維度: 名稱 ""、非法 mode、懸空(權限表查無)
+        chk('PR-003-5', exhaust('cpemis', ['A', ''], ['OR', 'AND', 'or'], ['y', 'n'], 3, ['PX']), { lossy: true, need: true })
+        let st6 = exhaust('cpemis', ['A', 'B'], ['or', undefined, 'AND'], ['y', 'n'], 3, ['PX'])
+        chk('PR-003-6', st6, { lossy: true, need: true })
+        assert.strict.ok(st6.allBad > 0, `靈敏度(權限層): 啟用項皆 mode 非法之格, 實得 ${st6.allBad}`)
     })
 
-    it('PR-004 物件形式窮舉(編輯器自己寫出之形式): 3 個名稱 × 各自 {缺席, (OR|AND|缺 mode) × (y|n)} × 全部鍵序排列 → getKpLossy 恆為空, 保序存檔後授權相等(含鍵序即不變式本身)', function() {
+    it('PR-004 物件形式窮舉(編輯器自己寫出之形式): 3 個名稱(三組: 純英數、含整數式名稱、含空字串名稱〔run05〕) × 各自 {缺席, (OR|AND|缺 mode|XOR) × (y|n)} × 全部鍵序排列 → getKpLossy 只在「啟用項皆 mode 非法」時非空(主責裁示之第三格), 其餘重新寫出後授權相等, 且同一組項目的 6 種鍵序授權完全相同(規則 4)', function() {
         this.timeout(300000)
-        let names = ['G1', 'G2', 'G3']
         let states = [null]
-        for (let mode of ['OR', 'AND', undefined]) {
+        for (let mode of ['OR', 'AND', undefined, 'XOR']) { //run05 e: 缺 mode 與非法 mode(XOR)皆視為 AND
             for (let isActive of ['y', 'n']) {
                 states.push({ ...(mode === undefined ? {} : { mode }), isActive })
             }
@@ -596,28 +795,45 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
         let ts = [{ id: 'T1' }, { id: 'T2' }, { id: 'T3' }]
         let pn = ['A', 'B', 'C']
         let leaks = []
+        let orderBad = []
         let total = 0
-        for (let fam of FAMS) {
-            let gs = names.map((n, i) => ({ name: n, cpemis: `{"${pn[i % 3]}":${ON}}` }))
-            let ps = pn.map((p) => ({ name: p, crules: JSON.stringify(fam[p]) }))
-            let eff = (cgrups) => getUserRules({ cgrups }, gs, ps, ts).rules.map((v) => `${v.name}=${v.isActive}`).join(',')
-            for (let s0 of states) {
-                for (let s1 of states) {
-                    for (let s2 of states) {
-                        let ss = [s0, s1, s2]
-                        for (let pm of perms) {
-                            let o = {}
-                            for (let i of pm) {
-                                if (ss[i] !== null) {
-                                    o[names[i]] = ss[i]
+        let nSets = 0
+        let nMulti = 0 //項目 ≥ 2 個(鍵序排列才有實質差異)之組數
+        let nAllBad = 0 //啟用項皆 mode 非法(判有損)之格數
+        let nNeed = 0 //其中硬寫確實改變授權者(判定之必要性)
+        //第二組名稱含整數式名稱: JSON.parse 後 JS 屬性序恆把 '2'、'1' 排到 G1 之前, 與文字序無關——規則 4 下授權仍相同
+        for (let names of [['G1', 'G2', 'G3'], ['G1', '2', '1'], ['', 'G2', '1']]) { //第三組含空字串名稱(run05 f: 保留為鍵 "")
+            for (let fam of FAMS) {
+                let gs = names.map((n, i) => ({ name: n, cpemis: `{"${pn[i % 3]}":${ON}}` }))
+                let ps = pn.map((p) => ({ name: p, crules: JSON.stringify(fam[p]) }))
+                let eff = (cgrups) => getUserRules({ cgrups }, gs, ps, ts).rules.map((v) => `${v.name}=${v.isActive}`).join(',')
+                for (let s0 of states) {
+                    for (let s1 of states) {
+                        for (let s2 of states) {
+                            let ss = [s0, s1, s2]
+                            let effs = new Set()
+                            for (let pm of perms) {
+                                //以文字拼出該鍵序之物件(不經 JS 物件, 避免整數式鍵被重排而失去排列意義)
+                                let raw = '{' + pm.filter((i) => ss[i] !== null).map((i) => `${JSON.stringify(names[i])}:${JSON.stringify(ss[i])}`).join(',') + '}'
+                                total++
+                                //物件形式只有一格可判有損: 啟用項皆 mode 缺或非法(主責裁示之限制項, KL-007); 其餘恆為空
+                                let lossy = getKpLossy(JSON5.parse(raw))
+                                let act = ss.map((s, i) => [s, names[i]]).filter(([s]) => s !== null && s.isActive === 'y')
+                                let allBad = act.length > 0 && act.every(([s]) => s.mode !== 'OR' && s.mode !== 'AND')
+                                assert.strict.deepEqual([...lossy].sort(), allBad ? act.map(([, n]) => n).sort() : [], `物件形式之有損判定 ${raw}`)
+                                let before = eff(raw)
+                                effs.add(before)
+                                let after = eff(saveLike(raw, names))
+                                if (before !== after && lossy.length === 0) {
+                                    leaks.push(`${raw}: ${before} → ${after}`)
                                 }
+                                nAllBad += allBad ? 1 : 0
+                                nNeed += (allBad && before !== after) ? 1 : 0
                             }
-                            let raw = JSON.stringify(o)
-                            total++
-                            assert.strict.deepEqual(getKpLossy(JSON5.parse(raw)), [], `物件形式不得判有損 ${raw}`)
-                            let after = eff(saveLike(raw, names))
-                            if (eff(raw) !== after) {
-                                leaks.push(`${raw}: ${eff(raw)} → ${after}`)
+                            nSets++
+                            nMulti += ss.filter((s) => s !== null).length >= 2 ? 1 : 0
+                            if (effs.size !== 1) {
+                                orderBad.push(`${names.join(',')} ${JSON.stringify(ss)}: ${[...effs].join(' | ')}`)
                             }
                         }
                     }
@@ -625,10 +841,14 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
             }
         }
         assert.strict.ok(total > 10000, `格數 ${total}`)
-        assert.strict.deepEqual(leaks.slice(0, 5), [], `${leaks.length} 組違規: ${leaks.slice(0, 5).join('\n')}`)
+        assert.strict.equal(total, 3 * FAMS.length * 729 * 6, '格數 = 3 組名稱 × 規則集 × 9^3 狀態 × 6 鍵序')
+        assert.strict.ok(nMulti > nSets / 2, `對照組: 多數組合有 ≥ 2 個項目(鍵序排列才有意義), 實得 ${nMulti}／${nSets}`)
+        assert.strict.deepEqual(leaks.slice(0, 5), [], `${leaks.length} 組寫出後授權改變(未判有損): ${leaks.slice(0, 5).join('\n')}`)
+        assert.strict.deepEqual(orderBad.slice(0, 5), [], `${orderBad.length} 組授權隨鍵序改變: ${orderBad.slice(0, 5).join('\n')}`)
+        assert.strict.ok(nAllBad > 0 && nNeed > 0, `靈敏度: 啟用項皆 mode 非法之格 ${nAllBad}、硬寫確實改變授權者 ${nNeed}`)
     })
 
-    it('PR-006 編輯後之輸出(外審 minimax#2): 對任一非有損原資料與任一列狀態組合(停用／OR／AND, 含新增整數式名稱), 寫出之物件的授權 = 依預期序(原序在前、新增附加於後)的陣列形式之授權; 若不等, 須由 getKeyOrderLost 判定易位(此時編輯器拒存)', function() {
+    it('PR-006 編輯後之輸出(外審 minimax#2): 對任一非有損原資料與任一列狀態組合(停用／OR／AND, 含新增整數式名稱), 寫出之物件的授權 = 規則 3 逐字計算之授權(與陣列元素序無關); 新增整數式 AND 名稱(舊制易位而拒存之形狀)不再被拒存且授權符合預期', function() {
         this.timeout(300000)
         let names = ['G1', '2', '1']
         let elems = []
@@ -656,62 +876,124 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
         }
         let ts = [{ id: 'T1' }, { id: 'T2' }, { id: 'T3' }]
         let pn = ['A', 'B', 'C']
+
+        //規則 3 之逐字參照實作(不經 getUserRules／mergeRules): items = [{ mode, set }], set 為該項值為 y 之標的集合(未列 = n, 規則 1);
+        //起點全 n(規則 2); 所有 OR 聯集, 無 OR 時以第一個 AND 為基底, 再與所有 AND 交集(規則 3)
+        let specMerge = (items) => {
+            let ors = items.filter((x) => x.mode === 'OR')
+            let ands = items.filter((x) => x.mode === 'AND')
+            let res = new Set()
+            if (ors.length > 0) {
+                for (let x of ors) {
+                    for (let t of x.set) {
+                        res.add(t)
+                    }
+                }
+            }
+            else if (ands.length > 0) {
+                res = new Set(ands[0].set)
+            }
+            for (let x of ands) {
+                res = new Set([...res].filter((t) => x.set.has(t)))
+            }
+            return res
+        }
+
         let n = 0
-        let nDiff = 0
+        let nShape = 0 //舊制易位(而拒存)之形狀: 原資料已有 G1 AND, 新啟用整數式 AND 名稱且無 OR → 寫出物件鍵序為 1／2 在前、G1 在後
         let leaks = []
-        for (let fam of FAMS) {
+        let memo = new Map() //寫出內容只取決於 (規則集, 列狀態), 與原資料無關(不再參考原鍵序), 同一組合只評估一次
+        let distinct = new Set()
+        for (let [fi, fam] of FAMS.entries()) {
             let gs = names.map((nm, i) => ({ name: nm, cpemis: `{"${pn[i % 3]}":${ON}}` }))
             let ps = pn.map((p) => ({ name: p, crules: JSON.stringify(fam[p]) }))
             let eff = (cgrups) => getUserRules({ cgrups }, gs, ps, ts).rules.map((v) => `${v.name}=${v.isActive}`).join(',')
+            let setOf = (nm) => new Set(ts.map((t) => t.id).filter((t) => fam[pn[names.indexOf(nm) % 3]][t] === 'y'))
             for (let arr of origs) {
                 let raw = JSON.stringify(arr)
                 if (getKpLossy(JSON5.parse(raw)).length > 0) {
                     continue //有損: 編輯器於存檔前即拒存
                 }
-                let ref = cvKpToObj(JSON5.parse(raw), HM)
+                let origAndG1 = arr.some((e) => e.name === 'G1' && e.mode === 'AND' && e.isActive === 'y')
                 for (let st of states) {
+                    n++
+                    //對話框列狀態 → 寫出(同 doSave: 物件, 鍵序 = JS 屬性序, 整數式名稱在前)
                     let kpNew = Object.create(null)
                     names.forEach((nm, i) => {
                         kpNew[nm] = { mode: st[i] === 2 ? 'AND' : 'OR', isActive: st[i] === 0 ? 'n' : 'y' }
                     })
-                    let seq = keyOrderOf(ref, kpNew)
-                    let out = keepKeyOrder(ref, kpNew)
-                    let intended = eff(JSON.stringify(seq.map((nm) => ({ name: nm, ...kpNew[nm] }))))
-                    let actual = eff(JSON.stringify(out))
-                    n++
-                    if (intended !== actual) {
-                        nDiff++
-                        if (getKpWriteLost(ref, kpNew).length === 0) { //四個編輯器共用之函數(預期序於內部由 ref 與 kpNew 導出)
-                            leaks.push(`${raw} ${st.join('')}: ${intended} → ${actual}`)
-                        }
+                    let out = JSON.stringify(kpNew)
+                    let key = `${fi}:${st.join('')}`
+                    if (!memo.has(key)) {
+                        let intended = names.map((nm) => ({ name: nm, ...kpNew[nm] }))
+                        //規則 3 逐字計算(只有啟用且 mode 合法的項參與, 規則 5)
+                        let res = specMerge(intended.filter((x) => x.isActive === 'y').map((x) => ({ mode: x.mode, set: setOf(x.name) })))
+                        let spec = ts.map((t) => `${t.id}=${res.has(t.id) ? 'y' : 'n'}`).join(',')
+                        memo.set(key, { spec, actual: eff(out), fwd: eff(JSON.stringify(intended)), rev: eff(JSON.stringify([...intended].reverse())) })
+                        distinct.add(spec)
+                    }
+                    let m = memo.get(key)
+                    if (m.actual !== m.spec || m.fwd !== m.spec || m.rev !== m.spec) {
+                        leaks.push(`${raw} ${st.join('')}: 規則 3 計算 ${m.spec}; 寫出物件 ${m.actual}; 陣列正序 ${m.fwd}; 陣列反序 ${m.rev}`)
+                    }
+                    //舊制拒存之形狀(sensitivity): 確認該形狀真的落在窮舉空間內, 且寫出之鍵序確為整數式在前(JS 屬性序), 而授權仍符合規則 3(上面已驗)
+                    if (origAndG1 && st[0] === 2 && (st[1] === 2 || st[2] === 2) && !st.includes(1)) {
+                        let ks = Object.keys(JSON.parse(out))
+                        assert.strict.ok(ks.indexOf('G1') > ks.findIndex((k) => /^\d+$/.test(k)) && ks.indexOf('G1') === ks.length - 1, `舊制易位形狀之鍵序 ${out}`)
+                        nShape++
                     }
                 }
             }
         }
-        assert.strict.deepEqual(leaks.slice(0, 5), [], `${leaks.length} 組輸出授權與預期不同而未被判定: ${leaks.slice(0, 5).join('\n')}`)
-        assert.strict.ok(n > 10000 && nDiff > 0, `靈敏度: 共 ${n} 格, 其中輸出授權與預期不同者 ${nDiff} 格(皆已被 getKeyOrderLost 判定)`)
+        assert.strict.deepEqual(leaks.slice(0, 5), [], `${leaks.length} 組寫出物件之授權與規則 3 計算不同: ${leaks.slice(0, 5).join('\n')}`)
+        assert.strict.ok(n > 10000, `格數 ${n}`)
+        assert.strict.ok(nShape > 0, `靈敏度: 窮舉空間內應含舊制易位而拒存之形狀(新增整數式 AND 名稱), 實得 ${nShape} 格, 皆已通過(不再拒存)`)
+        assert.strict.ok(distinct.size >= 5, `對照組: 規則 3 計算出的授權結果須有多種(標的集合共 8 種可能; 非全 y 或全 n), 實得 ${distinct.size} 種`)
     })
 
-    it('PR-005 兩個具體反例(外審 sol R3#2、run01 PR-004): 同名 AND／OR 並存且另有 AND 名稱 → 判定有損; 兩個 AND 群組且對話框序 ≠ 資料序 → 保序後授權相等', function() {
-        let gs = [{ name: 'G1', cpemis: `{"P1":${ON}}` }, { name: 'G2', cpemis: `{"P2":${ON}}` }]
-        let ps = [{ name: 'P1', crules: '{"T1":"y","T2":"y"}' }, { name: 'P2', crules: '{"T2":"y"}' }]
+    it('PR-005 具體反例(外審 sol R3#2、run01 PR-004; 依 R-AUTH-MERGE-00 重算): 同名 OR／AND 並存 → 判有損, 硬寫(取 AND 支或取 OR 支)改變授權; 兩個 AND 群組且對話框序 ≠ 資料序 → 重新寫出後授權相等且與序無關', function() {
         let ts = [{ id: 'T1' }, { id: 'T2' }]
-        let eff = (cgrups) => Object.fromEntries(getUserRules({ cgrups }, gs, ps, ts).rules.map((v) => [v.name, v.isActive]))
-        //反例 1(sol R3#2): 無法無損表示 → 判定有損(編輯器拒存), 若硬寫(保留 AND 支)會 T1 由 n 變 y
-        let c1 = '[{"name":"G1","mode":"AND","isActive":"y"},{"name":"G2","mode":"AND","isActive":"y"},{"name":"G2","mode":"OR","isActive":"y"}]'
-        assert.strict.deepEqual(eff(c1), { T1: 'n', T2: 'y' })
-        assert.strict.deepEqual(getKpLossy(JSON5.parse(c1)), ['G2'])
-        assert.strict.deepEqual(eff(JSON.stringify({ G1: { mode: 'AND', isActive: 'y' }, G2: { mode: 'AND', isActive: 'y' } })), { T1: 'y', T2: 'y' }, '硬寫即增權(證明拒存之必要)')
-        //反例 2(run01 PR-004): 資料序 G1,G2、對話框(群組表)序 G2,G1; 舊式依對話框序重寫即 T2 由 n 變 y; 保序後相等
-        ps = [{ name: 'P1', crules: '{"T1":"y"}' }, { name: 'P2', crules: '{"T2":"y"}' }] //此例規則集互斥(兩個 AND 項互為對方之限制)
-        let c2 = '[{"name":"G1","mode":"AND","isActive":"y"},{"name":"G2","mode":"AND","isActive":"y"}]'
-        assert.strict.deepEqual(eff(c2), { T1: 'y', T2: 'n' })
-        assert.strict.deepEqual(getKpLossy(JSON5.parse(c2)), [])
-        assert.strict.deepEqual(eff(saveLike(c2, ['G2', 'G1'], false)), { T1: 'n', T2: 'y' }, '舊式(不保序)增權')
-        assert.strict.deepEqual(eff(saveLike(c2, ['G2', 'G1'])), { T1: 'y', T2: 'n' }, '保序後相等')
-        //物件形式同
-        let c3 = '{"G1":{"mode":"AND","isActive":"y"},"G2":{"mode":"AND","isActive":"y"}}'
-        assert.strict.deepEqual(eff(saveLike(c3, ['G2', 'G1'])), eff(c3))
+        let mkEff = (ps, gs) => (cgrups) => Object.fromEntries(getUserRules({ cgrups }, gs, ps, ts).rules.map((v) => [v.name, v.isActive]))
+        let gs3 = [{ name: 'G1', cpemis: `{"P1":${ON}}` }, { name: 'G2', cpemis: `{"P2":${ON}}` }, { name: 'G3', cpemis: `{"P3":${ON}}` }]
+
+        //反例 1(sol R3#2 的新規則版): G1 同時為 OR 與 AND, 另有 G2(OR)、G3(AND); P1={T1}、P2={T2}、P3={T1,T2}
+        //規則 3: 所有 OR 聯集 {T1}∪{T2} = {T1,T2}, 再與所有 AND 交集 {T1} ∩ {T1,T2} = {T1}
+        let eff1 = mkEff([{ name: 'P1', crules: '{"T1":"y"}' }, { name: 'P2', crules: '{"T2":"y"}' }, { name: 'P3', crules: '{"T1":"y","T2":"y"}' }], gs3)
+        let c1 = '[{"name":"G1","mode":"AND","isActive":"y"},{"name":"G1","mode":"OR","isActive":"y"},{"name":"G2","mode":"OR","isActive":"y"},{"name":"G3","mode":"AND","isActive":"y"}]'
+        assert.strict.deepEqual(eff1(c1), { T1: 'y', T2: 'n' }, '規則 3 之期望')
+        assert.strict.deepEqual(getKpLossy(JSON5.parse(c1)), ['G1'], '物件形式無法無損表示 → 判有損(編輯器拒存)')
+        //硬寫取 AND 支(cvKpToObj 的顯示值): G2(OR)={T2} ∩ G1 {T1} ∩ G3 {T1,T2} = ∅ → 減權
+        assert.strict.deepEqual(eff1(saveLike(c1, ['G1', 'G2', 'G3'])), { T1: 'n', T2: 'n' }, '硬寫 AND 支: T1 由 y 變 n(減權), 證明拒存之必要')
+        //硬寫取 OR 支: ({T1}∪{T2}) ∩ G3 {T1,T2} = {T1,T2} → 增權
+        assert.strict.deepEqual(eff1(JSON.stringify({ G1: { mode: 'OR', isActive: 'y' }, G2: { mode: 'OR', isActive: 'y' }, G3: { mode: 'AND', isActive: 'y' } })), { T1: 'y', T2: 'y' }, '硬寫 OR 支: T2 由 n 變 y(增權)')
+        assert.strict.deepEqual(eff1(JSON.stringify(JSON5.parse(c1).reverse())), { T1: 'y', T2: 'n' }, '元素序反轉後授權不變(規則 4)')
+
+        //反例 1b(舊反例 1 之資料, 新規則重算): P1={T1,T2}、P2={T2}; [G1/AND, G2/AND, G2/OR] 規則 3 得 {T2}; 硬寫 AND 支亦得 {T2}——碰巧相等, 仍從嚴判有損(getKpLossy 保守側)
+        let gs2 = [{ name: 'G1', cpemis: `{"P1":${ON}}` }, { name: 'G2', cpemis: `{"P2":${ON}}` }]
+        let eff2 = mkEff([{ name: 'P1', crules: '{"T1":"y","T2":"y"}' }, { name: 'P2', crules: '{"T2":"y"}' }], gs2)
+        let c1b = '[{"name":"G1","mode":"AND","isActive":"y"},{"name":"G2","mode":"AND","isActive":"y"},{"name":"G2","mode":"OR","isActive":"y"}]'
+        assert.strict.deepEqual(eff2(c1b), { T1: 'n', T2: 'y' })
+        assert.strict.deepEqual(getKpLossy(JSON5.parse(c1b)), ['G2'])
+        assert.strict.deepEqual(eff2(saveLike(c1b, ['G1', 'G2'])), { T1: 'n', T2: 'y' }, '舊規則下此格硬寫增權(T1 由 n 變 y); 新規則(對稱交集)下碰巧相等')
+
+        //反例 2(run01 PR-004): 兩個 AND 群組, 資料序 G1,G2、對話框(群組表)序 G2,G1; 舊規則下依對話框序重寫即授權改變(AND 非對稱), 新規則下與序無關
+        for (let [p1, p2, exp] of [
+            ['{"T1":"y"}', '{"T2":"y"}', { T1: 'n', T2: 'n' }], //互斥: 兩個 AND 項互為對方之限制 → 交集為空
+            ['{"T1":"y","T2":"y"}', '{"T2":"y"}', { T1: 'n', T2: 'y' }], //G1 獨有之 T1 被 G2(未列 T1 = n)收回
+        ]) {
+            let eff = mkEff([{ name: 'P1', crules: p1 }, { name: 'P2', crules: p2 }], gs2)
+            let c2 = '[{"name":"G1","mode":"AND","isActive":"y"},{"name":"G2","mode":"AND","isActive":"y"}]'
+            let c2r = '[{"name":"G2","mode":"AND","isActive":"y"},{"name":"G1","mode":"AND","isActive":"y"}]'
+            let c3 = '{"G1":{"mode":"AND","isActive":"y"},"G2":{"mode":"AND","isActive":"y"}}'
+            let c3r = '{"G2":{"mode":"AND","isActive":"y"},"G1":{"mode":"AND","isActive":"y"}}'
+            assert.strict.deepEqual(getKpLossy(JSON5.parse(c2)), [])
+            for (let c of [c2, c2r, c3, c3r]) {
+                assert.strict.deepEqual(eff(c), exp, `規則 3 之期望 ${c} (P1 ${p1}, P2 ${p2})`)
+                for (let names of [['G1', 'G2'], ['G2', 'G1']]) {
+                    assert.strict.deepEqual(eff(saveLike(c, names)), exp, `重新寫出(列序 ${names.join(',')}) ${c}`)
+                }
+            }
+        }
     })
 
     it('PR-002 crules 陣列形式窮舉(name{T1,T2}×isActive{y,n,yes}, 長度 ≤ 3, 共 259 組): 編輯器顯示啟用之標的 = 伺服端授權之標的', function() {
@@ -745,6 +1027,44 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
     })
 
 
+    // ===== R-KEY-PROP-01(ADR-032, run02 F-25): 陣列形式 crules 元素之 name 不可轉為屬性鍵時略過, 不拋 TypeError =====
+    //修前 hasMode:false 之陣列形式以 o[r.name] = rest 取鍵, name 為 { toString: null } 之元素使整個解碼(編輯器開啟 VeCrules／清單頁 crules 計數)拋 TypeError
+
+    it('CO-KP-001 crules 陣列形式含不可轉鍵 name 的元素 → 不拋錯、該元素略過、其餘照常(修前拋 TypeError)', function() {
+        let arr = JSON5.parse('[{"name":"T","isActive":"y"},{"name":{"toString":null},"isActive":"y"},{"name":"U","isActive":"n"}]')
+        let o = null
+        assert.doesNotThrow(() => { o = cvKpToObj(arr) })
+        assert.strict.deepEqual(Object.keys(o), ['T', 'U'])
+        assert.strict.equal(getRuleEnable(o, 'T'), 'y')
+        assert.strict.equal(getRuleEnable(o, 'U'), 'n')
+        //伺服端同一份資料不拋錯, 且授權的標的與編輯器顯示啟用的標的相同(DF 差分)
+        let r = getUserRules({ cgrups: `{"G1":${ON}}` }, [{ name: 'G1', cpemis: `{"P1":${ON}}` }], [{ name: 'P1', crules: JSON.stringify(arr) }], [{ id: 'T' }, { id: 'U' }, { id: '[object Object]' }])
+        assert.strict.deepEqual(r.rules.map((v) => `${v.name}=${v.isActive}`), ['T=y', 'U=n', '[object Object]=n'])
+    })
+
+    it('CO-KP-002 可轉為鍵的非字串 name 維持修前行為(5 → "5"、true → "true"、["T"] → "T"、{} → "[object Object]"); 轉鍵後同名重複列所有列皆 y 才 y(與列序無關, 舊為後者覆蓋前者); hasMode:true 只留字串名稱(run05 f: 含空字串, 見 CO-004)', function() {
+        let arr = [{ name: 5, isActive: 'y' }, { name: true, isActive: 'y' }, { name: ['T'], isActive: 'y' }, { name: {}, isActive: 'y' }, { name: 'T', isActive: 'n' }]
+        let o = cvKpToObj(arr)
+        assert.strict.deepEqual(Object.keys(o).sort(), ['5', 'T', 'true', '[object Object]'].sort())
+        assert.strict.equal(getRuleEnable(o, 'T'), 'n', '["T"] 的 y 與 "T" 的 n 轉鍵後同名: 非所有列皆 y → n')
+        assert.strict.equal(getRuleEnable(o, '5'), 'y')
+        //反序(規則 4): 後者為 y 時, 後者覆蓋前者會得 y; 所有列皆 y 才 y 則仍為 n
+        let o2 = cvKpToObj([{ name: 'T', isActive: 'n' }, { name: ['T'], isActive: 'y' }, { name: 'U', isActive: 'y' }, { name: ['U'], isActive: 'y' }])
+        assert.strict.equal(getRuleEnable(o2, 'T'), 'n', '前 n 後 y → n')
+        assert.strict.equal(getRuleEnable(o2, 'U'), 'y', '轉鍵後同名皆 y → y')
+        let p = [{ name: { toString: null }, mode: 'OR', isActive: 'y' }, { name: 'G', mode: 'OR', isActive: 'y' }]
+        assert.doesNotThrow(() => cvKpToObj(p, HM))
+        assert.strict.deepEqual(Object.keys(cvKpToObj(p, HM)), ['G'])
+    })
+
+    it('CO-KP-003 不可轉鍵 name 全部略過 → 空容器(無原型); 與全部是不可轉者的伺服端結果一致(全 n)', function() {
+        let arr = [{ name: { toString: null }, isActive: 'y' }, { name: [{ toString: 1 }], isActive: 'y' }]
+        let o = cvKpToObj(arr)
+        assert.strict.deepEqual(Object.keys(o), [])
+        assert.strict.equal(Object.getPrototypeOf(o), null)
+    })
+
+
     // ===== 站點不變式 =====
 
     //src 內每一處 JSON5.parse(…) 的分類: 五元件〔站點 35〕與清單頁〔站點 37, 複審 R1〕皆已套(經 cvKpToObj; 帶 mode 者傳 { hasMode: true }); 其餘為伺服端解碼入口 mShare.mjs
@@ -759,6 +1079,7 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
         'src/components/LayoutContentPemis.vue': { all: 2, wrapped: 2, hasMode: 1, raw: 0 }, //站點 37(cpemis 帶 mode、crules 不帶)
         'src/components/LayoutContentUsers.vue': { all: 1, wrapped: 1, hasMode: 1, raw: 0 }, //站點 37
         'src/plugins/mShare.mjs': { all: 1, wrapped: 0, hasMode: 0, raw: 0 }, //getUserRules 之 cvStrToArr(伺服端解碼入口, 經 cvKpToArr)
+        'src/js/getAuthWarn.mjs': { all: 2, wrapped: 0, hasMode: 0, raw: 0 }, //run05 頁面提示之 parseKp(字串 → JSON5.parse, 損壞回 null; 其後經 cvKpToArr, 與伺服端同一解碼)與 isBadData(僅判定字串是否可解析為物件／陣列, 供 unparsable 提示, 不解碼授權內容)
     }
 
     it('SITE-AD-001 src 內每一處 JSON5.parse(授權資料) 皆分類: 五元件與三個清單頁皆經 cvKpToObj(帶 mode 者傳 { hasMode: true }), 新增讀取點即紅', function() {
@@ -798,23 +1119,48 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
         assert.strict.ok(/import getRuleEnable from '\.\.\/js\/getRuleEnable\.mjs'/.test(pemis), 'LayoutContentPemis 之 crules 計數須用 getRuleEnable')
     })
 
-    it('SITE-AD-003 以對話框序重寫授權字串之三個直接編輯器皆經 keepKeyOrder(R-AUTH-ORDER-01; 兩個關聯對話框之鍵序由解碼序構成、無重排); 四個帶 mode 者另經 getKpLossy 並於有損時以 authLossyBlocked 拒存(R-AUTH-LOSSY-01); 名稱代入用 fmtLossyMsg', function() {
+    it('SITE-AD-003 五個編輯元件不再引用排序保護(keepKeyOrder／getKeyOrderLost／getKpWriteLost, 反向守護: 原始碼出現即紅); 四個帶 mode 者仍經 getKpLossy 並於有損時以 authLossyBlocked 拒存(R-AUTH-LOSSY-01); 名稱代入用 fmtLossyMsg', function() {
         let txt = (fn) => fs.readFileSync(path.join(fdRoot, 'src', 'components', `${fn}.vue`), 'utf8')
-        for (let fn of ['VeCgrups', 'VeCpemis', 'VeCrules']) {
-            assert.strict.ok(/import keepKeyOrder/.test(txt(fn)), `${fn} 須 import keepKeyOrder`)
-            assert.strict.ok(/keepKeyOrder\(/.test(txt(fn)), `${fn} 須呼叫 keepKeyOrder(`)
+
+        //反向守護(規則 4: 結果與順序無關, 排序保護於本規則下非必要而已刪除): 三個模組檔不得復活; src／server 可執行碼(略過整行註解)不得出現其名稱
+        //(含 keyOrderOf、seqNew——舊關聯對話框自行傳入預期序之殘留)
+        for (let mod of ['keepKeyOrder', 'getKeyOrderLost', 'getKpWriteLost']) {
+            assert.strict.equal(fs.existsSync(path.join(fdRoot, 'src', 'js', `${mod}.mjs`)), false, `src/js/${mod}.mjs 已刪除, 不得復活`)
         }
-        //寫出前之輸出側守門一律經共用函數 getKpWriteLost(kpRef, kpNew)(預期序於函數內由參考與欲寫出之物件導出; 呼叫端不得自行傳序——關聯對話框曾以已套用 JS 屬性序之物件序當預期序而守門恆空, 外審 minimax 第二輪#1)
-        for (let [fn, ref, nw] of [['VeCgrups', 'vo.kpOrig', 'kpGrup'], ['VeCpemis', 'vo.kpOrig', 'kpPemi'], ['VeGrupBlngUsers', 'kpGrup', 'kpGrupNew'], ['VePemiBlngGrups', 'kpPemi', 'kpPemiNew']]) {
+        let gone = /\b(keepKeyOrder|getKeyOrderLost|getKpWriteLost|keyOrderOf|seqNew)\b/
+        let hits = []
+        let walkGone = (dir) => {
+            for (let ent of fs.readdirSync(dir, { withFileTypes: true })) {
+                let fp = path.join(dir, ent.name)
+                if (ent.isDirectory()) {
+                    walkGone(fp)
+                }
+                else if (/\.(vue|mjs|js)$/.test(ent.name)) {
+                    let rel = path.relative(fdRoot, fp).split(path.sep).join('/')
+                    fs.readFileSync(fp, 'utf8').split(/\r?\n/).forEach((l, i) => {
+                        //略過整行註解與行尾 // 註解(// 前須有空白, 不誤傷 http://)
+                        let code = l.replace(/\s\/\/.*$/, '')
+                        if (!/^\s*(\/\/|\*|\/\*|<!--)/.test(code) && gone.test(code)) {
+                            hits.push(`${rel}:${i + 1}: ${l.trim()}`)
+                        }
+                    })
+                }
+            }
+        }
+        walkGone(path.join(fdRoot, 'src'))
+        walkGone(path.join(fdRoot, 'server'))
+        assert.strict.deepEqual(hits, [], `src／server 不得再引用已刪除之排序保護:\n${hits.join('\n')}`)
+        //五個元件明確逐檔(縱使上面全域掃描已涵蓋, 此處對 import 與呼叫兩種形態分別守護)
+        for (let fn of ['VeCgrups', 'VeCpemis', 'VeCrules', 'VeGrupBlngUsers', 'VePemiBlngGrups']) {
             let t = txt(fn)
-            assert.strict.ok(t.includes(`getKpWriteLost(${ref}, ${nw})`), `${fn} 須呼叫 getKpWriteLost(${ref}, ${nw})(參考=解碼後之原資料)`)
-            assert.strict.ok(!/getKeyOrderLost\(|keyOrderOf\(|seqNew/.test(t), `${fn} 不得自行傳入預期序(getKeyOrderLost／keyOrderOf／seqNew)`)
+            assert.strict.ok(!/import (keepKeyOrder|getKeyOrderLost|getKpWriteLost)\b/.test(t), `${fn} 不得 import 已刪除之排序保護模組`)
+            assert.strict.ok(!/\b(keepKeyOrder|getKeyOrderLost|getKpWriteLost|keyOrderOf)\(/.test(t), `${fn} 不得呼叫已刪除之排序保護函數`)
         }
+
         for (let fn of ['VeCgrups', 'VeCpemis', 'VeGrupBlngUsers', 'VePemiBlngGrups']) {
             let t = txt(fn)
             assert.strict.ok(/import getKpLossy from '\.\.\/js\/getKpLossy\.mjs'/.test(t), `${fn} 須 import getKpLossy`)
             assert.strict.ok(/getKpLossy\(/.test(t), `${fn} 須呼叫 getKpLossy(`)
-            assert.strict.ok(/import getKpWriteLost from '\.\.\/js\/getKpWriteLost\.mjs'/.test(t), `${fn} 須 import getKpWriteLost`)
             assert.strict.ok(/authLossyBlocked/.test(t), `${fn} 須以 authLossyBlocked 顯示固定訊息`)
             assert.strict.ok(/import fmtLossyMsg from '\.\.\/js\/fmtLossyMsg\.mjs'/.test(t) && /fmtLossyMsg\(/.test(t), `${fn} 須以 fmtLossyMsg 代入名稱`)
             assert.strict.ok(!/\.replace\('\{names\}'/.test(t), `${fn} 不得以 String.replace 代入 {names}(名稱含 $ 樣式會被展開)`)
@@ -829,7 +1175,11 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
             assert.strict.ok(!d.includes(live), `${fn}.doSave 不得再以即時 store 資料(${live}…)取列`)
         }
         let lang = fs.readFileSync(path.join(fdRoot, 'server', 'procLang.mjs'), 'utf8')
-        assert.strict.ok(/authLossyBlocked: \{[^\n]*\n\s*eng: [^\n]*\{names\}[^\n]*\n\s*cht: [^\n]*\{names\}/.test(lang), 'procLang 須有 authLossyBlocked 之 eng／cht 且含 {names}')
+        let mLang = /authLossyBlocked: \{[^\n]*\n\s*eng: ([^\n]*\{names\}[^\n]*)\n\s*cht: ([^\n]*\{names\}[^\n]*)/.exec(lang)
+        assert.strict.ok(mLang !== null, 'procLang 須有 authLossyBlocked 之 eng／cht 且含 {names}')
+        //拒存訊息只剩「同名同時 OR 與 AND」一格, 不得再宣稱「順序無法保留」(規則 4 下順序不影響授權)
+        assert.strict.ok(!/order/i.test(mLang[1]) && !/順序/.test(mLang[2]), 'authLossyBlocked 文字不得再提順序')
+        assert.strict.ok(/OR/.test(mLang[1]) && /AND/.test(mLang[1]) && /OR/.test(mLang[2]) && /AND/.test(mLang[2]), 'authLossyBlocked 文字須說明同名同時 OR 與 AND')
     })
 
     it('SITE-AD-002 伺服端 getUserRules 之解碼與編輯器共用同一份 cvKpToArr(mShare.mjs 不再內嵌一份)', function() {

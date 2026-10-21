@@ -217,6 +217,10 @@
                                 <span style="color:#F57C00;">{{ props.value }}</span>
                                 <img style="vertical-align:sub; width:16px; height:16px;" :src="$ui.getIcon('warning')" />
                             </span>
+                            <span v-else-if="warnItemsByName[props.value]" :title="warnItemsByName[props.value]">
+                                <img style="vertical-align:sub; width:16px; height:16px; margin-right:4px;" :src="$ui.getIcon('warning')" />
+                                <span style="color:#F57C00;">{{ props.value }}</span>
+                            </span>
                             <span v-else>{{ props.value }}</span>
                         </template>
                         <template v-else-if="props.key==='email'">
@@ -224,10 +228,20 @@
                                 <span style="color:#F57C00;">{{ props.value }}</span>
                                 <img style="vertical-align:sub; width:16px; height:16px;" :src="$ui.getIcon('warning')" />
                             </span>
+                            <span v-else-if="warnItemsByEmail[props.value]" :title="warnItemsByEmail[props.value]">
+                                <img style="vertical-align:sub; width:16px; height:16px; margin-right:4px;" :src="$ui.getIcon('warning')" />
+                                <span style="color:#F57C00;">{{ props.value }}</span>
+                            </span>
                             <span v-else>{{ props.value }}</span>
                         </template>
                         <template v-else-if="props.key==='cgrups'">
-                            <div @click.stop.prevent @mousedown.stop.prevent>
+                            <div v-if="warnCgrupsById[props.row.id]" style="display:flex; align-items:center; gap:4px;" @click.stop.prevent @mousedown.stop.prevent>
+                                <span :title="warnCgrupsById[props.row.id]" style="display:flex; align-items:center; flex:0 0 auto;">
+                                    <img style="vertical-align:sub; width:16px; height:16px;" :src="$ui.getIcon('warning')" />
+                                </span>
+                                <button style="flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" @click="$dg.showVeCgrupsById(props.row.id)">{{ getCgrupsText(props.value) }}</button>
+                            </div>
+                            <div v-else @click.stop.prevent @mousedown.stop.prevent>
                                 <button style="width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" @click="$dg.showVeCgrupsById(props.row.id)">{{ getCgrupsText(props.value) }}</button>
                             </div>
                         </template>
@@ -260,7 +274,6 @@ import size from 'lodash-es/size.js'
 import filter from 'lodash-es/filter.js'
 import sortBy from 'lodash-es/sortBy.js'
 import cloneDeep from 'lodash-es/cloneDeep.js'
-import haskey from 'wsemi/src/haskey.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import isnum from 'wsemi/src/isnum.mjs'
@@ -269,6 +282,8 @@ import cdbl from 'wsemi/src/cdbl.mjs'
 import arrPull from 'wsemi/src/arrPull.mjs'
 import eachOwn from '../js/eachOwn.mjs'
 import cvKpToObj from '../js/cvKpToObj.mjs'
+import { getRefWarns, getRefWarnText, fmtWarn } from '../js/getAuthWarn.mjs'
+import { getNameErrs, mapNameKp } from '../js/getNameErrs.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
 import WSwitch from 'w-component-vue/src/components/WSwitch.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
@@ -493,93 +508,79 @@ export default {
             return b
         },
 
+        nameErrs: function() {
+            let vo = this
+
+            //只擋「本次造成或觸及」者(R-PRINCIPLE-00 g、h, R-NAME-UNIQ-02): 本次新增或改成空值／撞名之列擋存; 庫內既有的歷史同名／空值(僅外部同步可造成)不擋、改為警告圖示;
+            //重複之判準與伺服端同一份(findTouchedDup), 基準為 store 之 users(最近一次由伺服端載入的列). mappingBy 前端不知(伺服端選項), 前端一律採「只擋本次造成或觸及」,
+            //伺服端依 mappingBy 另有更嚴之檢查, 被擋時以伺服端回的錯誤鍵經 showCheckYes 顯示
+            return getNameErrs(get(vo, 'opt.rows', []), vo.users, 'name', { badScope: 'touched' })
+        },
+
+        emailErrs: function() {
+            let vo = this
+
+            //同 nameErrs; 另 email 須合格式(isEmail)
+            return getNameErrs(get(vo, 'opt.rows', []), vo.users, 'email', { badScope: 'touched', isValid: isEmail })
+        },
+
         errItemsByName: function() {
             let vo = this
 
-            //rows
-            let rows = get(vo, 'opt.rows', [])
-
-            //kpErr
-            let kpErr = Object.create(null) //無原型: 鍵為使用者資料, 不得命中 constructor 等原型鍵(規則帳本 R-KEY-01)
-            let kpName = Object.create(null)
-            each(rows, (v, k) => {
-
-                //name
-                let name = get(v, 'name', '')
-
-                //check
-                if (!isestr(name)) {
-
-                    //kpErr
-                    kpErr[name] = vo.$t(`userNameEmpty`)
-
-                    return true //跳出換下一個
-                }
-
-                //check
-                if (haskey(kpName, name)) {
-
-                    //kpErr
-                    kpErr[name] = vo.$t(`userNameDuplicate`)
-
-                    return true //跳出換下一個
-                }
-
-                //kpName
-                kpName[name] = true
-
+            //擋存者(本次造成或觸及之空名稱／重複): 既有呈現(橘色名稱＋圖示), 決定 isError
+            return mapNameKp(vo.nameErrs.errBlock, (kind) => {
+                return vo.$t(kind === 'empty' ? `userNameEmpty` : `userNameDuplicate`)
             })
-
-            return kpErr
         },
 
         errItemsByEmail: function() {
             let vo = this
 
-            //rows
+            //擋存者(本次造成或觸及之空值／格式錯誤／重複): 既有呈現, 決定 isError
+            return mapNameKp(vo.emailErrs.errBlock, (kind) => {
+                return vo.$t(kind === 'empty' ? `userEmailEmpty` : (kind === 'invalid' ? `userEmailError` : `userEmailDuplicate`))
+            })
+        },
+
+        warnItemsByName: function() {
+            let vo = this
+
+            //歷史同名／歷史空名稱(不擋存, 與 errItemsByName 互斥): 同樣顯示橘色名稱＋圖示, tooltip 說明為既有資料
+            let kp = mapNameKp(vo.nameErrs.warnHist, (n) => {
+                return fmtWarn(vo.$t('warnUserNameHistDup'), { n })
+            })
+            return Object.assign(kp, mapNameKp(vo.nameErrs.warnHistBad, () => {
+                return vo.$t('warnUserNameHistEmpty')
+            }))
+        },
+
+        warnItemsByEmail: function() {
+            let vo = this
+
+            //歷史同 email／歷史空值／歷史格式錯誤(不擋存, 與 errItemsByEmail 互斥)
+            let kp = mapNameKp(vo.emailErrs.warnHist, (n) => {
+                return fmtWarn(vo.$t('warnUserEmailHistDup'), { n })
+            })
+            return Object.assign(kp, mapNameKp(vo.emailErrs.warnHistBad, (kind) => {
+                return vo.$t(kind === 'empty' ? 'warnUserEmailHistEmpty' : 'warnUserEmailHistInvalid')
+            }))
+        },
+
+        warnCgrupsById: function() {
+            let vo = this
+
+            //cgrups 引用清單之衝突提示(R-PRINCIPLE-00 b、c、d、e、f): 列 id → tooltip 文字, 只含有衝突之列(無衝突之列不入表, 畫面維持原樣);
+            //引用比對的被引用表為 store 之 grups(群組頁已儲存之列), 判準與伺服端 getUserRules 同一份(findRefRows)
+            let kp = Object.create(null)
             let rows = get(vo, 'opt.rows', [])
-
-            //kpErr
-            let kpErr = Object.create(null)
-            let kpEmail = Object.create(null)
-            each(rows, (v, k) => {
-
-                //email
-                let email = get(v, 'email', '')
-
-                //check
-                if (!isestr(email)) {
-
-                    //kpErr
-                    kpErr[email] = vo.$t(`userEmailEmpty`)
-
-                    return true //跳出換下一個
+            each(rows, (r) => {
+                let res = getRefWarns(get(r, 'cgrups', ''), vo.grups)
+                if (res.hasWarn) {
+                    kp[get(r, 'id', '')] = getRefWarnText(res, (k) => vo.$t(k), 'warnKindGrup')
                 }
-
-                //check
-                if (!isEmail(email)) {
-
-                    //kpErr
-                    kpErr[email] = vo.$t(`userEmailError`)
-
-                    return true //跳出換下一個
-                }
-
-                //check
-                if (haskey(kpEmail, email)) {
-
-                    //kpErr
-                    kpErr[email] = vo.$t(`userEmailDuplicate`)
-
-                    return true //跳出換下一個
-                }
-
-                //kpEmail
-                kpEmail[email] = true
-
             })
 
-            return kpErr
+            return kp
         },
 
         isError: function() {
@@ -1102,7 +1103,7 @@ export default {
             if (n > 0) {
                 t = t.replace('{n}', n)
                 if (n === 1) {
-                    t = t.replace('{nms}', `(${vs[0]})`)
+                    t = t.replace('{nms}', `(${vs[0] === '' ? '""' : vs[0]})`) //空字串名稱(R-PRINCIPLE-00 f 照原樣保留)顯示為 "", 否則括號內看不到而像是消失
                 }
                 else {
                     t = t.replace('{nms}', '')
@@ -1129,11 +1130,9 @@ export default {
 
             //find
             let r = null
-            let kr = null
-            each(rows, (v, k) => {
+            each(rows, (v) => {
                 if (get(v, 'id', '') === id) {
                     r = v
-                    kr = k
                     return false //跳出
                 }
             })
@@ -1156,9 +1155,22 @@ export default {
                 .then((cgrups) => {
                     // console.log('cgrups', cgrups)
 
+                    //以 id 於「現在」之 opt.rows 重新找列(R-REL-PAIR-01): 對話框開啟期間 store 更新會重建 opt.rows(他人增刪、改 order), 開框時之列索引可能已指向另一列; 該列已不存在則提示並放棄回填
+                    let krNow = -1
+                    each(get(vo, 'opt.rows', []), (v, k) => {
+                        if (get(v, 'id', '') === id) {
+                            krNow = k
+                            return false //跳出
+                        }
+                    })
+                    if (krNow < 0) {
+                        vo.$alert(`${vo.$t('userEditCgrupsNoUserData')}`, { type: 'error' })
+                        return
+                    }
+
                     //set
-                    set(vo, `opt.rows[${kr}].cgrups`, cgrups)
-                    // console.log('vo.opt.rows[kr]', cloneDeep(vo.opt.rows[kr]))
+                    set(vo, `opt.rows[${krNow}].cgrups`, cgrups)
+                    // console.log('vo.opt.rows[krNow]', cloneDeep(vo.opt.rows[krNow]))
 
                     //refresh
                     vo.refresh()

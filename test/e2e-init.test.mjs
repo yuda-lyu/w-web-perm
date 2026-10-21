@@ -33,6 +33,7 @@ import fs from 'fs'
 import path from 'path'
 import { cleanup, launchBrowser, captureStableWithBox, apiBaseUrl, genTempSettings, restartBackend, assertBaselineMatch } from './tools/e2e-setup.mjs'
 import { runBaselineCase, createBaselineGate, openCasePage, itemsUnionBox } from './tools/e2eLib.mjs'
+import { urlSync, TOKEN_APP, TOKEN_ADMIN, callRpc } from './tools/api-setup.mjs'
 
 
 const baselineDir = './test/pics/init'
@@ -298,6 +299,109 @@ else {
                     await runCase('compare', lang, c, { onKnownDefect: () => this.skip() }) //已知缺陷協定: 標 pending(提示框殘留已由 w-component-vue 2.5.24 修正, 其偵測改為直接失敗, 見 e2e-setup probeStuckTooltip)
                 })
             }
+        }
+
+        //E2E-006（run05, 2026-10-21; spec 流程_應用啟動與登入 E2E-006; 規則帳本 R-MAPKEY-02, ADR-034）: 對應鍵符合多位使用者時登入被拒。
+        //  語意斷言, 不產標準圖、不依賴既有標準圖（spec 視覺項為「e2e 待補」; 是否與 E2E-004 共用標準圖待產製時逐張目視決定, 屬標準圖授權範圍）; 不在 cases 陣列內（cases 為產圖管線）。
+        //  資料前置（非使用者操作, 同 api-mapKey MK-010）: 預設對應鍵（mappingBy='id'）下經同步端點推入 email 與 admin 相同之 active 使用者 → 以臨時設定 { language, mappingBy:'email', urlRedirect } 重啟後端（DB 保留, 開瀏覽器前）。
+        //  開啟網址用 localhost（非 127.0.0.1）: 登入失敗之回呼 App.vue:loginError 只在「開發環境」（wsemi isDev: location.href 含 'localhost'）延遲 60 秒轉址, 否則立即轉址;
+        //  spec 之觀察「畫面停在拒絕登入」只在開發環境可見（本機 11006 同時監聽 IPv4／IPv6, localhost 可連）。urlRedirect 改為本機不存在之路徑, 避免逾時後轉往外部網站。
+        //  清理: restartBackend('./settings.json', { reseed: true }) 還原設定並重建 base seed（本行程不開資料庫, reseed 可刪 ./db）, 回驗 users 為 4 筆。
+        const FROM_006 = 'appE2eInit006'
+        const LOCAL_BASE = apiBaseUrl.replace('127.0.0.1', 'localhost')
+        const postSync = async (rows) => {
+            const url = urlSync.replace('{keyTable}', 'users').replace('{token}', TOKEN_APP)
+            const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify({ from: FROM_006, rows }) })
+            return await res.json()
+        }
+        const dupAdmin = (email) => ({ id: 'id-mk-dup', order: 0, name: 'dup-admin', email, from: FROM_006, cgrups: '{}', isAdmin: 'n', isActive: 'y' })
+        for (const lang of langs) {
+            it(`E2E-006-ambiguous-login [${lang}]: 對應鍵 email 命中兩位 active 使用者 → 拒絕登入(畫面停在拒絕登入、後端 ambiguousUserFromPerm、login error、權杖清空); 移除重複後登入恢復`, async function() {
+                this.timeout(300000)
+                try {
+                    await restartBackend('./settings.json') //前置: 預設對應鍵(上一案可能為語系臨時設定)
+                    const r0 = await postSync([dupAdmin('admin@example.com')])
+                    assert.strictEqual(r0.state, 'success', `mappingBy=id 下同步應成功(不檢查 email 重複), 實得 ${JSON.stringify(r0)}`)
+                    await restartBackend(genTempSettings({ language: lang, mappingBy: 'email', urlRedirect: `${LOCAL_BASE}/__e2e-redirect-006__` }))
+                    const browser = await launchBrowser()
+                    try {
+                        const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage()
+                        const loginErrors = []
+                        page.on('console', (m) => {
+                            if (m.text().startsWith('login error')) {
+                                loginErrors.push(m.args()[1] ? m.args()[1].jsonValue().catch(() => null) : Promise.resolve(null))
+                            }
+                        })
+                        const t0 = Date.now()
+                        const respP = page.waitForResponse((r) => r.url().includes('getUserByToken'), { timeout: 60000 })
+                        await page.goto(`${LOCAL_BASE}/?token=sys`, { waitUntil: 'domcontentloaded', timeout: 60000 })
+                        //①後端回應: state=error、msg=ambiguousUserFromPerm(登入入口 /api/getUserByToken 經 getTokenUser 拒絕)
+                        const body = await (await respP).json()
+                        assert.strictEqual(body.state, 'error', `getUserByToken 應拒絕, 實得 ${JSON.stringify(body)}`)
+                        assert.strictEqual(body.msg, 'ambiguousUserFromPerm', `應回固定語系鍵 ambiguousUserFromPerm, 實得 ${JSON.stringify(body.msg)}`)
+                        //畫面停在拒絕登入(connState=csErrLogin), 呈現該語系文字且不進入殼層
+                        await page.waitForFunction(() => !!(window.$vo && window.$vo.$store && window.$vo.$store.state.connState === 'csErrLogin'), null, { timeout: 30000 })
+                        await page.waitForFunction((t) => (document.body.innerText || '').includes(t), expectedText[lang].errLogin, { timeout: 15000 })
+                        const info = await page.evaluate(() => {
+                            const vo = window.$vo
+                            return {
+                                winLang: (window.___pmwperm___ || {}).language,
+                                body: (document.body.innerText || '').replace(/\s+/g, ' '),
+                                connState: vo.$store.state.connState,
+                                href: location.href,
+                                token: localStorage.getItem('wperm:userToken'),
+                                tabs: ['mmTargets', 'mmPemis', 'mmGrups', 'mmUsers'].map((k) => vo.$t(k)),
+                            }
+                        })
+                        assert.ok(Date.now() - t0 < 55000, '須在 60 秒轉址前完成觀察')
+                        assertConnLang(lang, info, 'errLogin')
+                        assert.ok(info.href.startsWith(`${LOCAL_BASE}/`) && !info.href.includes('__e2e-redirect-006__'), `60 秒內停在原頁(開發環境延遲轉址), 實得 ${info.href}`)
+                        for (const t of info.tabs) {
+                            assert.ok(!info.body.includes(t), `不進入殼層: 不應見頁籤「${t}」`)
+                        }
+                        //③權杖清空; ②主控台 login error 之物件為 { text: '登入時驗證失敗', msg: 'ambiguousUserFromPerm' }(App.vue:loginError 輸出)
+                        assert.strictEqual(info.token, '', `localStorage wperm:userToken 應被清為空字串, 實得 ${JSON.stringify(info.token)}`)
+                        const errs = await Promise.all(loginErrors)
+                        assert.ok(errs.some((e) => e && e.text === '登入時驗證失敗' && e.msg === 'ambiguousUserFromPerm'), `主控台應輸出 login error { text:'登入時驗證失敗', msg:'ambiguousUserFromPerm' }, 實得 ${JSON.stringify(errs)}`)
+                    }
+                    finally {
+                        await browser.close().catch(() => {})
+                    }
+                    //移除重複後(同 email 剩 1 筆)登入恢復(api-mapKey MK-011 之瀏覽器層): 以同 from 同步取代為不同 email(mappingBy=email 下唯一, 通過)
+                    const r1 = await postSync([dupAdmin('dup-admin@example.com')])
+                    assert.strictEqual(r1.state, 'success', `改為不同 email 應成功, 實得 ${JSON.stringify(r1)}`)
+                    const browser2 = await launchBrowser()
+                    try {
+                        const page = await (await browser2.newContext({ viewport: { width: 1440, height: 900 } })).newPage()
+                        await page.goto(`${apiBaseUrl}/?token=sys`, { waitUntil: 'domcontentloaded', timeout: 60000 })
+                        await page.waitForFunction(() => {
+                            const st = window.$vo && window.$vo.$store && window.$vo.$store.state
+                            return !!(st && st.connState === 'csLogin' && st.webInfor && Object.keys(st.webInfor).length > 0)
+                        }, null, { timeout: 60000 })
+                        await page.waitForTimeout(600)
+                        const ok = await page.evaluate(() => ({ body: (document.body.innerText || '').replace(/\s+/g, ' '), tabs: ['mmTargets', 'mmPemis', 'mmGrups', 'mmUsers'].map((k) => window.$vo.$t(k)) }))
+                        for (const t of ok.tabs) {
+                            assert.ok(ok.body.includes(t), `重複移除後應進入殼層(頁籤「${t}」)`)
+                        }
+                    }
+                    finally {
+                        await browser2.close().catch(() => {})
+                    }
+                }
+                finally {
+                    await restartBackend('./settings.json', { reseed: true })
+                    let us = await callRpc('users.select', [], TOKEN_ADMIN)
+                    //單一 mocha 行程全跑(npm test)時, 持有 lmdb 映射者為 mocha 行程自身(api 檔先開過), reseed 之刪庫失敗而退化為 upsert, 殘留的 id-mk-dup 不會被移除
+                    //(2026-10-22 全套實測: 殘留列污染其後的 e2e-users 等): 以管理者寫入 RPC 還原(同 readTables／restoreTables 之收尾作法)
+                    if (us.ok && us.output.some((u) => u.id === 'id-mk-dup')) {
+                        const rowsBase = us.output.filter((u) => u.id !== 'id-mk-dup').sort((a, b) => (a.order || 0) - (b.order || 0))
+                        const rr = await callRpc('updateUsers', [rowsBase], TOKEN_ADMIN)
+                        assert.ok(rr.ok, `以管理者寫入移除殘留之 id-mk-dup 應成功, 實得 ${JSON.stringify(rr).slice(0, 200)}`)
+                        us = await callRpc('users.select', [], TOKEN_ADMIN)
+                    }
+                    assert.ok(us.ok && us.output.length === 4 && !us.output.some((u) => u.id === 'id-mk-dup'), `清理後 users 應回到 base seed 4 筆, 實得 ${JSON.stringify(us).slice(0, 200)}`)
+                }
+            })
         }
     })
 }

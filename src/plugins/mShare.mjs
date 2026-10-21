@@ -16,6 +16,10 @@ import haskey from 'wsemi/src/haskey.mjs'
 import eachOwn from '../js/eachOwn.mjs'
 import getOwn from '../js/getOwn.mjs'
 import cvKpToArr from '../js/cvKpToArr.mjs'
+import getPropKey from '../js/getPropKey.mjs'
+import findRefRows from '../js/findRefRows.mjs'
+import getEffMode from '../js/getEffMode.mjs'
+import isAuthMode from '../js/isAuthMode.mjs'
 
 
 // //dlm
@@ -233,99 +237,112 @@ function getUserRules(user, grups, pemis, targets) {
         return arr
     }
 
-    let arrFinder = (arrSrc, arrPks, key) => {
-        let rs = []
-        each(arrSrc, (v) => {
-            let tSrc = get(v, key, '')
-            each(arrPks, (vv) => {
-                let tPks = get(vv, key, '')
-                if (tSrc === tPks) {
-                    rs.push({
-                        ...v,
-                        data: vv,
-                    })
-                    return false //跳出
+    //objOR／objAND／rulesToKp 走訪之 kpRule 物件: 鍵為規則名、值為使用者寫入之 isActive(可為數字, 如規則名 length 之值), 同樣以 eachOwn 依自有鍵走訪
+    let objOR = (obj1, obj2) => {
+        let kp = Object.create(null)
+        let objs = [obj1, obj2]
+        each(objs, (obj) => {
+            eachOwn(obj, (v, k) => {
+                if (!haskey(kp, k)) {
+                    kp[k] = 'n'
                 }
+                if (kp[k] === 'y' || v === 'y') {
+                    kp[k] = 'y'
+                }
+                else {
+                    kp[k] = 'n'
+                }
+            })
+        })
+        return kp
+    }
+
+    //objAND: 交集, 對稱(R-AUTH-MERGE-00): 任一方「未列」之鍵視同 n——結果之鍵為兩方鍵之聯集, 兩方皆為 y 才 y
+    //(舊規則 ADR-001 非對稱: obj1 獨有之鍵保留 obj1 的值, 僅 obj2 獨有者為 n, 故結果隨 AND 項之排列順序而異; 已由 ADR-033 取代)
+    let objAND = (obj1, obj2) => {
+        let kp = Object.create(null)
+        let objs = [obj1, obj2]
+        each(objs, (obj) => {
+            eachOwn(obj, (v, k) => {
+                kp[k] = (getOwn(obj1, k) === 'y' && getOwn(obj2, k) === 'y') ? 'y' : 'n'
+            })
+        })
+        return kp
+    }
+
+    //andAll: 多個 kpRule 之交集(R-PRINCIPLE-00 d: 引用之名稱對到多筆〔歷史同名〕時, 該項內容取各筆之交集); 0 個＝空(R-PRINCIPLE-00 c: 引用查無實體, 內容全 n); 1 個＝原樣
+    let andAll = (kps) => {
+        if (size(kps) === 0) {
+            return Object.create(null)
+        }
+        let kp = kps[0]
+        for (let k = 1; k < kps.length; k++) {
+            kp = objAND(kp, kps[k])
+        }
+        return kp
+    }
+
+    //rulesToKp: rules([{ name, isActive }])轉 kpRule, 鍵為規則名: 無原型容器, 使 __proto__／constructor 等原型鍵名之規則可被精確授權、不與繼承屬性混淆(規則帳本 R-AUTH-PATH-01、R-KEY-01)
+    let rulesToKp = (rules) => {
+        let kpRule = Object.create(null)
+        each(rules, (vv) => {
+            let k = getPropKey(vv.name) //規則名為使用者／外部應用寫入之任意 JSON 值: 屬性鍵轉型必拋者(如 { toString: null })不對應任何標的, 略過而非使整個權限查詢拋 TypeError(R-KEY-PROP-01)
+            if (k === null) {
+                return true //跳出換下一個
+            }
+            //同一項內(陣列形式)重複列同名規則: 所有列皆 y 才 y(任一列非 y 即 n), 與列之順序無關(R-AUTH-MERGE-00 第 4 條; 舊規則為後者覆蓋前者, 結果隨順序而異)
+            kpRule[k] = haskey(kpRule, k) ? ((kpRule[k] === 'y' && vv.isActive === 'y') ? 'y' : 'n') : vv.isActive
+        })
+        return kpRule
+    }
+
+    //kpToRules: kpRule 轉 rules([{ name, isActive }])
+    let kpToRules = (kp) => {
+        let rs = []
+        eachOwn(kp, (v, k) => {
+            rs.push({
+                name: k,
+                isActive: v,
             })
         })
         return rs
     }
 
+    //mergeRules: 輸入 rs 為 [{ mode, rules: [{ name, isActive }] }](同層各引用項, 已排除 isActive 非 'y' 者), 輸出合併後之 rules
+    //mode 缺或非 OR／AND 者(R-AUTH-MERGE-00 第 5 條, R-PRINCIPLE-00 e)「視為 AND」只作為限制(交集項), 不單獨授予授權: 該層若沒有任何 mode 合法的有效項, 結果全 n.
+    //why: 無法判讀時授權取各解讀(OR／AND／不計入)所得之交集(原則 3); 略過該項會使 AND 限制消失而放寬, 但把「唯一一個 mode 非法的項」當 AND 基底則會授予其內容(比修正前多給),
+    //  兩者之交集即「有其他有效項時當 AND 交集項, 沒有時內容為空」. 因此 c／d／e 皆只會收回、不會多給(unit-authMerge SP-CDE).
     let mergeRules = (rs) => {
 
-        //ts
+        //ts: mode 缺或非法者標 lim(getEffMode 為 AND)
         let ts = []
         each(rs, (v) => {
 
             //mode
-            let mode = get(v, 'mode', '')
+            let modeRaw = get(v, 'mode', '')
+            let mode = getEffMode(modeRaw)
+            let lim = !isAuthMode(modeRaw)
 
-            //check
-            if (mode !== 'OR' && mode !== 'AND') {
-                return true //跳出換下一個
-            }
-
-            //kpRule, 鍵為使用者寫入之規則名: 無原型容器, 使 __proto__／constructor 等原型鍵名之規則可被精確授權、不與繼承屬性混淆(規則帳本 R-AUTH-PATH-01、R-KEY-01)
-            let rules = get(v, 'rules', [])
-            let kpRule = Object.create(null)
-            each(rules, (vv) => {
-                kpRule[vv.name] = vv.isActive
-            })
+            //kpRule
+            let kpRule = rulesToKp(get(v, 'rules', []))
 
             //push
             ts.push({
                 mode,
+                lim,
                 kpRule,
             })
 
         })
 
-        //check
-        if (size(ts) === 0) {
+        //check: 沒有任何 mode 合法的有效項(含沒有任何項)→ 結果全 n
+        if (size(filter(ts, { lim: false })) === 0) {
             return []
         }
 
-        //objOR／objAND／rulesFin 走訪之 kpRule 物件: 鍵為規則名、值為使用者寫入之 isActive(可為數字, 如規則名 length 之值), 同樣以 eachOwn 依自有鍵走訪
-        let objOR = (obj1, obj2) => {
-            let kp = Object.create(null)
-            let objs = [obj1, obj2]
-            each(objs, (obj) => {
-                eachOwn(obj, (v, k) => {
-                    if (!haskey(kp, k)) {
-                        kp[k] = 'n'
-                    }
-                    if (kp[k] === 'y' || v === 'y') {
-                        kp[k] = 'y'
-                    }
-                    else {
-                        kp[k] = 'n'
-                    }
-                })
-            })
-            return kp
-        }
-
-        let objAND = (obj1, obj2) => {
-            let kp = Object.assign(Object.create(null), obj1) //淺複製入無原型容器(值皆為 y／n 或使用者寫入之原始值, 後續只比較不就地修改; cloneDeep 會把無原型物件複製成一般物件)
-            let objs = [obj2]
-            each(objs, (obj) => {
-                eachOwn(obj, (v, k) => {
-                    if (!haskey(kp, k)) {
-                        kp[k] = 'n'
-                    }
-                    if (kp[k] === 'y' && v === 'y') {
-                        kp[k] = 'y'
-                    }
-                    else {
-                        kp[k] = 'n'
-                    }
-                })
-            })
-            return kp
-        }
-
-        let tsOR = filter(ts, { mode: 'OR' })
-        let tsAND = filter(ts, { mode: 'AND' })
+        let tsOR = filter(ts, { mode: 'OR' }) //OR 必為合法 mode
+        let tsAND = filter(ts, { mode: 'AND' }) //含 lim 項(僅作限制)
+        let tsBase = filter(tsAND, { lim: false }) //基底只取 mode 合法之 AND 項
         // console.log('tsOR', tsOR)
         // console.log('tsAND', tsAND)
 
@@ -334,8 +351,8 @@ function getUserRules(user, grups, pemis, targets) {
         if (size(tsOR) > 0) {
             kpRuleFin = get(tsOR, `0.kpRule`)
         }
-        else if (size(tsAND) > 0) {
-            kpRuleFin = get(tsAND, `0.kpRule`)
+        else if (size(tsBase) > 0) {
+            kpRuleFin = get(tsBase, `0.kpRule`)
         }
         // console.log('kpRuleFin(0)', kpRuleFin)
 
@@ -357,95 +374,82 @@ function getUserRules(user, grups, pemis, targets) {
         // console.log('kpRuleFin(and)', kpRuleFin)
 
         //rulesFin
-        let rulesFin = []
-        eachOwn(kpRuleFin, (v, k) => {
-            rulesFin.push({
-                name: k,
-                isActive: v,
-            })
-        })
+        let rulesFin = kpToRules(kpRuleFin)
         // console.log('rulesFin', rulesFin)
 
         return rulesFin
+    }
+
+    //evalGroup: 單一群組列(候選)之合併結果, 回傳 { rules, pemisTree }
+    //  群組 cpemis 中 isActive 為 'y' 之引用逐一以名稱查權限表: 查無(懸空)者以其 mode 參與、內容全 n; 對到多筆(歷史同名)者內容取各筆 crules 之交集(R-PRINCIPLE-00 c／d; 皆只收回)
+    //  pemisTree 為供回傳 grups 樹之相容視圖(僅含查得之權限; data 為複本, 不寫入輸入之表列)
+    let evalGroup = (rowGrup) => {
+        let cpemis = get(rowGrup, 'cpemis', '')
+        let refs = filter(cvStrToArr(cpemis), { isActive: 'y' })
+        let rs = []
+        let pemisTree = []
+        each(refs, (rp) => {
+            let cands = findRefRows(pemis, rp.name)
+            let arrRules = map(cands, (c) => cvStrToArr(get(c, 'crules', '')))
+            let kps = map(arrRules, (rules) => rulesToKp(rules))
+            rs.push({
+                mode: rp.mode,
+                rules: kpToRules(andAll(kps)),
+            })
+            if (size(cands) > 0) {
+                pemisTree.push({
+                    ...rp,
+                    data: {
+                        ...cands[0],
+                        _rules: arrRules[0],
+                    },
+                })
+            }
+        })
+        return {
+            rules: mergeRules(rs),
+            pemisTree,
+        }
     }
 
     //cgrups
     let cgrups = get(user, 'cgrups', '')
     // console.log('cgrups', cgrups)
 
-    //cvStrToArr
-    let _grups = cvStrToArr(cgrups)
-    // console.log('cvStrToArr _grups', _grups)
+    //使用者 cgrups 中 isActive 為 'y' 之引用(isActive 非 'y' 者不參與, R-AUTH-MERGE-00 第 5 條)
+    let refsG = filter(cvStrToArr(cgrups), { isActive: 'y' })
+    // console.log('refsG', refsG)
 
-    //_grups
-    _grups = arrFinder(_grups, grups, 'name')
-    // console.log('arrFinder _grups', cloneDeep(_grups))
-
-    //filter
-    _grups = filter(_grups, { isActive: 'y' })
-    // console.log('filter _grups', cloneDeep(_grups))
-
-    //proc _pemis
-    _grups = map(_grups, (v) => {
-        let cpemis = get(v, 'data.cpemis', '')
-        let _pemis = cvStrToArr(cpemis)
-        _pemis = filter(_pemis, { isActive: 'y' })
-        _pemis = arrFinder(_pemis, pemis, 'name')
-        v.data._pemis = _pemis
-        return v
-    })
-    // console.log('proc _pemis _grups', cloneDeep(_grups))
-
-    //proc _rules
-    _grups = map(_grups, (v) => {
-        let _pemis = get(v, 'data._pemis', [])
-        _pemis = map(_pemis, (vv) => {
-            let crules = get(vv, 'data.crules', '')
-            let _rules = cvStrToArr(crules)
-            vv.data._rules = _rules
-            return vv
-        })
-        v.data._pemis = _pemis
-        return v
-    })
-    // console.log('proc _rules _grups', cloneDeep(_grups))
-
-    //merge _rules
+    //merge _rules, 並同時建立回傳之 grups 樹(僅含查得之群組, 供 grupsNames; 懸空引用雖參與合併但不是群組, 不列入)
+    let _grups = []
     let _rules = []
     if (true) {
 
         //rrs
         let rrs = []
-        each(_grups, (v) => {
+        each(refsG, (rg) => {
 
-            let modeG = v.mode
-            let _pemis = v.data._pemis
-
-            //rs
-            let rs = []
-            each(_pemis, (vv) => {
-                let modeP = vv.mode
-                let _rules = vv.data._rules
-                rs.push({
-                    mode: modeP,
-                    rules: _rules,
-                })
-
-            })
-            // console.log('rs', rs)
-
-            //mergeRules
-            let rulesP = mergeRules(rs)
-            // console.log('rulesP', rulesP)
-
-            //t
-            let t = {
-                mode: modeG,
-                rules: rulesP,
-            }
+            //查無(懸空)→ 候選 0 筆, 內容全 n; 對到多筆(歷史同名)→ 內容取各筆合併結果之交集(R-PRINCIPLE-00 c／d)
+            let cands = findRefRows(grups, rg.name)
+            let evs = map(cands, (c) => evalGroup(c))
+            let kps = map(evs, (ev) => rulesToKp(ev.rules))
 
             //push
-            rrs.push(t)
+            rrs.push({
+                mode: rg.mode,
+                rules: kpToRules(andAll(kps)),
+            })
+
+            //_grups
+            if (size(cands) > 0) {
+                _grups.push({
+                    ...rg,
+                    data: {
+                        ...cands[0],
+                        _pemis: evs[0].pemisTree,
+                    },
+                })
+            }
 
         })
         // console.log('rrs', rrs)

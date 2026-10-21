@@ -11,15 +11,16 @@
 //startApi→seedDb 重建 base seed、run 結束 mocha root after 殺 backend，故跨 run 亦 hermetic。
 //DB 斷言一律 getWoItems() 後**唯讀** select（跨進程唯讀實測可行；絕不在測試進程寫 DB，寫一律走 backend HTTP）。
 //
-//reject 字串已 Read 原始碼確認（皆純字串，非 Error；handler core() 各檢查以 Promise.reject 短路）：
-//  WWebPerm.mjs:1073/1085  缺 token / 缺 keyTable（query 取不到）              → 'token does not have permission'
-//  WWebPerm.mjs:1092       keyTable 不在白名單 ['targets','pemis','grups','users'] → `invalid keyTable: ${keyTable}`
-//  WWebPerm.mjs:631        token 非空但無效（getUserByToken 回 {} → !iseobj）    → 'can not find the user from token'
-//  WWebPerm.mjs:666        payload 非物件                                        → 'invalid payload in req'
-//  WWebPerm.mjs:676        payload.from 非有效字串                               → 'invalid from in payload'
-//  WWebPerm.mjs:683/686    payload.rows 非「非空陣列」（isearr）                 → 'invalid rows in payload'
+//reject 的 msg 為 procLang 語系鍵（皆純字串，非 Error；handler core() 各檢查以 Promise.reject 短路；
+//  2026-10-21 run03 校正: 原註記為英文訊息與行號，現碼皆為語系鍵，位置改以符號錨標示）：
+//  syncAndReplaceTabs handler 缺 token / 缺 keyTable（query 取不到）                 → 'tokenNoPermission'
+//  syncAndReplaceTabs handler keyTable 不在白名單 ['targets','pemis','grups','users'] → 'invalidKeyTable'
+//  getAndVerifyAppUser         token 非空但無效（getUserByToken 回 {} → !iseobj）    → 'cannotFindUserFromToken'
+//  parsePayload                payload 非物件                                        → 'invalidPayload'
+//  parsePayload                payload.from 非有效字串                               → 'invalidFromInPayload'
+//  parsePayload                payload.rows 非「非空陣列」（isearr）                 → 'invalidRowsInPayload'
 //
-//全量取代 + 稽核欄位自動補入已 Read 確認：WWebPerm.mjs:736 delAll({from}) → :740 procOrm(userId,keyTable,'insert',rows)；
+//全量取代 + 稽核欄位自動補入已 Read 確認：syncAndReplaceTabs 內 delAll({from}) → procOrm(userId,keyTable,'insert',rows)；
 //  procOrm insert 自動補 userId(=token 對應 user.id='id-for-application')/timeCreate/...；sync 路徑用 ltdtmapping+insert
 //  （非 funNew），故 payload 的 id(pk) 原樣保留。
 
@@ -57,7 +58,7 @@ describe('api-syncAndReplaceTabs', function() {
     after(async function() {
         this.timeout(60000)
         let woItems = await getWoItems()
-        let froms = ['appTest-1', 'appTest-2', 'appTest-3', 'appTest-4', 'appTest-5', 'appTest-6', 'appTest-7', 'appTest-8', 'appTest-9', 'appTest-10', 'appTest-11', 'appTest-11b', 'appTest-12', 'appTest-13', 'appTest-14', 'appTest-15', 'appTest-16', 'appTest-17', 'appTest-18', 'appTest-19', 'appTest-20', 'appTest-21', 'appTest-22']
+        let froms = ['appTest-1', 'appTest-2', 'appTest-3', 'appTest-4', 'appTest-5', 'appTest-6', 'appTest-7', 'appTest-8', 'appTest-9', 'appTest-10', 'appTest-11', 'appTest-11b', 'appTest-12', 'appTest-13', 'appTest-14', 'appTest-15', 'appTest-16', 'appTest-17', 'appTest-18', 'appTest-19', 'appTest-20', 'appTest-21', 'appTest-22', 'appTest-23', 'appTest-24', 'appTest-24b', 'appTest-25', 'appTest-26', 'appTest-27', 'appTest-27b']
         for (let kt of ['users', 'grups', 'pemis', 'targets']) {
             for (let from of froms) {
                 await woItems[kt].delAll({ from })
@@ -105,8 +106,8 @@ describe('api-syncAndReplaceTabs', function() {
     })
 
     //對應 spec E2E-002（已更新對齊現狀，決定保留 isearr 安全閘）：
-    //  推送空 rows（rows:[]）被後端 parsePayload 的 isearr 非空檢查（WWebPerm.mjs:683）拒絕，
-    //  回 state='error'、msg 含 'invalid rows in payload'，未進 delAll，故不支援「以空集合清源」。
+    //  推送空 rows（rows:[]）被後端 parsePayload 的 isearr 非空檢查拒絕，
+    //  回 state='error'、msg 含語系鍵 'invalidRowsInPayload'，未進 delAll，故不支援「以空集合清源」。
     //  此 isearr 檢查為「防外部應用誤送空陣列而整批清空資料」之安全閘。
     it('API-sync-002-empty-rows-rejected', async function() {
         const F = 'appTest-2'
@@ -564,6 +565,110 @@ describe('api-syncAndReplaceTabs', function() {
         let ru = await postSync('users', TOKEN_APP, { from: F, rows: [{ order: 0, email: 'nm22a@appTest.com', cgrups: '{}', isAdmin: 'n', isActive: 'y' }, { order: 1, name: 'dup', email: 'nm22b@appTest.com', cgrups: '{}', isAdmin: 'n', isActive: 'y' }, { order: 2, name: 'dup', email: 'nm22c@appTest.com', cgrups: '{}', isAdmin: 'n', isActive: 'y' }] })
         assert.strict.equal(ru.state, 'success', `users 不受影響，實得: ${JSON.stringify(ru)}`)
         assert.strict.equal((await idsOf('users', F)).length, 3)
+    })
+
+
+    // ===== R-NAME-UNIQ-01（F-02, ADR-034）：grups／pemis 的 name 不得重複（批內／他 from）=====
+    //述語: 外部同步於 delAll 之前, ①本批 rows 內 name 精確 === 重複 → invalidRows; ②該表既有列中 from 不等於本 from 者已使用此 name → invalidRows; 同 from 之既有列不算衝突;
+    //  外部應用只收固定語系鍵 invalidRows; 被拒時該 from 與他 from 全列逐位元不變(delAll 之前拒收); 比對為精確 ===(大小寫與空白不同視為不同名稱).
+    //修正前: 兩者皆回 success 並寫入同名列(ADR-031 決定 4 明載「不比照 ckKey 之重複偵測」)——授權以名稱查找(arrFinder 取第一個同名列), 同名並存即取決於列序.
+    const ROW_OF = {
+        grups: (id, name, F) => ({ id, name, description: id, from: F, cpemis: '{}' }),
+        pemis: (id, name, F) => ({ id, name, description: id, from: F, crules: '{}' }),
+    }
+
+    it('API-sync-023-duplicate-name-in-batch-rejected：grups／pemis 同批 rows 內 name 重複（相鄰、不相鄰、三筆中兩筆）→ invalidRows，該 from 與他 from 全列逐位元不變', async function() {
+        const F = 'appTest-23'
+        for (let kt of ['grups', 'pemis']) {
+            let mk = ROW_OF[kt]
+            let ok0 = await postSync(kt, TOKEN_APP, { from: F, rows: [mk('id-nd23-old', `nd23-old-${kt}`, F)] })
+            assert.strict.equal(ok0.state, 'success', `${kt} 預置舊列應成功，實得: ${JSON.stringify(ok0)}`)
+            let part0 = await snapOf(kt, F)
+            let others0 = await snapOthers(kt, F)
+            let variants = [
+                [mk('id-nd23-a', 'dupN', F), mk('id-nd23-b', 'dupN', F)],
+                [mk('id-nd23-a', 'dupN', F), mk('id-nd23-c', 'uniq', F), mk('id-nd23-b', 'dupN', F)],
+                [mk('id-nd23-c', 'uniq', F), mk('id-nd23-a', 'dupN', F), mk('id-nd23-b', 'dupN', F)],
+            ]
+            for (let rows of variants) {
+                let res = await postSync(kt, TOKEN_APP, { from: F, rows })
+                assert.strict.equal(res.state, 'error', `${kt} rows=${JSON.stringify(rows.map((v) => v.name))} 同批同名應被拒，實得: ${JSON.stringify(res)}`)
+                assert.strict.equal(res.msg, 'invalidRows', `${kt} 應回語系鍵 invalidRows，實得: ${JSON.stringify(res.msg)}`)
+                assert.strict.equal(await snapOf(kt, F), part0, `${kt} 該 from 分區須逐位元不變（delAll 之前拒收）`)
+                assert.strict.equal(await snapOthers(kt, F), others0, `${kt} 他 from 須逐位元不變`)
+            }
+            assert.strict.deepEqual(await idsOf(kt, F), ['id-nd23-old'], `${kt} 只剩舊列`)
+        }
+    })
+
+    it('API-sync-024-name-used-by-other-from-rejected：grups／pemis 的 name 已為他 from 之既有列使用（含 base seed）→ invalidRows，兩個 from 皆不變', async function() {
+        const F = 'appTest-24'
+        const G = 'appTest-24b'
+        for (let kt of ['grups', 'pemis']) {
+            let mk = ROW_OF[kt]
+            //G 先持有 name
+            let resG = await postSync(kt, TOKEN_APP, { from: G, rows: [mk('id-of24-g', `of24-${kt}`, G)] })
+            assert.strict.equal(resG.state, 'success', `${kt} G 預置應成功，實得: ${JSON.stringify(resG)}`)
+            //F 預置自己之列
+            let resF0 = await postSync(kt, TOKEN_APP, { from: F, rows: [mk('id-of24-f0', `of24-f0-${kt}`, F)] })
+            assert.strict.equal(resF0.state, 'success', `${kt} F 預置應成功，實得: ${JSON.stringify(resF0)}`)
+            let partF0 = await snapOf(kt, F)
+            let partG0 = await snapOf(kt, G)
+            let others0 = await snapOthers(kt, F)
+            //(a) 與 G 之 name 相同; (b) 與 base seed(from '')之 name 相同; 各自夾在合法列之間, 整批拒收
+            let baseName = (await (await getWoItems())[kt].select({ from: '' }))[0].name
+            for (let name of [`of24-${kt}`, baseName]) {
+                let res = await postSync(kt, TOKEN_APP, { from: F, rows: [mk('id-of24-ok', `of24-ok-${kt}`, F), mk('id-of24-f1', name, F)] })
+                assert.strict.equal(res.state, 'error', `${kt} name=${name} 已屬他 from 應被拒，實得: ${JSON.stringify(res)}`)
+                assert.strict.equal(res.msg, 'invalidRows', `${kt} 應回語系鍵 invalidRows，實得: ${JSON.stringify(res.msg)}`)
+                assert.strict.equal(await snapOf(kt, F), partF0, `${kt} name=${name} 本 from 須逐位元不變`)
+                assert.strict.equal(await snapOf(kt, G), partG0, `${kt} name=${name} 他 from(G)須逐位元不變`)
+                assert.strict.equal(await snapOthers(kt, F), others0, `${kt} name=${name} 其他 from 全列須逐位元不變`)
+            }
+        }
+    })
+
+    it('API-sync-025-same-from-resend-same-name-accepted：同 from 重送同名（含換 id 保留 name、重送完全相同之批）→ 成功（同 from 之既有列隨 delAll 重寫，不算衝突）', async function() {
+        const F = 'appTest-25'
+        for (let kt of ['grups', 'pemis']) {
+            let mk = ROW_OF[kt]
+            let r1 = await postSync(kt, TOKEN_APP, { from: F, rows: [mk('id-sf25-a', `sf25-${kt}`, F), mk('id-sf25-b', `sf25b-${kt}`, F)] })
+            assert.strict.equal(r1.state, 'success', `${kt} 第 1 次應成功，實得: ${JSON.stringify(r1)}`)
+            let r2 = await postSync(kt, TOKEN_APP, { from: F, rows: [mk('id-sf25-a', `sf25-${kt}`, F), mk('id-sf25-b', `sf25b-${kt}`, F)] })
+            assert.strict.equal(r2.state, 'success', `${kt} 重送完全相同之批應成功，實得: ${JSON.stringify(r2)}`)
+            let r3 = await postSync(kt, TOKEN_APP, { from: F, rows: [mk('id-sf25-c', `sf25-${kt}`, F)] })
+            assert.strict.equal(r3.state, 'success', `${kt} 換 id 保留 name 應成功（舊列隨 delAll 移除），實得: ${JSON.stringify(r3)}`)
+            assert.strict.deepEqual(await idsOf(kt, F), ['id-sf25-c'], `${kt} 全量取代後只剩新批`)
+        }
+    })
+
+    it('API-sync-026-exact-match-only：僅大小寫或前後空白不同之 name 視為不同名稱（精確 ===，不正規化），可寫入', async function() {
+        const F = 'appTest-26'
+        for (let kt of ['grups', 'pemis']) {
+            let mk = ROW_OF[kt]
+            let names = [`Case26-${kt}`, `case26-${kt}`, `Case26-${kt} `, ` Case26-${kt}`, `CASE26-${kt}`]
+            let res = await postSync(kt, TOKEN_APP, { from: F, rows: names.map((n, i) => mk(`id-ci26-${i}`, n, F)) })
+            assert.strict.equal(res.state, 'success', `${kt} 精確比對下互不相同，應成功，實得: ${JSON.stringify(res)}`)
+            assert.strict.equal((await idsOf(kt, F)).length, names.length, `${kt} 全部寫入`)
+        }
+    })
+
+    it('API-sync-027-users-default-mappingBy-id-no-mapkey-check：預設 mappingBy=id 時 users 不另檢查對應鍵（email 空／批內重複／與他 from 重複皆可寫入）', async function() {
+        //述語(R-MAPKEY-01): mappingBy='id'(預設)不另檢查——預設部署之 email 可空／可重複, 新規則不得使其外部同步全部失敗; id 唯一性由主鍵與 idOtherFrom 保證.
+        //mappingBy='email'／'name' 之行為見 api-mapKey.test.mjs 與 unit-keyCheck.
+        const F = 'appTest-27'
+        const G = 'appTest-27b'
+        let u = (id, name, email, f, isActive = 'y') => ({ id, order: 0, name, email, from: f, cgrups: '{}', isAdmin: 'n', isActive })
+        let rG = await postSync('users', TOKEN_APP, { from: G, rows: [u('id-mk27-g', 'g27', 'x27@appTest.com', G)] })
+        assert.strict.equal(rG.state, 'success', `G 預置應成功，實得: ${JSON.stringify(rG)}`)
+        let res = await postSync('users', TOKEN_APP, { from: F, rows: [
+            u('id-mk27-1', 'a27', '', F), //active 且 email 空
+            u('id-mk27-2', 'b27', 'dup27@appTest.com', F),
+            u('id-mk27-3', 'c27', 'dup27@appTest.com', F), //批內重複
+            u('id-mk27-4', 'd27', 'x27@appTest.com', F), //與他 from(G)重複
+        ] })
+        assert.strict.equal(res.state, 'success', `mappingBy=id 不應檢查 email，實得: ${JSON.stringify(res)}`)
+        assert.strict.equal((await idsOf('users', F)).length, 4)
     })
 
 })

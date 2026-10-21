@@ -197,9 +197,9 @@ describe('unit-eachOwn (R-OBJ-ITER-01)', function() {
         for (let name of ['kp', 'obj', 'kpRuleFin']) {
             assert.strict.ok(!new RegExp(`\\beach\\(\\s*${name}\\s*,`).test(ms), `mShare 不得 each(${name}, …)`)
         }
-        has(ms, 'eachOwn(kp, (v, k) =>', 0) //cvKpToArr 已抽至 src/js/cvKpToArr.mjs(R-AUTH-DECODE-01), 見下
+        has(ms, 'eachOwn(kp, (v, k) =>', 1) //kpToRules(run05: kpRule → rules 抽成一處, mergeRules 之 rulesFin 與同名多列之交集皆經之); cvKpToArr 已抽至 src/js/cvKpToArr.mjs(R-AUTH-DECODE-01), 見下
         has(ms, 'eachOwn(obj, (v, k) =>', 2) //objOR、objAND
-        has(ms, 'eachOwn(kpRuleFin, (v, k) =>', 1) //rulesFin
+        has(ms, 'eachOwn(kpRuleFin, (v, k) =>', 0) //run05: 改經 kpToRules(kpRuleFin)
         assert.strict.ok(/import cvKpToArr from '\.\.\/js\/cvKpToArr\.mjs'/.test(ms), 'mShare 應 import 共用之 cvKpToArr')
 
         //src/js/cvKpToArr.mjs(伺服端與編輯器共用之授權資料解碼): 走訪 JSON5 解析物件改 eachOwn; cvKpToObj 走訪其輸出(真陣列)亦 eachOwn
@@ -209,16 +209,12 @@ describe('unit-eachOwn (R-OBJ-ITER-01)', function() {
         let co = codeOf('src/js/cvKpToObj.mjs')
         assert.strict.ok(!/lodash-es/.test(co), 'cvKpToObj 不得 import lodash')
         has(co, 'eachOwn(kp, (v, k) =>', 1) //物件形式
-        has(co, 'eachOwn(arr, (r) =>', 1) //陣列形式(crules)
-        has(co, 'eachOwn(arr, (r, i) =>', 1) //陣列形式(帶 mode; 位置 i 供鍵序: 有效啟用元素首次出現之序)
-        has(co, 'eachOwn(names, (name) =>', 1)
+        has(co, 'eachOwn(arr, (r) =>', 2) //陣列形式: crules(不帶 mode)與帶 mode 各一處(鍵序為名稱首次出現之序, 不再需要位置 i)
+        has(co, 'eachOwn(seen, (name) =>', 1) //帶 mode: 依名稱首次出現之序輸出(seen 為名稱陣列)
         has(co, 'eachOwn(g.acts, (a) =>', 1)
         assert.strict.ok(!/\beach\(/.test(co), 'cvKpToObj 不得用 lodash each')
-        //R-AUTH-ORDER-01／R-AUTH-LOSSY-01 之新模組(2026-10-20 run02): 走訪使用端物件一律 eachOwn, 不 import lodash
-        let ko = codeOf('src/js/keepKeyOrder.mjs')
-        assert.strict.ok(!/lodash-es/.test(ko) && !/\beach\(/.test(ko), 'keepKeyOrder 不得用 lodash')
-        has(ko, 'eachOwn(kpRef, (v, k) =>', 1)
-        has(ko, 'eachOwn(kpNew, (v, k) =>', 1)
+        //R-AUTH-LOSSY-01 之 getKpLossy(2026-10-20 run02 新增, 2026-10-21 run04 依 R-AUTH-MERGE-00 精簡為僅「同名同時 OR 與 AND」一格): 走訪使用端物件一律 eachOwn, 不 import lodash
+        //(run02 之 keepKeyOrder／getKeyOrderLost／getKpWriteLost 已隨 R-AUTH-MERGE-00 第 4 條〔結果與順序無關〕刪除, 其站點不再存在; 反向守護見 unit-cvKpToObj SITE-AD-003)
         let kl = codeOf('src/js/getKpLossy.mjs')
         assert.strict.ok(!/lodash-es/.test(kl) && !/\beach\(/.test(kl), 'getKpLossy 不得用 lodash')
         has(kl, 'eachOwn(cvKpToArr(kp), (r) =>', 1)
@@ -271,6 +267,7 @@ describe('unit-eachOwn (R-OBJ-ITER-01)', function() {
             'src/components/LayoutContentPemis.vue::vo.kpPemiGrup',
             'src/plugins/submitGuard.mjs::kpRunning',
             'server/procLang.mjs::kp',
+            'src/plugins/mShare.mjs::kps', //run05 getUserRules 之 andAll(kps): kps 為本程式以 map 建立之真陣列(各候選之 kpRule), 非使用端物件
         ])
         //變數名涵蓋 JSON5／JSON 解析結果與鍵值對照物件之常見命名: kp*、cgrups*／cpemis*／crules*、parsed*
         let re = /\b(each|map|size|filter|forEach|find|some|every|reduce|sortBy|toArray|flatMap|groupBy|keyBy)\(\s*([\w.]*\b(?:kp|cgrups|cpemis|crules|parsed)\w*)\s*[,)]/g

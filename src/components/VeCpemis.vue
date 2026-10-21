@@ -25,6 +25,16 @@
                     @domresize="resizeHead"
                 >
 
+                    <!-- 無法掛在任何一列之警告: 理由同 VeCgrups 該處註解(R-PRINCIPLE-00 f) -->
+                    <div
+                        style="padding:10px 15px; font-size:0.8rem; color:#F57C00; display:flex; align-items:center;"
+                        :title="lossyHintTitle"
+                        v-if="lossyHint"
+                    >
+                        <img style="flex:0 0 auto; width:16px; height:16px; margin-right:4px;" :src="$ui.getIcon('warning')" />
+                        <span>{{ lossyHint }}</span>
+                    </div>
+
                     <!-- 功能區 -->
                     <div
                         style="padding:5px; background:#fff; display:flex; align-items:center;"
@@ -127,7 +137,11 @@
                             :opt="opt"
                         >
                             <template v-slot:cell-render="props">
-                                <span v-if="props.key==='name'">{{ props.value }}</span>
+                                <template v-if="props.key==='name'">
+                                    <!-- 警告圖示: 理由同 VeCgrups 該處註解(無警告者與修前同一節點) -->
+                                    <span :title="props.row.warnText" v-if="props.row.warnText"><img style="vertical-align:sub; width:16px; height:16px; margin-right:4px;" :src="$ui.getIcon('warning')" />{{ props.value }}</span>
+                                    <span v-else>{{ props.value }}</span>
+                                </template>
                                 <!-- flex 置中容器: 理由同 VeCgrups 該處註解 -->
                                 <div
                                     style="display:flex; align-items:center; height:100%;"
@@ -175,14 +189,13 @@ import isEqual from 'lodash-es/isEqual.js'
 import cloneDeep from 'lodash-es/cloneDeep.js'
 import genPm from 'wsemi/src/genPm.mjs'
 import delay from 'wsemi/src/delay.mjs'
-import iseobj from 'wsemi/src/iseobj.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import getOwn from '../js/getOwn.mjs'
 import cvKpToObj from '../js/cvKpToObj.mjs'
-import keepKeyOrder from '../js/keepKeyOrder.mjs'
 import getKpLossy from '../js/getKpLossy.mjs'
-import getKpWriteLost from '../js/getKpWriteLost.mjs'
 import fmtLossyMsg from '../js/fmtLossyMsg.mjs'
+import { getRefState, getRefRowsExtra, getDupRowsInconsistent, getRawModeMap, putRowsToKp, getRowIdxs } from '../js/editorRefRows.mjs'
+import { getRefWarns, getItemWarnText, fmtWarn } from '../js/getAuthWarn.mjs'
 import WDialog from 'w-component-vue/src/components/WDialog.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
 import WAggridVue from 'w-aggrid-vue/src/components/WAggridVue.vue'
@@ -228,6 +241,9 @@ export default {
             items: [],
             itemsCheck: [],
             opt: null,
+
+            lossyHint: '', //無法掛在任何一列之警告文字(啟用而名稱非字串之項目), 無則 ''
+            lossyHintTitle: '',
 
         }
     },
@@ -537,8 +553,8 @@ export default {
 
             let vo = this
 
-            //check
-            if (!isestr(name)) {
+            //check, 名稱 '' 為合法名稱(R-PRINCIPLE-00 f: 懸空之額外列可為 '', 須可改 mode／停用), 僅非字串者拒絕
+            if (typeof name !== 'string') {
                 vo.$alert(`${vo.$t('cpemiEditNoName')}`, { type: 'error' })
                 return
             }
@@ -546,30 +562,19 @@ export default {
             //rows
             let rows = get(vo, 'opt.rows', [])
 
-            //find
-            let r = null
-            let kr = null
-            each(rows, (v, k) => {
-                if (get(v, 'name', '') === name) {
-                    r = v
-                    kr = k
-                    return false //跳出
-                }
-            })
+            //krs, 精確同名之全部列(getRowIdxs; 理由同 VeCgrups.showVeCgrupsToggleItemModeByName)
+            let krs = getRowIdxs(rows, 'name', name)
 
             //check
-            if (!iseobj(r)) {
+            if (size(krs) === 0) {
                 vo.$alert(`${vo.$t('cpemiEditNoTarget')}`, { type: 'error' })
                 return
             }
 
-            //mode
-            // let mode = th.value
-            // console.log('mode', mode)
-
             //set
-            set(vo, `opt.rows[${kr}].mode`, mode)
-            // console.log('vo.opt.rows[kr]', cloneDeep(vo.opt.rows[kr]))
+            each(krs, (kr) => {
+                set(vo, `opt.rows[${kr}].mode`, mode)
+            })
 
             //refresh
             vo.refresh()
@@ -584,8 +589,8 @@ export default {
 
             let vo = this
 
-            //check
-            if (!isestr(name)) {
+            //check, 名稱 '' 為合法名稱(同 showVeCpemisToggleItemModeByName)
+            if (typeof name !== 'string') {
                 vo.$alert(`${vo.$t('cpemiEditNoName')}`, { type: 'error' })
                 return
             }
@@ -593,31 +598,24 @@ export default {
             //rows
             let rows = get(vo, 'opt.rows', [])
 
-            //find
-            let r = null
-            let kr = null
-            each(rows, (v, k) => {
-                if (get(v, 'name', '') === name) {
-                    r = v
-                    kr = k
-                    return false //跳出
-                }
-            })
+            //krs, 精確同名之全部列(理由同 showVeCpemisToggleItemModeByName)
+            let krs = getRowIdxs(rows, 'name', name)
 
             //check
-            if (!iseobj(r)) {
+            if (size(krs) === 0) {
                 vo.$alert(`${vo.$t('cpemiEditNoTarget')}`, { type: 'error' })
                 return
             }
 
-            //enable
-            let _enable = get(r, 'enable', 'n')
+            //enable, 同名列狀態恆一致, 取第一列切換後套用全部
+            let _enable = get(rows[krs[0]], 'enable', 'n')
             let enable = _enable === 'y' ? 'n' : 'y'
             // console.log('enable', enable)
 
             //set
-            set(vo, `opt.rows[${kr}].enable`, enable)
-            // console.log('vo.opt.rows[kr]', cloneDeep(vo.opt.rows[kr]))
+            each(krs, (kr) => {
+                set(vo, `opt.rows[${kr}].enable`, enable)
+            })
 
             //refresh
             vo.refresh()
@@ -636,26 +634,15 @@ export default {
             let rows = get(vo, 'opt.rows', [])
             // console.log('rows', rows)
 
-            //kpRow
-            let kpRow = Object.create(null) //無原型: 鍵為使用者資料, 不得命中 constructor 等原型鍵(規則帳本 R-KEY-01)
-            each(rows, (r, kr) => {
-                kpRow[r.name] = kr
-            })
-
             //rowsEff
             let rowsEff = vo.getDisplayData()
             // console.log('rowsEff', rowsEff)
 
-            //toggle
+            //toggle, 每個顯示中之列對其精確同名之全部列一併套用(getRowIdxs; 理由同 VeCgrups.showVeCgrupsToggleItemsEnableAllYes)
             each(rowsEff, (r) => {
-
-                //kr
-                let kr = kpRow[r.name]
-
-                //set
-                set(vo, `opt.rows[${kr}].enable`, 'y')
-                // console.log('vo.opt.rows[kr]', cloneDeep(vo.opt.rows[kr]))
-
+                each(getRowIdxs(rows, 'name', r.name), (kr) => {
+                    set(vo, `opt.rows[${kr}].enable`, 'y')
+                })
             })
 
             //refresh
@@ -675,26 +662,15 @@ export default {
             let rows = get(vo, 'opt.rows', [])
             // console.log('rows', rows)
 
-            //kpRow
-            let kpRow = Object.create(null)
-            each(rows, (r, kr) => {
-                kpRow[r.name] = kr
-            })
-
             //rowsEff
             let rowsEff = vo.getDisplayData()
             // console.log('rowsEff', rowsEff)
 
-            //toggle
+            //toggle, 對精確同名之全部列一併套用(理由同 showVeCpemisToggleItemsEnableAllYes)
             each(rowsEff, (r) => {
-
-                //kr
-                let kr = kpRow[r.name]
-
-                //set
-                set(vo, `opt.rows[${kr}].enable`, 'n')
-                // console.log('vo.opt.rows[kr]', cloneDeep(vo.opt.rows[kr]))
-
+                each(getRowIdxs(rows, 'name', r.name), (kr) => {
+                    set(vo, `opt.rows[${kr}].enable`, 'n')
+                })
             })
 
             //refresh
@@ -714,29 +690,21 @@ export default {
             let rows = get(vo, 'opt.rows', [])
             // console.log('rows', rows)
 
-            //kpRow
-            let kpRow = Object.create(null)
-            each(rows, (r, kr) => {
-                kpRow[r.name] = kr
-            })
-
             //rowsEff
             let rowsEff = vo.getDisplayData()
             // console.log('rowsEff', rowsEff)
 
-            //toggle
+            //toggle, 對精確同名之全部列一併套用(理由同 showVeCpemisToggleItemsEnableAllYes; 同名列狀態一致, 各顯示列算出之反向值相同)
             each(rowsEff, (r) => {
-
-                //kr
-                let kr = kpRow[r.name]
 
                 //enable
                 let _enable = get(r, 'enable', 'n')
                 let enable = _enable === 'y' ? 'n' : 'y'
 
                 //set
-                set(vo, `opt.rows[${kr}].enable`, enable)
-                // console.log('vo.opt.rows[kr]', cloneDeep(vo.opt.rows[kr]))
+                each(getRowIdxs(rows, 'name', r.name), (kr) => {
+                    set(vo, `opt.rows[${kr}].enable`, enable)
+                })
 
             })
 
@@ -805,43 +773,21 @@ export default {
                     return false
                 }
 
-                //kpPemi
-                let kpPemi = Object.create(null)
-                each(rows, (r) => {
-                    let name = get(r, 'name', '')
-                    let mode = get(r, 'mode', '')
-                    let enable = get(r, 'enable', '')
-                    if (!isestr(name)) {
-                        console.log(`invalid name`)
-                        return true //跳出換下一個
-                    }
-                    if (mode !== 'OR' && mode !== 'AND') {
-                        console.log(`invalid mode[${mode}]`)
-                        return true //跳出換下一個
-                    }
-                    if (!isestr(enable)) {
-                        console.log(`invalid enable`)
-                        return true //跳出換下一個
-                    }
-                    kpPemi[name] = {
-                        mode,
-                        isActive: enable,
-                    }
-                })
-                // console.log('kpPemi', kpPemi)
-
-                //保留原鍵序(R-AUTH-ORDER-01, 主控複審 R3): 對話框為權限表序, 原字串已有之權限維持原相對順序、新增者附加於後;
-                //伺服端 mergeRules 在沒有有效 OR 項時以第一個 AND 項為起始, 鍵序改變即改變授權
-                let lostNames = getKpWriteLost(vo.kpOrig, kpPemi) //預期序由參考(解碼後之原資料)與欲寫出之物件於函數內導出
-                kpPemi = keepKeyOrder(vo.kpOrig, kpPemi)
-
-                //欲寫出之鍵序若被 JS 屬性序(整數式鍵恆先排)改變而使有效 AND 項之相對順序易位(如新啟用整數式名稱之 AND 權限)
-                //→ 授權會改變, 編輯器無法在不改變授權下寫出, 拒存並顯示固定訊息(同無法無損表示, R-AUTH-LOSSY-01; 外審 minimax#2)
-                if (size(lostNames) > 0) {
-                    vo.$ui.updateLoading(false) //showCheckYes 前關 loading
-                    await vo.$dg.showCheckYes(fmtLossyMsg(vo.$t('authLossyBlocked'), lostNames))
+                //同名多列(權限表之歷史同名, R-PRINCIPLE-00 d): 理由同 VeCgrups.doSave——不一致者拒存並點名, 一致者寫出一次
+                let namesDupBad = getDupRowsInconsistent(rows)
+                if (size(namesDupBad) > 0) {
+                    vo.$ui.updateLoading(false) //showCheckYes 前關 loading（modal 阻斷期間避免 loading 疊在底下）
+                    await vo.$dg.showCheckYes(fmtWarn(vo.$t('warnDupRowsInconsistent'), { names: namesDupBad }))
                     return false
                 }
+
+                //kpPemi: 名稱為字串之列(含名稱 '' 與懸空之額外列)皆寫出, 不得丟棄啟用中之引用(R-PRINCIPLE-00 c／f); 共用 putRowsToKp(unit-editorRows 往返不變式)
+                //限制項仍為開啟時之「AND、啟用」者寫回原始 mode(vo.rawModeMap; 理由同 VeCgrups.doSave)
+                let kpPemi = Object.create(null)
+                putRowsToKp(kpPemi, rows, vo.rawModeMap)
+                // console.log('kpPemi', kpPemi)
+
+                //鍵序無關授權(R-AUTH-MERGE-00 第 4 條: 結果與項目之儲存順序、物件鍵序、陣列元素序無關), 故不需保留原鍵序, 亦無整數式名稱易位之拒存
 
                 //cpemis
                 let cpemis = JSON.stringify(kpPemi)
@@ -923,11 +869,13 @@ export default {
             //kpPemi, lossyNames(物件形式無法無損表示者, R-AUTH-LOSSY-01)
             let kpPemi = Object.create(null)
             let lossyNames = []
+            let rawModeMap = Object.create(null) //限制項之原始 mode(getRawModeMap), 存檔時未改者原樣寫回
             if (isestr(cpemis)) {
                 try {
                     let kpRaw = JSON5.parse(cpemis)
                     kpPemi = cvKpToObj(kpRaw, { hasMode: true })
                     lossyNames = getKpLossy(kpRaw)
+                    rawModeMap = getRawModeMap(kpRaw)
                 }
                 catch (err) {
                     console.log('cpemis', cpemis)
@@ -948,17 +896,9 @@ export default {
                 let name = v.name
                 // console.log('name', name)
 
-                //mode
-                let mode = get(p, 'mode', '')
-                if (mode !== 'OR' && mode !== 'AND') {
-                    mode = 'OR'
-                }
-                // console.log('mode', mode)
-
-                //enable
-                let _enable = get(p, 'isActive', '')
-                let enable = _enable === 'y' ? 'y' : 'n'
-                // console.log('isActive', enable)
+                //mode, enable: 與伺服端同解讀(getRefState, 理由同 VeCgrups.show)
+                let { mode, enable } = getRefState(p)
+                // console.log('mode', mode, 'enable', enable)
 
                 //r
                 let r = {
@@ -970,17 +910,34 @@ export default {
 
                 return r
             })
+
+            //額外列: 啟用中而權限表查無列之引用(懸空, 含名稱 '')各一列附於表列之後(理由同 VeCgrups.show, R-PRINCIPLE-00 c／f)
+            items = [...items, ...getRefRowsExtra(kpPemi, vo.pemis)]
+
+            //warnText: 各列引用之衝突提示(理由同 VeCgrups.show)
+            let resWarn = getRefWarns(cpemis, vo.pemis)
+            each(items, (r) => {
+                let codes = getOwn(resWarn.kpWarns, r.name, null)
+                if (codes !== null) {
+                    r.warnText = getItemWarnText(codes, r.name, vo.$t, 'warnKindPemi')
+                }
+            })
             // console.log('items', items)
+
+            //lossyHint: 啟用而名稱非字串之項目(noName)無列可掛, 於內容區最上方提示(理由同 VeCgrups.show)
+            let namesNoName = resWarn.byCode.noName
+            vo.lossyHint = size(namesNoName) > 0 ? fmtWarn(vo.$t('warnRefNoName'), { names: namesNoName }) : ''
+            vo.lossyHintTitle = size(namesNoName) > 0 ? fmtLossyMsg(vo.$t('authLossyBlocked'), lossyNames) : ''
 
             //save
             vo.isEditable = isEditable
             vo.grup = grup
             vo.items = items
 
-            //存檔依據(非響應式): 解碼後之原資料(保序參考)、原字串、有損名稱、開啟時之列內容
-            vo.kpOrig = kpPemi
+            //存檔依據(非響應式): 原字串、有損名稱、開啟時之列內容(含額外列)
             vo.cpemisOrig = cpemis
             vo.lossyNames = lossyNames
+            vo.rawModeMap = rawModeMap
             vo.itemsInit = map(items, (r) => ({ name: r.name, mode: r.mode, enable: r.enable }))
 
             //genOpt

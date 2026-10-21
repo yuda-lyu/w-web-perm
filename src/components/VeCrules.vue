@@ -127,7 +127,11 @@
                             :opt="opt"
                         >
                             <template v-slot:cell-render="props">
-                                <span v-if="props.key==='id'">{{ props.value }}</span>
+                                <template v-if="props.key==='id'">
+                                    <!-- 警告圖示(R-PRINCIPLE-00 a 之提示): 僅該管理對象於原 crules 重複列且有勾有不勾時(warnText, show 時由 getRuleWarns 取得)才渲染於 ID 左側; 無警告者與修前同一節點(不預留空間) -->
+                                    <span :title="props.row.warnText" v-if="props.row.warnText"><img style="vertical-align:sub; width:16px; height:16px; margin-right:4px;" :src="$ui.getIcon('warning')" />{{ props.value }}</span>
+                                    <span v-else>{{ props.value }}</span>
+                                </template>
                                 <input v-else-if="props.key==='enable'" type="checkbox" :checked="props.value === 'y'" @click="toggleItemEnableById(props.row.id)" :disabled="!isEditable" />
                                 <span v-else>{{ props.value }}</span>
                             </template>
@@ -164,9 +168,10 @@ import genPm from 'wsemi/src/genPm.mjs'
 import delay from 'wsemi/src/delay.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
+import getOwn from '../js/getOwn.mjs'
 import getRuleEnable from '../js/getRuleEnable.mjs'
 import cvKpToObj from '../js/cvKpToObj.mjs'
-import keepKeyOrder from '../js/keepKeyOrder.mjs'
+import { getRuleWarns, fmtWarn } from '../js/getAuthWarn.mjs'
 import WDialog from 'w-component-vue/src/components/WDialog.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
 import WAggridVue from 'w-aggrid-vue/src/components/WAggridVue.vue'
@@ -740,8 +745,8 @@ export default {
                 })
                 // console.log('kpRule', kpRule)
 
-                //保留原鍵序(R-AUTH-ORDER-01, 主控複審 R3): crules 之合併與順序無關(僅同名後者覆蓋, 解碼已等價), 與另四個編輯器統一套用使輸出穩定
-                kpRule = keepKeyOrder(vo.kpOrig, kpRule)
+                //兩態(勾/不勾): 勾＝y、不勾＝n; 未列等同 n, 重存把「未列」寫成顯式 n 不改變授權(R-AUTH-MERGE-00 第 1 條)——不增第三種狀態
+                //鍵序無關授權(同條第 4 條), 不需保留原鍵序
 
                 //crules
                 let crules = JSON.stringify(kpRule)
@@ -828,12 +833,18 @@ export default {
             }
             // console.log('kpRule', kpRule)
 
+            //resRule: 原字串中同一管理對象重複列且有勾有不勾者(R-PRINCIPLE-00 a; 解碼已收嚴為 n, 與伺服端同), 供該列 ID 左側之警告圖示與 tooltip(存檔寫出顯式值即解除)
+            let resRule = getRuleWarns(crules)
+
             //items
             let items = map(vo.targets, (v) => {
                 let enable = getRuleEnable(kpRule, v.id)
                 let r = {
                     id: v.id,
                     enable,
+                }
+                if (getOwn(resRule.kpConflict, v.id, false) === true) {
+                    r.warnText = fmtWarn(vo.$t('warnRuleConflict'), { names: [v.id] })
                 }
                 return r
             })
@@ -843,7 +854,6 @@ export default {
             vo.isEditable = isEditable
             vo.pemi = pemi
             vo.items = items
-            vo.kpOrig = kpRule //存檔依據(非響應式): 解碼後之原資料(保序參考)
 
             //genOpt
             vo.genOpt()

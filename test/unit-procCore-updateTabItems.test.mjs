@@ -14,6 +14,7 @@ import cacheSt from 'wsemi/src/cacheSt.mjs'
 import ds from '../src/schema/index.mjs'
 import proc from '../server/procCore.mjs'
 import createLockSave from '../server/lockSave.mjs'
+import { tabWriteKey } from '../server/keyCheck.mjs'
 import reuseDeletedIds from '../src/plugins/reuseDeletedIds.mjs'
 import { mkTable, mkProcOrm, mkSrLog } from './tools/unitOrm.mjs'
 
@@ -200,13 +201,66 @@ describe('unit-procCore-updateTabItems (後台整表寫入之雙擊防護, ADR-0
     })
 
 
+    //外審 sol R7(run04): 有限數字 id 的正規化(R-ORM-04)原晚於 pickKeysOnly 合併, 數字 id 對不上庫內字串 id 而該列之群組指派被靜默略過卻回成功
+    it('UNIT-UTI-012 pickKeysOnly 模式: 有限數字 id(如 7)對應庫內字串 id(\'7\') → 該列 cgrups 採納(修前: 靜默略過仍回成功)', async function() {
+        let { seed, woItems, pc } = createEnv()
+        await woItems.users.insert([{ ...cloneDeep(seed.users[0]), id: '7', order: 3, name: 'num', email: 'num@example.com', cgrups: '{}' }])
+        let cg = '{"權限群組M2":{"mode":"OR","isActive":"y"}}'
+        let rows = [cloneDeep(seed.users[0]), cloneDeep(seed.users[1]), { ...cloneDeep(woItems.users.get('7')), id: 7, cgrups: cg }]
+        let r = await pc.updateUsers('id-admin', rows, { pickKeysOnly: ['cgrups'] })
+        assert.strict.equal(r, 'saveTabItemsSuccess')
+        assert.strict.equal(woItems.users.get('7').cgrups, cg, '數字 id 之列指派須採納')
+        assert.strict.equal(woItems.users.size(), 3, '不得多出列')
+    })
+
+    //外審 sol R10(run04): 外部同步(WWebPerm.syncAndReplaceTabs)與後台整表寫入須共用同表互斥鍵 tabWriteKey, 否則兩者各自「先檢查唯一、後寫入」可交錯而略過 F-02／F-14.
+    //此處以同一個 kmx 實例從外部持有 tabWriteKey('grups'), 驗證 updateGrups 必須等它釋放才寫入(同步端同鍵由 unit-keyCheck SITE-KC-007 靜態守護)
+    it('UNIT-UTI-013 後台整表寫入與外部同步共用同表互斥鍵: 他方持有 tabWriteKey 期間 updateGrups 不寫入, 釋放後才完成', async function() {
+        let seed = seedRows()
+        let woItems = {}
+        for (let k of Object.keys(TABLES)) {
+            woItems[k] = mkTable(seed[k])
+        }
+        let { srLog } = mkSrLog()
+        let cst = cacheSt()
+        let kmx = pmKeyMutex()
+        let pc = proc(woItems, mkProcOrm(ds, woItems), { srLog, kmx, lockSave: createLockSave(cst) })
+        env = { cst }
+        let release = null
+        let gate = new Promise((resolve) => {
+            release = resolve
+        })
+        let held = kmx(tabWriteKey('grups'), async () => {
+            await gate
+        })
+        let nr = newRow('grups', '013')
+        let done = false
+        let p = pc.updateGrups('id-admin', [...cloneDeep(seed.grups), nr]).then((v) => {
+            done = true
+            return v
+        })
+        //持鎖期間：讓出事件迴圈數輪, updateGrups 仍不得寫入或完成
+        for (let i = 0; i < 20; i++) {
+            await new Promise((resolve) => setImmediate(resolve))
+        }
+        assert.strict.equal(done, false, '持鎖期間不得完成')
+        assert.strict.equal(woItems.grups.cnt.insert + woItems.grups.cnt.save + woItems.grups.cnt.del, 0, '持鎖期間不得寫入')
+        //另一張表不受影響(鍵依表而異)
+        let rp = await pc.updatePemis('id-admin', [...cloneDeep(seed.pemis), newRow('pemis', '013')])
+        assert.strict.equal(rp, 'saveTabItemsSuccess')
+        release()
+        await held
+        assert.strict.equal(await p, 'saveTabItemsSuccess')
+        assert.strict.equal(woItems.grups.size(), seed.grups.length + 1)
+    })
+
     //占位於失敗後釋放: 拒絕(ckKey / saveNewRowExists)後同一操作者可立即再送
     it('UNIT-UTI-006 拒絕後占位即釋放 → 同一操作者立即再送合法資料成功', async function() {
         let { seed, woItems, pc } = createEnv()
-        //ckKey 拒絕(名稱重複)
+        //ckKey 拒絕(名稱重複; 2026-10-21 F-02 起 pemis／grups 之名稱重複回 nameDuplicate, ADR-034)
         let dup = { ...newRow('pemis', '006'), name: seed.pemis[0].name }
         let e1 = await pc.updatePemis('id-admin', [...seed.pemis, dup]).then(() => null, (e) => e)
-        assert.strict.equal(e1, 'saveRowFieldDuplicate')
+        assert.strict.equal(e1, 'nameDuplicate')
         //saveNewRowExists 拒絕: 標 _isNew 但 id 已存在
         let exist = { ...cloneDeep(seed.pemis[0]), _isNew: true }
         let e2 = await pc.updatePemis('id-admin', [exist, cloneDeep(seed.pemis[1])]).then(() => null, (e) => e)

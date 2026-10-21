@@ -253,12 +253,16 @@ describe('unit-procCore-writeValidate (寫入前驗證與寫入失敗回 key, AD
         assert.strict.deepEqual(r, { ok: false, v: 'saveWriteFail' })
     })
 
-    it('WV-ERR-003 本套件語系鍵原樣轉出(saveRowFieldDuplicate)', async function() {
+    it('WV-ERR-003 本套件語系鍵原樣轉出(名稱重複 nameDuplicate〔2026-10-21 F-02, ADR-034 起 pemis／grups 專用〕; 使用者 email 重複仍為 saveRowFieldDuplicate)', async function() {
         let { woItems, pc } = createEnv()
         let rows = (await woItems.pemis.select()).sort((a, b) => a.order - b.order)
         rows.push(newRow('pemis', { name: 'P1' }))
         let r = await run(pc, 'pemis', rows)
-        assert.strict.deepEqual(r, { ok: false, v: 'saveRowFieldDuplicate' })
+        assert.strict.deepEqual(r, { ok: false, v: 'nameDuplicate' })
+        let rowsU = (await woItems.users.select()).sort((a, b) => a.order - b.order)
+        rowsU.push(newRow('users', { email: rowsU[0].email }))
+        let rU = await run(pc, 'users', rowsU)
+        assert.strict.deepEqual(rU, { ok: false, v: 'saveRowFieldDuplicate' })
     })
 
 

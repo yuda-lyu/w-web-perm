@@ -82,7 +82,7 @@ describe('unit-validateRows (寫入前驗證之判準, ADR-026)', function() {
     })
 
     //上游等價: 同一語料經真 procOrm insert → 上游拒絕(主鍵) 或 存值≠送入值(非主鍵) ⇔ 本判準拒絕
-    it('VR-EQ-001 與真 procOrm(w-serv-orm 1.1.10 + wsemi clearXSS)逐筆等價(主鍵與非主鍵欄位)', async function() {
+    it('VR-EQ-001 與真 procOrm(已安裝版 w-serv-orm + wsemi clearXSS)逐筆等價(主鍵與非主鍵欄位)', async function() {
         let bad = []
         for (let s of CORPUS) {
             //非主鍵欄位: targets.description

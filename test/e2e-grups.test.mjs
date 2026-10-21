@@ -13,7 +13,7 @@
 //act 走 user-facing input；assert = 語意斷言 + pixel baseline（§6.2 / §6.3）。
 //grups 與 targets 差異：主鍵為 id（funNew 自動產生、清單隱藏），列鍵以 name 去重；
 //name 空 / 重複為「前端 errItemsByName 攔截」（isError 引用 errItemsByName，非空→errInNames 擋存、不送後端，
-//對齊 users；異於 targets 之 isError 引用未定義變數恆空而走後端 ckKey）；另有 belongUsers / cpemis 兩個關聯欄按鈕；
+//對齊 users 與 targets〔targets 之 isError 亦引用已定義之 errItemsById 於前端攔截，見 spec 標的 E2E-007／008；2026-10-21 run03 更正原載「異於 targets 之 isError 引用未定義變數恆空而走後端 ckKey」〕）；另有 belongUsers / cpemis 兩個關聯欄按鈕；
 //save 結果（成功 / 失敗 / 空 / errInNames）皆走 $dg.showCheckYes 持久 modal。
 import fs from 'fs'
 import assert from 'assert'

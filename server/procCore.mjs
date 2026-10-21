@@ -13,6 +13,7 @@ import getOwn from '../src/js/getOwn.mjs'
 import ds from '../src/schema/index.mjs'
 import procLang from './procLang.mjs'
 import validateRowsBeforeWrite from './validateRows.mjs'
+import { findTouchedDup, findDupIndex, tabWriteKey, checkUsersWrite } from './keyCheck.mjs'
 
 
 //isRowObj: 待寫入之列須為至少有一個自有可列舉鍵之物件(非 null、非陣列; 不用依 toString 判型之 iseobj, 免被 Symbol.toStringTag 偽稱)
@@ -58,7 +59,8 @@ function mergePickKeysOnly(ltdtDb, rowsIn, keyDetect, pickKeys) {
 }
 
 
-function proc(woItems, procOrm, { srLog, kmx, lockSave }) {
+//mappingBy: 使用者對應鍵('id'｜'email'｜'name', WWebPerm 已正規化; 未給或其他值視同 'id'), 供 users 整表寫入的對應鍵檢查(R-PRINCIPLE-00 適用表 h, R-MAPKEY-03)
+function proc(woItems, procOrm, { srLog, kmx, lockSave, mappingBy = 'id' }) {
 
 
     //updateTabItems
@@ -91,10 +93,15 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave }) {
         //雙擊防護(後端): 同一操作者之同表寫入處理中再送出即拒絕 'saveInProgress'(不排隊, 見 lockSave.mjs, ADR-025);
         //占位包在 kmx 之外層, 不同操作者之並行寫入仍由 kmx 序列化、各自成功(ADR-012)
         //序列化同表之並行整表批次寫入: 防 lost update (同 keyTable 序列化, 不同表並行)
-        return await lockSave(`updateTabItems:${keyTable}`, userId, () => kmx('updateTabItems:' + keyTable, async () => {
+        return await lockSave(`updateTabItems:${keyTable}`, userId, () => kmx(tabWriteKey(keyTable), async () => { //與外部同步(WWebPerm.syncAndReplaceTabs)共用同表互斥鍵(外審 sol R10)
 
         //pickKeysOnly, 須於 mutex 內讀取資料庫為基底, 避免與並行寫入 race
         if (isearr(pickKeysOnly)) {
+            //有限數字 id 先轉為字串形式再與庫內對應(外審 sol R7): mergePickKeysOnly 只認非空字串 id, 數字 id(如 1)對不上庫內之 '1' 而該列指派被靜默略過卻回成功(R-ORM-04 之同一正規化, 此處原晚於合併)
+            rows = map(rows, (r) => {
+                let id = get(r, 'id')
+                return (typeof id === 'number' && Number.isFinite(id)) ? { ...r, id: String(id) } : r
+            })
             let ltdtDb = await woItems[keyTable].select()
             rows = mergePickKeysOnly(ltdtDb, rows, keyDetect, pickKeysOnly)
             srLog.info({ event: 'updateTabItems-pickKeysOnly', keyTable, userId, pickKeysOnly })
@@ -111,7 +118,8 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave }) {
         })
 
         //ckKey, 回傳 err key (saveRowFieldInvalid / saveRowFieldDuplicate) 或 null; 動態細節 (row index/field/value) 改記 srLog, 不進使用者訊息
-        let ckKey = (rows, key) => {
+        //opt.skipDup 為 true 時只檢查空值／非字串, 不檢查重複: pemis／grups 之名稱唯一改由下方 findTouchedDup 判定(只拒本次造成或觸及者, F-02, ADR-034)
+        let ckKey = (rows, key, opt = {}) => {
             let err = null
 
             //check
@@ -129,7 +137,7 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave }) {
                 }
 
                 //check
-                if (haskey(kp, value)) {
+                if (opt.skipDup !== true && haskey(kp, value)) {
                     srLog.error({ event: 'updateTabItems-ckKey-error', keyTable, key, msg: 'saveRowFieldDuplicate', row: k, value })
                     err = `saveRowFieldDuplicate`
                     return false //跳出
@@ -152,18 +160,13 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave }) {
                     return Promise.reject(err)
                 }
             }
-            if (arrHas(keyTable, ['pemis', 'grups'])) { //users可重複name故不列入
-                err = ckKey(rows, 'name')
+            if (arrHas(keyTable, ['pemis', 'grups'])) { //users可重複name故不列入; 此處只驗空值, 名稱重複見下方 findTouchedDup
+                err = ckKey(rows, 'name', { skipDup: true })
                 if (err !== null) {
                     return Promise.reject(err)
                 }
             }
-            if (arrHas(keyTable, ['users'])) {
-                err = ckKey(rows, 'email')
-                if (err !== null) {
-                    return Promise.reject(err)
-                }
-            }
+            //users 之 email／對應鍵檢查改至下方 select 之後(需庫內現況判定「本次造成或觸及」, R-PRINCIPLE-00 適用表 h), 不再於此以整表 ckKey('email') 擋(歷史空值／重複會使所有存檔失敗)
         }
 
         //主鍵之有限數字轉為其字串形式(規則帳本 R-ORM-04; w-serv-orm 1.1.11 起庫內即如此存放): ltdtDiffByKey 以嚴格比對, 未轉時 123 對不上庫內之 '123',
@@ -173,8 +176,41 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave }) {
             return (typeof id === 'number' && Number.isFinite(id)) ? { ...r, id: String(id) } : r
         })
 
+        //pemis／grups 以 id 對應既有列(見下方 isNameKeyTable 分支), 送入之整表內主鍵 id(字串)不得重複, 否則 Map(id → 列) 靜默併成一列而遺失其一(unit-procCore-writeValidate WV-008);
+        //缺 id 之列(API 直打, 視為新增)不參與; 錯誤鍵同 validateRowsBeforeWrite 之 idDuplicate: saveRowFieldDuplicate
+        if (arrHas(keyTable, ['pemis', 'grups'])) {
+            let kIdDup = findDupIndex(rows, 'id', (r) => isestr(get(r, 'id'))) //空字串 id 視為未給(待自動產號, validateRows 同), 不參與重複判定(外審 sol R6)
+            if (kIdDup >= 0) {
+                srLog.error({ event: 'updateTabItems-ckKey-error', keyTable, key: 'id', msg: 'saveRowFieldDuplicate', row: kIdDup, value: get(rows, [kIdDup, 'id']) })
+                return Promise.reject('saveRowFieldDuplicate')
+            }
+        }
+
         //ltdtDiffByKey
         let ltdtOld = await woItems[keyTable].select()
+
+        //pemis／grups 名稱唯一(F-02, 規則帳本 R-NAME-UNIQ-02, ADR-034): 寫入後之名稱集合即送入之整表(含他 from 之外部同步列), 其中出現兩列(不同 id)同名且為「本次造成或觸及」者整次拒收於任何寫入之前;
+        //庫內已有之歷史重複(僅外部同步可造成)原樣送回不算, 否則已有重複之庫將無法在後台修復. 比對為精確 ===(同 arrFinder). 放在 select 之後、saveNewRowExists 之前, 使撞名先於「新增列已存在」被回報(與修正前 ckKey 之次序相同)
+        let isNameKeyTable = arrHas(keyTable, ['pemis', 'grups'])
+        if (isNameKeyTable) {
+            let kDup = findTouchedDup(rows, ltdtOld, 'name')
+            if (kDup >= 0) {
+                srLog.error({ event: 'updateTabItems-ckKey-error', keyTable, key: 'name', msg: 'nameDuplicate', row: kDup, value: get(rows, [kDup, 'name']) })
+                return Promise.reject('nameDuplicate')
+            }
+        }
+
+        //users 之 email／對應鍵(R-PRINCIPLE-00 適用表 h, 規則帳本 R-MAPKEY-03): 遭遇衝突就收嚴, 但只擋「本次造成或觸及」者, 歷史既有之空值／重複原樣送回不拒(否則已有歷史資料之庫無法在後台修復, 連群組指派 pickKeysOnly 也會失敗);
+        //①全表 email 須為非空字串且不重複; ②mappingBy 為 email／name 時另對 isActive==='y' 之列檢查該欄位(含停用改啟用); 判準單一擁有者 keyCheck.checkUsersWrite(與外部同步 F-14 同口徑).
+        //放在 select 之後、saveNewRowExists 之前(次序同 pemis／grups 之 findTouchedDup), 於任何破壞性寫入之前(本函式在 kmx(tabWriteKey) 內, R-WRITE-LOCK-01); 被拒時資料表零變更.
+        //srLog 只記錯誤鍵、原因、欄位與列索引, 不記 email／name 之值(個資; 修正前重複時記 value)
+        if (keyTable === 'users') {
+            let ck = checkUsersWrite(rows, ltdtOld, mappingBy)
+            if (ck !== null) {
+                srLog.error({ event: 'updateTabItems-ckKey-error', keyTable, key: ck.field, msg: ck.key, reason: ck.reason, row: ck.k })
+                return Promise.reject(ck.key)
+            }
+        }
 
         //新增列已存在即拒絕 (ADR-025): 同一包重送且第 2 次於第 1 次完成後才處理時(占位已釋放), 第 1 次已建立之列會被當「修改」(diff),
         //以前端之佔位字覆寫伺服器於新增時填入之建立者 / 建立時間(procOrm save 只覆寫 userIdUpdate / timeUpdate); 故整包拒絕、不寫入
@@ -189,7 +225,21 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave }) {
         }
 
         let ltdtNew = rows
-        let r = ltdtDiffByKey(ltdtOld, ltdtNew, keyDetect)
+        let r = null
+        if (isNameKeyTable) {
+            //pemis／grups 一律以主鍵 id 對應(F-02 完整化, run04 主責補強, ADR-034 Update): 寫入後之名稱集合須等於送入之整表, findTouchedDup 對「送入整表」驗唯一才成立,
+            //而以 name 為 diff 鍵時 ltdtDiffByKey 以 Map(name → 列) 對應, 下列單次存檔雖通過檢查卻使庫內與送入不同、留下同名兩列且仍回成功(D1 設計稿 §1.5 以真 procCore＋ORM 替身實測,
+            //unit-procCore-nameUniq NU-021～024 守護): ①改名 A→A2 並以舊名 A 新增另一列(新 id)——改名靜默遺失; ②刪除 A 並以同名新增(新 id, F-02② 原案)——舊列未刪;
+            //③鏈式改名 A→B 且 B→C——id-2 應為 C 卻停在 B; ④庫內已有同名列(歷史重複)時改名其中先出現之一列——新名稱之列走 add 而其 id 已存在, insert 對既有主鍵略過(NU-011 修前實測).
+            //改以 id 對應後: 改名成為 diff 而非 del + add(建立者與建立時間沿用庫內, 同名之歷史重複各自獨立); 缺 id 之送入列(API 直打)無從對應既有列, 視為新增.
+            let withId = ltdtNew.filter((v) => isestr(get(v, 'id')))
+            let noId = ltdtNew.filter((v) => !isestr(get(v, 'id')))
+            r = ltdtDiffByKey(ltdtOld, withId, 'id')
+            r.add = [...r.add, ...noId]
+        }
+        else {
+            r = ltdtDiffByKey(ltdtOld, ltdtNew, keyDetect)
+        }
         // console.log('ltdtDiffByKey r', r)
 
         //寫入前驗證(規則帳本 R-ORM-01, ADR-026): 於第一個破壞步驟(del)之前擋下可預判之寫入失敗, 被拒時資料表零變更.
