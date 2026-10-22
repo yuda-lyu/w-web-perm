@@ -7,6 +7,7 @@
 //  GN-4 同一名稱不同時屬於擋存與歷史警告(以擋存者為準); 比對為精確 ===; 原型鍵名(constructor／__proto__)無誤判;
 //  GN-5 getDelRefCount: 只以基準(已儲存)列之名稱計, 未儲存新增列刪除不影響他人; 僅 AND 引用且刪除後查無者計入; run06 起刪除確認改走 getDelImpact(nRefs 連帶清理之引用端數, 任何 mode 皆計; nAnd 其中 AND 引用者; nWiden 歷史同名)＋getDelConfirmText(GN-047、GN-048);
 //  GN-6 站點: 三個清單頁以 getNameErrs 取代舊的逐列 haskey 計重複; 新增之警告儲存格僅在有衝突時換成 flex 容器, 無衝突之分支維持原 DOM; 刪除確認走專案 DOM 模態(showCheckYesNo), 不用原生 confirm.
+//  GN-7 重複者之一為外部列(from 非空, externalRows.isExternalRow): getNameErrs 另回 dupExternal(值 → 外部列 from, 無原型物件), 頁面據以把提示改為「外部來源 X 已使用此名稱」(nameUsedByExternal); 判準與擋存不變(仍為 dup).
 //
 //跑法: npx mocha test/unit-getNameErrs.test.mjs --reporter list --timeout 30000
 import assert from 'assert'
@@ -156,6 +157,12 @@ describe('unit-getNameErrs (清單頁名稱／email 擋存與歷史警告判準,
     describe('GN-2 前端判擋存 ⇔ 伺服端回 nameDuplicate', function() {
 
         // 與 unit-procCore-nameUniq 同一組裝: 真 procCore + 表替身
+        //legacy 三態(run07 U1 修正, 外部列保護 F-23 / R-EXT-OWN-01 / R-PRINCIPLE-00 原則 5):
+        //  false: 無歷史重複; true: 歷史重複之後出現列(id-2)為外部列(from 'appX', 外部同步灌入之同名列);
+        //  'backend': 歷史重複之兩列皆為後台列(from ''; 後台歷史亦可能有同名, F-02 之前無唯一檢查).
+        //外部列之身分／結構欄(name 等)與刪除，後台不得變更(saveExternalRowChanged), 故「對 id-2 改名／刪除」之情境若 id-2 為外部列會先因外部列守門被拒,
+        //而本檔述語(GN-2)只驗「前端擋存 ⇔ 伺服端 nameDuplicate」之同名判準, 與外部列無關: 此三情境改用 'backend' 種子(判準不變、斷言未放寬);
+        //其餘 legacy 情境維持外部列 id-2(外部列原樣送回／被排序／被併入重複仍須與前端判準一致), 外部列自身之拒收見 unit-procCore-external.
         let seedRows = (table, legacy) => {
             let col = TABLES[table].col
             let mk = (o) => ({ ...ds[table].funNew(), ...AUDIT, [col]: '{}', ...o })
@@ -168,7 +175,7 @@ describe('unit-getNameErrs (清單頁名稱／email 擋存與歷史警告判準,
             }
             return [
                 mk({ id: 'id-1', order: 1, name: 'X1', from: '', description: 'd1' }),
-                mk({ id: 'id-2', order: 2, name: 'X1', from: 'appX', description: 'd2' }),
+                mk({ id: 'id-2', order: 2, name: 'X1', from: legacy === 'backend' ? '' : 'appX', description: 'd2' }),
                 mk({ id: 'id-3', order: 3, name: 'X3', from: '', description: 'd3' }),
             ]
         }
@@ -208,9 +215,9 @@ describe('unit-getNameErrs (清單頁名稱／email 擋存與歷史警告判準,
             ['歷史重複 原樣', true, (rows) => rows, false],
             ['歷史重複 改說明與無關列', true, (rows) => desc(rows, { 0: 'e1', 2: 'e3' }), false],
             ['歷史重複 先出現列改名', true, (rows) => ren(rows, { 0: 'X1-r' }), false],
-            ['歷史重複 後出現列改名', true, (rows) => ren(rows, { 1: 'X1-o' }), false],
-            ['歷史重複 刪其中一列', true, (rows) => rows.filter((v) => v.id !== 'id-2'), false],
-            ['歷史重複 兩列皆改名', true, (rows) => ren(rows, { 0: 'A', 1: 'B' }), false],
+            ['歷史重複 後出現列改名', 'backend', (rows) => ren(rows, { 1: 'X1-o' }), false],
+            ['歷史重複 刪其中一列', 'backend', (rows) => rows.filter((v) => v.id !== 'id-2'), false],
+            ['歷史重複 兩列皆改名', 'backend', (rows) => ren(rows, { 0: 'A', 1: 'B' }), false],
             ['歷史重複 反序', true, (rows) => [rows[2], rows[1], rows[0]], false],
             ['歷史重複 加第三個同名列', true, (rows, t) => [...rows, newRow(t, 'X1')], true],
             ['歷史重複 無關列改名併入', true, (rows) => ren(rows, { 2: 'X1' }), true],
@@ -632,6 +639,120 @@ describe('unit-getNameErrs (清單頁名稱／email 擋存與歷史警告判準,
     })
 
 
+    // ===== GN-7: 後台列與外部列撞名(run07 UI1; F-23 原則 6「維持拒外部, 後台儲存前提示外部來源 X 已使用此名稱」) =====
+    describe('GN-7 重複者之一為外部列(from 非空) → dupExternal 供提示「外部來源 X 已使用此名稱」', function() {
+
+        let ext = (id, name, from) => ({ id, name, from })
+
+        it('GN-070 後台新增列撞外部列之名 → errBlock dup(仍擋存), dupExternal[名稱] 為該外部列之 from', function() {
+            let old = [ext('e1', 'A', 'teamA'), { id: 'b1', name: 'B', from: '' }]
+            let rows = [...cloneDeep(old), { id: 'n1', name: 'A', from: '', _isNew: true }]
+            let r = getNameErrs(rows, old, 'name')
+            assert.strict.deepEqual({ ...r.errBlock }, { A: 'dup' })
+            assert.strict.deepEqual({ ...r.dupExternal }, { A: 'teamA' })
+        })
+
+        it('GN-071 後台列改名撞外部列之名 → dup 且 dupExternal 有該名稱; 撞到後台列者(無外部列)dupExternal 無該鍵', function() {
+            let old = [ext('e1', 'A', 'teamA'), { id: 'b1', name: 'B', from: '' }, { id: 'b2', name: 'C', from: '' }]
+            let rows = cloneDeep(old)
+            rows[1].name = 'A' //B → A(撞外部列)
+            rows[2].name = 'D'
+            let r = getNameErrs(rows, old, 'name')
+            assert.strict.deepEqual({ ...r.errBlock }, { A: 'dup' })
+            assert.strict.deepEqual({ ...r.dupExternal }, { A: 'teamA' })
+
+            let rows2 = cloneDeep(old)
+            rows2[2].name = 'B' //C → B(撞後台列)
+            let r2 = getNameErrs(rows2, old, 'name')
+            assert.strict.deepEqual({ ...r2.errBlock }, { B: 'dup' })
+            assert.strict.deepEqual(keys(r2.dupExternal), [], '兩方皆為後台列: 維持原提示, 不帶外部來源')
+        })
+
+        it('GN-072 兩組並存: 撞外部列之組與後台互撞之組分別標示', function() {
+            let old = [ext('e1', 'A', 'teamA'), { id: 'b1', name: 'B', from: '' }]
+            let rows = [...cloneDeep(old), { id: 'n1', name: 'A', from: '' }, { id: 'n2', name: 'N', from: '' }, { id: 'n3', name: 'N', from: '' }]
+            let r = getNameErrs(rows, old, 'name')
+            assert.strict.deepEqual({ ...r.errBlock }, { A: 'dup', N: 'dup' })
+            assert.strict.deepEqual({ ...r.dupExternal }, { A: 'teamA' })
+        })
+
+        it('GN-073 歷史同名(外部列二筆原樣)不擋存 → warnHist, 無 dupExternal; 再加一個後台列則 dup 且 dupExternal 取第一個外部列之 from', function() {
+            let old = [ext('e1', 'X', 'teamA'), ext('e2', 'X', 'teamB')]
+            let r = getNameErrs(cloneDeep(old), old, 'name')
+            assert.strict.deepEqual(keys(r.errBlock), [])
+            assert.strict.deepEqual({ ...r.warnHist }, { X: 2 })
+            assert.strict.deepEqual(keys(r.dupExternal), [])
+            let r2 = getNameErrs([...cloneDeep(old), { id: 'n1', name: 'X', from: '', _isNew: true }], old, 'name')
+            assert.strict.deepEqual({ ...r2.errBlock }, { X: 'dup' })
+            assert.strict.deepEqual({ ...r2.dupExternal }, { X: 'teamA' })
+            assert.strict.deepEqual(keys(r2.warnHist), [], 'dup 者不再列為歷史警告')
+        })
+
+        it('GN-074 from 為 ""、缺欄、null、數字、布林、物件者為後台列(isExternalRow 同源), 不產生 dupExternal', function() {
+            for (let f of ['', undefined, null, 0, 1, true, false, {}]) {
+                let old = [{ id: 'o1', name: 'A', from: f }]
+                let rows = [...cloneDeep(old), { id: 'n1', name: 'A', _isNew: true }]
+                let r = getNameErrs(rows, old, 'name')
+                assert.strict.deepEqual({ ...r.errBlock }, { A: 'dup' }, `from=${JSON.stringify(f)}`)
+                assert.strict.deepEqual(keys(r.dupExternal), [], `from=${JSON.stringify(f)}`)
+            }
+        })
+
+        it('GN-075 列無 from 欄(舊資料形狀)完全不受影響: errBlock／warnHist／warnHistBad 同前, dupExternal 為空之無原型物件', function() {
+            let old = nm('A', 'B')
+            let r = getNameErrs([...cloneDeep(old), { id: 'n', name: 'A' }], old, 'name')
+            assert.strict.deepEqual({ ...r.errBlock }, { A: 'dup' })
+            assert.strict.deepEqual(keys(r.dupExternal), [])
+            assert.strict.equal(Object.getPrototypeOf(r.dupExternal), null)
+            for (let k of ['errBlock', 'warnHist', 'warnHistBad']) {
+                assert.strict.ok(k in r, `${k} 仍在回傳物件內(向下相容)`)
+            }
+        })
+
+        it('GN-076 原型鍵名(constructor／__proto__／toString)撞外部列: dupExternal 以自有鍵標示, 未撞者 `in` 為 false', function() {
+            for (let n of ['constructor', '__proto__', 'toString']) {
+                let old = [ext('e1', n, 'teamA')]
+                let r = getNameErrs([...cloneDeep(old), { id: 'n1', name: n, from: '', _isNew: true }], old, 'name')
+                assert.strict.equal(r.errBlock[n], 'dup', n)
+                assert.strict.equal(r.dupExternal[n], 'teamA', n)
+                assert.strict.equal(Object.getPrototypeOf(r.dupExternal), null)
+                let r0 = getNameErrs(cloneDeep(old), old, 'name')
+                assert.strict.equal(n in r0.dupExternal, false, `${n} 無重複時不得因原型鏈被當成有外部來源`)
+            }
+            assert.strict.equal(({}).polluted, undefined)
+        })
+
+        it('GN-077 使用者 email 同機制: 後台列 email 撞外部列之 email → dup 並帶 dupExternal(頁面只對 name 套用外部來源提示, email 維持原提示)', function() {
+            let opt = { badScope: 'touched', isValid: isEmail }
+            let old = [{ id: 'e1', email: 'u@x.com', from: 'sso' }, { id: 'b1', email: 'b@x.com', from: '' }]
+            let rows = cloneDeep(old)
+            rows[1].email = 'u@x.com'
+            let r = getNameErrs(rows, old, 'email', opt)
+            assert.strict.deepEqual({ ...r.errBlock }, { 'u@x.com': 'dup' })
+            assert.strict.deepEqual({ ...r.dupExternal }, { 'u@x.com': 'sso' })
+        })
+
+        it('GN-078 數字 id 之外部列(正規化後)亦能判為外部列; 外部列為壞值(空名稱)時不算 dup、無 dupExternal', function() {
+            let old = [{ id: '1', name: 'A', from: 'sso' }]
+            let rows = [{ id: 1, name: 'A', from: 'sso' }, { id: 'n1', name: 'A', from: '', _isNew: true }]
+            let r = getNameErrs(rows, old, 'name')
+            assert.strict.deepEqual({ ...r.dupExternal }, { A: 'sso' })
+            let old2 = [{ id: 'e1', name: '', from: 'sso' }]
+            let r2 = getNameErrs(cloneDeep(old2), old2, 'name')
+            assert.strict.deepEqual(keys(r2.dupExternal), [])
+        })
+
+        it('GN-079 後台列列於外部列之前(列序不同)仍取得外部列之 from(不依列序、不取首列)', function() {
+            let old = [{ id: 'b1', name: 'B', from: '' }, ext('e1', 'A', 'teamA')]
+            let rows = cloneDeep(old)
+            rows[0].name = 'A' //後台列(在前)改名撞外部列(在後)
+            let r = getNameErrs(rows, old, 'name')
+            assert.strict.deepEqual({ ...r.errBlock }, { A: 'dup' })
+            assert.strict.deepEqual({ ...r.dupExternal }, { A: 'teamA' })
+        })
+    })
+
+
     // ===== GN-6: 站點(靜態) =====
     describe('GN-6 站點不變式', function() {
 
@@ -711,7 +832,7 @@ describe('unit-getNameErrs (清單頁名稱／email 擋存與歷史警告判準,
             }
         })
 
-        it('SITE-GN-004 刪除確認: 群組頁／權限頁經 getDelImpact＋getDelConfirmText＋showCheckYesNo(單一框, 多種影響併入同一框), 無影響時不彈框; 不用原生 confirm／alert(儲存前之引用連帶預覽另一個確認框見 unit-getCascadePreview SITE-GCP-001)', function() {
+        it('SITE-GN-004 刪除確認: 群組頁／權限頁經 getDelImpact＋getDelConfirmText＋showCheckYesNo(單一框, 多種影響併入同一框), 無影響時不彈框; 不用原生 confirm／alert(儲存前之引用連帶預覽另一個確認框見 unit-getCascadePreview SITE-GCP-001; 新增撞懸空名之確認框見 unit-getAddImpact SITE-AI)', function() {
             for (let [fn, kind, arg] of [['LayoutContentGrups', 'Grup', `vo.grups, vo.users, 'Grup'`], ['LayoutContentPemis', 'Pemi', `vo.pemis, vo.grups, 'Pemi'`]]) {
                 let c = code(`src/components/${fn}.vue`)
                 assert.strict.ok(c.includes(`let impact = getDelImpact(delIds, ${arg}, getRowsRemain())`), `${fn} 影響人數`)
@@ -719,7 +840,7 @@ describe('unit-getNameErrs (清單頁名稱／email 擋存與歷史警告判準,
                 assert.strict.ok(c.includes(`vo.$dg.showCheckYesNo(confirmText)`), `${fn} 確認框`)
                 assert.strict.ok(/if \(confirmText === ''\) \{\s*doDelete\(\)\s*return\s*\}/.test(c), `${fn} 無影響時直接刪除`)
                 assert.strict.equal((c.match(/showCheckYesNo\(confirmText\)/g) || []).length, 1, `${fn} 刪除流程只能一個確認框`)
-                assert.strict.equal((c.match(/showCheckYesNo\(/g) || []).length, 2, `${fn} 全檔只有兩個確認框: 刪除前一個、儲存前(改名預覽)一個`)
+                assert.strict.equal((c.match(/showCheckYesNo\(/g) || []).length, 3, `${fn} 全檔只有三個確認框: 刪除前一個、儲存前(改名預覽)一個、儲存前(新增撞懸空名, run07 getAddImpact)一個`)
             }
             for (let fn of pages) {
                 let c = code(`src/components/${fn}.vue`)

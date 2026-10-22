@@ -143,7 +143,7 @@ async function initialData() {
 
     rs = [
 
-        ['peter', 'teamA', `
+        ['peter', '', `
             { 
                 '權限群組M1': {
                     'mode': 'OR',
@@ -151,7 +151,7 @@ async function initialData() {
                 }
             }
         `, 'n'],
-        ['mary', 'teamA', `
+        ['mary', '', `
             { 
                 '權限群組M2': {
                     'mode': 'OR',
@@ -159,7 +159,7 @@ async function initialData() {
                 }
             }
         `, 'n'],
-        ['john', 'teamA', `
+        ['john', '', `
             { 
                 '權限群組M3': {
                     'mode': 'OR',

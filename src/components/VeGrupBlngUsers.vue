@@ -210,6 +210,8 @@ import cvKpToObj from '../js/cvKpToObj.mjs'
 import getKpLossy from '../js/getKpLossy.mjs'
 import fmtLossyMsg from '../js/fmtLossyMsg.mjs'
 import pairRowsToSnapshot from '../js/pairRowsToSnapshot.mjs'
+import { makeBaseline } from '../js/rowDigest.mjs'
+import { makeRowStates, getChangedIdx, buildRowsSend } from '../js/relDialogSend.mjs'
 import { getRefState, getRawModeMap, putRefEntry } from '../js/editorRefRows.mjs'
 import { getRefWarns, getRefWarnText } from '../js/getAuthWarn.mjs'
 import WDialog from 'w-component-vue/src/components/WDialog.vue'
@@ -253,6 +255,11 @@ export default {
             isModified: false,
 
             grup: null,
+
+            //baseline, rowStates: 開框(show)時綁定之草稿基準(F-26, R-BASELINE-01), 之後 store 推播變新不更新, 每次 show() 重新綁定;
+            //baseline 為草稿所依據之那份使用者列之逐列內容指紋, 存檔隨 updateUsers 第 2 參送伺服端; rowStates 為開框時各列之歸屬狀態, 存檔時判定使用者有無變更該列
+            baseline: null,
+            rowStates: null,
 
             items: [],
             itemsCheck: [],
@@ -1006,14 +1013,15 @@ export default {
 
         },
 
-        saveUsers: async function(rows) {
-            // console.log('method saveUsers', rows)
+        saveUsers: async function(rows, baseline) {
+            // console.log('method saveUsers', rows, baseline)
 
             let vo = this
 
             //3) updateUsers, 各自 catch + okX 旗標短路 (canonical 五段結構; 空清單檢查已上移至 doSave core())
+            //第 2 參 { baseline }: 開框時綁定之草稿基準(由 doSave 於流程開頭取得並傳入, 不於此讀 vo.baseline——存檔進行中若再次 show() 會換成新草稿之基準); 伺服端比對「本次將寫入之列」之庫內版本, 草稿之後被改過即整次拒收 saveStale(失敗路徑沿用下方 catch 顯示語系文字)
             let okSave = false
-            await vo.$fapi.updateUsers(rows)
+            await vo.$fapi.updateUsers(rows, { baseline })
                 .then(() => { okSave = true })
                 .catch(async (err) => {
                     vo.$ui.updateLoading(false) //showCheckYes 前關 loading（modal 阻斷期間避免 loading 疊在底下）
@@ -1057,6 +1065,10 @@ export default {
 
             let vo = this
 
+            //pmDlg: 本次存檔流程所屬之對話框 promise(外審 sol R2): 存檔進行中(如 await delay)若再次 show() 開啟另一群組, vo.pm 會被換成新視窗之 promise,
+            //舊流程完成時只能 resolve 自己的 promise、且不得關閉新視窗(見下方 .then)
+            let pmDlg = vo.pm
+
             async function core(unlockBtn) {
 
                 //1) 事先檢測 (所有同步檢查在開 loading 之前, 空清單不應先閃 loading); 訊息框前以 unlockBtn() 釋放儲存鈕之 promiseUnlock 鎖:
@@ -1068,6 +1080,13 @@ export default {
                     await vo.$dg.showCheckYes(`${vo.$t('userSaveUsersEmpty')}`)
                     return
                 }
+
+                //草稿基準與開框時各列之歸屬狀態(F-26, R-BASELINE-01): 於流程開頭(任何 await 之前)取得並以區域變數持有——存檔進行中若再次 show() 會把 vo.baseline／vo.rowStates 換成新草稿之值, 舊草稿之列不可配新草稿之基準
+                let baseline = cloneDeep(vo.baseline)
+                let rowStates = vo.rowStates
+
+                //grupName: 被編輯之群組名稱, 同樣於流程開頭(任何 await 之前)取得——等待後才讀 vo.grup.name 會讀到新開啟之實體, 把舊草稿之歸屬寫成指派新實體(外審 sol R2)
+                let grupName = get(vo, 'grup.name', '')
 
                 //1b) 無法無損表示之授權資料(R-AUTH-LOSSY-01, 主控複審 R4): 該列使用者之 cgrups 含物件形式無法無損表示之格(getKpLossy)者, 本對話框不得改寫其字串——
                 //本對話框所管之歸屬／模式有變更 → 整次儲存拒絕並點名(原子, 其餘列亦不寫); 未變更 → 該列字串逐字元不動(見下方 kpLossyIdx)
@@ -1083,10 +1102,17 @@ export default {
                     return false
                 }
 
+                //1a2) 使用者於本次編輯相對「開框時」有變更之列(F-26, S4; 外審 B.1): 對話框之列是開框時之草稿值, 他人於開框後改過而使用者未碰之列, 不得以草稿值改寫(覆蓋他人之變更);
+                //故只有 kpChanged 之列才對存檔當下快照之字串套用變更(下方 putRefEntry), 其餘列(含開框後新增而不在對話框內者)一律原樣帶回存檔當下 store 之版本(逐字不動), 亦不納入下方有損檢查
+                let kpChanged = getChangedIdx(rows, rowStates)
+
                 let kpLossyIdx = Object.create(null)
                 let kpRawModes = Object.create(null) //列索引 → 該列快照字串之限制項原始 mode(getRawModeMap), 供下方 putRefEntry 寫回未改之限制項
                 let lossyNames = []
                 each(rows, (r, kr) => {
+                    if (kpChanged[kr] !== true) {
+                        return true //使用者未變更: 原樣帶回, 不檢查有損亦不需 rawModeMap
+                    }
                     let u = pairs[kr]
                     let kpRaw = null
                     try {
@@ -1100,7 +1126,7 @@ export default {
                         return true //跳出換下一個
                     }
                     kpLossyIdx[kr] = true
-                    let p = getOwn(cvKpToObj(kpRaw, { hasMode: true }), get(vo, 'grup.name', ''), null)
+                    let p = getOwn(cvKpToObj(kpRaw, { hasMode: true }), grupName, null)
                     let was = get(p, 'isActive', '') === 'y'
                     let wasMode = was ? get(p, 'mode', '') : ''
                     let now = get(r, 'enable', '') === 'y'
@@ -1123,16 +1149,17 @@ export default {
 
                 //users: 沿用 1b 之快照(見上)
 
-                //usersNew
-                let usersNew = map(rows, (r, kr) => {
+                //kpNewCgrups: 列索引 → 該列新 cgrups 字串; 只收「使用者有變更(kpChanged)、非有損、且 putRefEntry 判定本項確有變更」者, 其餘一律不收(由 buildRowsSend 原樣帶回)
+                let kpNewCgrups = Object.create(null)
+                each(rows, (r, kr) => {
+
+                    //使用者未變更之列(kpChanged)與有損列(kpLossyIdx): 歸屬未變更, 字串逐字元不動
+                    if (kpChanged[kr] !== true || kpLossyIdx[kr] === true) {
+                        return true //跳出換下一個
+                    }
 
                     //u, 以列身分配對之快照列(見 1a)
                     let u = pairs[kr]
-
-                    //有損列(kpLossyIdx): 歸屬未變更, 字串逐字元不動
-                    if (kpLossyIdx[kr] === true) {
-                        return u
-                    }
 
                     //cgrups
                     let cgrups = get(u, 'cgrups', '')
@@ -1150,16 +1177,18 @@ export default {
                     //本項未變更 → 回 false, 字串逐字元不動(含其他項為陣列形式／含停用項者, 修前會正規化改寫)
                     //其餘項中之限制項(mode 缺或非法之啟用引用)寫回原始 mode(kpRawModes[kr]), 不寫成可當基底之合法 AND(否則本群組為該層唯一合法項而被取消時多給, R-PRINCIPLE-00 e)
                     let kpGrupNew = Object.create(null)
-                    if (putRefEntry(kpGrupNew, kpGrup, get(vo, 'grup.name', ''), get(r, 'enable', ''), get(r, 'mode', ''), kpRawModes[kr])) {
+                    if (putRefEntry(kpGrupNew, kpGrup, grupName, get(r, 'enable', ''), get(r, 'mode', ''), kpRawModes[kr])) {
 
                         //cgrups(鍵序無關授權, R-AUTH-MERGE-00 第 4 條: 不需保留原鍵序, 亦無整數式名稱易位之拒存)
-                        u.cgrups = JSON.stringify(kpGrupNew)
+                        kpNewCgrups[kr] = JSON.stringify(kpGrupNew)
 
                     }
 
-                    return u
                 })
-                console.log('usersNew', usersNew)
+
+                //usersNew: 送出之整表＝存檔當下 store 快照(users)之全部列、依其 order 序(F-26 c0, S4): 修前只送「對話框之列」, 開框後他人／外部同步新增之列被伺服端整表 diff 刪除;
+                //只有 kpNewCgrups 之列換其 cgrups 一欄, 其餘列(使用者未變更者、有損列、開框後新增而不在對話框內者)與快照同一物件、逐字不動(伺服端只對本次將寫入之列比對基準, 故不因開框後他人之變更而被拒)
+                let usersNew = buildRowsSend(users, pairs, kpNewCgrups, 'cgrups')
 
                 // //check
                 // if (size(usersNew) === 0) {
@@ -1167,7 +1196,7 @@ export default {
                 // }
 
                 //saveUsers, 失敗時回 false: 失敗提示已由 saveUsers 顯示, 此處不關閉對話框(保留未存變更供重按儲存)
-                let okSave = await vo.saveUsers(usersNew)
+                let okSave = await vo.saveUsers(usersNew, baseline)
                 if (!okSave) {
                     return false
                 }
@@ -1186,10 +1215,12 @@ export default {
                         }
 
                         //resolve
-                        vo.pm.resolve(rows)
+                        pmDlg.resolve(rows)
 
                         //hide
-                        vo.bShow = false
+                        if (vo.pm === pmDlg) { //期間若已 show() 開啟另一視窗, 舊流程不得關閉新視窗
+                            vo.bShow = false
+                        }
 
                     })
                     .catch((err) => {
@@ -1246,13 +1277,22 @@ export default {
             //users
             let users = cloneDeep(vo.users)
 
+            //baseline(F-26, R-BASELINE-01; 外審 B.1): 於生成 items 之同一處, 以 items 所依據之那份使用者列(users)計算並綁定為本次草稿之載入基準; 之後 store 推播變新不得更新它
+            //(存檔當下才由最新 store 取基準, 證明的是「store 新」而非「待存之編輯內容新」), 每次 show() 重新綁定. 欄位口徑與伺服端同一(vo.$ds.users.keys 經 rowDigest.makeBaseline)
+            let baseline = makeBaseline(users, vo.$ds.users.keys)
+
             //items
             let items = vo.genItems(grup, users)
+
+            //rowStates: 開框時各列之歸屬狀態(須在任何切換操作前由 items 記下; opt.rows 與 items 為同一份陣列, 切換會就地改 enable／mode), 供存檔時判定使用者有無變更該列
+            let rowStates = makeRowStates(items)
 
             //save
             vo.isEditable = isEditable
             vo.grup = grup
             vo.items = items
+            vo.baseline = baseline
+            vo.rowStates = rowStates
 
             //genOpt
             vo.genOpt()

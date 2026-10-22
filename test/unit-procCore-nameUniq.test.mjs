@@ -33,6 +33,10 @@ const TABLES = {
 //seedRows: 一般(無歷史重複)種子與「歷史重複」種子
 //  clean: X1(id-1)、X2(id-2)、X3(id-3)
 //  legacy: X1(id-1, from '')、X1(id-2, from 'appX': 外部同步灌入之同名列)、X3(id-3) —— 以 name 為鍵之差異無法區分 id-1 與 id-2
+//  legacy === 'backend': 同 legacy, 但 id-2 亦為後台列(from ''; F-02 之前後台亦可能造成同名)
+//run07 U1 修正(外部列保護 F-23 / R-EXT-OWN-01 / R-PRINCIPLE-00 原則 5): 外部列(from 非空)之身分／結構欄後台不得改、不得刪(saveExternalRowChanged),
+//故 NU-012(對 id-2 改名)、NU-013(刪除 id-2、對 id-2 改名)若 id-2 為外部列會先被外部列守門拒收; 這兩案之述語(P3)只談「歷史同名之修復路徑」,
+//與外部列無關, 改用 'backend' 種子, 斷言未放寬; 外部列版本之拒收(同形操作對外部 id-2 → saveExternalRowChanged 且零寫入)見 unit-procCore-external.
 function seedRows(table, legacy) {
     let col = TABLES[table].col
     let mk = (o) => ({ ...ds[table].funNew(), ...AUDIT, [col]: '{}', ...o })
@@ -45,7 +49,7 @@ function seedRows(table, legacy) {
     }
     return [
         mk({ id: 'id-1', order: 1, name: 'X1', from: '', description: 'd1' }),
-        mk({ id: 'id-2', order: 2, name: 'X1', from: 'appX', description: 'd2' }),
+        mk({ id: 'id-2', order: 2, name: 'X1', from: legacy === 'backend' ? '' : 'appX', description: 'd2' }),
         mk({ id: 'id-3', order: 3, name: 'X3', from: '', description: 'd3' }),
     ]
 }
@@ -195,7 +199,7 @@ describe('unit-procCore-nameUniq (後台整表寫入之群組／權限名稱唯�
         })
 
         it(`NU-012 ${table}: 歷史重複存在, 重複中「後出現之一列」改為不重複之名稱 → 可存且改名落地`, async function() {
-            let { woItems, pc } = createEnv(table, true)
+            let { woItems, pc } = createEnv(table, 'backend')
             let rows = await rowsOf(woItems, table)
             rows[1].name = 'X1-other' //id-2
             let r = await run(pc, table, rows)
@@ -206,7 +210,7 @@ describe('unit-procCore-nameUniq (後台整表寫入之群組／權限名稱唯�
         })
 
         it(`NU-013 ${table}: 歷史重複存在, 刪除重複中之一列 → 可存, 另一列仍在; 兩列皆改名亦可存`, async function() {
-            let { woItems, pc } = createEnv(table, true)
+            let { woItems, pc } = createEnv(table, 'backend')
             let rows = await rowsOf(woItems, table)
             let r = await run(pc, table, rows.filter((v) => v.id !== 'id-2'))
             assert.strict.deepEqual(r, { ok: true, v: 'saveTabItemsSuccess' })
@@ -214,7 +218,7 @@ describe('unit-procCore-nameUniq (後台整表寫入之群組／權限名稱唯�
             assert.strict.equal(byId(woItems, table, 'id-1').name, 'X1')
             //兩列皆改名(新環境; 第一個環境之占位計時器須先清, 否則 mocha 不結束)
             env.cst.clear()
-            let e2 = createEnv(table, true)
+            let e2 = createEnv(table, 'backend')
             let rows2 = await rowsOf(e2.woItems, table)
             rows2[0].name = 'A'
             rows2[1].name = 'B'

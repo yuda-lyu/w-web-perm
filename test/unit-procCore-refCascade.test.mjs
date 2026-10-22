@@ -809,7 +809,8 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
 
         it('RW-212 歷史同名只刪其一 → 該名稱仍有存續列, 引用不動(引用端零寫入、逐位元不變); 兩列都刪 → 引用被清', async function() {
             let seed = seedRows()
-            addRows(seed, 'grups', { id: 'id-gd1', name: 'GD', from: '', cpemis: J({ P1: OR }) }, { id: 'id-gd2', name: 'GD', from: 'appX', cpemis: J({ P2: OR }) })
+            //run07 U1 修正(外部列保護 R-EXT-OWN-01): 原 id-gd2 為外部列(appX), 後台不得刪外部列(saveExternalRowChanged); 本案述語為「歷史同名刪除連帶清理」, 與外部列無關, 同名兩列皆為後台列(from ''). 外部列不可刪之拒收見 unit-procCore-external
+            addRows(seed, 'grups', { id: 'id-gd1', name: 'GD', from: '', cpemis: J({ P1: OR }) }, { id: 'id-gd2', name: 'GD', from: '', cpemis: J({ P2: OR }) })
             addUsers(seed, { cgrups: J({ GD: OR, G1: OR }) }, { cgrups: J([{ name: 'GD', mode: 'AND', isActive: 'n' }]) })
             let { woItems, pc } = createEnv({ seed })
             let snapU = woItems.users.snapshot()
@@ -826,7 +827,8 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
 
         it('RW-213 歷史同名兩列於同一次儲存一併刪除 → 引用被清', async function() {
             let seed = seedRows()
-            addRows(seed, 'pemis', { id: 'id-pd1', name: 'PD', from: '', crules: '{}' }, { id: 'id-pd2', name: 'PD', from: 'appX', crules: '{}' })
+            //run07 U1 修正(外部列保護 R-EXT-OWN-01): 原 id-pd2 為外部列(appX)不可由後台刪除; 本案述語為「歷史同名兩列一併刪除之連帶清理」, 與外部列無關, 同名兩列皆為後台列(from '')
+            addRows(seed, 'pemis', { id: 'id-pd1', name: 'PD', from: '', crules: '{}' }, { id: 'id-pd2', name: 'PD', from: '', crules: '{}' })
             addRows(seed, 'grups', { id: 'id-gp', name: 'GP', from: '', cpemis: J({ PD: OR, P1: OR }) })
             let { woItems, pc } = createEnv({ seed })
             assert.strict.deepEqual(await run(pc, 'pemis', drop(await rowsOf(woItems, 'pemis'), 'id-pd1', 'id-pd2')), OKR)
@@ -968,7 +970,8 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
 
         it('RW-221f 歷史同名只刪其一(缺 id): 庫內 GD×2, 送入僅一列缺 id 之 GD → 對應其一, 另一被刪但名稱仍有存續列, 引用不動', async function() {
             let seed = seedRows()
-            addRows(seed, 'grups', { id: 'id-gd1', name: 'GD', from: '', cpemis: '{}' }, { id: 'id-gd2', name: 'GD', from: 'appX', cpemis: '{}' })
+            //run07 U1 修正(外部列保護 R-EXT-OWN-01): 原 id-gd2 為外部列(appX)不可由後台刪除; 述語與外部列無關, 同名兩列皆為後台列(from '')
+            addRows(seed, 'grups', { id: 'id-gd1', name: 'GD', from: '', cpemis: '{}' }, { id: 'id-gd2', name: 'GD', from: '', cpemis: '{}' })
             addUsers(seed, { cgrups: J({ GD: OR }) })
             let { woItems, pc } = createEnv({ seed })
             let snapU = woItems.users.snapshot()
@@ -1042,9 +1045,11 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
     // =====================================================================
     describe('族 3 拒絕與預檢(整次拒存、四表零變更)', function() {
 
+        //run07 U1 修正(外部列保護 R-EXT-OWN-01): 原 id-gd2 為外部列(appX), 後台不得改名外部列(saveExternalRowChanged, 先於級聯預檢); RW-301／302／303／316 之述語為歷史同名組之改名級聯預檢,
+        //與外部列無關, 同名兩列皆為後台列(from ''), 拒收鍵 renameCascadeDupGroup 之斷言不變. 外部列改名被拒見 unit-procCore-external
         let seedDup = () => {
             let seed = seedRows()
-            addRows(seed, 'grups', { id: 'id-gd1', name: 'GD', from: '', cpemis: '{}' }, { id: 'id-gd2', name: 'GD', from: 'appX', cpemis: '{}' })
+            addRows(seed, 'grups', { id: 'id-gd1', name: 'GD', from: '', cpemis: '{}' }, { id: 'id-gd2', name: 'GD', from: '', cpemis: '{}' })
             return seed
         }
 
@@ -1598,6 +1603,84 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
             }
         }
 
+        //外審 sol R7(run07): ORM 之逐筆失敗訊息(w-serv-orm getMapOrm.getMsgFail)把「超過 100 字元」之主鍵截斷為 99 字元加「…」(lodash truncate length:100 omission:'…')再包成 id[...];
+        //截斷後之字面不等於完整 id, 故只以「完整 id 之字面」遮罩時含 ']' 之長 id 會殘留(通則正則只遮到第一個 ']'). 規格: R-REF-CASCADE-01 第 4、8 條「引用端 id 遮罩後才拋出／不記引用端 id」; 引用端 id 之任何片段不得出現於 srLog 與重新拋出之錯誤.
+        //錯誤文字由真 procOrm(getMapOrm → getProc)於「users.save 逐筆 ok:0」時自行產生(非手寫字串), 故截斷行為以套件現況為準
+        const LONG_IDS = [
+            { tag: '含 ] 之長 id(前綴 15 字元 + 120 個 z)', id: `prefix]PRIVATE-${'z'.repeat(120)}`, secrets: ['PRIVATE', 'prefix]', 'z'.repeat(10)] },
+            { tag: '純長 id(無 ], 138 字元)', id: `PRIVATE-${'z'.repeat(130)}`, secrets: ['PRIVATE', 'z'.repeat(10)] },
+            { tag: '含 ] 且恰 100 字元(邊界: 不截斷)', id: `prefix]PRIVATE-${'z'.repeat(85)}`, secrets: ['PRIVATE', 'prefix]', 'z'.repeat(10)] },
+            { tag: '含 ] 且 101 字元(邊界: 截斷為 99 字元加「…」)', id: `prefix]PRIVATE-${'z'.repeat(86)}`, secrets: ['PRIVATE', 'prefix]', 'z'.repeat(10)] },
+        ]
+        let noLeakLong = (x, w) => {
+            let s = typeof x === 'string' ? x : JSON.stringify(x)
+            for (let secret of [...w.secrets, w.id, w.id.slice(0, 30)]) {
+                assert.strict.ok(!s.includes(secret), `不得含 ${JSON.stringify(secret.slice(0, 40))}: ${s.slice(0, 300)}`)
+            }
+        }
+        it('RW-421p 前提: 夾具長 id 之字元數為 135／138／100／101(ORM 於超過 100 字元才截斷為 99 字元加「…」, 故前二者與第四者被截斷、第三者恰不截斷)', function() {
+            assert.strict.deepEqual(LONG_IDS.map((w) => w.id.length), [135, 138, 100, 101])
+        })
+
+        for (let w of LONG_IDS) {
+            it(`RW-421 引用端 id 為${w.tag}, 引用 G1、G1→G1x、users.save 第 1 次逐筆 ok:0(真 ORM 產生之錯誤含 id[<原 id 或其截斷形式>])、補償成功 → srLog 不含 id 任何片段; refCascade-restored.raw 與 updateGrups-error.raw 皆為 failed to save data: id[*]`, async function() {
+                let env = createEnv({ seed: addUsers(seedRows(), { id: w.id, cgrups: J({ G1: OR }) }) })
+                let { woItems, pc, logs } = env
+                let ctl = injectFault(woItems.users, 'save', { on: [1], mode: 'ok0', ids: [w.id] })
+                assert.strict.deepEqual(await run(pc, 'grups', edit(await rowsOf(woItems, 'grups'), 'id-g1', { name: 'G1x' })), ERR('saveWriteFail'))
+                assert.strict.equal(ctl.hit, 1)
+                noLeakLong(logs, w)
+                assert.strict.equal(findLog(logs, 'refCascade-restored')[0].raw, 'failed to save data: id[*]')
+                assert.strict.equal(findLog(logs, 'updateGrups-error')[0].raw, 'failed to save data: id[*]')
+            })
+
+            it(`RW-422 writeWithCascade 直接(真 procOrm 產生錯誤), 引用端 id 為${w.tag} → 重新拋出之錯誤(取其 message／字串)與 srLog 皆不含 id 任何片段, 且為 failed to save data: id[*]`, async function() {
+                let env = createEnv({ seed: addUsers(seedRows(), { id: w.id, cgrups: J({ G1: OR }) }) })
+                let { woItems, logs } = env
+                injectFault(woItems.users, 'save', { on: [1], mode: 'ok0', ids: [w.id] })
+                let holdersOld = await woItems.users.select()
+                let rowsOld = await woItems.grups.select()
+                let rowsNew = edit(rowsOld, 'id-g1', { name: 'G1x' })
+                let plan = planRefChanges({ keyTable: 'grups', rowsOld, rowsNew, holdersOld })
+                assert.strict.ok(plan.changes.some((c) => c.id === w.id), '前提: 該長 id 使用者為引用端改寫列')
+                let { srLog, logs: logs2 } = mkSrLog()
+                let e = await writeWithCascade({ plan, holdersOld, woItems, procOrm: mkProcOrm(ds, woItems), userId: 'id-op', srLog, writeMain: async () => 'MAIN' }).then(() => 'RESOLVED', (err) => err)
+                assert.strict.notEqual(e, 'RESOLVED')
+                let msg = (typeof e === 'string') ? e : e.message
+                assert.strict.equal(msg, 'failed to save data: id[*]')
+                noLeakLong(String(e), w)
+                noLeakLong(e instanceof Error ? e.stack : '', w)
+                noLeakLong(logs2, w)
+                noLeakLong(logs, w)
+            })
+        }
+
+        it('RW-423 兩位引用端 id 互為前綴且皆被截斷(長 id A 與 A+40 個 y 截斷後字面相同)同時失敗 → 兩個 id[...] 皆遮罩, 無片段殘留', async function() {
+            let A = `prefix]PRIVATE-${'z'.repeat(120)}`
+            let B = `${A}${'y'.repeat(40)}`
+            let env = createEnv({ seed: addUsers(seedRows(), { id: A, cgrups: J({ G1: OR }) }, { id: B, cgrups: J({ G1: OR }) }) })
+            let { woItems, pc, logs } = env
+            let ctl = injectFault(woItems.users, 'save', { on: [1], mode: 'ok0', ids: [A, B] })
+            assert.strict.deepEqual(await run(pc, 'grups', edit(await rowsOf(woItems, 'grups'), 'id-g1', { name: 'G1x' })), ERR('saveWriteFail'))
+            assert.strict.equal(ctl.hit, 1)
+            noLeakLong(logs, { id: A, secrets: ['PRIVATE', 'prefix]', 'y'.repeat(10), 'z'.repeat(10)] })
+            assert.strict.equal(findLog(logs, 'refCascade-restored')[0].raw, 'failed to save data: id[*], id[*]')
+        })
+
+        it('RW-424 長 id 之截斷形式含 ] 而另一短 id 為其前綴(短 a]b 與長 a]bPRIVATE… 同時失敗)→ 兩個 id[...] 皆遮罩(只用通則正則會殘留 b]PRIVATE…)', async function() {
+            let S = 'a]b'
+            let L = `a]bPRIVATE-${'c'.repeat(120)}`
+            let env = createEnv({ seed: addUsers(seedRows(), { id: S, cgrups: J({ G1: OR }) }, { id: L, cgrups: J({ G1: OR }) }) })
+            let { woItems, pc, logs } = env
+            let ctl = injectFault(woItems.users, 'save', { on: [1], mode: 'ok0', ids: [S, L] })
+            assert.strict.deepEqual(await run(pc, 'grups', edit(await rowsOf(woItems, 'grups'), 'id-g1', { name: 'G1x' })), ERR('saveWriteFail'))
+            assert.strict.equal(ctl.hit, 1)
+            let s = JSON.stringify(logs)
+            assert.strict.ok(!s.includes('PRIVATE') && !s.includes('c'.repeat(10)) && !s.includes('a]b'), `srLog 不得含任何 id 片段: ${s.slice(0, 300)}`)
+            assert.strict.equal(findLog(logs, 'refCascade-restored')[0].raw, 'failed to save data: id[*], id[*]')
+            assert.strict.equal(findLog(logs, 'updateGrups-error')[0].raw, 'failed to save data: id[*], id[*]')
+        })
+
         //(e) 補償本身失敗(雙重故障)
         //rawRestore: 補償錯誤原文須入 srLog.rawRestore(e1／e3 為注入之 reject 字樣; e2 為逐筆 ok:0, 無例外文字, 只要求非空)
         let DOUBLE = [
@@ -2110,6 +2193,14 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
         describe('並行(隨機交錯, 於 ORM 呼叫點注入隨機讓出)', function() {
 
             //各操作之送入資料(自種子建構一次, 與是否並行無關: 整表寫入以送入之整表為準, 過時之欄位會覆寫(last-writer-wins), 故終態須等價於某一依序執行)
+            //run07 U1 修正(外部列保護 F-23 / F-26, R-PRINCIPLE-00 原則 3、5): 種子 u2 為外部列(appX), 其 cgrups 會被先到之 G 級聯改寫; 後到之 U 若帶「種子時之舊 cgrups」送回,
+            //依新規則屬「過期快照還原外部列指派」, 無基準即拒收 saveBaselineRequired(外審 B.2), 與本案述語(後台列之 last-writer-wins 下全部成功且終態等價於某一依序執行, 鎖階層不死結)無關,
+            //故本段並行與其依序基準皆改用「users 全為後台列」之種子(seedAllBackend); 斷言未放寬. 外部列之過期快照拒收與並行序列化見 unit-procCore-external.
+            let seedAllBackend = () => {
+                let s = seedRows()
+                s.users = s.users.map((u) => ({ ...u, from: '' }))
+                return s
+            }
             const SCEN = [
                 { G: 'rename', P: 'del', T: 'del', U: 'cg' },
                 { G: 'swap', P: 'rename', T: 'del2', U: 'cg' },
@@ -2125,7 +2216,7 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
                 { G: 'swap', P: 'delRen', T: 'del2', U: 'delUser' },
             ]
             let buildOps = (sc) => {
-                let s = seedRows()
+                let s = seedAllBackend()
                 let gs = {
                     rename: () => edit(s.grups, 'id-g1', { name: 'G1x' }),
                     swap: () => edit(edit(s.grups, 'id-g1', { name: 'G2' }), 'id-g2', { name: 'G1' }),
@@ -2189,7 +2280,7 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
                 let set = new Set()
                 let views = new Set()
                 for (let perm of permutations(ops.map((o) => o.name))) {
-                    let env = createEnv()
+                    let env = createEnv({ seed: seedAllBackend() })
                     let results = {}
                     for (let nm of perm) {
                         let o = ops.find((x) => x.name === nm)
@@ -2210,7 +2301,7 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
             let concurrentRound = async (sc, ids, seedNo) => {
                 let rand = mulberry32(seedNo)
                 let ops = buildOps(sc).filter((o) => ids.includes(o.name))
-                let env = createEnv()
+                let env = createEnv({ seed: seedAllBackend() })
                 for (let k of TABLE_KEYS) {
                     fuzzTable(env.woItems[k], rand)
                 }
@@ -2389,7 +2480,8 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
             try {
                 let r1 = await withTimeout(run(env.pc, 'users', edit(await rowsOf(env.woItems, 'users'), 'id-u1', { description: 'x' })), 5000, 'updateUsers 持他表鎖')
                 assert.strict.deepEqual(r1, OKR)
-                let r2 = await withTimeout(run(env.pc, 'users', edit(await rowsOf(env.woItems, 'users'), 'id-u2', { cgrups: J({ G1: OR }) }), { pickKeysOnly: ['cgrups'] }, 'id-admin2'), 5000, 'updateUsers(pickKeysOnly) 持他表鎖')
+                //run07 U1 修正: 原改外部列 id-u2(appX)之 cgrups, 無基準即拒收 saveBaselineRequired(外部列指派欄須附載入基準, R-EXT-OWN-01/R-BASELINE-01); 本案述語為取鎖階層, 與外部列無關, 改以後台列 id-u4 驗 pickKeysOnly 路徑(斷言未放寬)
+                let r2 = await withTimeout(run(env.pc, 'users', edit(await rowsOf(env.woItems, 'users'), 'id-u4', { cgrups: J({ G1: OR }) }), { pickKeysOnly: ['cgrups'] }, 'id-admin2'), 5000, 'updateUsers(pickKeysOnly) 持他表鎖')
                 assert.strict.deepEqual(r2, OKR)
             }
             finally {
@@ -2406,7 +2498,8 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
             }
             let env = createEnv({ proc: { kmx } })
             await run(env.pc, 'users', drop(edit(await rowsOf(env.woItems, 'users'), 'id-u1', { name: 'renamed' }), 'id-u5'))
-            await run(env.pc, 'users', edit(await rowsOf(env.woItems, 'users'), 'id-u2', { cgrups: J({ G1: OR }) }), { pickKeysOnly: ['cgrups'] }, 'id-admin2')
+            //run07 U1 修正: 原改外部列 id-u2 之 cgrups(無基準 → 被 saveBaselineRequired 拒收而本案未檢回傳值, 取鎖軌跡仍為一把而掩蓋了該次其實未成功); 改以後台列 id-u4 並斷言成功, 使「pickKeysOnly 路徑取一把鎖」確實走完寫入
+            assert.strict.deepEqual(await run(env.pc, 'users', edit(await rowsOf(env.woItems, 'users'), 'id-u4', { cgrups: J({ G1: OR }) }), { pickKeysOnly: ['cgrups'] }, 'id-admin2'), OKR)
             assert.strict.deepEqual(log, [tabWriteKey('users'), tabWriteKey('users')])
         })
 

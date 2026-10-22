@@ -15,12 +15,15 @@
 //  - 因此「修改一列」「新增一列」「刪除一列」皆須送「整張表的完整 rows（含未改動列）」，僅調整目標列。
 //  - 去重鍵檢測（procCore.mjs:66-87）：targets 同 id、pemis/grups 同 name、users 同 email 重複 → reject（saveRowFieldDuplicate，procCore.mjs:54）。
 //
+//【run07（F-23 外部列守門）調整】後台 updateXxx 對「外部列」（from 為非空字串者）有守門：新增列 from 須為 ''、外部列不得刪／改身分結構欄／改 from。
+//  故本檔：①後台新增之夾具列一律 from:''（原 'apiTest' 者）；②restoreBaseSeed 先以 purgeExternalRows 移除同步灌入之外部夾具（後台不得刪外部列）；③base seed 全為後台列。
+//  外部列守門本身之案例（各表×各操作×基準）見 api-externalRows.test.mjs。
 //token 用 TOKEN_ADMIN（'sys' → id-for-admin，過 verifyConn.checkToken + 為 isAdmin='y'）。
 //每 case 前以 restoreBaseSeed 將目標表復原為 base seed（送 base 快照經同一 RPC 寫回），確保 case 間隔離。
 //DB 斷言一律 getWoItems() 唯讀 select（跨進程唯讀實測可行；寫入一律走 backend RPC，測試進程不寫 DB）。
 
 import assert from 'assert'
-import { startApi, TOKEN_ADMIN, TOKEN_APP, getWoItems, callRpc, urlSync } from './tools/api-setup.mjs'
+import { startApi, TOKEN_ADMIN, TOKEN_APP, getWoItems, callRpc, urlSync, purgeExternalRows } from './tools/api-setup.mjs'
 
 
 //4 個寫入 RPC 對照表：RPC 名 ↔ keyTable ↔ diff/去重 鍵
@@ -50,7 +53,10 @@ async function readTable(keyTable) {
 let baseSeed = { users: null, grups: null, pemis: null, targets: null }
 
 //將 keyTable 復原為 base seed：送 base 快照經寫入 RPC（整表 diff 會把 DB 推回快照內容）。
+//run07（F-23）：後台整表寫入不得刪除外部列（from 為非空字串者，如 API-updateUsers-004／005 以同步灌入之夾具），故先以 purgeExternalRows（測試框架之重置，
+//  不經 RPC）移除外部列，再送 base 快照；base seed 本身無外部列（peter／mary／john 之 from 已由 'teamA' 改 ''）。
 async function restoreBaseSeed(keyTable) {
+    await purgeExternalRows([keyTable])
     let res = await callRpc(RPC[keyTable].fn, [baseSeed[keyTable]], TOKEN_ADMIN)
     assert.strict.ok(res.ok, `restoreBaseSeed(${keyTable}) 應成功，實得: ${JSON.stringify(res)}`)
 }
@@ -63,12 +69,12 @@ describe('api-updateTabs（寫入 RPC：add / del / diff / order / 去重鍵）'
         this.timeout(200000)
         await startApi()
         //擷取 base seed 快照。startApi 可能 reuse 別檔已啟動的 backend（未重 seed），DB 可能殘留
-        //api-syncAndReplaceTabs 留下的 from='appTest-*' 列；canonical base seed 之 from 僅 '' 與 'teamA'
-        //（見 api-setup.mjs SEED 註）。故過濾掉 appTest 分區，確保 baseSeed 為純 base；restoreBaseSeed 以
-        //整表 diff 寫回此純快照時，會把殘留 appTest 列一併清除（整表取代語意），使每 case 起點 hermetic。
+        //別檔以同步留下的外部列（from 為非空字串，如 'appTest-*'）；canonical base seed 之 from 全為 ''（run07 起 peter／mary／john 亦為 ''，見 api-setup.mjs SEED 註）。
+        //故只取後台列（from ''），確保 baseSeed 為純 base；restoreBaseSeed 先移除外部列（purgeExternalRows）再以
+        //整表 diff 寫回此純快照（整表取代語意），使每 case 起點 hermetic。
         for (let kt of ['users', 'grups', 'pemis', 'targets']) {
             let rows = await readTable(kt)
-            baseSeed[kt] = rows.filter((r) => !String(r.from || '').startsWith('appTest'))
+            baseSeed[kt] = rows.filter((r) => String(r.from || '') === '')
         }
     })
 
@@ -89,9 +95,10 @@ describe('api-updateTabs（寫入 RPC：add / del / diff / order / 去重鍵）'
             if (u.id === 'id-for-peter') return { ...u, description: 'peter-edited-desc' }
             return { ...u }
         })
+        //run07(F-23): 後台新增列之 from 須為 ''(原為 'apiTest', 非空 from 即外部列而被 saveFromNotAllowed 拒收); 本案測整表 diff 之新增／刪除／修改／order, 與來源無關
         sent.push({
             id: 'id-app-new-user', order: 99, name: 'newUser', email: 'newuser@example.com',
-            description: 'brand new', from: 'apiTest', cgrups: '{}', isAdmin: 'n', isActive: 'y',
+            description: 'brand new', from: '', cgrups: '{}', isAdmin: 'n', isActive: 'y',
         })
 
         let res = await callRpc('updateUsers', [sent], TOKEN_ADMIN)
@@ -174,8 +181,9 @@ describe('api-updateTabs（寫入 RPC：add / del / diff / order / 去重鍵）'
         //(2) 本次造成或觸及者仍擋：新增第三列使用該 email／無關列改成該 email／重複中一列改成第三者（john）已用之 email → saveRowFieldDuplicate，DB 零變更
         let snap2 = await snapUsers()
         let john = after1.find((u) => u.id === 'id-for-john')
+        //run07(F-23): 新增列之 from 改 ''(原為 F; 後台新增列 from 非空即 saveFromNotAllowed, 見 api-externalRows)。peter(後台列; 與外部列 id-uk4-dup 為歷史重複之一)改 email 仍屬「觸及」而被擋
         let mut = [
-            (rows) => [...rows, { ...rows[0], id: 'id-uk4-third', name: 'third4', email: peter.email, from: F }],
+            (rows) => [...rows, { ...rows[0], id: 'id-uk4-third', name: 'third4', email: peter.email, from: '' }],
             (rows) => rows.map((u) => (u.id === 'id-for-john' ? { ...u, email: peter.email } : u)),
             (rows) => rows.map((u) => (u.id === 'id-for-peter' ? { ...u, email: john.email } : u)),
         ]
@@ -187,11 +195,26 @@ describe('api-updateTabs（寫入 RPC：add / del / diff / order / 去重鍵）'
             assert.strict.equal(await snapUsers(), snap2, `#${k} DB 須零變更`)
         }
 
-        //(3) 修復：重複中一列改成唯一新 email → 成功且落地
-        let sent3 = after1.map((u) => (u.id === 'id-uk4-dup' ? { ...u, email: 'uk4-fixed@example.com' } : { ...u }))
+        //(3) 修復：重複中之後台列(peter)改成唯一新 email → 成功且落地
+        //  run07(F-23): 原案改「外部列 id-uk4-dup」之 email, 外部列之身分欄(email)後台不得改(saveExternalRowChanged, 由外部來源修正), 故修復改由後台列(peter)那一側;
+        //  外部列那一側之後台修改須被拒且 DB 零變更((3b))、改由外部同步修復((3c))
+        let sent3 = after1.map((u) => (u.id === 'id-for-peter' ? { ...u, email: 'uk4-fixed@example.com' } : { ...u }))
         let r3 = await callRpc('updateUsers', [sent3], TOKEN_ADMIN)
-        assert.strict.ok(r3.ok, `重複中一列改成唯一 email 應成功，實得: ${JSON.stringify(r3)}`)
-        assert.strict.equal((await usersSorted()).find((u) => u.id === 'id-uk4-dup').email, 'uk4-fixed@example.com')
+        assert.strict.ok(r3.ok, `重複中一列(後台列)改成唯一 email 應成功，實得: ${JSON.stringify(r3)}`)
+        assert.strict.equal((await usersSorted()).find((u) => u.id === 'id-for-peter').email, 'uk4-fixed@example.com')
+
+        //(3b) 外部列(id-uk4-dup)改 email → saveExternalRowChanged, DB 零變更(email 為外部列之身分欄)
+        let snap3 = await snapUsers()
+        let r3b = await callRpc('updateUsers', [(await usersSorted()).map((u) => (u.id === 'id-uk4-dup' ? { ...u, email: 'uk4-fixed2@example.com' } : { ...u }))], TOKEN_ADMIN)
+        assert.strict.equal(r3b.ok, false, `後台改外部列 email 應被拒，實得: ${JSON.stringify(r3b)}`)
+        assert.strict.equal(r3b.msg, 'saveExternalRowChanged', `應回 saveExternalRowChanged，實得: ${r3b.msg}`)
+        assert.strict.equal(await snapUsers(), snap3, '(3b) DB 須零變更')
+
+        //(3c) 由外部來源修復(同步同 from 改 email) → 成功; 其後後台原樣送回可存
+        let rs3 = await postSync({ from: F, rows: [uSync('id-uk4-dup', 'dupper4', 'uk4-fixed2@example.com', F)] })
+        assert.strict.equal(rs3.state, 'success', `外部同步修復應成功，實得: ${JSON.stringify(rs3)}`)
+        let r3c = await callRpc('updateUsers', [(await usersSorted()).map((u) => ({ ...u }))], TOKEN_ADMIN)
+        assert.strict.ok(r3c.ok, `外部修復後後台原樣送回應成功，實得: ${JSON.stringify(r3c)}`)
     })
 
     it('API-updateUsers-005-legacy-empty-email-roundtrip：歷史空 email（外部同步造成）原樣送回並編修他列 → 成功；新增空 email 列／既有有效列改為空 → saveRowFieldInvalid、DB 不變；空 email 列自行改成有效 email → 成功（run05 新增，待實跑）', async function() {
@@ -211,9 +234,10 @@ describe('api-updateTabs（寫入 RPC：add / del / diff / order / 去重鍵）'
 
         //(2) 新增空 email 列（active／inactive 皆是）、既有有效列 email 改為空 → saveRowFieldInvalid，DB 零變更
         let snap2 = await snapUsers()
+        //run07(F-23): 新增列之 from 改 ''(原為 F; 後台新增列 from 非空即 saveFromNotAllowed)
         let mut = [
-            (rows) => [...rows, { ...rows[0], id: 'id-uk5-new', name: 'new5', email: '', from: F }],
-            (rows) => [...rows, { ...rows[0], id: 'id-uk5-new', name: 'new5', email: '', from: F, isActive: 'n' }],
+            (rows) => [...rows, { ...rows[0], id: 'id-uk5-new', name: 'new5', email: '', from: '' }],
+            (rows) => [...rows, { ...rows[0], id: 'id-uk5-new', name: 'new5', email: '', from: '', isActive: 'n' }],
             (rows) => rows.map((u) => (u.id === 'id-for-john' ? { ...u, email: '' } : u)),
         ]
         for (let [k, f] of mut.entries()) {
@@ -223,11 +247,20 @@ describe('api-updateTabs（寫入 RPC：add / del / diff / order / 去重鍵）'
             assert.strict.equal(await snapUsers(), snap2, `#${k} DB 須零變更`)
         }
 
-        //(3) 空 email 列自行改成有效 email → 成功
+        //(3) 空 email 列改成有效 email
+        //  run07(F-23): 歷史空 email 列為外部列(from=F, 經同步灌入), email 為外部列之身分欄, 後台不得改(saveExternalRowChanged, 優先序在 email 檢查之後, 故 email 合法仍被外部列守門拒), 改由外部同步修復;
+        //  後台列之「空 email 自行修復」見 api-mapKey MK-020／021(以 seedExtra 旁路造出後台歷史列)與 unit-procCore-usersKey
+        let snap3 = await snapUsers()
         let sent3 = after1.map((u) => (u.id === 'id-uk5-empty' ? { ...u, email: 'uk5-fixed@example.com' } : { ...u }))
         let r3 = await callRpc('updateUsers', [sent3], TOKEN_ADMIN)
-        assert.strict.ok(r3.ok, `空 email 列改成有效 email 應成功，實得: ${JSON.stringify(r3)}`)
-        assert.strict.equal((await usersSorted()).find((u) => u.id === 'id-uk5-empty').email, 'uk5-fixed@example.com')
+        assert.strict.equal(r3.ok, false, `後台改外部列之 email 應被拒，實得: ${JSON.stringify(r3)}`)
+        assert.strict.equal(r3.msg, 'saveExternalRowChanged', `應回 saveExternalRowChanged，實得: ${r3.msg}`)
+        assert.strict.equal(await snapUsers(), snap3, '(3) DB 須零變更')
+        let rs3 = await postSync({ from: F, rows: [uSync('id-uk5-empty', 'empty5', 'uk5-fixed@example.com', F), uSync('id-uk5-inact', 'inact5', '', F, 'n')] })
+        assert.strict.equal(rs3.state, 'success', `外部同步修復應成功，實得: ${JSON.stringify(rs3)}`)
+        assert.strict.equal((await usersSorted()).find((u) => u.id === 'id-uk5-empty').email, 'uk5-fixed@example.com', '外部修復後落地')
+        let r3c = await callRpc('updateUsers', [(await usersSorted()).map((u) => ({ ...u }))], TOKEN_ADMIN)
+        assert.strict.ok(r3c.ok, `外部修復後後台原樣送回應成功，實得: ${JSON.stringify(r3c)}`)
     })
 
 
@@ -241,7 +274,7 @@ describe('api-updateTabs（寫入 RPC：add / del / diff / order / 去重鍵）'
         //刪 權限群組M3、改 權限群組M1.description、新增 grupNew
         let kept = before.filter((g) => g.name !== '權限群組M3')
         let sent = kept.map((g) => g.name === '權限群組M1' ? { ...g, description: 'M1-edited' } : { ...g })
-        sent.push({ id: 'id-grup-new', order: 88, name: 'grupNew', description: 'new grup', from: 'apiTest', cpemis: '{}' })
+        sent.push({ id: 'id-grup-new', order: 88, name: 'grupNew', description: 'new grup', from: '', cpemis: '{}' }) //run07(F-23): 後台新增列 from 須為 ''(原 'apiTest')
 
         let res = await callRpc('updateGrups', [sent], TOKEN_ADMIN)
         assert.strict.ok(res.ok, `updateGrups 應成功，實得: ${JSON.stringify(res)}`)
@@ -290,7 +323,7 @@ describe('api-updateTabs（寫入 RPC：add / del / diff / order / 去重鍵）'
         //刪 權限P4、改 權限P1.description、新增 pemiNew
         let kept = before.filter((p) => p.name !== '權限P4')
         let sent = kept.map((p) => p.name === '權限P1' ? { ...p, description: 'P1-edited' } : { ...p })
-        sent.push({ id: 'id-pemi-new', order: 77, name: 'pemiNew', description: 'new pemi', from: 'apiTest', crules: '{}' })
+        sent.push({ id: 'id-pemi-new', order: 77, name: 'pemiNew', description: 'new pemi', from: '', crules: '{}' }) //run07(F-23): 後台新增列 from 須為 ''(原 'apiTest')
 
         let res = await callRpc('updatePemis', [sent], TOKEN_ADMIN)
         assert.strict.ok(res.ok, `updatePemis 應成功，實得: ${JSON.stringify(res)}`)
@@ -342,7 +375,7 @@ describe('api-updateTabs（寫入 RPC：add / del / diff / order / 去重鍵）'
         let newId = '專案C/頁X/區塊Z/新按鈕'
         let kept = before.filter((t) => t.id !== delId)
         let sent = kept.map((t) => t.id === editId ? { ...t, description: 'target-edited-desc' } : { ...t })
-        sent.push({ id: newId, order: 66, description: 'new target', from: 'apiTest' })
+        sent.push({ id: newId, order: 66, description: 'new target', from: '' }) //run07(F-23): 後台新增列 from 須為 ''(原 'apiTest')
 
         let res = await callRpc('updateTargets', [sent], TOKEN_ADMIN)
         assert.strict.ok(res.ok, `updateTargets 應成功，實得: ${JSON.stringify(res)}`)
@@ -431,7 +464,7 @@ describe('api-updateTabs（寫入 RPC：add / del / diff / order / 去重鍵）'
         await restoreBaseSeed('grups')
         let before = await readTable('grups')
         let snap0 = await snapTable('grups')
-        let sent = [...before.map((g) => ({ ...g })), { id: 'id-grup-markup', order: 77, name: 'g<b', description: '', from: 'apiTest', cpemis: '{}' }]
+        let sent = [...before.map((g) => ({ ...g })), { id: 'id-grup-markup', order: 77, name: 'g<b', description: '', from: '', cpemis: '{}' }] //run07(F-23): from 須為 ''(原 'apiTest' 會先被外部列守門以 saveFromNotAllowed 拒收, 蓋過本案要驗之 htmlMarkupNotAllowed)
 
         let res = await callRpc('updateGrups', [sent], TOKEN_ADMIN)
         assert.strict.equal(res.ok, false, `應被拒，實得: ${JSON.stringify(res)}`)
@@ -455,7 +488,7 @@ describe('api-updateTabs（寫入 RPC：add / del / diff / order / 去重鍵）'
         await restoreBaseSeed('users')
         let before = await readTable('users')
         let snap0 = await snapTable('users')
-        let sent = [...before.map((u) => ({ ...u })), { id: 'id-app-markup-user', order: 98, name: 'markupUser', email: 'x<y@example.com', description: '', from: 'apiTest', cgrups: '{}', isAdmin: 'n', isActive: 'y' }]
+        let sent = [...before.map((u) => ({ ...u })), { id: 'id-app-markup-user', order: 98, name: 'markupUser', email: 'x<y@example.com', description: '', from: '', cgrups: '{}', isAdmin: 'n', isActive: 'y' }] //run07(F-23): from 須為 ''(同 API-updateGrups-003)
 
         let res = await callRpc('updateUsers', [sent], TOKEN_ADMIN)
         assert.strict.equal(res.ok, false, `應被拒，實得: ${JSON.stringify(res)}`)

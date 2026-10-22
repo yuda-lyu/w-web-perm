@@ -80,4 +80,5 @@ function pairRowsToSnapshot(rows, snapshot, opt = {}) {
 }
 
 
+export { toId }
 export default pairRowsToSnapshot

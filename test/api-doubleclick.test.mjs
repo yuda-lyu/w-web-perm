@@ -24,9 +24,9 @@
 //
 //【第二位操作者】沿用既有測試權杖 TOKEN_APP（'{token-for-application}'，srv.mjs 開發樣本：getUserByToken → id 'id-for-application'、
 //  isAdmin 'y'），不新增權杖。資料通道（verifyConn → getAndVerifyClientUser）須該 id（mappingBy 預設 'id'）於 perm users 表且
-//  isActive='y'、isAdmin='y'（verifyClientUser 讀 perm 列），故 before 以 TOKEN_ADMIN 之 updateUsers 插入 OP_B 列（from＝FROM_DC）；
+//  isActive='y'、isAdmin='y'（verifyClientUser 讀 perm 列），故 before 以 TOKEN_ADMIN 之 updateUsers 插入 OP_B 列（from＝''，後台列）；
 //  users 表之案例基底（caseBase.users）＝ base seed ＋ OP_B 列，快照一律含之。after 以 base seed 還原（移除 OP_B 列），另以
-//  delAll({from}) 兜底——OP_B 列若殘留，api-verifyConn-auth「TOKEN_APP 走 client 通道應拒」會失敗。
+//  delAll({id}) 兜底（run07: 原以 from 兜底）——OP_B 列若殘留，api-verifyConn-auth「TOKEN_APP 走 client 通道應拒」會失敗。
 //
 //act＝以 Promise.allSettled 並行打 2 次（或依序 2 次）同表寫入 RPC；assert 走 DB 終態（g_mOrm 唯讀 select）+ RPC 回傳。
 //callRpc 改自 test/tools/api-setup.mjs import（2026-09-28 收斂；本檔原一份局部實作，與共用版邏輯僅差 raw／
@@ -45,8 +45,8 @@ import { callRpc, TOKEN_ADMIN, TOKEN_APP } from './tools/api-setup.mjs'
 const OP_A_ID = 'id-for-admin' //TOKEN_ADMIN('sys')
 const OP_B_ID = 'id-for-application' //TOKEN_APP
 
-//本檔插入之測試資料之 from（OP_B 列）
-const FROM_DC = 'apiDoubleclick'
+//run07(F-23 外部列守門): 後台 updateXxx 新增列之 from 須為 ''(非空即外部列, 後台不得新增), 故本檔所有經後台寫入之夾具列(OP_B 列、各案新列)一律 from ''
+//  (原 OP_B 列為 'apiDoubleclick'、新列為 'dcTest'; 本檔測雙擊防護與並行序列化, 與來源無關)。OP_B 列之辨識改以其 id(OP_B_ID)
 
 //前端新列之佔位字（清單頁 addItem / copyItem 把 userId / timeCreate / userIdUpdate / timeUpdate 設為 `{${$t('xxxAddIdNew')}}`）
 const PH = '{新增}'
@@ -59,7 +59,7 @@ const RPC = {
 }
 
 //OP_B 之 perm users 列（isAdmin='y' 始過 verifyClientUser；isActive='y' 始過 getTokenUser 反查）
-const OP_B_ROW = { id: OP_B_ID, order: 99, name: 'application', email: 'application@example.com', description: '', from: FROM_DC, cgrups: '{}', isAdmin: 'y', isActive: 'y' }
+const OP_B_ROW = { id: OP_B_ID, order: 99, name: 'application', email: 'application@example.com', description: '', from: '', cgrups: '{}', isAdmin: 'y', isActive: 'y' }
 
 
 //callRpc 已改自 test/tools/api-setup.mjs import（見檔頭 import 清單與檔頭說明），本檔不再自留副本。
@@ -128,7 +128,7 @@ function assertOneOfSnapshots(keyField, after, candidateKeySetsByName) {
 
 //newRowIsNew：模擬清單頁 addItem 送出之新列（前端 funNew 之 id、稽核欄位為佔位字、transient _isNew，對齊 LayoutContent*.vue addItem）
 function newRowIsNew(keyTable, tag) {
-    let common = { order: 0, description: '', from: 'dcTest', userId: PH, timeCreate: PH, userIdUpdate: PH, timeUpdate: PH, _isNew: true }
+    let common = { order: 0, description: '', from: '', userId: PH, timeCreate: PH, userIdUpdate: PH, timeUpdate: PH, _isNew: true }
     if (keyTable === 'users') {
         return { ...common, id: `id-dc${tag}-user`, name: `dcUser${tag}`, email: `dc${tag}-user@example.com`, cgrups: '{}', isAdmin: 'n', isActive: 'y' }
     }
@@ -163,7 +163,7 @@ describe('doubleclick API E2E — perm 寫入 RPC 之雙擊防護與並行序列
             baseSeed[kt] = await readTable(kt)
         }
         //前次中斷而殘留之 OP_B 列不屬 base seed（否則 caseBase 內 id / email 重複，且 after 還原後仍殘留）
-        baseSeed.users = baseSeed.users.filter((v) => v.id !== OP_B_ID && v.from !== FROM_DC)
+        baseSeed.users = baseSeed.users.filter((v) => v.id !== OP_B_ID)
         //前置：插入第二位操作者（OP_B）之 perm users 列，並確認其 token 可走 client 通道
         await restoreRows('users', caseBase('users'))
         let probe = await callRpc('getWebInfor', [], TOKEN_APP)
@@ -216,29 +216,29 @@ describe('doubleclick API E2E — perm 寫入 RPC 之雙擊防護與並行序列
 
     it('E2E-DC-01-update-users-double：兩位操作者並行 updateUsers 同表 → 序列化、終態為其一快照、無 lost-update', async function() {
         await runConcurrentCase('users',
-            { id: 'id-dc-user-a', order: 90, name: 'dcUserA', email: 'dc-user-a@example.com', description: '', from: 'dcTest', cgrups: '{}', isAdmin: 'n', isActive: 'y' },
-            { id: 'id-dc-user-b', order: 91, name: 'dcUserB', email: 'dc-user-b@example.com', description: '', from: 'dcTest', cgrups: '{}', isAdmin: 'n', isActive: 'y' },
+            { id: 'id-dc-user-a', order: 90, name: 'dcUserA', email: 'dc-user-a@example.com', description: '', from: '', cgrups: '{}', isAdmin: 'n', isActive: 'y' },
+            { id: 'id-dc-user-b', order: 91, name: 'dcUserB', email: 'dc-user-b@example.com', description: '', from: '', cgrups: '{}', isAdmin: 'n', isActive: 'y' },
         )
     })
 
     it('E2E-DC-02-update-grups-double：兩位操作者並行 updateGrups 同表 → 序列化、終態為其一快照、無 lost-update', async function() {
         await runConcurrentCase('grups',
-            { id: 'id-dc-grup-a', order: 90, name: 'dcGrupA', description: 'A', from: 'dcTest', cpemis: '{}' },
-            { id: 'id-dc-grup-b', order: 91, name: 'dcGrupB', description: 'B', from: 'dcTest', cpemis: '{}' },
+            { id: 'id-dc-grup-a', order: 90, name: 'dcGrupA', description: 'A', from: '', cpemis: '{}' },
+            { id: 'id-dc-grup-b', order: 91, name: 'dcGrupB', description: 'B', from: '', cpemis: '{}' },
         )
     })
 
     it('E2E-DC-03-update-pemis-double：兩位操作者並行 updatePemis 同表 → 序列化、終態為其一快照、無 lost-update', async function() {
         await runConcurrentCase('pemis',
-            { id: 'id-dc-pemi-a', order: 90, name: 'dcPemiA', description: 'A', from: 'dcTest', crules: '{}' },
-            { id: 'id-dc-pemi-b', order: 91, name: 'dcPemiB', description: 'B', from: 'dcTest', crules: '{}' },
+            { id: 'id-dc-pemi-a', order: 90, name: 'dcPemiA', description: 'A', from: '', crules: '{}' },
+            { id: 'id-dc-pemi-b', order: 91, name: 'dcPemiB', description: 'B', from: '', crules: '{}' },
         )
     })
 
     it('E2E-DC-04-update-targets-double：兩位操作者並行 updateTargets 同表 → 序列化、終態為其一快照、無 lost-update', async function() {
         await runConcurrentCase('targets',
-            { id: '專案DC/頁/區塊A', order: 90, description: 'A', from: 'dcTest' },
-            { id: '專案DC/頁/區塊B', order: 91, description: 'B', from: 'dcTest' },
+            { id: '專案DC/頁/區塊A', order: 90, description: 'A', from: '' },
+            { id: '專案DC/頁/區塊B', order: 91, description: 'B', from: '' },
         )
     })
 
@@ -298,15 +298,15 @@ describe('doubleclick API E2E — perm 寫入 RPC 之雙擊防護與並行序列
     }
 
 
-    //收尾：所有表復原 base seed（users 之 OP_B 列一併移除）；OP_B 列若仍殘留（如 users 還原失敗）以 delAll({from}) 兜底
+    //收尾：所有表復原 base seed（users 之 OP_B 列一併移除）；OP_B 列若仍殘留（如 users 還原失敗）以 delAll({id}) 兜底
     after(async function() {
         this.timeout(60000)
         for (let kt of ['users', 'grups', 'pemis', 'targets']) {
             if (baseSeed[kt]) await restoreRows(kt, baseSeed[kt].map((v) => ({ ...v })))
         }
         let us = await readTable('users')
-        if (us.some((v) => v.from === FROM_DC)) {
-            await (await getTables()).users.delAll({ from: FROM_DC })
+        if (us.some((v) => v.id === OP_B_ID)) {
+            await (await getTables()).users.delAll({ id: OP_B_ID }) //run07: OP_B 列改為後台列(from ''), 兜底改以 id 刪除(原以 from 刪除)
         }
     })
 

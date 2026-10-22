@@ -14,7 +14,7 @@
 //  S9 被級聯改寫之引用端列以操作者記為更新者(userIdUpdate／timeUpdate), 其他欄位不變(規則 6、已知限制⑤).
 //
 //輸入空間(軸 × 格; 每格對應之案例見各 it 之編號, 全表於回報):
-//  被寫入表(grups／pemis／targets) × 事件(改名／刪除／刪後同名新增／互換／鏈式／歷史同名) × 入口(後台整表寫入／外部同步同 from) × 引用端形狀(物件／陣列／停用項) × 引用端來源(from ''／teamA／appRC 外部) × cascadeRename(預設／false) × 拒絕(三鍵) × 操作者(admin／application) × 並行(五寫入者).
+//  被寫入表(grups／pemis／targets) × 事件(改名／刪除／刪後同名新增／互換／鏈式／歷史同名) × 入口(後台整表寫入／外部同步同 from) × 引用端形狀(物件／陣列／停用項) × 引用端來源(from ''／appRC 外部; run07 起基準種子已無外部 teamA 列) × cascadeRename(預設／false) × 拒絕(三鍵) × 操作者(admin／application) × 並行(五寫入者).
 //
 //真後端; DB 斷言一律 getWoItems() 唯讀 select, 寫入一律走後端 RPC／同步 API(例外: 歷史同名列無任何現行寫入入口可造〔ADR-034〕, 以 restartBackend 之 seedExtra 於後端停止期間旁路寫庫, 同 e2e-array-form).
 //設定切換以 restartBackend(genTempSettings({ cascadeRename:false })); 收尾還原 './settings.json' 並 reseed, 以管理者寫入 RPC 還原四表為 base seed(同 api-mapKey 之做法).
@@ -26,7 +26,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import JSON5 from 'json5'
-import { startApi, TOKEN_ADMIN, TOKEN_APP, getWoItems, callRpc, urlSync, urlGetPermUserInfor, readSrLogSince } from './tools/api-setup.mjs'
+import { startApi, TOKEN_ADMIN, TOKEN_APP, getWoItems, callRpc, urlSync, urlGetPermUserInfor, readSrLogSince, purgeExternalRows } from './tools/api-setup.mjs'
 import { restartBackend, genTempSettings } from './tools/e2e-setup.mjs'
 import { BASE_SEED_COUNT, assertPristineSeed } from './tools/baseSeed.mjs'
 import getPermUserInfor from '../src/getPermUserInfor.mjs'
@@ -262,7 +262,10 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
 
     //restoreAll: 以管理者寫入 RPC 把四表還原為 base seed. 次序「被引用者先、引用端後」(targets → pemis → grups → users):
     //  被引用表之改名會連帶改寫引用端(此時引用端仍指向舊名, 隨即被改回), 引用端最後一併還原; 反序則引用端先指向 base 名稱(尚無實體)而使 grups／pemis 改回原名被 renameCascadeNameInUse 拒絕
+    //  run07(F-23): 後台整表寫入不得刪除外部列(from 非空, 本檔以同步灌入之 appRC* 夾具與 seedExtra 之 appRC-d 列), 故先以 purgeExternalRows(測試框架之重置, 不經 RPC)移除外部列再以 RPC 還原後台列;
+    //  直接刪除不經引用連帶, 之後由「被引用者先、引用端後」之 RPC 還原把後台引用端改回 base seed
     let restoreAll = async () => {
+        await purgeExternalRows()
         for (let kt of ['targets', 'pemis', 'grups', 'users']) {
             let r = await withTimeout(callRpc(FN[kt], [clone(BASE[kt])], TOKEN_ADMIN), 60000, `restoreAll ${FN[kt]}`)
             if (!r.ok) {
@@ -310,9 +313,14 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
                 { ...g0, id: 'id-rc-dg2', order: 11, name: 'rc-dup-g', description: 'rc-dup-g 2', from: '', cpemis: JSON.stringify({ [P.p2]: ON('OR') }) },
                 { ...g0, id: 'id-rc-dh1', order: 12, name: 'rc-dup-h', description: 'rc-dup-h 1', from: '', cpemis: JSON.stringify({ [P.p1]: ON('OR') }) },
                 { ...g0, id: 'id-rc-dh2', order: 13, name: 'rc-dup-h', description: 'rc-dup-h 2', from: '', cpemis: JSON.stringify({ [P.p2]: ON('OR') }) },
+                //run07(F-23): dk1／dk2 為兩列皆後台之歷史同名組(rc-dup-k, 被 id-rc-dkh 引用), 供「改名任一筆」(RC-032)與「兩筆皆刪」(RC-035)之後台案例;
+                //  rc-dup-g 之 dg1 屬外部(appRC-d, 後台不得改名／刪除, 見 api-externalRows), 仍供 RC-033 之外部同步案例
+                { ...g0, id: 'id-rc-dk1', order: 14, name: 'rc-dup-k', description: 'rc-dup-k 1', from: '', cpemis: JSON.stringify({ [P.p1]: ON('OR') }) },
+                { ...g0, id: 'id-rc-dk2', order: 15, name: 'rc-dup-k', description: 'rc-dup-k 2', from: '', cpemis: JSON.stringify({ [P.p2]: ON('OR') }) },
             ],
             users: [
                 { ...u0, id: 'id-rc-du', order: 10, name: 'rcDupHolder', email: 'rc-dup-holder@example.com', description: '', from: '', cgrups: JSON.stringify({ 'rc-dup-g': ON('OR') }) },
+                { ...u0, id: 'id-rc-dkh', order: 11, name: 'rcDupHolderK', email: 'rc-dup-holder-k@example.com', description: '', from: '', cgrups: JSON.stringify({ 'rc-dup-k': ON('OR') }) },
             ],
         }
         fs.mkdirSync(dirTmp, { recursive: true })
@@ -381,8 +389,10 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
 
         // ---------- 案例 1: 後台改名級聯 ----------
 
-        it('API-RC-001 後台群組改名: users.cgrups(物件／陣列形式、外部 teamA 列)連帶改寫、授權與改名前相同、未命中列逐位元不變、pemis／targets 不動(S1、S2、S7; srLog 計數不含引用端值)', async function() {
+        it('API-RC-001 後台群組改名: users.cgrups(物件／陣列形式、外部 appRC1 列)連帶改寫、授權與改名前相同、未命中列逐位元不變、pemis／targets 不動(S1、S2、S7; srLog 計數不含引用端值)', async function() {
             await setupFx()
+            //run07(F-23): 基準種子之 peter／mary／john 由外部 teamA 改後台列(from ''), 原「外部 teamA 列被改名級聯改寫」之外部列涵蓋改以同步灌入一位外部使用者(from=appRC1)補上, 斷言之意不變(外部列之 cgrups 被連帶改寫、from 不變、nExternal 計為 1)
+            await mustSync('users', { from: 'appRC1', rows: [{ id: 'id-rc-001x', order: 0, name: 'rc001x', email: 'rc-001x@rc.example.com', cgrups: JSON.stringify({ [G.m1]: ON('OR') }), isAdmin: 'n', isActive: 'y' }] })
             const OLD = G.m1
             const NEW = '權限群組M1改名'
             let usersB = await rowsOf('users')
@@ -405,12 +415,15 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
                 A.deepEqual(omit(grupsA.find((g) => g.id === b.id), AUDIT), omit(b, AUDIT), `他群組 ${b.id} 不變`)
             }
 
-            //S1 引用端: 物件形式、陣列形式、外部 teamA 列皆改寫; 未命中者逐字不動
+            //S1 引用端: 物件形式、陣列形式、外部列(appRC1)皆改寫; 未命中者逐字不動
             let usersA = await rowsOf('users')
             let hit = checkHolders({ label: 'cgrups', before: usersB, after: usersA, field: 'cgrups', ren: new Map([[OLD, NEW]]) })
-            A.deepEqual(hit, ['id-for-peter', 'id-rc-ua', 'id-rc-ui', 'id-rc-uctl1', 'id-rc-uo'].sort(), '被改寫者恰為引用舊名之 5 位使用者(含 teamA 之 peter 與停用項之 ui)')
+            A.deepEqual(hit, ['id-for-peter', 'id-rc-ua', 'id-rc-ui', 'id-rc-uctl1', 'id-rc-uo', 'id-rc-001x'].sort(), '被改寫者恰為引用舊名之 6 位使用者(含後台列 peter、外部列 001x 與停用項之 ui)')
             let peter = usersA.find((u) => u.id === 'id-for-peter')
-            A.equal(peter.from, 'teamA', 'peter 之來源仍為外部 teamA(Q8: 後台寫入改寫外部列之 cgrups, from 不變)')
+            A.equal(peter.from, '', 'peter 為後台列(run07 起基準種子 from 為 \'\'), 來源不變')
+            let ext = usersA.find((u) => u.id === 'id-rc-001x')
+            A.equal(ext.from, 'appRC1', '外部列 001x 之來源仍為 appRC1(Q8: 後台寫入改寫外部列之 cgrups, from 不變)')
+            A.deepEqual(Object.keys(JSON.parse(ext.cgrups)), [NEW], '外部列 001x 之 cgrups 已改為新名')
             A.deepEqual(Object.keys(JSON.parse(peter.cgrups)), [NEW], 'peter 之 cgrups 已改為新名')
             let ua = JSON.parse(usersA.find((u) => u.id === 'id-rc-ua').cgrups)
             A.ok(Array.isArray(ua), '陣列形式引用仍為陣列')
@@ -429,8 +442,8 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
             //規則 8 log: refCascade-done 帶計數、不帶引用端 id／email／name
             let lines = await waitLines(t0, (l) => l.event === 'refCascade-done' && l.keyTable === 'grups', 'refCascade-done')
             let done = lines.find((l) => l.event === 'refCascade-done' && l.keyTable === 'grups')
-            A.deepEqual({ holder: done.holder, nRename: done.nRename, nDelName: done.nDelName, nHolders: done.nHolders, nRenameHolders: done.nRenameHolders, nDelHolders: done.nDelHolders, nExternal: done.nExternal }, { holder: 'users', nRename: 1, nDelName: 0, nHolders: 5, nRenameHolders: 5, nDelHolders: 0, nExternal: 1 }, `refCascade-done 計數(實得 ${done._raw})`)
-            checkNoSecrets(lines, ['id-for-peter', 'id-rc-uo', 'id-rc-ua', 'id-rc-ui', 'id-rc-uctl1', 'peter@example.com', '@rc.example.com'], '001')
+            A.deepEqual({ holder: done.holder, nRename: done.nRename, nDelName: done.nDelName, nHolders: done.nHolders, nRenameHolders: done.nRenameHolders, nDelHolders: done.nDelHolders, nExternal: done.nExternal }, { holder: 'users', nRename: 1, nDelName: 0, nHolders: 6, nRenameHolders: 6, nDelHolders: 0, nExternal: 1 }, `refCascade-done 計數(實得 ${done._raw})`)
+            checkNoSecrets(lines, ['id-for-peter', 'id-rc-uo', 'id-rc-ua', 'id-rc-ui', 'id-rc-uctl1', 'id-rc-001x', 'peter@example.com', '@rc.example.com'], '001')
         })
 
         it('API-RC-002 後台權限改名: grups.cpemis(物件／陣列形式)連帶改寫、全部使用者授權不變、users／targets 不動(S1、S2、S7)', async function() {
@@ -539,6 +552,8 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
 
         it('API-RC-020 後台刪除群組: users.cgrups 該名稱被移除(含停用項); AND 引用者授權變寬且等於「找不到即忽略」(對照使用者)、僅引用者清為全 n(S3)', async function() {
             await setupFx()
+            //run07(F-23): mary 由外部 teamA 改後台列(from ''), 原「引用端含外部列被清理」之涵蓋改以同步灌入一位外部使用者(from=appRC20, 僅引用 M2)補上
+            await mustSync('users', { from: 'appRC20', rows: [{ id: 'id-rc-020x', order: 0, name: 'rc020x', email: 'rc-020x@rc.example.com', cgrups: JSON.stringify({ [G.m2]: ON('OR') }), isAdmin: 'n', isActive: 'y' }] })
             let usersB = await rowsOf('users')
             let permB = await permAll()
             let pemisS = await snapKt('pemis')
@@ -548,7 +563,8 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
             A.ok(!(await rowsOf('grups')).some((g) => g.name === G.m2), 'M2 已刪除')
 
             let hit = checkHolders({ label: '刪群組', before: usersB, after: await rowsOf('users'), field: 'cgrups', del: new Set([G.m2]) })
-            A.deepEqual(hit, ['id-for-mary', 'id-rc-ui', 'id-rc-uo'].sort(), '被清理者恰為 mary、uo(AND 引用)、ui(停用項引用: 刪除不論 isActive 皆移除)')
+            A.deepEqual(hit, ['id-for-mary', 'id-rc-ui', 'id-rc-uo', 'id-rc-020x'].sort(), '被清理者恰為 mary、uo(AND 引用)、ui(停用項引用: 刪除不論 isActive 皆移除)與外部列 020x')
+            A.equal((await rowsOf('users')).find((u) => u.id === 'id-rc-020x').from, 'appRC20', '外部列 020x 被清理後 from 不變')
             let permA = await permAll()
             //S3: uo 原為 OR M1 ＋ AND M2; 清理後等於僅 OR M1 之對照使用者(舊版「找不到即忽略」之結果)
             A.deepEqual(permA['id-rc-uo'].rules, permA['id-rc-uctl1'].rules, 'uo 清理後之授權須等於僅引用 M1 之對照使用者')
@@ -559,11 +575,11 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
                 A.deepEqual(permA[id].rules, permB[id].rules, `${id} 未引用 M2, 授權不變`)
             }
             A.equal(await snapKt('pemis'), pemisS, 'pemis 不動')
-            //規則 8 log: refCascade-done 之刪除計數(mary 來源 teamA 為外部列, 其餘為後台列)
+            //規則 8 log: refCascade-done 之刪除計數(020x 來源 appRC20 為外部列, 其餘為後台列; run07 前為 mary 來源 teamA)
             let lines = await waitLines(t0, (l) => l.event === 'refCascade-done' && l.keyTable === 'grups', 'refCascade-done')
             let done = lines.find((l) => l.event === 'refCascade-done' && l.keyTable === 'grups')
-            A.deepEqual({ holder: done.holder, nRename: done.nRename, nDelName: done.nDelName, nHolders: done.nHolders, nRenameHolders: done.nRenameHolders, nDelHolders: done.nDelHolders, nExternal: done.nExternal }, { holder: 'users', nRename: 0, nDelName: 1, nHolders: 3, nRenameHolders: 0, nDelHolders: 3, nExternal: 1 }, `refCascade-done 計數(實得 ${done._raw})`)
-            checkNoSecrets(lines, ['id-for-mary', 'id-rc-uo', 'id-rc-ui', 'mary@example.com', '@rc.example.com'], '020')
+            A.deepEqual({ holder: done.holder, nRename: done.nRename, nDelName: done.nDelName, nHolders: done.nHolders, nRenameHolders: done.nRenameHolders, nDelHolders: done.nDelHolders, nExternal: done.nExternal }, { holder: 'users', nRename: 0, nDelName: 1, nHolders: 4, nRenameHolders: 0, nDelHolders: 4, nExternal: 1 }, `refCascade-done 計數(實得 ${done._raw})`)
+            checkNoSecrets(lines, ['id-for-mary', 'id-rc-uo', 'id-rc-ui', 'id-rc-020x', 'mary@example.com', '@rc.example.com'], '020')
         })
 
         it('API-RC-021 後台刪除權限: grups.cpemis 該名稱被移除(物件／陣列形式皆清); AND 引用者之授權等於對照群組之使用者(S3)', async function() {
@@ -975,6 +991,20 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
             }
         }
         let okOf = (st) => st.status === 'fulfilled' && (st.value.ok === true || st.value.state === 'success')
+        //writeFresh(run07, F-23／F-26): 後台整表寫入須原樣帶回外部列(外部列之內容後台不得改, 不得新增／刪除); 外部同步並行時, 後台所持外部列快照可能已過期(該列被同步改名／刪除)而被拒
+        //  (saveExternalRowChanged／saveFromNotAllowed／saveStale／saveBaselineRequired)——此為過期快照之正確處置, 後台應重新載入再送。故以 build(最新列) 建 payload, 遇上述拒絕即重讀重送(至多 8 次), 回傳最終結果與嘗試次數。
+        //  原 070／071 之設計「GW 之 payload 帶 SW 之終態(sx1→sx1b、刪 sx2)、兩者謀同一終態」自 run07 起不可行(後台不得改／刪外部列), 改為: 外部列之改名／刪除只由同步寫入者(SW)執行, GW 只改後台列且重讀重送; 終態斷言不變
+        let STALE_KEYS = new Set(['saveExternalRowChanged', 'saveFromNotAllowed', 'saveStale', 'saveBaselineRequired'])
+        let writeFresh = async (kt, build) => {
+            let r = null
+            for (let i = 1; i <= 8; i++) {
+                r = await write(kt, build((await rowsOf(kt)).map(clone)))
+                if (r.ok || !STALE_KEYS.has(r.msg)) {
+                    return { ...r, tries: i }
+                }
+            }
+            return { ...r, tries: 8 }
+        }
         let rotate = (arr, k) => [...arr.slice(k % arr.length), ...arr.slice(0, k % arr.length)]
         let checkIntegrity = async (label) => {
             let dg = await danglingOf()
@@ -1005,16 +1035,17 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
                 await mustSync('grups', { from: fromS, rows: [gRow(`id-${sx1}`, sx1, {}), gRow(`id-${sx2}`, sx2, {})] })
 
                 //終態 payload
-                let [T, Pm, Gr, U] = [await rowsOf('targets'), await rowsOf('pemis'), await rowsOf('grups'), await rowsOf('users')]
+                let [T, Pm, U] = [await rowsOf('targets'), await rowsOf('pemis'), await rowsOf('users')]
                 let payT = T.filter((t) => t.id !== tD)
                 let payP = Pm.filter((x) => x.name !== pD).map((x) => (x.name === pT ? { ...x, crules: JSON.stringify({ [tK]: 'y' }) } : (x.name === pU ? { ...x, name: pU2 } : x)))
-                let payG = Gr.filter((g) => g.name !== gD && g.name !== sx2).map((g) => (g.name === gP ? { ...g, cpemis: JSON.stringify({ [pT]: ON('OR') }) } : (g.name === gU ? { ...g, name: gU2 } : (g.name === sx1 ? { ...g, name: sx1b } : g))))
+                //run07(F-23): GW 只改後台列(刪 gD、gU→gU2、gP 之 cpemis), 外部列 sx1／sx2 原樣帶回(其改名／刪除由 SW 執行; 原 payload 曾含 sx2 之刪除與 sx1→sx1b), 並以 writeFresh 重讀重送
+                let buildG = (rows) => rows.filter((g) => g.name !== gD).map((g) => (g.name === gP ? { ...g, cpemis: JSON.stringify({ [pT]: ON('OR') }) } : (g.name === gU ? { ...g, name: gU2 } : g)))
                 let payU = [...U.map((u) => (u.id === uGid ? { ...u, cgrups: JSON.stringify({ [gP]: ON('OR') }), description: 'edited-by-UW' } : u)), uRow(uNid, `${p}uN`, { [gP]: ON('OR') })]
                 let swBody = { from: fromS, rows: [gRow(`id-${sx1}`, sx1b, {})] }
                 let jobs = [
                     () => write('targets', payT),
                     () => write('pemis', payP),
-                    () => write('grups', payG),
+                    () => writeFresh('grups', buildG),
                     () => write('users', payU),
                     () => postSync('grups', swBody),
                 ]
@@ -1059,16 +1090,16 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
                 let permB = await permAll()
                 let usersB = await rowsOf('users')
 
-                let [T, Pm, Gr] = [await rowsOf('targets'), await rowsOf('pemis'), await rowsOf('grups')]
+                let [T, Pm] = [await rowsOf('targets'), await rowsOf('pemis')]
                 let payT = T.filter((t) => t.id !== tD)
                 let payP = Pm.filter((x) => x.name !== pD).map((x) => (x.name === pT ? { ...x, crules: JSON.stringify({ [tK]: 'y' }) } : x))
-                //GW 之 payload 帶 SW 之終態(sx1→sx1b), 兩者謀同一終態; gP 預先清掉 pD
-                let payG = Gr.map((g) => (g.name === gP ? { ...g, cpemis: JSON.stringify({ [pT]: ON('OR') }) } : (g.name === gR ? { ...g, name: gR2 } : (g.name === sx1 ? { ...g, name: sx1b } : g))))
+                //run07(F-23): GW 只改後台列(gR→gR2; gP 預先清掉 pD), 外部列 sx1 原樣帶回、其改名(sx1→sx1b)由 SW 執行(原 payload 曾帶 SW 之終態, 後台不得改外部列); 以 writeFresh 重讀重送
+                let buildG = (rows) => rows.map((g) => (g.name === gP ? { ...g, cpemis: JSON.stringify({ [pT]: ON('OR') }) } : (g.name === gR ? { ...g, name: gR2 } : g)))
                 let swBody = { from: fromS, rows: [gRow(`id-${sx1}`, sx1b, { [pT]: ON('OR') })] }
                 let jobs = [
                     () => write('targets', payT),
                     () => write('pemis', payP),
-                    () => write('grups', payG),
+                    () => writeFresh('grups', buildG),
                     () => postSync('grups', swBody),
                 ]
                 let rs = await settleWithin(rotate(jobs, r).map((j) => j()), 30000, `第 ${r} 輪`)
@@ -1117,6 +1148,39 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
             }
         })
 
+        it('API-RC-073 後台持過期之外部列快照整表寫入(外部同步已改名／已刪除該外部列): 被拒(saveExternalRowChanged／saveFromNotAllowed)且四表逐位元不變(含同批後台列之編修亦未落地); 重新載入後重送成功(run07 F-23／F-26, 取代 070／071 原「GW 帶 SW 終態」之設計)', async function() {
+            const F = 'appRC73'
+            let edit73 = (rows) => rows.map((g) => (g.name === G.m3 ? { ...g, description: 'edit73' } : g))
+            await mustSync('grups', { from: F, rows: [gRow('id-rc-s73a', 'rcS73a', {}), gRow('id-rc-s73b', 'rcS73b', {})] })
+
+            //(1) 外部同步改名 a(b 不動): 持舊快照之後台寫入 → a 之身分欄(name／description)與庫內不同 → saveExternalRowChanged
+            let stale1 = (await rowsOf('grups')).map(clone)
+            await mustSync('grups', { from: F, rows: [gRow('id-rc-s73a', 'rcS73a-renamed', {}), gRow('id-rc-s73b', 'rcS73b', {})] })
+            let s1 = await snap4()
+            let r1 = await write('grups', edit73(stale1))
+            A.equal(r1.ok, false, `(1) 持過期外部列快照應被拒，實得: ${JSON.stringify(r1)}`)
+            A.equal(r1.msg, 'saveExternalRowChanged', `(1) 應回 saveExternalRowChanged，實得: ${r1.msg}`)
+            A.deepEqual(await snap4(), s1, '(1) 被拒時四表須逐位元不變(後台列 M3 之編修未落地)')
+
+            //(2) 外部同步再刪除 b: 持舊快照之後台寫入含 b → 庫內已無 b, 視為「新增」且 from 非 ''(外部列不得由後台新增) → saveFromNotAllowed
+            let stale2 = (await rowsOf('grups')).map(clone)
+            await mustSync('grups', { from: F, rows: [gRow('id-rc-s73a', 'rcS73a-renamed', {})] })
+            let s2 = await snap4()
+            let r2 = await write('grups', edit73(stale2))
+            A.equal(r2.ok, false, `(2) 持過期外部列快照(含已被同步刪除之列)應被拒，實得: ${JSON.stringify(r2)}`)
+            A.equal(r2.msg, 'saveFromNotAllowed', `(2) 應回 saveFromNotAllowed，實得: ${r2.msg}`)
+            A.deepEqual(await snap4(), s2, '(2) 被拒時四表須逐位元不變')
+
+            //(3) 重新載入後重送: 成功, 後台列之編修落地、外部列不變
+            let r3 = await write('grups', edit73((await rowsOf('grups')).map(clone)))
+            A.ok(r3.ok, `(3) 重新載入後重送應成功，實得: ${JSON.stringify(r3)}`)
+            let gs = await rowsOf('grups')
+            A.equal(gs.find((g) => g.name === G.m3).description, 'edit73', '(3) 後台列之編修已落地')
+            A.deepEqual(gs.filter((g) => g.from === F).map((g) => g.name), ['rcS73a-renamed'], '(3) 外部列分區仍為同步後之內容')
+            checkLangKey('saveExternalRowChanged')
+            checkLangKey('saveFromNotAllowed')
+        })
+
     })
 
 
@@ -1134,6 +1198,8 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
             A.deepEqual(gs.filter((g) => g.name === 'rc-dup-g').map((g) => g.id).sort(), ['id-rc-dg1', 'id-rc-dg2'], '前提: 庫內兩列同名 rc-dup-g(旁路寫入)')
             A.deepEqual(gs.filter((g) => g.name === 'rc-dup-h').map((g) => g.id).sort(), ['id-rc-dh1', 'id-rc-dh2'], '前提: 庫內兩列同名 rc-dup-h')
             A.ok((await rowsOf('users')).some((u) => u.id === 'id-rc-du'), '前提: 引用者 id-rc-du 存在')
+            A.deepEqual(gs.filter((g) => g.name === 'rc-dup-k').map((g) => g.id).sort(), ['id-rc-dk1', 'id-rc-dk2'], '前提: 庫內兩列同名 rc-dup-k(兩列皆後台, run07)')
+            A.ok((await rowsOf('users')).some((u) => u.id === 'id-rc-dkh'), '前提: 引用者 id-rc-dkh 存在')
         })
         after(async function() {
             this.timeout(300000)
@@ -1143,7 +1209,8 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
 
         it('API-RC-032 renameCascadeDupGroup(後台): 被改名者屬歷史同名組且該名稱仍被引用 → 回語系鍵、四表逐位元不變、srLog 有 reason 且不含引用端值; 改名任一筆皆同(S4)', async function() {
             checkLangKey('renameCascadeDupGroup')
-            for (let id of ['id-rc-dg2', 'id-rc-dg1']) {
+            //run07(F-23): 原迴圈為 dg2／dg1; dg1 現為外部列(appRC-d)、後台改名外部列屬 saveExternalRowChanged(非本案之 renameCascadeDupGroup), 故「任一筆」改以兩列皆後台之 dk1／dk2(rc-dup-k, 被 dkh 引用)驗, dg2 仍驗(其同名者 dg1 為外部列)
+            for (let id of ['id-rc-dg2', 'id-rc-dk1', 'id-rc-dk2']) {
                 let s0 = await snap4()
                 let t0 = Date.now()
                 let r = await edit('grups', (rows) => rows.map((g) => (g.id === id ? { ...g, name: 'rc-dup-g-renamed' } : g)))
@@ -1151,7 +1218,7 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
                 A.equal(r.msg, 'renameCascadeDupGroup', `${id} 應回語系鍵 renameCascadeDupGroup，實得: ${r.msg}`)
                 A.deepEqual(await snap4(), s0, `${id} 被拒時四表須逐位元不變`)
                 let lines = await waitLines(t0, (l) => l.event === 'updateTabItems-refCascade-error' && l.msg === 'renameCascadeDupGroup', 'refCascade-error')
-                checkNoSecrets(lines, ['id-rc-du', 'rcDupHolder', 'rc-dup-holder@example.com'], `032 ${id}`)
+                checkNoSecrets(lines, ['id-rc-du', 'rcDupHolder', 'rc-dup-holder@example.com', 'id-rc-dkh', 'rcDupHolderK', 'rc-dup-holder-k@example.com'], `032 ${id}`)
             }
         })
 
@@ -1177,15 +1244,16 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
         })
 
         it('API-RC-035 刪除歷史同名組之一筆: 仍有同 id 同名之存續列, 引用不清理(逐位元不變); 兩筆皆刪後才清理(S3)', async function() {
+            //run07(F-23): 原以 dg1／dg2 驗, dg1 現為外部列(appRC-d, 後台不得刪除), 改以兩列皆後台之 dk1／dk2(rc-dup-k, 被 dkh 引用)驗同一句 spec
             let usersS = await snapKt('users')
-            let r1 = await edit('grups', (rows) => rows.filter((g) => g.id !== 'id-rc-dg1'))
+            let r1 = await edit('grups', (rows) => rows.filter((g) => g.id !== 'id-rc-dk1'))
             A.ok(r1.ok, `刪除其一應成功，實得: ${JSON.stringify(r1)}`)
             A.equal(await snapKt('users'), usersS, '歷史同名只刪其一: users 逐位元不變(引用仍解得出)')
             let usersB = await rowsOf('users')
-            let r2 = await edit('grups', (rows) => rows.filter((g) => g.id !== 'id-rc-dg2'))
+            let r2 = await edit('grups', (rows) => rows.filter((g) => g.id !== 'id-rc-dk2'))
             A.ok(r2.ok, `刪除另一筆應成功，實得: ${JSON.stringify(r2)}`)
-            let hit = checkHolders({ label: '歷史同名全刪', before: usersB, after: await rowsOf('users'), field: 'cgrups', del: new Set(['rc-dup-g']) })
-            A.deepEqual(hit, ['id-rc-du'], '最後一筆被刪後引用才被清理')
+            let hit = checkHolders({ label: '歷史同名全刪', before: usersB, after: await rowsOf('users'), field: 'cgrups', del: new Set(['rc-dup-k']) })
+            A.deepEqual(hit, ['id-rc-dkh'], '最後一筆被刪後引用才被清理')
         })
 
     })

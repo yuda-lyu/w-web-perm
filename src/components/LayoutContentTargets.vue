@@ -198,6 +198,18 @@
 
             </div>
 
+            <!-- 外部列提示與外部同步警示橫幅(bannerLines 為空時 v-for 不渲染任何節點, 畫面與 DOM 同未啟用前) -->
+            <div
+                v-for="(b, kb) in bannerLines"
+                :key="kb"
+                :data-fmid="`targets-banner-${b.kind}`"
+                :style="getBannerStyle(b.kind)"
+            >
+                <svg v-if="b.kind==='ext'" style="vertical-align:sub; margin-right:4px;" width="16" height="16" viewBox="0 0 24 24"><path :d="mdiLock" fill="#666"></path></svg>
+                <img v-else style="vertical-align:sub; width:16px; height:16px; margin-right:4px;" :src="$ui.getIcon('warning')" />
+                <span>{{ b.text }}</span>
+            </div>
+
         </div>
 
         <template
@@ -213,6 +225,7 @@
                 >
                     <template v-slot:cell-render="props">
                         <template v-if="props.key==='id'">
+                            <span v-for="loc in lockOfRow(props.row)" :key="loc.from" :title="getLockTitle(loc)" style="margin-right:4px;"><svg style="vertical-align:sub;" width="16" height="16" viewBox="0 0 24 24"><path :d="mdiLock" fill="#666"></path></svg></span>
                             <span v-if="errItemsById[props.value]" :title="errItemsById[props.value]">
                                 <span style="color:#F57C00;">{{ props.value }}</span>
                                 <img style="vertical-align:sub; width:16px; height:16px;" :src="$ui.getIcon('warning')" />
@@ -237,7 +250,7 @@
 </template>
 
 <script>
-import { mdiGamepadCircle, mdiStackOverflow, mdiAccountGroupOutline, mdiBallotRecountOutline, mdiCloudUploadOutline, mdiTrashCanOutline, mdiTableHeadersEye, mdiPlus, mdiPencilOutline, mdiContentCopy } from '@mdi/js/mdi.js'
+import { mdiGamepadCircle, mdiStackOverflow, mdiAccountGroupOutline, mdiBallotRecountOutline, mdiCloudUploadOutline, mdiTrashCanOutline, mdiTableHeadersEye, mdiPlus, mdiPencilOutline, mdiContentCopy, mdiLock } from '@mdi/js/mdi.js'
 import get from 'lodash-es/get.js'
 import each from 'lodash-es/each.js'
 import size from 'lodash-es/size.js'
@@ -252,6 +265,10 @@ import cdbl from 'wsemi/src/cdbl.mjs'
 import arrPull from 'wsemi/src/arrPull.mjs'
 import reuseDeletedIds from '../plugins/reuseDeletedIds.mjs'
 import { getSavePreview } from '../js/getCascadePreview.mjs'
+import { getAddImpact, getAddConfirmText } from '../js/getAddImpact.mjs'
+import { isExternalRow } from '../js/externalRows.mjs'
+import { makeBaseline } from '../js/rowDigest.mjs'
+import { fmtVars, getBannerLines, splitCheckedRows, getExternalEdits } from '../js/externalUi.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
 import WSwitch from 'w-component-vue/src/components/WSwitch.vue'
 import WButtonCircle from 'w-component-vue/src/components/WButtonCircle.vue'
@@ -287,6 +304,7 @@ export default {
             mdiPlus,
             mdiPencilOutline,
             mdiContentCopy,
+            mdiLock,
 
             panelHeight: 100,
             headHeight: 100,
@@ -330,6 +348,7 @@ export default {
             widthTargetDescription: null,
 
             items: [],
+            baseline: [], //載入基準([[id, 內容指紋]]): 與 items 於 changeParams 同一處由同一份來源列產生(草稿所依據之版本), 存檔時隨 RPC 送伺服端比對是否過期(F-26, R-BASELINE-01); 不得於存檔當下由最新 store 重算
             itemsCheck: [],
             opt: null,
 
@@ -397,6 +416,22 @@ export default {
             return rs
         },
 
+        lockExternalRows: function() {
+            //後台是否不得改外部列(from 為非空字串者; 伺服端 opt.lockExternalRows 經 getWebInfor 帶來, 'y'／'n'; 舊伺服端無此鍵視為未啟用)
+            return get(this, 'webInfor.lockExternalRows', '')
+        },
+
+        isLockExternal: function() {
+            return this.lockExternalRows === 'y'
+        },
+
+        bannerLines: function() {
+            let vo = this
+
+            //清單上方橫幅各行: 外部列提示(啟用保護且有外部列; 標的無指派欄, 用 Target 專用文案)＋本表之外部同步警示; 皆無為空陣列, 不渲染任何節點
+            return getBannerLines({ keyTable: 'targets', kind: 'Target', rows: vo.targets, lock: vo.isLockExternal, syncWarns: get(vo, 'webInfor.syncWarns', []), $t: (k) => vo.$t(k) })
+        },
+
         changeParams: function() {
             // console.log('computed changeParams')
 
@@ -408,8 +443,12 @@ export default {
             //items
             let items = cloneDeep(vo.targets)
 
+            //baseline, 與 items 同一處由同一份來源列(items)計算: 草稿所依據之版本(F-26), 推播重建 items 時一併更新, 存檔時不重算
+            let baseline = makeBaseline(items, vo.$ds.targets.keys)
+
             //save
             vo.items = items
+            vo.baseline = baseline
 
             //genOpt
             vo.genOpt({ isEditable })
@@ -457,10 +496,16 @@ export default {
             //kpErr
             let kpErr = Object.create(null) //無原型: 鍵為使用者資料, 不得命中 constructor 等原型鍵(規則帳本 R-KEY-01)
             let kpId = Object.create(null)
+            let kpExt = Object.create(null) //id → 外部列之來源 from(共用該 id 之列中有外部列者; 重複之提示改為「外部來源 X 已使用此名稱」, 以 id 為名)
             each(rows, (v, k) => {
 
                 //id
                 let id = get(v, 'id', '')
+
+                //kpExt
+                if (isestr(id) && isExternalRow(v) && !haskey(kpExt, id)) {
+                    kpExt[id] = v.from
+                }
 
                 //check
                 if (!isestr(id)) {
@@ -475,7 +520,7 @@ export default {
                 if (haskey(kpId, id)) {
 
                     //kpErr
-                    kpErr[id] = vo.$t(`targetIdDuplicate`)
+                    kpErr[id] = haskey(kpExt, id) ? fmtVars(vo.$t('nameUsedByExternal'), { name: id, from: kpExt[id] }) : vo.$t(`targetIdDuplicate`)
 
                     return true //跳出換下一個
                 }
@@ -550,6 +595,30 @@ export default {
             return head
         },
 
+        lockOfRow: function(row) {
+            let vo = this
+
+            //啟用外部列保護且該列為外部列者回 [{ from }](首欄顯示鎖頭), 否則回空陣列(供 v-for 渲染 0 或 1 個節點: 無外部列時 DOM 同未啟用前, 不留 v-if 之註解節點)
+            if (vo.isLockExternal && isExternalRow(row)) {
+                return [{ from: row.from }]
+            }
+            return []
+        },
+
+        getLockTitle: function(loc) {
+            let vo = this
+
+            return fmtVars(vo.$t('externalRowLocked'), { from: loc.from })
+        },
+
+        getBannerStyle: function(kind) {
+
+            //橫幅樣式沿用既有色票與間距: 與功能區同為 border-top:1px solid #ddd; 字級 0.8rem(同副標題／waitingData)、水平內距 15px(同 waitingData)、垂直內距 5px(同功能區 padding:5px);
+            //外部列提示為中性灰底(#f2f2f2, 同按鈕 hover 底)、文字 #444(同工具鈕圖示色); 外部同步警示為淡橘底(#FFE0B2, 同編輯模式開關之橫條色)搭既有警告圖示; 長來源名稱以 overflow-wrap:anywhere 折行, 窄螢幕不溢出
+            let bg = kind === 'warn' ? '#FFE0B2' : '#f2f2f2'
+            return `padding:5px 15px; border-top:1px solid #ddd; background:${bg}; color:#444; font-size:0.8rem; overflow-wrap:anywhere;`
+        },
+
         genOpt: function() {
             // console.log('methods genOpt')
 
@@ -574,10 +643,13 @@ export default {
                 let kpRowDrag = {}
                 let kpHeadCheckBox = {}
                 if (vo.isEditable) {
+
+                    //外部列(from 非空)之身分／結構欄逐列唯讀(啟用保護時以函數判定: w-aggrid-vue 之 setobj 原樣取 kpCellEditable[key] 指給 ag-grid colDef.editable, 其接受 (params) => boolean);
+                    //標的無指派欄; from 欄於所有列皆唯讀(外部同步所擁有, 後台新增列 from 恆為空)
+                    let editable = vo.isLockExternal ? (params) => !isExternalRow(params.data) : true
                     kpCellEditable = {
-                        'id': true,
-                        'description': true,
-                        'from': true,
+                        'id': editable,
+                        'description': editable,
                     }
                     kpRowDrag = {
                         'id': true,
@@ -771,6 +843,7 @@ export default {
             let _r = vo.$ds.targets.funNew()
             r.id = _r.id //使用新建方式預先產生id避免重複
             r.id = vo.$s.getNameNew(rows, 'id', nameOld, vo.$t('targetCopyNameNew'))
+            r.from = '' //複製出之列為後台新增列, 不繼承來源(來源非空即外部列, 後台新增列 from 須為空, 否則伺服端 saveFromNotAllowed; 不論是否啟用外部列保護)
             r.userId = `{${vo.$t('targetAddIdNew')}}`
             r.timeCreate = `{${vo.$t('targetAddIdNew')}}`
             r.userIdUpdate = `{${vo.$t('targetAddIdNew')}}`
@@ -804,6 +877,28 @@ export default {
                 return
             }
 
+            //外部列保護(啟用時): 外部列(from 非空)不得刪除(伺服端 saveExternalRowChanged), 先過濾掉並以 showCheckYes 提示被略過之筆數(警告, 非 success), 使用者按確定後其餘照常;
+            //全為外部列則不刪除任何列
+            let sp = splitCheckedRows(vo.itemsCheck, vo.isLockExternal)
+            if (sp.nBlocked > 0) {
+                vo.$dg.showCheckYes(fmtVars(vo.$t('externalRowDelBlocked'), { n: sp.nBlocked }), { type: 'warning' })
+                    .then(() => {
+                        if (size(sp.rows) > 0) {
+                            vo.deleteItems(sp.rows)
+                        }
+                    })
+                return
+            }
+
+            vo.deleteItems(sp.rows)
+
+        },
+
+        deleteItems: function(itemsDel) {
+            // console.log('method deleteItems')
+
+            let vo = this
+
             //cloneDeep
             let rows = get(vo, 'opt.rows', [])
 
@@ -811,7 +906,7 @@ export default {
             rows = cloneDeep(rows)
 
             //filter
-            each(vo.itemsCheck, (v) => {
+            each(itemsDel, (v) => {
                 // console.log('v', v)
                 let id = get(v, 'data.id', '')
                 if (!isestr(id)) {
@@ -857,13 +952,22 @@ export default {
                     return
                 }
 
-                //rows
+                //rows, baseline: 與 rows 同一刻(同步)擷取——兩者於 changeParams 同一處同時產生, 之後確認框期間若推播重建清單, 仍帶「草稿所依據之那一版」之基準(F-26), 不由最新 store 重算
                 let rows = get(vo, 'opt.rows', [])
+                let baseline = cloneDeep(vo.baseline)
 
                 //check
                 if (size(rows) === 0) {
                     unlockBtn()
                     await vo.$dg.showCheckYes(`${vo.$t('targetAddEmpty')}`)
+                    return
+                }
+
+                //外部列保護(啟用時): 外部列之身分／結構欄(含 id)以逐列唯讀與刪除過濾擋下, 但貼上(Ctrl+V)等路徑可繞過逐列唯讀, 送出前再比對一次(基準為 store 之 targets);
+                //有違規即不送出並提示(伺服端同樣整次拒收 saveExternalRowChanged); 於開 loading 之前, 訊息框前釋放按鈕鎖
+                if (vo.isLockExternal && getExternalEdits({ keyTable: 'targets', keys: vo.$ds.targets.keys, rowsNew: rows, rowsOld: vo.targets }) !== null) {
+                    unlockBtn()
+                    await vo.$dg.showCheckYes(vo.$t('saveExternalRowChanged'), { type: 'warning' })
                     return
                 }
 
@@ -877,6 +981,11 @@ export default {
                 //標的 id 即名稱, 可就地改寫, 改 id 對伺服端等同刪舊增新(不級聯), 引用該標的之 pemis.crules 項目於同一次寫入內被連帶清理(刪除亦同); 有權限之規則將被清理時先確認,
                 //確認框文字之判定見 src/js/getCascadePreview.mjs(標的頁只確認、不改成功訊息)
                 let pv = getSavePreview({ kind: 'Target', rowsOld: vo.targets, rowsNew: rowsSend, holdersOld: vo.pemis, $t: (k) => vo.$t(k) })
+
+                //新增撞懸空名(F-23／F-26 原則 7; src/js/getAddImpact.mjs): 本次新增之標的 id(含就地改寫成新 id 者)查無既有同名實體, 而仍有啟用中之權限 crules 規則指向該 id——新增後該規則即對新標的生效,
+                //須明確同意才送出; 以實際送出之列 rowsSend 規劃(同上), 與預覽同於開 loading 之前同步計算(基準為 store 之 targets／pemis), 無懸空引用時不彈框; 與刪除／改 id 預覽依序(先預覽、再新增確認), 各自只在需要時彈出
+                let addText = getAddConfirmText(getAddImpact({ keyTable: 'targets', rowsOld: vo.targets, rowsNew: rowsSend, holders: vo.pemis }), (k) => vo.$t(k), 'Target')
+
                 if (pv.confirmText !== '') {
 
                     //先開確認框之流程: 開框前 unlockBtn() 釋放儲存鈕之 promiseUnlock 鎖(同上, 按鈕鎖只涵蓋請求期間); 流程狀態仍由 runSubmit 保持至本流程結束,
@@ -893,12 +1002,23 @@ export default {
 
                 }
 
+                //新增撞懸空名之確認(同上之鎖釋放與選否中止; 單一框、單一問句)
+                if (addText !== '') {
+                    unlockBtn()
+                    let isGoAdd = await vo.$dg.showCheckYesNo(addText)
+                        .then(() => true)
+                        .catch(() => false)
+                    if (!isGoAdd) {
+                        return
+                    }
+                }
+
                 //3) 確定打 API 才開 loading
                 vo.$ui.updateLoading(true)
 
-                //4) updateTargets, 各自 catch + 旗標短路
+                //4) updateTargets, 各自 catch + 旗標短路; 第 2 參 { baseline } 為載入基準(伺服端於表鎖內比對本次將寫入之列是否仍與草稿所依據之版本相同, 否則整次拒收 saveStale)
                 let okSave = false
-                await vo.$fapi.updateTargets(rowsSend)
+                await vo.$fapi.updateTargets(rowsSend, { baseline })
                     .then(() => { okSave = true })
                     .catch(async (err) => {
                         vo.$ui.updateLoading(false) //showCheckYes 前關 loading（modal 阻斷期間避免 loading 疊在底下）

@@ -82,7 +82,7 @@ let funNew = (ndata = {}) => {
 let funTest = () => {
     let rs = [
 
-        ['peter', 'teamA', `
+        ['peter', '', `
             { 
                 '權限群組M1': {
                     'mode': 'OR',
@@ -90,7 +90,7 @@ let funTest = () => {
                 }
             }
         `, 'n'],
-        ['mary', 'teamA', `
+        ['mary', '', `
             { 
                 '權限群組M2': {
                     'mode': 'OR',
@@ -98,7 +98,7 @@ let funTest = () => {
                 }
             }
         `, 'n'],
-        ['john', 'teamA', `
+        ['john', '', `
             { 
                 '權限群組M3': {
                     'mode': 'OR',

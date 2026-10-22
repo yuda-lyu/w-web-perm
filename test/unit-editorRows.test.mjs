@@ -1369,7 +1369,9 @@ describe('unit-editorRows (編輯對話框之引用清單 ↔ 列, 存檔不丟�
         for (let [fn, kpNew, kp, self, col, fieldRow, u, field, tab, kind] of [['VeGrupBlngUsers', 'kpGrupNew', 'kpGrup', 'grup', 'grupsNames', 'grups', 'u', 'cgrups', 'vo.grups', 'warnKindGrup'], ['VePemiBlngGrups', 'kpPemiNew', 'kpPemi', 'pemi', 'pemisNames', 'pemis', 'g', 'cpemis', 'vo.pemis', 'warnKindPemi']]) {
             let lines = codeOf(fn)
             let d = methodBody(lines, 'doSave')
-            assert.ok(d.includes(`if (putRefEntry(${kpNew}, ${kp}, get(vo, '${self}.name', ''), get(r, 'enable', ''), get(r, 'mode', ''), kpRawModes[kr])) {`), `${fn}.doSave 須以 putRefEntry(含該列快照之 rawModeMap)改寫`)
+            //run07 外審 sol R2: 被編輯之群組／權限名稱於 doSave 流程開頭(任何 await 之前)取一次, 之後一律用該區域變數(再次 show() 不得使舊流程改寫新實體)
+            assert.ok(d.includes(`if (putRefEntry(${kpNew}, ${kp}, ${self}Name, get(r, 'enable', ''), get(r, 'mode', ''), kpRawModes[kr])) {`), `${fn}.doSave 須以 putRefEntry(含該列快照之 rawModeMap)改寫, 名稱用開頭取得之區域變數`)
+            assert.ok(d.split(`get(vo, '${self}.name', '')`).length - 1 === 1 && d.includes(`let ${self}Name = get(vo, '${self}.name', '')`), `${fn}.doSave 只可於開頭讀一次 vo.${self}.name`)
             assert.ok(d.includes('kpRawModes[kr] = getRawModeMap(kpRaw)') && d.indexOf('kpRawModes[kr] = getRawModeMap(kpRaw)') < d.indexOf('if (size(getKpLossy(kpRaw)) === 0) {'), `${fn}.doSave 須於有損檢查之解析處(同一份快照字串)為每列建 rawModeMap`)
             assert.ok(!/isEqual\(/.test(d), `${fn}.doSave 不得再以 isEqual 判定改寫`)
             assert.ok(!d.includes(`get(r, '${fieldRow}'`), `${fn}.doSave 不得再讀列上之 ${fieldRow}(經 fltKp* 篩過, 會丟棄懸空引用)`)

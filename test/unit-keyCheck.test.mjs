@@ -305,7 +305,8 @@ describe('unit-keyCheck (名稱唯一與對應鍵檢查之純函數, F-02／F-14
             let iCk = code.indexOf('findTouchedDup(')
             let iOrm = code.indexOf('procOrm(userId, keyTable')
             assert.strict.ok(iCk > 0 && iOrm > 0 && iCk < iOrm, 'findTouchedDup 須在 procOrm 寫入之前')
-            assert.strict.ok(/if \(isNameKeyTable\) \{[\s\S]{0,1200}ltdtDiffByKey\(ltdtOld, withId, 'id'\)/.test(code), 'pemis／grups 須無條件以 id 對應差異(ltdtDiffByKey(ltdtOld, withId, \'id\'))')
+            //run07 外審 sol R5: 缺 id 之列拆分(withId 以 id 對應、noId 視為新增)之條件由 isNameKeyTable 擴為「isNameKeyTable || keyTable === 'users'」(users 同批兩列缺 id 時 Map(id → 列) 使前列被覆蓋而只建立一列卻回成功); pemis／grups 仍無條件以 id 對應
+            assert.strict.ok(/if \(isNameKeyTable \|\| keyTable === 'users'\) \{[\s\S]{0,1200}ltdtDiffByKey\(ltdtOld, withId, 'id'\)/.test(code), 'pemis／grups(及 users, R5)須無條件以 id 對應差異(ltdtDiffByKey(ltdtOld, withId, \'id\'))')
             assert.strict.ok(!/isNameKeyTable && hasDupKey/.test(code), '不得再以「庫內已有同名」為條件才改 id 對應(name 鍵之 diff 會使庫內與送入不同, NU-040～042)')
             assert.strict.ok(/findDupIndex\(rows, 'id'/.test(code), 'pemis／grups 須先拒送入整表內重複之 id(NU-044; 空字串 id 視為未給不參與, NU-046)')
         })

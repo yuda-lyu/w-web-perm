@@ -5,8 +5,8 @@
 //reject → {state:'error', msg:<純字串>}，resolve → {state:'success', msg:<insert 結果>}）。
 //本 API **會寫 DB**（全量取代：同 from 先 delAll 再 insert）。
 //
-//【測試隔離策略】每個 case 用**自己獨立的 from（'appTest-N'）**，不撞 base seed 的 ''（admin/grups/pemis/targets）
-//與 'teamA'（peter/mary/john）、也互不干擾。成功案例的 full-replace 本身會先 delAll(該 from) 自清，故 case 間
+//【測試隔離策略】每個 case 用**自己獨立的 from（'appTest-N'）**，不撞 base seed 的 ''（四表全部；run07 起 peter/mary/john 亦為 ''，
+//原為 'teamA'）、也互不干擾。成功案例的 full-replace 本身會先 delAll(該 from) 自清，故 case 間
 //無需額外 clearFrom（且 backend 對空 rows 會拒、無法用 rows:[] 清——見下 DISCREPANCY）。每次 mocha run 由
 //startApi→seedDb 重建 base seed、run 結束 mocha root after 殺 backend，故跨 run 亦 hermetic。
 //DB 斷言一律 getWoItems() 後**唯讀** select（跨進程唯讀實測可行；絕不在測試進程寫 DB，寫一律走 backend HTTP）。
@@ -54,7 +54,7 @@ describe('api-syncAndReplaceTabs', function() {
     //  appTest-N 列會殘留 → 污染同進程其他唯讀斷言（如 api-getPerm T28 以 targets 總數斷言）。
     //  後端 sync 路徑無法以空 rows 清源（isearr 安全閘拒空陣列，WWebPerm.mjs:683），故直接以 woItems.delAll({from})
     //  刪除本檔用到的每個 appTest-N 分區列（delAll 同 backend 全量取代所用之刪除機制，WWebPerm.mjs:736）。
-    //  僅刪本檔特化之 appTest from，base seed（from='' / 'teamA'）不動。
+    //  僅刪本檔特化之 appTest from，base seed（from=''，四表全為後台列）不動。
     after(async function() {
         this.timeout(60000)
         let woItems = await getWoItems()
@@ -67,7 +67,7 @@ describe('api-syncAndReplaceTabs', function() {
     })
 
     //對應 spec E2E-001：以 app token 全量取代某 from 分區的 users —— 先推一筆舊資料、再推新批，舊批應被整批替換，
-    //base seed 其他分區（teamA 的 peter/mary/john）不受影響，新列稽核欄位由後端自動補入。
+    //base seed 之後台列（from ''：admin/peter/mary/john）不受影響，新列稽核欄位由後端自動補入。
     it('API-sync-001-success-replace-users', async function() {
         const F = 'appTest-1'
 
@@ -100,9 +100,11 @@ describe('api-syncAndReplaceTabs', function() {
             assert.strict.ok(typeof v.timeCreate === 'string' && v.timeCreate.length > 0, 'timeCreate 應由後端自動補為非空字串')
         }
 
-        //base seed 其他分區不受影響（teamA：peter/mary/john 仍 3 筆）
-        let rowsTeamA = await woItems.users.select({ from: 'teamA' })
-        assert.strict.equal(rowsTeamA.length, 3, 'teamA 分區（peter/mary/john）應仍為 3 筆，不受 appTest 同步影響')
+        //base seed 其他分區不受影響
+        //  run07(F-23): peter/mary/john 之 from 由 'teamA' 改 ''，原斷言「teamA 分區 3 筆」之等價為「後台列(from '')之 users 仍 4 筆：admin/peter/mary/john」(同一句 spec：同步只取代自己的 from 分區)
+        let rowsBackoffice = await woItems.users.select({ from: '' })
+        assert.strict.deepEqual(rowsBackoffice.map((v) => v.id).sort(), ['id-for-admin', 'id-for-john', 'id-for-mary', 'id-for-peter'], '後台列(from \'\')之 users(admin/peter/mary/john)應仍為 4 筆，不受 appTest 同步影響')
+        assert.strict.equal((await woItems.users.select({ from: 'teamA' })).length, 0, '基準種子已無 teamA 分區(run07 起 from 為 \'\')')
     })
 
     //對應 spec E2E-002（已更新對齊現狀，決定保留 isearr 安全閘）：

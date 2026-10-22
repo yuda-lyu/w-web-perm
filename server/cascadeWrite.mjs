@@ -1,3 +1,4 @@
+import truncate from 'lodash-es/truncate.js'
 import ds from '../src/schema/index.mjs'
 import { fillIdlessIds } from '../src/js/refCascade.mjs'
 import validateRowsBeforeWrite from './validateRows.mjs'
@@ -72,7 +73,11 @@ async function writeWithCascade({ plan, holdersOld, woItems, procOrm, userId, sr
 
     //toRaw: 錯誤原文只入 srLog(raw、rawRestore; 規則帳本 R-ORM-02), 對外仍為固定語系鍵; 原文中之主鍵(ORM 逐筆失敗訊息之 id[…])可能為引用端(使用者)之 id, 一律遮罩後才入 log(不記引用端 id)
     //先以「已知引用端 id 之完整字面」遮罩(id 本身可含 ']' 而使通則正則提早結束, 殘留後半段個資; 外審 sol 增量 D1), 再以通則遮罩其餘 id[…]
-    let holderIds = plan.changes.map((c) => c.id).filter((v) => typeof v === 'string' && v !== '').sort((a, b) => b.length - a.length) //較長者先遮罩(id 互為前綴時, 如 'a' 與 'a]b', 較短者先遮罩會殘留後半段)
+    //ORM 之逐筆失敗訊息(w-serv-orm getMapOrm.getMsgFail)把超過 100 字元之主鍵截斷為 99 字元加「…」再包成 id[...](外審 sol R7), 截斷後之字面不等於完整 id, 故同時納入截斷形式之字面
+    let holderIds = plan.changes.map((c) => c.id).filter((v) => typeof v === 'string' && v !== '').flatMap((id) => {
+        let t = truncate(id, { length: 100, omission: '…' })
+        return t === id ? [id] : [id, t]
+    }).sort((a, b) => b.length - a.length) //較長者先遮罩(id 互為前綴時, 如 'a' 與 'a]b', 較短者先遮罩會殘留後半段)
     let maskId = (t) => {
         let s = t
         holderIds.forEach((id) => {

@@ -12,8 +12,18 @@
 //跑法: npx mocha test/api-mapKey.test.mjs --reporter list --timeout 300000
 
 import assert from 'assert'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import { startApi, TOKEN_ADMIN, TOKEN_APP, getWoItems, callRpc, urlSync } from './tools/api-setup.mjs'
 import { restartBackend, genTempSettings, apiBaseUrl } from './tools/e2e-setup.mjs'
+
+//run07(F-23 外部列守門)調整說明: MK-020／021 測的是「後台 updateUsers 對歷史重複／空對應鍵只擋本次造成或觸及者」(R-MAPKEY-03), 其「歷史資料」原以外部同步(from=appMk-9／appMk-10)造出,
+//  並由後台編修該些列之 name／email／isActive 與刪改——自 run07 起外部列(from 非空)之身分欄後台不得改(saveExternalRowChanged), 故歷史資料改為「後台列」(from ''; 即 F-14 之前版本由後台寫入之歷史列),
+//  以 restartBackend 之 seedExtra 於後端停止期間旁路寫庫(同 api-refCascade 歷史同名列之作法; 現行任何寫入入口皆拒造出此類資料); 後台新增列之 from 一律 ''。
+//  外部列版之守門(後台不得改外部列之 name／email)見 api-externalRows。
+const dirTmp = path.join(path.dirname(fileURLToPath(import.meta.url)), '_tmp', 'api-mapKey') //seed-extra.json, 收尾刪除
+const SEED_EXTRA_IDS = ['id-mk9-a', 'id-mk9-b', 'id-mk9-c', 'id-mk9-new', 'id-mk10-a', 'id-mk10-b', 'id-mk10-c', 'id-mk10-new']
 
 
 let postSync = async (keyTable, body) => {
@@ -47,9 +57,12 @@ describe('api-mapKey (F-14: 使用者對應鍵之外部同步檢查與登入多�
         //本檔寫入之 from 分區逐一 delAll(對稱於各測試之寫入; 只動本檔專屬之 appMk-* from, base seed 不動)。
         //  reseed 於 mocha 進程持有 lmdb 映射時刪不掉 ./db 而退化為 upsert(見 e2e-setup wipeDbVerified), 不會移除測試列, 故須先自行清
         let woItems = await getWoItems()
-        for (let from of ['appMk-dup', 'appMk-1', 'appMk-2', 'appMk-3', 'appMk-4', 'appMk-5', 'appMk-6', 'appMk-6b', 'appMk-7', 'appMk-8', 'appMk-9', 'appMk-10']) { //appMk-9／10: MK-020／021(run05)
+        for (let from of ['appMk-dup', 'appMk-1', 'appMk-2', 'appMk-3', 'appMk-4', 'appMk-5', 'appMk-6', 'appMk-6b', 'appMk-7', 'appMk-8']) {
             await woItems.users.delAll({ from })
         }
+        //MK-020／021(run05; run07 起歷史列為後台列, from ''): 以主鍵清除旁路追加列與其後台新增列, 並刪除 seed-extra.json
+        await woItems.users.delAll({ id: { $in: SEED_EXTRA_IDS } })
+        fs.rmSync(dirTmp, { recursive: true, force: true })
         //還原預設設定(本檔曾切換 mappingBy)並 reseed 收尾
         await restartBackend('./settings.json', { reseed: true })
     })
@@ -152,7 +165,7 @@ describe('api-mapKey (F-14: 使用者對應鍵之外部同步檢查與登入多�
         let partF0 = await snapOf(F)
         let partG0 = await snapOf(G)
         let others0 = await snapOthers(F)
-        for (let email of ['g3@appMk.com', 'peter@example.com']) { //他 from(G)與 base seed(teamA)
+        for (let email of ['g3@appMk.com', 'peter@example.com']) { //他 from(G)與 base seed(peter, 後台列 from ''; run07 前為 teamA)
             let res = await postSync('users', { from: F, rows: [u('id-mk3-ok', 'ok3', 'ok3@appMk.com', F), u('id-mk3-f1', 'f13', email, F)] })
             assert.strict.equal(res.state, 'error', `email=${email} 已屬他 from 應被拒，實得: ${JSON.stringify(res)}`)
             assert.strict.equal(res.msg, 'invalidRows')
@@ -229,6 +242,15 @@ describe('api-mapKey (F-14: 使用者對應鍵之外部同步檢查與登入多�
     let usersSorted = async () => (await (await getWoItems()).users.select()).sort((a, b) => (a.order || 0) - (b.order || 0))
     let snapUsers = async () => JSON.stringify((await (await getWoItems()).users.select()).sort((a, b) => String(a.id).localeCompare(String(b.id))))
     let updateUsers = async (rows) => callRpc('updateUsers', [rows], TOKEN_ADMIN)
+    //writeSeedExtra(run07): 旁路追加之後台歷史列(from ''; 其餘欄位承 base seed 之 peter 列, 含稽核欄位), 回傳 seed-extra.json 路徑供 restartBackend 之 seedExtra
+    let writeSeedExtra = async (users) => {
+        let p = (await (await getWoItems()).users.select({ id: 'id-for-peter' }))[0]
+        let rows = users.map((o) => ({ ...p, from: '', cgrups: '{}', description: '', isAdmin: 'n', isActive: 'y', ...o }))
+        fs.mkdirSync(dirTmp, { recursive: true })
+        let fp = path.join(dirTmp, 'seed-extra.json')
+        fs.writeFileSync(fp, JSON.stringify({ users: rows }), 'utf8')
+        return fp
+    }
     //expectReject: 送出 mut(整表複本) 應被拒且回 key, DB 零變更
     let expectReject = async (label, mut, key) => {
         let snap0 = await snapUsers()
@@ -239,12 +261,14 @@ describe('api-mapKey (F-14: 使用者對應鍵之外部同步檢查與登入多�
     }
 
     it('MK-020 後台 users 整表寫入(mappingBy=name): 歷史重複 name 的 active 列原樣送回可存; 新增同名／空 name 的 active 列、啟用而撞名的停用列 → 被拒; inactive 不參與', async function() {
-        //前置: mappingBy='id' 同步造成「歷史重複 name 的兩個 active 列」與「一個停用列」(name 模式的同步會拒絕重複 active name), 再切換為 name
-        await restartBackend('./settings.json')
-        const F = 'appMk-9'
-        let rs = await postSync('users', { from: F, rows: [u('id-mk9-a', 'hist9', 'a9@appMk.com', F), u('id-mk9-b', 'hist9', 'b9@appMk.com', F), u('id-mk9-c', 'inact9', 'c9@appMk.com', F, 'n')] })
-        assert.strict.equal(rs.state, 'success', `前置：mappingBy=id 下同步應成功，實得: ${JSON.stringify(rs)}`)
-        await restartBackend(genTempSettings({ mappingBy: 'name' }))
+        //前置: 「歷史重複 name 的兩個 active 列」與「一個停用列」——run07 前以 mappingBy='id' 同步(外部列)造成(name 模式的同步會拒絕重複 active name), 現改為後台歷史列(from '')以 seedExtra 於後端停止期間旁路寫庫
+        //  (外部列之 name／isActive 後台不得改, 見檔頭 run07 說明), 並直接以 mappingBy=name 之設定重啟; 新增列之 from 一律 ''
+        const F = ''
+        await restartBackend(genTempSettings({ mappingBy: 'name' }), { seedExtra: await writeSeedExtra([
+            { id: 'id-mk9-a', order: 91, name: 'hist9', email: 'a9@appMk.com' },
+            { id: 'id-mk9-b', order: 92, name: 'hist9', email: 'b9@appMk.com' },
+            { id: 'id-mk9-c', order: 93, name: 'inact9', email: 'c9@appMk.com', isActive: 'n' },
+        ]) })
 
         //(1) 歷史重複 name 原樣送回並編修無關列 → 成功(修正前: 若整表有任一列 email 空或重複即整次拒存; name 模式下本就不應被歷史資料卡住)
         let rows0 = await usersSorted()
@@ -269,12 +293,13 @@ describe('api-mapKey (F-14: 使用者對應鍵之外部同步檢查與登入多�
     })
 
     it('MK-021 後台 users 整表寫入(mappingBy=email): 歷史空／重複 email 原樣送回可存; 啟用而空／撞 email 的停用列、新增 active 全空白 email → 被拒; 新增空 email(任何列) → 被拒', async function() {
-        //前置: mappingBy='id' 同步造成「active 空 email」「inactive 空 email」「inactive 與 base seed peter 同 email」, 再切換為 email
-        await restartBackend('./settings.json')
-        const F = 'appMk-10'
-        let rs = await postSync('users', { from: F, rows: [u('id-mk10-a', 'a10', '', F), u('id-mk10-b', 'b10', '', F, 'n'), u('id-mk10-c', 'c10', 'peter@example.com', F, 'n')] })
-        assert.strict.equal(rs.state, 'success', `前置：mappingBy=id 下同步應成功，實得: ${JSON.stringify(rs)}`)
-        await restartBackend(genTempSettings({ mappingBy: 'email' }))
+        //前置: 「active 空 email」「inactive 空 email」「inactive 與 base seed peter 同 email」之歷史列——run07 前以 mappingBy='id' 同步(外部列)造成, 現改為後台歷史列(from '')以 seedExtra 旁路寫庫, 再以 mappingBy=email 重啟(理由同 MK-020)
+        const F = ''
+        await restartBackend(genTempSettings({ mappingBy: 'email' }), { seedExtra: await writeSeedExtra([
+            { id: 'id-mk10-a', order: 91, name: 'a10', email: '' },
+            { id: 'id-mk10-b', order: 92, name: 'b10', email: '', isActive: 'n' },
+            { id: 'id-mk10-c', order: 93, name: 'c10', email: 'peter@example.com', isActive: 'n' },
+        ]) })
 
         //(1) 歷史空／重複 email 原樣送回並編修無關列 → 成功(對應鍵 email 時, active 空 email 亦屬歷史容忍)
         let rows0 = await usersSorted()

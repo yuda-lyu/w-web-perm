@@ -52,8 +52,9 @@ export const SEED = {
     adminId: 'id-for-admin', adminEmail: 'admin@example.com', adminGrup: '權限群組M4',
     peterId: 'id-for-peter', peterEmail: 'peter@example.com', peterGrup: '權限群組M1',
     userCount: 4, grupCount: 4, pemiCount: 4, targetCount: 22,
-    //base seed 既有 from：admin from=''、peter/mary/john from='teamA'、grups/pemis/targets from=''。
-    //sync 測試用隔離 from（不撞 ''/'teamA'）：
+    //base seed 之 from：四表全部為 ''（run07〔F-23〕起 peter/mary/john 由 'teamA' 改 ''，與 admin 一致，故基準種子已無外部列；
+    //外部列〔from 為非空字串者〕一律由測試以 /syncAndReplaceTabs 自行建立，後台 updateXxx 不得新增／改／刪外部列）。
+    //sync 測試用隔離 from（不撞 ''）：
     SYNC_FROM: 'appTest',
 }
 
@@ -121,7 +122,50 @@ export async function readTables() {
 }
 //收尾(與 readTables 對稱): 把三表還原為擷取時之現況(含夾具以外各列之原文欄位), 不留測試加入的列, 也不改動 base seed 列之序與原文
 //(經管理者寫入 RPC, 與 api-updateTabs 之 restoreBaseSeed 同法; sync 端點拒絕空 rows 故不能用它清)
+//purgeExternalRows(run07, F-23): 測試框架之收尾／重置工具——刪除「外部列」(from 為非空字串者; 經 /syncAndReplaceTabs 灌入之夾具)。
+//  why: 後台整表寫入 updateXxx 自 run07 起不得刪除外部列(saveExternalRowChanged), 故「以整表寫入把表還原為 base seed」之收尾無法移除測試以同步灌入之夾具列;
+//  外部同步端點又拒絕空 rows(isearr 安全閘), 亦不能用它清。與 api-syncAndReplaceTabs／api-mapKey 之 after 同法, 由測試行程直接以 woItems.delAll 刪除(測試框架之重置, 非測試中手動改寫資料庫)。
+//  只刪外部列, 後台列(from '')不動; 直接刪除不經引用連帶, 故呼叫端須於其後以整表寫入還原引用端表(被引用者先、引用端後)。
+//  kts: 要清理之表名陣列(預設四表); opt.keepIds: { 表名: [id] }——這些 id 之外部列不刪(收尾快照本身若含外部列)。回傳 { 表名: 刪除筆數 }。
+export async function purgeExternalRows(kts = ['users', 'grups', 'pemis', 'targets'], opt = {}) {
+    const keep = (opt && opt.keepIds) || {}
+    const woItems = await getWoItems()
+    const out = {}
+    for (const kt of kts) {
+        const keepSet = new Set((keep[kt] || []).map((v) => String(v)))
+        const ids = (await woItems[kt].select())
+            .filter((r) => typeof r.from === 'string' && r.from !== '' && !keepSet.has(String(r.id)))
+            .map((r) => String(r.id))
+        out[kt] = ids.length
+        if (ids.length > 0) {
+            await woItems[kt].delAll({ id: { $in: ids } })
+            const left = (await woItems[kt].select({ id: { $in: ids } })).length
+            if (left !== 0) {
+                throw new Error(`purgeExternalRows(${kt}): 刪除後仍有 ${left} 筆外部列`)
+            }
+        }
+    }
+    return out
+}
+
 export async function restoreTables(snap) {
+    //run07: 先移除收尾快照之外的外部列夾具(後台寫入不得刪外部列, 見 purgeExternalRows)
+    //(先經資料通道 select 判斷有無待清之外部列; 無則不 import g_mOrm——該 import 於 mocha 行程內持有 lmdb 映射, 會使後續 reseed 刪不掉 ./db, 見 e2e-setup wipeDbVerified)
+    const keepIds = {}
+    const ktsExt = []
+    for (const [kt] of TABLE_FN) {
+        keepIds[kt] = (snap[kt] || []).map((r) => String(r.id))
+        const cur = await callRpc(`${kt}.select`, [], TOKEN_ADMIN)
+        if (!(cur.ok && Array.isArray(cur.output))) {
+            throw new Error(`${kt}.select 應成功, 實得 ${JSON.stringify(cur).slice(0, 200)}`)
+        }
+        if (cur.output.some((r) => typeof r.from === 'string' && r.from !== '' && !keepIds[kt].includes(String(r.id)))) {
+            ktsExt.push(kt)
+        }
+    }
+    if (ktsExt.length > 0) {
+        await purgeExternalRows(ktsExt, { keepIds })
+    }
     for (const [kt, fn] of TABLE_FN) {
         const res = await callRpc(fn, [snap[kt]], TOKEN_ADMIN)
         if (!res.ok) {

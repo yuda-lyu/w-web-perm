@@ -312,6 +312,55 @@ let kpLang = {
         eng: `Not saved: the list changed while this dialog was open (removed or renamed: {names}). Nothing was changed. Please close this dialog, reload the page and try again.`,
         cht: `未儲存：此對話框開啟期間清單已有異動（已刪除或改名：{names}）。資料未變更，請關閉對話框並重新整理頁面後再操作。`,
     },
+    //@@UI1-KEYS
+    //F-23／F-26 清單頁(標的／權限／群組／使用者)之外部列與外部同步提示(R-PRINCIPLE-00 原則 3「收嚴＋提示」、原則 5; R-EXT-OWN-01; ADR-037; src/js/externalUi.mjs、src/js/getAddImpact.mjs):
+    //  externalRowLocked 外部列首欄鎖頭圖示之 tooltip({from} 為來源); externalRowsNotice／externalRowsNoticeTarget 清單上方提示({n} 為外部列數; 標的無指派欄故另一鍵);
+    //  syncWarnIdRenumber 外部同步疑似 id 重編之警示({from} 來源、{n} 筆數); externalRowDelBlocked 勾選含外部列而被略過之提示({n}); nameUsedByExternal 後台列與外部列撞名之儲存前提示({name}、{from});
+    //  confirmAddRefs* 新增撞「懸空名」(仍被啟用中之引用指向、查無實體)之確認: {list} 新名稱(至多 5 個)、{n} 受影響之引用端數、{m} 其中以 AND 引用者(標的之 crules 項目無 mode, 無 AND 句)
+    externalRowLocked: {
+        eng: `Synchronized from external source "{from}". Read-only here.`,
+        cht: `由外部來源「{from}」同步，於此為唯讀。`,
+    },
+    externalRowsNotice: {
+        eng: `{n} row(s) are synchronized from an external source. Their identity fields are read-only and they cannot be deleted here; only their assignment settings can be changed.`,
+        cht: `有 {n} 筆資料由外部來源同步。其身分欄位於此為唯讀且不可刪除，僅可修改其授權指派設定。`,
+    },
+    externalRowsNoticeTarget: {
+        eng: `{n} row(s) are synchronized from an external source. They are read-only and cannot be deleted here.`,
+        cht: `有 {n} 筆資料由外部來源同步，於此為唯讀且不可刪除。`,
+    },
+    syncWarnIdRenumber: {
+        eng: `The external source "{from}" appears to have renumbered ids ({n} item(s) now carry a name that previously belonged to an item with a different id). Each synchronization removes the old items and cleans up the references to them, which may erase the assignments made here. Please ask the source to keep ids stable or to omit ids.`,
+        cht: `外部來源「{from}」疑似重編 id（有 {n} 筆項目的名稱，先前屬於不同 id 之項目）。每次同步會移除舊項目並連帶清理其引用，可能抹掉在此做的指派。請來源端保持 id 穩定或不帶 id。`,
+    },
+    externalRowDelBlocked: {
+        eng: `{n} selected row(s) are synchronized from an external source and cannot be deleted here. They were skipped.`,
+        cht: `所選資料中有 {n} 筆由外部來源同步，無法在此刪除，已略過。`,
+    },
+    nameUsedByExternal: {
+        eng: `External source "{from}" already uses the name "{name}".`,
+        cht: `外部來源「{from}」已使用此名稱「{name}」。`,
+    },
+    confirmAddRefsGrup: {
+        eng: `Adding the group(s) "{list}": {n} user(s) already refer to the name, so after saving they will get (or be limited by) the permissions of the new group(s). Add anyway?`,
+        cht: `新增群組「{list}」後，將有 {n} 位使用者取得或受此群組限制（其授權設定原已引用此名稱）。確定新增？`,
+    },
+    confirmAddRefsAndGrup: {
+        eng: `Adding the group(s) "{list}": {n} user(s) already refer to the name, so after saving they will get (or be limited by) the permissions of the new group(s); {m} of them refer to it with AND. Add anyway?`,
+        cht: `新增群組「{list}」後，將有 {n} 位使用者（其中 {m} 位以 AND 引用）取得或受此群組限制（其授權設定原已引用此名稱）。確定新增？`,
+    },
+    confirmAddRefsPemi: {
+        eng: `Adding the permission(s) "{list}": {n} group(s) already refer to the name, so after saving they will get (or be limited by) the new permission(s). Add anyway?`,
+        cht: `新增權限「{list}」後，將有 {n} 個群組取得或受此權限限制（其授權設定原已引用此名稱）。確定新增？`,
+    },
+    confirmAddRefsAndPemi: {
+        eng: `Adding the permission(s) "{list}": {n} group(s) already refer to the name, so after saving they will get (or be limited by) the new permission(s); {m} of them refer to it with AND. Add anyway?`,
+        cht: `新增權限「{list}」後，將有 {n} 個群組（其中 {m} 個以 AND 引用）取得或受此權限限制（其授權設定原已引用此名稱）。確定新增？`,
+    },
+    confirmAddRefsTarget: {
+        eng: `Adding the target(s) "{list}": the rules of {n} permission(s) already contain settings for the name, so after saving those settings will take effect for the new target(s). Add anyway?`,
+        cht: `新增管控對象「{list}」後，將有 {n} 個權限的規則取得此管控對象的設定（其規則原已寫有此名稱）。確定新增？`,
+    },
     saveInProgress: { //同一操作者之同表儲存處理中再送出 (ADR-025)
         eng: `The previous save is still in progress. Please do not submit again.`,
         cht: `上一次儲存仍在處理中，請勿重複送出`,
@@ -354,6 +403,23 @@ let kpLang = {
     saveCascadePartial: {
         eng: `The related references may be out of sync with this change (the automatic restore failed). Please do not make further changes and contact the system administrator to run the reference audit.`,
         cht: `相關的授權引用可能與本次變更不一致（自動還原失敗）。請勿再變更資料，並通知系統管理者執行引用稽核。`,
+    },
+    //F-23／F-26(外部列保護與過期快照; R-PRINCIPLE-00 原則 3、5; R-EXT-OWN-01、R-BASELINE-01, ADR-037): 後台整表寫入被拒(零變更)之固定訊息, 動態細節(來源、筆數、原因)只入 srLog
+    saveFromNotAllowed: {
+        eng: `Not saved: rows saved here must have an empty "From" value (rows with a source are managed by the external source). Nothing was changed.`,
+        cht: `未儲存：於此儲存之列其「來源」須為空白（有來源之列由外部來源管理）。資料未變更。`,
+    },
+    saveExternalRowChanged: {
+        eng: `Not saved: rows synchronized from an external source cannot be deleted here, and only their assignment settings can be changed. Nothing was changed. Please change them at the external source.`,
+        cht: `未儲存：由外部來源同步之列不可在此刪除，且僅能修改其授權指派設定。資料未變更，請至外部來源端處理。`,
+    },
+    saveStale: {
+        eng: `Not saved: the data changed (by someone else or by an external synchronization) after this page was loaded. Nothing was changed. Please reload the page and try again.`,
+        cht: `未儲存：載入此頁面後資料已被他人或外部同步更新。資料未變更，請重新整理頁面後再操作。`,
+    },
+    saveBaselineRequired: {
+        eng: `Not saved: changing the assignment settings of rows synchronized from an external source requires the latest loaded data, which this request did not carry. Nothing was changed. Please reload the page and try again.`,
+        cht: `未儲存：修改外部來源同步列之授權指派設定須附載入時之資料版本，此次請求未附。資料未變更，請重新整理頁面後再操作。`,
     },
     cannotGetUserId: {
         eng: `Cannot get the user id`,

@@ -67,6 +67,10 @@ let mkUser = (id, o = {}) => ({ ...ds.users.funNew(), ...AUDIT, id, name: id, em
 //  nmi   : 歷史同名但其一為停用 —— u1 active／u3 inactive 同名 peter
 //  ldn   : 歷史重複 name(皆 active) —— u1、u2(from appX)同名 same
 //  len   : 歷史空 name —— u1(active)、u3(inactive)name 皆為空字串
+//  ldeB／ldeiB／ldnB: 同 lde／ldei／ldn, 但歷史重複之 u2 亦為後台列(from ''; F-14 之前後台亦可能造成重複)
+//run07 U1 修正(外部列保護 F-23 / R-EXT-OWN-01、過期快照 F-26 / R-BASELINE-01): u2(from appX)為外部列, 其身分／結構欄(name／email／description／isAdmin／isActive)後台不得改(saveExternalRowChanged),
+//指派欄 cgrups 無載入基準不得改(saveBaselineRequired). UK-027／030／031／102／105 之述語(歷史重複 email／name 之修復、啟用、編修、群組指派不受歷史資料影響)與外部列無關,
+//改用 B 版種子(u2 為後台列), 期望值與斷言不變; 外部列版本之拒收／基準放行見 unit-procCore-external. 其餘 lde／ldei／ldn 案例(只改 u1／u3、原樣送回 u2)維持外部列 u2.
 const SEEDS = {
     clean: () => [
         mkUser('u1', { name: 'peter', email: 'peter@x.test' }),
@@ -103,6 +107,9 @@ const SEEDS = {
         mkUser('u2', { name: 'mary', email: 'mary@x.test' }),
         mkUser('u3', { name: '', email: 'john@x.test', isActive: 'n' }),
     ],
+}
+for (let [b, a] of [['ldeB', 'lde'], ['ldeiB', 'ldei'], ['ldnB', 'ldn']]) {
+    SEEDS[b] = () => SEEDS[a]().map((r) => ({ ...r, from: '' }))
 }
 
 //nu: 模擬清單頁 addItem 之新列(前端 funNew 產 id、稽核欄位為佔位字、transient _isNew); 預設 name／email 逐列互異(同一批多個新列時不互相撞)
@@ -194,7 +201,7 @@ const CASES = [
     { id: 'UK-025', seed: 'lde', title: '歷史重複存在, 無關列改成該值(併入重複組)', mut: (rows) => { by(rows, 'u3').email = 'dup@x.test'; return rows }, want: all(D) },
     { id: 'UK-026', seed: 'lde', title: '刪除重複中之一列 → 可存', mut: (rows) => rows.filter((r) => r.id !== 'u1'), want: all(OK), verify: async (e) => assert.strict.equal(e.woItems.users.has('u1'), false) },
     {
-        id: 'UK-027', seed: 'lde', title: '重複兩列皆改為互異之唯一值 → 可存',
+        id: 'UK-027', seed: 'ldeB', title: '重複兩列皆改為互異之唯一值 → 可存',
         mut: (rows) => { by(rows, 'u1').email = 'a1@x.test'; by(rows, 'u2').email = 'a2@x.test'; return rows }, want: all(OK),
         verify: async (e) => assert.strict.deepEqual([e.woItems.users.get('u1').email, e.woItems.users.get('u2').email], ['a1@x.test', 'a2@x.test']),
     },
@@ -202,8 +209,8 @@ const CASES = [
     { id: 'UK-029', seed: 'lde', title: '歷史重複中一列 email 改為空字串', mut: (rows) => { by(rows, 'u1').email = ''; return rows }, want: all(I) },
 
     // ===== 歷史重複 email, 其一為停用(ldei): 啟用造成 active 重複(對應鍵 email) =====
-    { id: 'UK-030', seed: 'ldei', title: '啟用歷史重複中之停用列(email 不變)', mut: (rows) => { by(rows, 'u2').isActive = 'y'; return rows }, want: [OK, D, OK] },
-    { id: 'UK-031', seed: 'ldei', title: '編修停用列描述(維持停用) → 可存', mut: (rows) => { by(rows, 'u2').description = 'edited'; return rows }, want: all(OK) },
+    { id: 'UK-030', seed: 'ldeiB', title: '啟用歷史重複中之停用列(email 不變)', mut: (rows) => { by(rows, 'u2').isActive = 'y'; return rows }, want: [OK, D, OK] },
+    { id: 'UK-031', seed: 'ldeiB', title: '編修停用列描述(維持停用) → 可存', mut: (rows) => { by(rows, 'u2').description = 'edited'; return rows }, want: all(OK) },
     { id: 'UK-032', seed: 'ldei', title: '停用歷史重複中之 active 列 → 可存', mut: (rows) => { by(rows, 'u1').isActive = 'n'; return rows }, want: all(OK) },
 
     // ===== 歷史空 email(lee): 歷史容忍, 本次新增或改成空者擋 =====
@@ -279,7 +286,7 @@ const CASES = [
         verify: async (e) => assert.strict.equal(e.woItems.users.get('u1').cgrups, CG),
     },
     {
-        id: 'UK-102', seed: 'ldn', title: 'pickKeysOnly: 歷史重複 name 的庫(mappingBy=name), 群組指派成功',
+        id: 'UK-102', seed: 'ldnB', title: 'pickKeysOnly: 歷史重複 name 的庫(mappingBy=name), 群組指派成功',
         mut: (rows) => { by(rows, 'u2').cgrups = CG; return rows }, opt: { pickKeysOnly: ['cgrups'] }, want: all(OK),
         verify: async (e) => assert.strict.equal(e.woItems.users.get('u2').cgrups, CG),
     },
@@ -307,7 +314,7 @@ const CASES = [
         },
     },
     {
-        id: 'UK-105', seed: 'ldei', title: 'pickKeysOnly: 歷史重複(其一停用)送入啟用 → 不採納(只採 cgrups), 成功, 仍為停用',
+        id: 'UK-105', seed: 'ldeiB', title: 'pickKeysOnly: 歷史重複(其一停用)送入啟用 → 不採納(只採 cgrups), 成功, 仍為停用',
         mut: (rows) => { by(rows, 'u2').isActive = 'y'; by(rows, 'u2').cgrups = CG; return rows }, opt: { pickKeysOnly: ['cgrups'] }, want: all(OK),
         verify: async (e) => {
             assert.strict.equal(e.woItems.users.get('u2').isActive, 'n')

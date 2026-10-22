@@ -496,5 +496,5 @@ function fillIdlessIds(keyTable, rowsPool, rows, rowsAvoid = []) {
 }
 
 
-export { REF_OF, rewriteRefs, diffRefTargets, planRefChanges, fillIdlessIds }
+export { REF_OF, rewriteRefs, diffRefTargets, planRefChanges, fillIdlessIds, keyOf, entName, decodeKp, listEntries } //keyOf／entName／decodeKp／listEntries: run07 新增匯出(行為不變), 供 getAddImpact 沿用同一套引用解碼與名稱比對口徑
 export default planRefChanges

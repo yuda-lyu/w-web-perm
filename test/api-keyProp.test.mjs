@@ -63,6 +63,7 @@ describe('api-keyProp (資料驅動之規則名轉屬性鍵, R-KEY-PROP-01)', fu
     after(async function() {
         this.timeout(120000)
         if (snap0) {
+            //run07(F-23): 夾具為外部列(from=appKeyProp, 經同步灌入), 後台整表寫入不得刪除外部列, 故 restoreTables 內先以 purgeExternalRows 移除快照以外之外部列再寫回(本檔之測試意圖為授權資料之容錯, 與外部列守門無關, 夾具維持外部列)
             await restoreTables(snap0) //服務之收尾由 e2e-setup 註冊之 root after 負責
         }
     })

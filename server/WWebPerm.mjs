@@ -41,6 +41,7 @@ import planRefChanges, { REF_OF, diffRefTargets } from '../src/js/refCascade.mjs
 import { findDupIndex, findKeyOtherFrom, withTabLocks, mapKeyOf, checkMapKeyBatch, pickUniqueUser } from './keyCheck.mjs'
 import { checkCascadePlan, writeWithCascade, buildSyncRowsNew } from './cascadeWrite.mjs'
 import { createAuthorizeExec, wrapOperOrm } from './dataChannel.mjs'
+import { markHasKey, keepAssignOnMissing, countIdRenumber } from './syncKeep.mjs'
 
 
 /**
@@ -62,6 +63,7 @@ import { createAuthorizeExec, wrapOperOrm } from './dataChannel.mjs'
  * @param {String} [opt.urlRedirect=''] 輸入錯誤時自動轉址字串，提供站台例如無法登入或驗證失敗時須自動轉址，預設''
  * @param {String} [opt.mappingBy='id'] 輸入外部系統識別使用者token後所提供之資料物件，與權限系統之使用者資料物件，兩者間查找之對應欄位，可選'id'、'email'、'name'，未給或非此三者時為'id'，預設'id'。對應鍵須能唯一指出使用者：mappingBy為'email'或'name'時，外部同步(syncAndReplaceTabs)users之有效(isActive為'y')列，該欄位須為非空字串且與本批及其他from之有效列皆不重複(違規整批拒收invalidRows)；登入查找以對應鍵於權限系統users命中多於1筆有效使用者時一律拒絕(ambiguousUserFromPerm)，不取首筆；mappingBy為'id'(預設)時不另檢查
  * @param {Boolean} [opt.cascadeRename=true] 輸入群組、權限改名時是否連帶更新引用它之授權字串(users.cgrups、grups.cpemis)，預設true。改名以主鍵id判定(同id異名)，後台整表儲存與外部同步(同一from內)皆適用，於同一次寫入內改寫並可能寫入外部來源之users列之cgrups；給false則不連帶(引用成為懸空，視同引用查無對象而收嚴並於頁面提示)。群組、權限、標的被刪除時之引用連帶清理(users.cgrups、grups.cpemis、pemis.crules)不受此設定影響
+ * @param {String} [opt.lockExternalRows='y'] 輸入後台是否不得改外部列(from為非空字串，即經syncAndReplaceTabs由外部來源同步之列)，可選'y'或'n'，預設'y'。'y'時伺服端強制：後台新增列from須為空字串、外部列不可刪除、不可改from、身分/結構欄(指派欄與順序以外之欄位)不可改，違規整次拒收(saveFromNotAllowed／saveExternalRowChanged)；授權指派欄(users.cgrups、grups.cpemis、pemis.crules)後台可寫，但須附載入基準(用戶端自動附帶)，無基準者拒收(saveBaselineRequired)；外部列之order由外部擁有、後台儲存不重編。給'n'回到舊行為(僅保留from須為字串之檢查)。升版後既有庫中from為非空字串之列即視為外部列而唯讀，請先以g_fixFromType.mjs／g_purgeFrom.mjs盤點(見README Upgrade Notes)
  * @param {String} [opt.logFd='./logs'] 輸入log紀錄儲存位置字串，預設'./logs'
  * @param {String} [opt.logInterval='hr'] 輸入log紀錄檔案拆檔時長字串，可選'hr'或'day'，預設'hr'
  * @param {Integer} [opt.logNumKeep=null] 輸入log檔保留數上限正整數，超出者自最舊刪除，未給採w-syslog預設(hr模式365*24、day模式365)，預設null
@@ -258,6 +260,10 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     let cascadeRename = get(opt, 'cascadeRename', true) !== false
 
 
+    //lockExternalRows, 後台是否不得改外部列(from 為非空字串者)之身分／結構欄、不得刪除與複製繼承 from(預設 true; 僅 'n' 或 false 關閉, 回到舊行為; F-23, R-EXT-OWN-01, ADR-037)
+    let lockExternalRows = !(get(opt, 'lockExternalRows', 'y') === 'n' || get(opt, 'lockExternalRows', 'y') === false)
+
+
     //kpLangExt
     let kpLangExt = get(opt, 'kpLangExt', null)
 
@@ -317,6 +323,21 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     let kmx = pmKeyMutex()
 
 
+    //syncWarns: 外部同步「同一 from 同名異 id」(疑似 id 重編)之提示登錄(記憶體, 重啟即清; 主控定案: 不加開關, 記 warn log 並使頁面可提示):
+    //以「表名＋來源」為鍵, 最近一次同步有此情形者登錄筆數與時間, 已無此情形者清除; 只含表名、來源名稱、筆數、時間, 不含個資
+    let kpSyncWarn = new Map()
+    let setSyncWarn = (keyTable, from, n) => {
+        let k = `${keyTable}\u0000${from}`
+        if (n > 0) {
+            kpSyncWarn.set(k, { keyTable, from, n, time: new Date().toISOString() })
+        }
+        else {
+            kpSyncWarn.delete(k)
+        }
+    }
+    let getSyncWarns = () => [...kpSyncWarn.values()]
+
+
     //lockSave: 後台整表寫入(updateTabItems)之雙擊防護(後端, 見 lockSave.mjs, ADR-025): 以「updateTabItems:{表名}:{操作者 id}」於 cacheSt 原子占位,
     //同一操作者之同表寫入處理中再送出即 reject 'saveInProgress'(不排隊); 包在 kmx 之外層, 不同操作者之並行仍由 kmx 序列化(ADR-012)
     let cst = cacheSt()
@@ -324,7 +345,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
 
     //procCore: 整表批次 diff 寫入邏輯 (updateTabItems + updateTargets/Pemis/Grups/Users)
-    let pc = procCore(woItems, procOrm, { srLog, kmx, lockSave, mappingBy, cascadeRename }) //mappingBy 供 users 整表寫入的對應鍵檢查(R-PRINCIPLE-00 適用表 h); cascadeRename 供群組／權限改名之引用級聯(適用表 m)
+    let pc = procCore(woItems, procOrm, { srLog, kmx, lockSave, mappingBy, cascadeRename, lockExternalRows }) //mappingBy 供 users 整表寫入的對應鍵檢查(R-PRINCIPLE-00 適用表 h); cascadeRename 供群組／權限改名之引用級聯(適用表 m); lockExternalRows 供後台對外部列之守門(F-23)
 
 
     //procStaInfor: 統計資訊, fdLog 對齊 srLog 使用同一目錄(讀 settings.logFd, fallback 邏輯同 srLog.mjs); mock 由 settings.staEventMock 注入(e2e 統計圖穩定用)
@@ -362,6 +383,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             modeEditUsers,
 
             cascadeRename, //改名是否連帶更新引用(opt.cascadeRename), 供清單頁儲存前預覽與伺服端一致(R-REF-CASCADE-01)
+            lockExternalRows: lockExternalRows ? 'y' : 'n', //後台是否不得改外部列(opt.lockExternalRows), 供清單頁逐列唯讀、複製重置 from 與伺服端一致(R-EXT-OWN-01)
+            syncWarns: getSyncWarns(), //外部同步疑似 id 重編之提示(同一 from 同名異 id), 供清單頁橫幅(原則 3: 提示); 不含個資, 僅表名、來源名稱、筆數、時間
 
             widthTargetId,
             widthTargetDescription,
@@ -641,6 +664,9 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                 return Promise.reject(`invalidRows`)
             }
 
+            //hasCgrups: users 列是否自帶 cgrups 鍵(須於 ltdtmapping 缺鍵補 '' 之前記錄); 缺該鍵者於下方保留庫內指派(F-23, 指派欄屬後台, 見 syncKeep.mjs)
+            let hasCgrups = (keyTable === 'users') ? markHasKey(rows, 'cgrups') : null
+
             //save from
             rows = map(rows, (v, k) => {
             // v.order = k + 1 //order大部分由外部給予, 不能複寫
@@ -763,6 +789,34 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                 }
             }
 
+            //外部同步 payload 缺 cgrups 鍵之 users 列保留庫內值(F-23; 主控定案: 指派欄屬後台, 同步不得清掉後台指派; 含該鍵則以外部為準): 修正前 ltdtmapping 缺鍵補 ''、delAll＋insert 即清空後台已指派之群組.
+            //只在確有缺鍵之列時才讀庫內(同一 from); 對應先依 id、無 id 者依 mappingBy(email／name)恰命中 1 筆, 對不到者視為新使用者(cgrups 維持 ''). grups.cpemis／pemis.crules 不在此列(未經主控裁示, 缺鍵仍清空,
+            //為較嚴之既有行為); select 失敗之處置同上段(toOutKey, 尚未寫入任何資料)
+            if (hasCgrups !== null && hasCgrups.some((b) => b === false)) {
+                let rsSame = null
+                try {
+                    rsSame = await woItems[keyTable].select({ from }) //此處 keyTable 恆為 users(hasCgrups 非 null); 非登入查找, 不經 pickUniqueUser(SITE-KC-004 只管登入反查)
+                }
+                catch (err) {
+                    let raw = (typeof err === 'string') ? err : ((err && err.message) || String(err))
+                    let key = toOutKey(err, 'anUnexpectedErrorOccurred')
+                    srLog.error({ event: 'syncAndReplaceTabs-error', msg: key, raw, keyTable, from, step: 'select' })
+                    return Promise.reject(key)
+                }
+                //isKeepable: 保留值於 delAll 之前須再通過一次寫入前驗證(上方 validateRowsBeforeWrite 看到的是補出之空字串, 外審 sol R4); 不過者不保留(視為空, 收嚴), 只記筆數
+                let kr = keepAssignOnMissing({ rows, hasKey: hasCgrups, rowsOldSameFrom: rsSame, mappingBy, isKeepable: (val) => validateRowsBeforeWrite([{ id: 'keep', cgrups: val }]) === null })
+                rows = kr.rows
+                if (kr.nKeep > 0) {
+                    srLog.info({ event: 'syncAndReplaceTabs-keepAssign', keyTable, from, field: 'cgrups', n: kr.nKeep })
+                }
+                if (kr.nSkip > 0) {
+                    srLog.warn({ event: 'syncAndReplaceTabs-keepAssign-skip', keyTable, from, field: 'cgrups', n: kr.nSkip, reason: 'notKeepable' })
+                }
+                if (kr.nConflict > 0) {
+                    srLog.warn({ event: 'syncAndReplaceTabs-keepAssign-skip', keyTable, from, field: 'cgrups', n: kr.nConflict, reason: 'mapKeyConflict' }) //對應鍵與 id 指向不同使用者, 指派不移轉而清空(收嚴須附提示; 不含個資值)
+                }
+            }
+
             //引用連帶(適用表 m／n, R-REF-CASCADE-01): 同步 grups／pemis／targets 時, 同一 from 內依穩定 id 判定——同 id 異名＝改名級聯、舊 id 不在本批＝刪除而連帶清理引用(寫入後仍存續之同名者不清理);
             //未帶 id 之列(ORM 每次補隨機主鍵)改依名稱對應(見 buildSyncRowsNew). 預檢(新名撞懸空名、歷史同名組改名、容器內相撞、改寫後欄位驗證)於 delAll 之前, 被拒整批零變更;
             //外部應用只收固定語系鍵 invalidRows／htmlMarkupNotAllowed(R-ORM-02), 動態原因入 srLog. select 失敗之處置同上段(toOutKey, 未寫入任何資料).
@@ -781,6 +835,16 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                     return Promise.reject(key)
                 }
                 kind = diffRefTargets({ keyTable, rowsOld: rowsPlan.rowsOld, rowsNew: rowsPlan.rowsNew, opt: { cascadeRename } })
+
+                //外部 id 不穩定之偵測(主控定案: 不加開關; 同一 from 同一批內出現「同名異 id」＝疑似 id 重編, id 消失視為刪除會每次清理引用而可能抹掉後台指派): 記 warn log(不記個資值, 只記筆數)
+                //並登錄供 getWebInfor.syncWarns 於頁面提示; 之後同一(表, from)之同步已無此情形即清除提示. 只適用有 name 之 grups／pemis(users 之 name 可重複, targets 之 id 即名稱)
+                if (keyTable === 'grups' || keyTable === 'pemis') {
+                    let nRenum = countIdRenumber(rowsPlan.rowsOld.filter((o) => o !== null && typeof o === 'object' && o.from === from), rows)
+                    setSyncWarn(keyTable, from, nRenum)
+                    if (nRenum > 0) {
+                        srLog.warn({ event: 'syncAndReplaceTabs-idRenumber', keyTable, from, n: nRenum })
+                    }
+                }
             }
 
             //doWrite: delAll from, insert; ORM／I/O 失敗之原文只入 srLog, 外部應用收 saveWriteFail(規則帳本 R-ORM-02); 引用端先寫、失敗補償還原(cascadeWrite.mjs)
@@ -1350,12 +1414,16 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
             getWebInfor,
 
-            updateTargets: pc.updateTargets,
-            updatePemis: pc.updatePemis,
-            updateGrups: pc.updateGrups,
+            //updateXxx 第 3 參 opt 為用戶端給之 { baseline }(草稿載入基準, F-26, R-BASELINE-01), 其餘鍵一律不採納(pickKeysOnly 等為伺服端設定); 未給(舊客戶端)見 procCore 之處置
+            updateTargets: (userId, rows, opt) => pc.updateTargets(userId, rows, opt),
+            updatePemis: (userId, rows, opt) => pc.updatePemis(userId, rows, opt),
+            updateGrups: (userId, rows, opt) => pc.updateGrups(userId, rows, opt),
             //updateUsers, modeEditUsers='for:grups' 時 API 與 UI 一致只採納既有使用者之 cgrups 變更, 身分欄/新增/刪除/順序以資料庫為準
-            updateUsers: (userId, rows) => {
-                let opt = (modeEditUsers === 'for:grups') ? { pickKeysOnly: ['cgrups'] } : {}
+            updateUsers: (userId, rows, optClient) => {
+                let opt = (optClient !== null && typeof optClient === 'object' && optClient.baseline !== undefined && optClient.baseline !== null) ? { baseline: optClient.baseline } : {}
+                if (modeEditUsers === 'for:grups') {
+                    opt.pickKeysOnly = ['cgrups']
+                }
                 return pc.updateUsers(userId, rows, opt)
             },
 

@@ -1,6 +1,7 @@
 import eachOwn from './eachOwn.mjs'
 import findTouchedDup from './findTouchedDup.mjs'
 import getPropKey from './getPropKey.mjs'
+import { isExternalRow } from './externalRows.mjs'
 
 
 //後台清單頁(群組／權限／使用者)「名稱(或 email)擋存」之判準, 單一擁有者(規則帳本 R-PRINCIPLE-00 g、h, R-NAME-UNIQ-02):
@@ -35,6 +36,7 @@ import getPropKey from './getPropKey.mjs'
  *   errBlock     值 → 'empty' | 'invalid' | 'dup'(會擋存)
  *   warnHist     值 → 目前共用該值之列數(歷史同名, 不擋存; 與 errBlock 互斥, 以擋存者為準)
  *   warnHistBad  值 → 'empty' | 'invalid'(歷史壞值, 不擋存; 僅 badScope 為 'touched' 時有)
+ *   dupExternal  值 → 外部列之來源 from(僅 errBlock 為 'dup' 者, 且共用該值之列中有外部列〔from 為非空字串, externalRows.isExternalRow〕; 供提示改為「外部來源 X 已使用此名稱」, 否則無此鍵)
  * @example
  *
  * let rowsOld = [{ id: '1', name: 'A' }, { id: '2', name: 'A' }]
@@ -54,6 +56,7 @@ function getNameErrs(rowsNew0, rowsOld0, key = 'name', opt = {}) {
     let errBlock = Object.create(null)
     let warnHist = Object.create(null)
     let warnHistBad = Object.create(null)
+    let dupExternal = Object.create(null)
 
     let isRow = (r) => r !== null && typeof r === 'object'
 
@@ -146,6 +149,10 @@ function getNameErrs(rowsNew0, rowsOld0, key = 'name', opt = {}) {
             let k = findTouchedDup(kpNew.get(v), kpOld.get(v) || [], key)
             if (k >= 0) {
                 errBlock[kc] = 'dup'
+                let rExt = kpNew.get(v).find((r) => isExternalRow(r)) //另一方(或其中一方)為外部列: 提示改為「外部來源 X 已使用此名稱」
+                if (rExt !== undefined) {
+                    dupExternal[kc] = rExt.from
+                }
             }
             else {
                 warnHist[kc] = cnt.get(v)
@@ -163,6 +170,7 @@ function getNameErrs(rowsNew0, rowsOld0, key = 'name', opt = {}) {
         errBlock,
         warnHist,
         warnHistBad,
+        dupExternal,
     }
 }
 

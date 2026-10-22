@@ -24,6 +24,12 @@
 //  ②檔尾新增 describe「run06 引用連帶」: AF-036／037 群組／權限改名之儲存前預覽確認框(筆數、舊→新名單、外部來源警示; 按否不送出、按是附筆數之成功訊息、引用端已改寫、各使用者授權不變)、AF-038／039 刪除確認之筆數(OR 與停用者計入 n、只有啟用之 AND 計入 m)與清理、
 //  AF-040 預檢被伺服端拒絕時不彈確認框而顯示失敗彈窗、AF-042 名單超過 5 個之截斷、AF-041 cascadeRename:false(restartBackend(genTempSettings(…)); 不彈框、引用未改寫而懸空、使用者頁出現警告圖示; 案後 restartBackend('./settings.json') 還原). 皆為語意斷言、不產標準圖;
 //  資料前置以管理者寫入 RPC(含 from 非空之外部來源列), 案後 restoreTables 還原並回驗筆數(R-E2E-ISO-01).
+//run07(F-23 外部列受保護; R-EXT-OWN-01、ADR-037; 2026-10-22): 後台不得新增／改／刪外部列(from 為非空字串者; 指派欄 cgrups／cpemis／crules 除外), 外部列之 order 由外部擁有(後台儲存不改).
+//  原以「同步端點建夾具、後台 RPC 模擬另一端」之 15 案前提失效, 修測試夾具與流程(產品行為不變、斷言不放寬):
+//  ①AF-014a／b／e「另一端把整表反序」: 後台整表寫入不改外部列 order, 改以兩個合法管道合成整表反序——後台列走 updateXxx、外部列走同步端點重送並給反序 order(reverseTableByOtherEnd);
+//  ②AF-035: 被勾選啟用之 john-off 須為後台列(外部列之身分欄與 isActive 唯讀, 後台無從編輯), 前置改以後台寫入 RPC 新增停用之同名使用者(對應鍵仍於新增當時之預設 id, 其後才重啟為 name);
+//  ③AF-036／037／038／039／041: 被改名／刪除之主體(群組／權限)與引用端夾具改為後台列(經 updateXxx 新增), 唯「外部來源之引用端」(ren-ext／ren-gx／del-ue／del-ge)只能經同步端點建立(後台新增外部列被拒 saveFromNotAllowed),
+//  其 cgrups／cpemis 為指派欄, 由伺服端引用連帶改寫(不受守門限制); 另把夾具建立移入 try(夾具中途失敗仍走 finally 還原, 否則殘列使後續案誤報重複).
 //跑法: npx mocha test/e2e-array-form.test.mjs --timeout 300000
 import assert from 'assert'
 import fs from 'fs'
@@ -117,6 +123,28 @@ async function syncRows(kt, rows, from) {
     const url = `${apiBaseUrl}/syncAndReplaceTabs?keyTable=${kt}&token=${encodeURIComponent(TOKEN_APP)}`
     const res = await (await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify({ from, rows: rows.map((v) => ({ ...v, from })) }) })).json()
     assert.ok(res.state === 'success', `夾具 ${kt}(${from}) 寫入應成功, 實得 ${JSON.stringify(res)}`)
+}
+
+//「另一端把 users／grups 整表反序」(AF-014a／b／e; run07): 外部列之 order 由外部擁有, 後台整表寫入(updateXxx)不改其 order(伺服端還原為庫內值, R-EXT-OWN-01), 單以 updateXxx 反序只會重排後台列、外部列不動;
+//  故由兩個合法管道合成「整表反序」(結果等同假設全部列皆可由後台改序時 updateXxx 所得):
+//  ①後台列——另一位管理者之整表寫入(updateXxx 依陣列位置重給後台列之 order);
+//  ②外部列——外部應用以同步端點對同一批外部列(夾具分區 FROM)重送, 並給「其在反序整表中之位置」為 order(外部擁有 order, 同步是改變外部列順序之合法途徑).
+//  驗收: DB 之新序確為整表反序(否則等待 store 重排之同步點會空等)。回傳反序後之整表(含各列整列資料, 依新 order 由小到大)
+async function reverseTableByOtherEnd(kt) {
+    const fn = { users: 'updateUsers', grups: 'updateGrups' }[kt]
+    assert.ok(fn, `reverseTableByOtherEnd: 未知的表 ${kt}`)
+    const cur = (await readTables())[kt]
+    const reversed = cur.slice().reverse()
+    const exts = cur.filter((v) => typeof v.from === 'string' && v.from !== '')
+    assert.ok(exts.length > 0 && exts.every((v) => v.from === FROM), `前提: ${kt} 之外部列皆屬夾具分區 ${FROM}(其他分區之列不在本函式之重排範圍), 實得 ${JSON.stringify(exts.map((v) => [v.id, v.from]))}`)
+    const resp = await callRpc(fn, [reversed], TOKEN_ADMIN)
+    assert.ok(resp.ok, `另一端(另一位管理者)重排後台列 ${fn} 應成功, 實得 ${JSON.stringify(resp)}`)
+    const pos = new Map(reversed.map((v, i) => [v.id, i + 1]))
+    assert.ok(FIX[kt].every((v) => pos.has(v.id)), `前提: 夾具分區 ${FROM} 之 ${kt} 皆在現況表內`)
+    await syncRows(kt, FIX[kt].map((v) => ({ ...v, order: pos.get(v.id) })), FROM)
+    const now = (await readTables())[kt]
+    assert.deepStrictEqual(now.map((v) => v.id), reversed.map((v) => v.id), `前提: 另一端重排後 DB 之 ${kt} 列序應為原列序之反序`)
+    return reversed
 }
 
 //庫內某表名稱為 name 之列的 id(經資料通道 select; 不經瀏覽器狀態)
@@ -638,11 +666,8 @@ describe('e2e-array-form (陣列形式授權資料: 編輯器顯示與存檔, �
                 await openColDialog(page, k, 'belongUsers', 'grupBlngEditUsers')
                 const rows = await readDlgRows(page, 'name')
                 assert.strict.equal(rows['peter']?.enable, false, '前提: peter 尚未歸屬 arr-g')
-                //另一端重排: 把現有 users 反序後整表寫回(updateXxx 以陣列位置重給 order)
-                const cur = (await readTables()).users
-                const reversed = cur.slice().reverse()
-                const resp = await callRpc('updateUsers', [reversed], TOKEN_ADMIN)
-                assert.ok(resp.ok, `另一端重排 updateUsers 應成功, 實得 ${JSON.stringify(resp)}`)
+                //另一端重排: 把現有 users 整表反序(後台列走 updateUsers、外部列走同步端點重送並給反序 order; run07 外部列 order 由外部擁有, 見 reverseTableByOtherEnd)
+                const reversed = await reverseTableByOtherEnd('users')
                 const expectIds = reversed.map((v) => v.id).join(',')
                 await waitUntilExist(page, 'store 內 users 已依新 order 重排', (ids) => {
                     const us = (window.$vo.$store.state.users || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0))
@@ -684,10 +709,8 @@ describe('e2e-array-form (陣列形式授權資料: 編輯器顯示與存檔, �
                 await openColDialog(page, k, 'belongGrups', 'pemiBlngEditGrups')
                 const rows = await readDlgRows(page, 'name')
                 assert.strict.equal(rows['權限群組M1']?.enable, false, '前提: M1 不含 arr-p')
-                const cur = (await readTables()).grups
-                const reversed = cur.slice().reverse()
-                const resp = await callRpc('updateGrups', [reversed], TOKEN_ADMIN)
-                assert.ok(resp.ok, `另一端重排 updateGrups 應成功, 實得 ${JSON.stringify(resp)}`)
+                //另一端重排: 同 AF-014a(整表反序; 後台列走 updateGrups、外部列走同步端點)
+                const reversed = await reverseTableByOtherEnd('grups')
                 const expectIds = reversed.map((v) => v.id).join(',')
                 await waitUntilExist(page, 'store 內 grups 已依新 order 重排', (ids) => {
                     const gs = (window.$vo.$store.state.grups || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0))
@@ -835,10 +858,8 @@ describe('e2e-array-form (陣列形式授權資料: 編輯器顯示與存檔, �
                 await openColDialog(page, k, 'cgrups', 'userEditCgrups')
                 const rows = await readDlgRows(page, 'name')
                 assert.strict.equal(rows['權限群組M1']?.enable, false, '前提: arr-u 之 M1 為停用')
-                const cur = (await readTables()).users
-                const reversed = cur.slice().reverse()
-                const resp = await callRpc('updateUsers', [reversed], TOKEN_ADMIN)
-                assert.ok(resp.ok, `另一端重排 updateUsers 應成功, 實得 ${JSON.stringify(resp)}`)
+                //另一端重排: 同 AF-014a(整表反序; 後台列走 updateUsers、外部列走同步端點)
+                const reversed = await reverseTableByOtherEnd('users')
                 const expectIds = reversed.map((v) => v.id).join(',')
                 await waitUntilExist(page, 'store 內 users 已依新 order 重排', (ids) => {
                     const us = (window.$vo.$store.state.users || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0))
@@ -2171,8 +2192,9 @@ describe('e2e-array-form run05 衝突之收嚴與提示 (R-PRINCIPLE-00; 語意�
 
         before(async function() {
             this.timeout(400000)
-            //預設對應鍵(id)下同步允許停用之同名使用者; 再以臨時設定重啟後端為 mappingBy='name'(DB 保留)
-            await syncRows('users', [mkU('id-john-off', 'john', '{}', { email: 'john-off@example.com', isActive: 'n' })], F5)
+            //預設對應鍵(id)下允許新增停用之同名使用者; 再以臨時設定重啟後端為 mappingBy='name'(DB 保留)。
+            //run07(F-23): john-off 須為「後台列」(from ''): 外部列之身分欄(含說明)與「是否有效」後台唯讀、不可編輯, 本案要驗之「後台改啟用撞名被拒」只可能發生於後台列; 故前置改以後台寫入 RPC 新增(原經同步端點建為外部列)
+            await editTable('users', (rows) => [...rows, rowU6('id-john-off', 'john', '{}', { email: 'john-off@example.com', isActive: 'n' })])
             await restartBackend(genTempSettings({ mappingBy: 'name' }))
             snapMk = await readTables()
         })
@@ -2259,6 +2281,11 @@ async function editTable(kt, fn) {
     assert.ok(res.ok, `夾具 ${fnName} 應成功, 實得 ${JSON.stringify(res).slice(0, 300)}`)
 }
 
+//run07(F-23 外部列受保護): 後台寫入 RPC(updateXxx)不得新增外部列(from 非空者被拒 saveFromNotAllowed), 故本段夾具之「外部來源列」(ren-ext、ren-gx、del-ue、del-ge)改經外部同步端點建立於分區 EXT6;
+//  其餘(被改名／被刪除之主體與其他引用端)一律為後台列(from ''), 以管理者寫入 RPC 新增——改名／刪除之主體須後台可改可刪; 外部來源引用端之 cgrups／cpemis 為指派欄, 由伺服端引用連帶改寫(不受守門限制).
+//  外部列之 order 由外部給(EXT6_ORDER 大於後台列之陣列位置, 使其排在清單最後, 與修前「追加於表尾」之列序一致); 案後 restoreTables 先以 purgeExternalRows 清外部夾具再還原(R-E2E-ISO-01)
+const EXT6 = 'teamA'
+const EXT6_ORDER = 300
 //AF-036／041 夾具: 群組 ren-g(cpemis 為 P3 與 P1, 啟用樹 G = P1 ∪ P3)、無人引用之 ren-lone; 使用者 ren-u(物件形式, OR 引用 ren-g)、ren-ua(陣列形式, OR 引用 ren-g 與 M1)、
 //  ren-ext(from=teamA 外部來源; OR 引用 M1、AND 引用 ren-g)——三者之授權互異, 且 ren-ext 之 AND 使「懸空 ⇒ 空」與「已更新 ⇒ M1 ∩ G」可分辨
 const REN_G_WANT = {
@@ -2274,8 +2301,8 @@ async function seedRenGrup() {
     await editTable('users', (rows) => [...rows,
         rowU6('id-ren-u', 'ren-u', { 'ren-g': ON5('OR') }),
         rowU6('id-ren-ua', 'ren-ua', [{ name: 'ren-g', mode: 'OR', isActive: 'y' }, { name: '權限群組M1', mode: 'OR', isActive: 'y' }]),
-        rowU6('id-ren-ext', 'ren-ext', { '權限群組M1': ON5('OR'), 'ren-g': ON5('AND') }, { from: 'teamA' }),
     ])
+    await syncRows('users', [rowU6('id-ren-ext', 'ren-ext', { '權限群組M1': ON5('OR'), 'ren-g': ON5('AND') }, { order: EXT6_ORDER })], EXT6)
 }
 
 //AF-037 夾具: 權限 ren-p(啟用 { A, BB }); 群組 ren-g1(物件形式, OR 引用)、ren-gx(from=teamA 外部來源; OR 引用 P1、AND 引用 ren-p)、ren-gy(陣列形式, OR 引用 ren-p 與 P2); 各由一位使用者 OR 引用以觀察最終授權
@@ -2288,9 +2315,9 @@ async function seedRenPemi() {
     await editTable('pemis', (rows) => [...rows, rowP6('id-ren-p', 'ren-p', { [T_A]: 'y', [T_BB]: 'y' })])
     await editTable('grups', (rows) => [...rows,
         rowG6('id-ren-g1', 'ren-g1', { 'ren-p': ON5('OR') }),
-        rowG6('id-ren-gx', 'ren-gx', { '權限P1': ON5('OR'), 'ren-p': ON5('AND') }, { from: 'teamA' }),
         rowG6('id-ren-gy', 'ren-gy', [{ name: 'ren-p', mode: 'OR', isActive: 'y' }, { name: '權限P2', mode: 'OR', isActive: 'y' }]),
     ])
+    await syncRows('grups', [rowG6('id-ren-gx', 'ren-gx', { '權限P1': ON5('OR'), 'ren-p': ON5('AND') }, { order: EXT6_ORDER })], EXT6)
     await editTable('users', (rows) => [...rows,
         rowU6('id-ren-pu1', 'ren-pu1', { 'ren-g1': ON5('OR') }),
         rowU6('id-ren-pu2', 'ren-pu2', { 'ren-gx': ON5('OR') }),
@@ -2317,8 +2344,8 @@ async function seedDelGrup() {
         rowU6('id-del-uo', 'del-uo', { 'del-g': ON5('OR'), '權限群組M1': ON5('OR') }),
         rowU6('id-del-ua', 'del-ua', { '權限群組M1': ON5('OR'), 'del-g': ON5('AND') }),
         rowU6('id-del-ud', 'del-ud', { '權限群組M2': ON5('OR'), 'del-g': OFF5('AND') }),
-        rowU6('id-del-ue', 'del-ue', { '權限群組M1': ON5('OR'), 'del-g': ON5('AND') }, { from: 'teamA' }),
     ])
+    await syncRows('users', [rowU6('id-del-ue', 'del-ue', { '權限群組M1': ON5('OR'), 'del-g': ON5('AND') }, { order: EXT6_ORDER })], EXT6)
 }
 
 //AF-039 夾具: 權限 del-p(啟用 { C, TODO }); 引用之群組 del-go(OR)、del-ga(AND)、del-gd(停用之 AND)、del-ge(from=teamA 外部來源, AND); 使用者 del-pu-o／del-pu-a 各 OR 引用 del-go／del-ga 以觀察授權
@@ -2336,8 +2363,8 @@ async function seedDelPemi() {
         rowG6('id-del-go', 'del-go', { 'del-p': ON5('OR'), '權限P2': ON5('OR') }),
         rowG6('id-del-ga', 'del-ga', { '權限P1': ON5('OR'), 'del-p': ON5('AND') }),
         rowG6('id-del-gd', 'del-gd', { '權限P2': ON5('OR'), 'del-p': OFF5('AND') }),
-        rowG6('id-del-ge', 'del-ge', { '權限P1': ON5('OR'), 'del-p': ON5('AND') }, { from: 'teamA' }),
     ])
+    await syncRows('grups', [rowG6('id-del-ge', 'del-ge', { '權限P1': ON5('OR'), 'del-p': ON5('AND') }, { order: EXT6_ORDER })], EXT6)
     await editTable('users', (rows) => [...rows,
         rowU6('id-del-pu-o', 'del-pu-o', { 'del-go': ON5('OR') }),
         rowU6('id-del-pu-a', 'del-pu-a', { 'del-ga': ON5('OR') }),
@@ -2387,8 +2414,8 @@ describe('e2e-array-form run06 引用連帶: 改名預覽確認、刪除確認�
     // ----- 群組改名: 儲存前之預覽確認框(spec 流程_後台群組清單 E2E-015) -----
     for (const lang of LANGS) {
         it(`AF-036-rename-grup-preview [${lang}]: (spec 流程_後台群組清單 E2E-015) 改名 ren-g→ren-g-new(另改無人引用之 ren-lone)後按儲存 → 確認框(confirmSaveRenameRefsExtGrup: 3 位使用者、名單只列有人引用之 ren-g→ren-g-new、1 位外部來源之警示); 按否不送出(DB 零變更、改名與儲存鈕保留); 再儲存按是 → 成功彈窗附已一併更新 3 位使用者(grupSaveGrupsSuccessCascade)、引用端 cgrups 已改寫(物件仍物件、陣列仍陣列)、各使用者授權與改名前逐位相同`, async function() {
-            await seedRenGrup()
             try {
+                await seedRenGrup()
                 await withPageLang(lang, async (page) => {
                     //6 步 user path: ①群組頁 ②雙擊名稱格輸入新名(Enter 提交; 清單進入已修改) ③按儲存 ④看到確認框(筆數、舊→新名單、外部來源警示) ⑤按否／再儲存按是 ⑥看到結果彈窗, DB 與授權符合
                     for (const [id, want] of Object.entries(REN_G_WANT)) {
@@ -2458,8 +2485,8 @@ describe('e2e-array-form run06 引用連帶: 改名預覽確認、刪除確認�
     // ----- 權限改名: 儲存前之預覽確認框(spec 流程_後台權限清單 E2E-015) -----
     for (const lang of LANGS) {
         it(`AF-037-rename-pemi-preview [${lang}]: (spec 流程_後台權限清單 E2E-015) 改名 ren-p→ren-p-new 後按儲存 → 確認框(confirmSaveRenameRefsExtPemi: 3 個群組、ren-p→ren-p-new、1 個外部來源群組之警示); 按否不送出(DB 零變更、改名與儲存鈕保留); 再儲存按是 → 成功彈窗附已一併更新 3 個群組(pemiSavePemisSuccessCascade)、群組 cpemis 已改寫(物件仍物件、陣列仍陣列)、各使用者授權與改名前逐位相同`, async function() {
-            await seedRenPemi()
             try {
+                await seedRenPemi()
                 await withPageLang(lang, async (page) => {
                     //6 步 user path 同 AF-036(權限頁; 引用端為群組之 cpemis)
                     for (const [id, want] of Object.entries(REN_P_WANT)) {
@@ -2518,8 +2545,8 @@ describe('e2e-array-form run06 引用連帶: 改名預覽確認、刪除確認�
     // ----- 群組刪除確認之筆數與連帶清理(spec 流程_後台群組清單 E2E-014 補強) -----
     for (const lang of LANGS) {
         it(`AF-038-delete-grup-counts [${lang}]: (spec 流程_後台群組清單 E2E-014 補強) 刪除被 4 位使用者引用之 del-g(OR 者、啟用之 AND 者 2 位、停用之 AND 者、外部來源 AND 者) → 確認框 n=4(OR 與停用者計入)、m=2(只計啟用之 AND); 按否保留; 按是只自清單移除; 儲存後 4 位使用者之 cgrups 已移除 del-g(其餘項目不變)、授權依 AND 限制解除重算、成功彈窗為原文字(grupSaveGrupsSuccess)`, async function() {
-            await seedDelGrup()
             try {
+                await seedDelGrup()
                 await withPageLang(lang, async (page) => {
                     for (const [id, want] of Object.entries(DEL_G_BEFORE)) {
                         assert.deepEqual(await getResolvedActiveTargets(page, id), want, `刪除前 ${id} 之授權(由 base seed 規則集推導)`)
@@ -2554,8 +2581,8 @@ describe('e2e-array-form run06 引用連帶: 改名預覽確認、刪除確認�
     // ----- 權限刪除確認之筆數與連帶清理(spec 流程_後台權限清單 E2E-014 補強) -----
     for (const lang of LANGS) {
         it(`AF-039-delete-pemi-counts [${lang}]: (spec 流程_後台權限清單 E2E-014 補強) 刪除被 4 個群組引用之 del-p(OR 者、啟用之 AND 者 2 個、停用之 AND 者、外部來源 AND 者) → 確認框 n=4、m=2; 按否保留; 按是只自清單移除; 儲存後 4 個群組之 cpemis 已移除 del-p(其餘項目不變)、授權依 AND 限制解除重算、成功彈窗為原文字(pemiSavePemisSuccess)`, async function() {
-            await seedDelPemi()
             try {
+                await seedDelPemi()
                 await withPageLang(lang, async (page) => {
                     for (const [id, want] of Object.entries(DEL_P_BEFORE)) {
                         assert.deepEqual(await getResolvedActiveTargets(page, id), want, `刪除前 ${id} 之授權(由 base seed 規則集推導)`)
@@ -2591,8 +2618,8 @@ describe('e2e-array-form run06 引用連帶: 改名預覽確認、刪除確認�
     // ----- 改名被伺服端預檢拒絕: 不彈確認框、照常送出並顯示失敗彈窗(spec 流程_後台群組清單 E2E-016) -----
     for (const lang of LANGS) {
         it(`AF-040-rename-rejected [${lang}]: (spec 流程_後台群組清單 E2E-016) rej-u 以啟用引用不存在之 Ghost(懸空)並引用 rej-g; 把 rej-g 改名為 Ghost 後按儲存 → 不彈確認框、直接顯示失敗彈窗(grupSaveGrupsFail: renameCascadeNameInUse); DB 三表零變更、清單仍為已修改`, async function() {
-            await seedRej()
             try {
+                await seedRej()
                 await withPageLang(lang, async (page) => {
                     const db0 = await snapAll()
                     await gotoGrups(page)
@@ -2617,8 +2644,8 @@ describe('e2e-array-form run06 引用連帶: 改名預覽確認、刪除確認�
     // ----- 名單截斷: 一次改名 6 個權限, 確認框只列前 5 個並附總數(spec 流程_後台權限清單 E2E-015 補強) -----
     for (const lang of LANGS) {
         it(`AF-042-rename-pemi-list-truncated [${lang}]: (spec 流程_後台權限清單 E2E-015 補強) 一次改名被同一群組引用之 6 個權限(tr-p1～tr-p6 → tr-q1～tr-q6) → 確認框(confirmSaveRenameRefsPemi: 1 個群組)之名單只列前 5 個舊→新並附 cascadeListMore(共 6 個); 按是 → 成功彈窗附已更新 1 個群組, tr-g 之 6 個引用皆已改名`, async function() {
-            await seedTrunc()
             try {
+                await seedTrunc()
                 await withPageLang(lang, async (page) => {
                     const db0 = await snapAll()
                     await gotoPemis(page)
@@ -2671,8 +2698,8 @@ describe('e2e-array-form run06 引用連帶: 改名預覽確認、刪除確認�
 
         for (const lang of LANGS) {
             it(`AF-041-cascade-off [${lang}]: (spec 流程_後台群組清單 E2E-017) 後端 cascadeRename:false(webInfor 帶旗標)下把 ren-g 改名為 ren-g-new 後按儲存 → 不彈改名確認框、成功彈窗為原文字(grupSaveGrupsSuccess, 不附筆數); DB 中使用者之引用未改寫(仍為 ren-g)、授權依懸空收嚴; 使用者頁三位引用者之 cgrups 儲存格出現懸空警告圖示`, async function() {
-                await seedRenGrup()
                 try {
+                    await seedRenGrup()
                     await withPageLang(lang, async (page) => {
                         assert.strict.equal(await page.evaluate(() => window.$vo.$store.state.webInfor.cascadeRename), false, '前提: 前端取得之 webInfor.cascadeRename 為 false(後端已以 cascadeRename:false 重啟)')
                         //改名前之授權同 AF-036(夾具相同)
