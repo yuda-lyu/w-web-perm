@@ -10,7 +10,7 @@ import { REF_OF, rewriteRefs } from './refCascade.mjs'
 //懸空引用稽核(升版一次性清理工具之核心; 規則帳本 R-REF-CASCADE-01 之配套, 適用表 n 上線前之舊資料可能已有懸空引用):
 //  users.cgrups 引用不存在之群組名、grups.cpemis 引用不存在之權限名、pemis.crules 引用不存在之管控對象 id.
 //  清理＝把懸空項目自授權字串移除(不論 isActive), 效果等同舊版「找不到即忽略」; 改寫一律經 refCascade.rewriteRefs(物件形式仍物件、陣列形式仍陣列、未命中者同一字串), 不另寫一套.
-//本檔為純函數(不依賴 Vue／DOM／ORM), 供離線稽核(test/tools/authRefsAudit.mjs)、一次性清理(test/tools/authRefsClean.mjs／g_authRefsClean.mjs)與日後頁面共用.
+//本檔為純函數(不依賴 Vue／DOM／ORM), 供離線稽核(server/tools/authRefsAudit.mjs)、一次性清理(server/tools/authRefsClean.mjs／g_authRefsClean.mjs)與日後頁面共用.
 
 
 //EFFECT: 懸空項目對授權之影響說明(item.effect 之碼 → 文字; 依 src/plugins/mShare.mjs 之 mergeRules, R-AUTH-MERGE-00／R-PRINCIPLE-00 c)

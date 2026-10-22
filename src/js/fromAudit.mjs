@@ -6,7 +6,7 @@ import { getDelImpact } from './getDelRefCount.mjs'
 //來源欄 from 之稽核、型別正規化與「整來源清除」規劃(run07 升版維運工具之核心; F-23 外部列受保護、規則帳本 R-PRINCIPLE-00 原則 5):
 //  外部列＝from 為非空字串者(externalRows.isExternalRow, 單一擁有者, 本檔不另寫判準); from 為 ''、缺欄、非字串(null／數字／布林／物件)者為後台列.
 //  升版後外部列於後台唯讀(不得改、不得刪), 故升版前舊資料之「非空 from」列將成為唯讀; 非字串 from 後台寫入起被拒收.
-//本檔為純函數(不依賴 Vue／DOM／ORM／fs), 供離線維運腳本 g_fixFromType.mjs／g_purgeFrom.mjs(經 test/tools/fromTools.mjs)與單元測試共用;
+//本檔為純函數(不依賴 Vue／DOM／ORM／fs), 供離線維運腳本 g_fixFromType.mjs／g_purgeFrom.mjs(經 server/tools/fromTools.mjs)與單元測試共用;
 //所有函數不改輸入; 輸出之 id 與名稱僅供離線工具列印於 stdout, 不得寫入 srLog(規則帳本: 日誌不記 id／個資).
 
 

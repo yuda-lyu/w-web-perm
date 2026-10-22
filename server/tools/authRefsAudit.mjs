@@ -1,7 +1,7 @@
 //懸空引用之離線稽核工具(適用表 n 上線後之升版前盤點; 規則帳本 R-REF-CASCADE-01 之配套; 不屬測試, 只讀匯出檔、不寫庫).
 //
-//用法(自專案根):
-//  node test/tools/authRefsAudit.mjs <匯出檔.json> [--json] [--clean-out <檔>]
+//用法(自專案根; 套件安裝後此檔位於 node_modules/w-web-perm/server/tools/, 以該路徑執行即可, 匯出檔路徑相對於目前工作目錄):
+//  node server/tools/authRefsAudit.mjs <匯出檔.json> [--json] [--clean-out <檔>]
 //
 //  匯出檔內容 { users, grups, pemis, targets }(各為列陣列, 如以資料通道 select 之結果或 g_backupDb.mjs 之備份整理而得)。
 //  --json       輸出結構化結果 { items, counts, changes, badJson, unnamed, unsafe, noId, widen }(供其他工具), 省略則輸出文字報告.
@@ -18,7 +18,7 @@
 
 import fs from 'fs'
 import path from 'path'
-import { pathToFileURL } from 'url'
+import isMain from './isMain.mjs'
 import auditRefs, { EFFECT } from '../../src/js/refAudit.mjs'
 
 
@@ -134,13 +134,13 @@ function formatReport(rp, opt = {}) {
 
 
 //CLI
-if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
+if (isMain(import.meta.url)) {
     let args = process.argv.slice(2)
     let iOut = args.indexOf('--clean-out')
     let cleanOut = (iOut >= 0) ? args[iOut + 1] : undefined
     let fp = args.find((a, k) => !a.startsWith('--') && !(iOut >= 0 && k === iOut + 1))
     if (!fp || (iOut >= 0 && (cleanOut === undefined || cleanOut.startsWith('--')))) {
-        console.log('用法: node test/tools/authRefsAudit.mjs <匯出檔.json> [--json] [--clean-out <檔>]')
+        console.log('用法: node server/tools/authRefsAudit.mjs <匯出檔.json> [--json] [--clean-out <檔>]')
         process.exit(2)
     }
     //輸出不得覆寫輸入(同一檔; 以解析後之絕對路徑與已存在檔之 inode 判定): --clean-out 只含變更列之 id 與引用欄位, 覆寫匯出檔會使其遺失其餘列與欄位

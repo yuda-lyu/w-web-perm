@@ -292,7 +292,7 @@ describe('unit-validateRows (寫入前驗證之判準, ADR-026)', function() {
         return iWrite < 0 ? null : { validateFirst: iValidate >= 0 && iValidate < iWrite, no: lines[iWrite].no }
     }
 
-    it('SITE-NS-001 寫入站點全集: 僅 procCore.mjs、WWebPerm.mjs 與 cascadeWrite.mjs(引用連帶之引用端寫入與補償, ADR-036), 皆在第一個寫入呼叫之前呼叫 validateRowsBeforeWrite', function() {
+    it('SITE-NS-001 寫入站點全集: 後端執行期僅 procCore.mjs、WWebPerm.mjs 與 cascadeWrite.mjs(引用連帶之引用端寫入與補償, ADR-036), 皆在第一個寫入呼叫之前呼叫 validateRowsBeforeWrite; 另登記離線維運工具 tools/authRefsClean.mjs、tools/fromTools.mjs(不要求驗證)', function() {
         let fdServer = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'server')
         let found = {}
         let walk = (dir, rel) => { //遞迴(含 server/staLogs 等子目錄)
@@ -309,7 +309,10 @@ describe('unit-validateRows (寫入前驗證之判準, ADR-026)', function() {
             }
         }
         walk(fdServer, '')
-        assert.strict.deepEqual(Object.keys(found).sort(), ['WWebPerm.mjs', 'cascadeWrite.mjs', 'procCore.mjs'], `寫入站點檔案: ${JSON.stringify(found)}`)
+        //tools/: run08 自 test/tools 搬入 server/tools 之離線維運工具核心(R-SHIP-TOOLS-01; 後端須先停止, 自有備份與寫後回驗, 見 README Upgrade steps), 不是後端執行期之寫入站點,
+        //不要求 validateRowsBeforeWrite; 仍須逐一登記(新增任何寫 ORM 之檔案即紅), 以維持「寫入站點全集」之意義
+        const OFFLINE_TOOLS = ['tools/authRefsClean.mjs', 'tools/fromTools.mjs']
+        assert.strict.deepEqual(Object.keys(found).sort(), ['WWebPerm.mjs', 'cascadeWrite.mjs', 'procCore.mjs', ...OFFLINE_TOOLS], `寫入站點檔案: ${JSON.stringify(found)}`)
         assert.strict.ok(found['WWebPerm.mjs'].validateFirst && found['procCore.mjs'].validateFirst && found['cascadeWrite.mjs'].validateFirst, `須在第一個寫入之前驗證: ${JSON.stringify(found)}`)
         //資料通道只放行 select(寫入方法不得出現在其放行清單)
         let dc = sourceLines(path.join(fdServer, 'dataChannel.mjs'), 'code').map((l) => l.text).join('\n')

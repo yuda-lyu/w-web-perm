@@ -1,5 +1,5 @@
 //來源欄 from 之離線維運工具之執行核心(run07 升版工具; F-23 外部列受保護之配套): 由專案根之 g_fixFromType.mjs／g_purgeFrom.mjs 呼叫(連專案資料庫);
-//邏輯抽成可注入 woItems 之函數, 供單元測試以 ORM 替身與真 lmdb 臨時庫驗證(test/unit-fromAudit.test.mjs). 風格與安全機制同 test/tools/authRefsClean.mjs(runClean).
+//邏輯抽成可注入 woItems 之函數, 供單元測試以 ORM 替身與真 lmdb 臨時庫驗證(test/unit-fromAudit.test.mjs). 風格與安全機制同 server/tools/authRefsClean.mjs(runClean).
 //純函數(稽核、規劃、清除計畫)在 src/js/fromAudit.mjs; 本檔負責讀寫、備份、驗證與文字報告.
 //
 //共通安全機制(apply 之順序, 任一步失敗即中止、其後步驟不執行; 備份失敗時零寫入):
@@ -143,6 +143,25 @@ async function delRows(wo, table, ids) {
 }
 
 
+/**
+ * 值是否無法經 JSON 往返而保真(備份為 JSON 檔, 不保真者無法依備份還原原列)
+ *
+ * 以「JSON 編碼再解碼須與原值嚴格深度相等」判定(run07 增量外審 N3): 比逐型別列舉完備——NaN／±Infinity／bigint／Date(被編成字串)／自有 undefined(被丟棄)／陣列內 undefined(被改 null)／Buffer(被改物件)皆不相等;
+ * 無法 JSON 編碼者(bigint、循環參照)亦視為不保真. 同時供 server/tools/authRefsClean.mjs 之 runClean 使用(run08 外審 sol #2)
+ *
+ * @param {*} v 輸入任意值(如四表全部列之陣列)
+ * @returns {Boolean} 回傳不保真為 true
+ */
+function isJsonLossy(v) {
+    try {
+        return !isDeepStrictEqual(JSON.parse(JSON.stringify(v)), v)
+    }
+    catch (err) {
+        return true //bigint 等無法 JSON 編碼者
+    }
+}
+
+
 //backupBefore: 備份(a)整個資料庫 (b)四表全部列(wx); 成功回傳 null, 失敗回傳 { stage, err }
 async function backupBefore(p) {
     let { res, rows0, tool, meta, backupPath, backupDb, log } = p
@@ -150,17 +169,8 @@ async function backupBefore(p) {
     //備份保真(外審 sol R11): 兩份備份皆為 JSON, NaN／±Infinity／bigint 等非 JSON 值會被存成 null 或失敗而無法還原原列, 筆數回驗不會發現;
     //列內含此類值時於任何備份與寫入之前中止(零寫入), 須人工處理該列
     res.stage = 'backupFidelity'
-    //以「JSON 編碼再解碼須與原列嚴格深度相等」判定(增量外審 N3): 比逐型別列舉完備——NaN／±Infinity／bigint／Date(被編成字串)／自有 undefined(被丟棄)／陣列內 undefined(被改 null)／Buffer(被改物件)皆不相等
-    let isLossy = (v) => {
-        try {
-            return !isDeepStrictEqual(JSON.parse(JSON.stringify(v)), v)
-        }
-        catch (err) {
-            return true //bigint 等無法 JSON 編碼者
-        }
-    }
     for (let t of TABLES) {
-        if (isLossy(rows0[t])) {
+        if (isJsonLossy(rows0[t])) {
             return { stage: 'backupFidelity', err: new Error(`backup would be lossy: table ${t} has a row that does not survive a JSON round trip (NaN, Infinity, bigint, Date, undefined, Buffer...); nothing was written. Please fix that row first`) }
         }
     }
@@ -712,4 +722,4 @@ async function runPurgeFrom(p = {}) {
 }
 
 
-export { TABLES, checkDbNotInUse, formatFromAudit, formatFixReport, formatPurgeReport, runAuditFrom, runFixFromType, runPurgeFrom }
+export { TABLES, isJsonLossy, checkDbNotInUse, formatFromAudit, formatFixReport, formatPurgeReport, runAuditFrom, runFixFromType, runPurgeFrom }

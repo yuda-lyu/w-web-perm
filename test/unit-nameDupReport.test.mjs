@@ -1,4 +1,4 @@
-//名稱重複與對應鍵稽核工具之單元測試(F-02／F-14; 規則帳本 R-NAME-UNIQ-03). 受測: test/tools/nameDupReport.mjs(唯讀稽核; 輸入 { users, grups, pemis, targets }).
+//名稱重複與對應鍵稽核工具之單元測試(F-02／F-14; 規則帳本 R-NAME-UNIQ-03). 受測: server/tools/nameDupReport.mjs(唯讀稽核; 輸入 { users, grups, pemis, targets }).
 //
 //述語:
 //  ND-1 grups／pemis 同名組(精確 ===)逐組列出各筆 id／from／isActive／order, 單一名稱不列; 大小寫或空白不同不算同名;
@@ -12,11 +12,11 @@ import path from 'path'
 import crypto from 'crypto'
 import { execFileSync, spawnSync } from 'child_process'
 import { fileURLToPath } from 'url'
-import { buildReport, formatReport, decodeRefs } from './tools/nameDupReport.mjs'
+import { buildReport, formatReport, decodeRefs } from '../server/tools/nameDupReport.mjs'
 
 
 const projRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
-const TOOL = path.join(projRoot, 'test', 'tools', 'nameDupReport.mjs')
+const TOOL = path.join(projRoot, 'server', 'tools', 'nameDupReport.mjs')
 const TMP = path.join(projRoot, 'test', '_tmp', 'nameDupReport')
 
 

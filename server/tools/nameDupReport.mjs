@@ -1,8 +1,8 @@
 //名稱重複與使用者對應鍵之唯讀稽核工具(F-02／F-14; 規則帳本 R-NAME-UNIQ-03; ADR-034). 不屬測試, 不寫任何資料, 不提供自動刪除/改名——清理由管理者於後台逐一處理並確認授權.
 //
-//用法(自專案根):
-//  node test/tools/nameDupReport.mjs <匯出檔.json> [--mapping-by id|email|name] [--json]
-//  node test/tools/nameDupReport.mjs --audit <匯出檔.json> [--mapping-by id|email|name] [--json]   (同上; 與 authMergeReport.mjs --audit 寫法一致)
+//用法(自專案根; 套件安裝後此檔位於 node_modules/w-web-perm/server/tools/, 以該路徑執行即可, 匯出檔路徑相對於目前工作目錄):
+//  node server/tools/nameDupReport.mjs <匯出檔.json> [--mapping-by id|email|name] [--json]
+//  node server/tools/nameDupReport.mjs --audit <匯出檔.json> [--mapping-by id|email|name] [--json]   (同上; 與 authMergeReport.mjs --audit 寫法一致)
 //
 //  匯出檔內容 { users, grups, pemis, targets }(各為列陣列, 如以資料通道 select 之結果或資料庫匯出)。
 //  --mapping-by 省略時 email 與 name 皆報告(部署之 mappingBy 設定不在資料庫內); 給 id 則只查 id 缺漏(id 為主鍵, 不會重複).
@@ -20,7 +20,7 @@
 //  報告含 email(對應鍵)原文, 請妥善保管、勿外傳.
 
 import fs from 'fs'
-import { pathToFileURL } from 'url'
+import isMain from './isMain.mjs'
 import JSON5 from 'json5'
 import cvKpToArr from '../../src/js/cvKpToArr.mjs'
 
@@ -189,14 +189,14 @@ function formatReport(rp) {
 
 
 //CLI
-if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
+if (isMain(import.meta.url)) {
     let args = process.argv.slice(2)
     let iMap = args.indexOf('--mapping-by')
     let mappingBy = (iMap >= 0) ? args[iMap + 1] : undefined
     let iAudit = args.indexOf('--audit')
     let fp = (iAudit >= 0) ? args[iAudit + 1] : args.find((a, k) => !a.startsWith('--') && !(iMap >= 0 && k === iMap + 1))
     if (!fp || (iMap >= 0 && !['id', 'email', 'name'].includes(mappingBy))) {
-        console.log('用法: node test/tools/nameDupReport.mjs <匯出檔.json> [--mapping-by id|email|name] [--json]')
+        console.log('用法: node server/tools/nameDupReport.mjs <匯出檔.json> [--mapping-by id|email|name] [--json]')
         process.exit(2)
     }
     let data = JSON.parse(fs.readFileSync(fp, 'utf8'))

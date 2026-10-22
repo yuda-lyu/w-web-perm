@@ -19,6 +19,7 @@ import { isDeepStrictEqual } from 'util'
 import getDb from 'w-serv-orm/src/getDb.mjs'
 import now2strp from 'wsemi/src/now2strp.mjs'
 import { buildReport, formatReport } from './authRefsAudit.mjs'
+import { isJsonLossy } from './fromTools.mjs'
 
 
 const TABLES = ['users', 'grups', 'pemis', 'targets']
@@ -53,7 +54,7 @@ async function readTables(woItems) {
  * @param {String} [p.backupPath] 輸入引用端表之備份檔路徑, 預設 ./authRefsClean-backup-<時間戳>.json(相對工作目錄)
  * @param {Function} [p.backupDb] 輸入資料庫備份函數(回傳 Promise, reject 表失敗), 預設 getDb.backup(woItems)
  * @param {Function} [p.log] 輸入輸出文字之函數, 預設 console.log
- * @returns {Promise<Object>} 回傳 { ok, apply, stage, err, audit, auditAfter, dbBackup, backupPath, written, failed, stale }; ok 為 false 時 stage 為失敗之階段(check／select／backupDb／backupRows／stale／write／verify), err 為訊息; 不 reject
+ * @returns {Promise<Object>} 回傳 { ok, apply, stage, err, audit, auditAfter, dbBackup, backupPath, written, failed, stale }; ok 為 false 時 stage 為失敗之階段(check／select／backupFidelity／backupDb／backupRows／stale／write／verify), err 為訊息; 不 reject
  */
 async function runClean(p = {}) {
     let woItems = p.woItems
@@ -111,6 +112,15 @@ async function runClean(p = {}) {
         res.ok = true
         res.stage = 'audit'
         return res
+    }
+
+    //備份保真(run08 外審 sol #2, 與 fromTools.backupBefore 同一判準 isJsonLossy): 引用端表備份為 JSON, NaN／±Infinity／bigint／Date／undefined／Buffer 等非 JSON 值會被存成 null 或別型,
+    //依備份還原即遺失原值而筆數回驗不會發現; 列內含此類值時於任何備份與寫入之前中止(零寫入), 須人工處理該列
+    res.stage = 'backupFidelity'
+    for (let t of TABLES) {
+        if (isJsonLossy(rows0[t])) {
+            return fail('backupFidelity', `backup would be lossy: table ${t} has a row that does not survive a JSON round trip (NaN, Infinity, bigint, Date, undefined, Buffer...); nothing was written. Please fix that row first`)
+        }
     }
 
     //(a) 備份整個資料庫

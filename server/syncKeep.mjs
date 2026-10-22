@@ -1,5 +1,6 @@
-//外部同步(WWebPerm.mjs:syncAndReplaceTabs)之兩個純函數(F-23; R-PRINCIPLE-00 原則 3、5; 規則帳本 R-EXT-OWN-01; ADR-037), 不依賴 ORM／Vue, 供單元測試:
+//外部同步(WWebPerm.mjs:syncAndReplaceTabs)之三個純函數(F-23; R-PRINCIPLE-00 原則 3、5; 規則帳本 R-EXT-OWN-01; ADR-037), 不依賴 ORM／Vue, 供單元測試:
 //  keepAssignOnMissing: users 列「payload 缺 cgrups 鍵」時保留庫內指派(指派欄屬後台, Lv1; 含該鍵則以外部為準)——修正前 ltdtmapping 缺鍵補 ''、delAll＋insert 即清掉後台已指派之群組(run06 已知限制④);
+//  keepAssignByEntity: grups 列缺 cpemis 鍵、pemis 列缺 crules 鍵時同樣保留(run08; 同為後台可寫之指派欄)——群組／權限無登入對應鍵, 實體身分依 id(無 id 者依名稱), 見該函數說明;
 //  countIdRenumber: 同一 from 同一批內出現「同名異 id」(疑似外部 id 重編)之筆數, 供 warn log 與頁面提示(外部 id 不穩定時, id 消失＝刪除會每次清理引用而抹掉後台指派, 不加開關, 以提示處理)
 
 
@@ -94,12 +95,101 @@ function keepAssignOnMissing({ rows, hasKey, rowsOldSameFrom, mappingBy = 'id', 
         else if (byMap && isStr(v[mappingBy]) && v[mappingBy] !== '') {
             let cands = oldByMap.get(v[mappingBy])
             o = (cands !== undefined && cands.length === 1) ? cands[0] : null
+
+            //對應鍵命中多筆(如同值之啟用與停用列)無從判定歸屬, 不取首筆而不保留; 須附提示, 計入 nConflict(收嚴＋提示, run08 外審 sol #3; 與 keepAssignByEntity 之無 id 同名多筆一致)
+            if (cands !== undefined && cands.length > 1) {
+                nConflict++
+            }
         }
         if (o === null || !hasOwn(o, key)) {
             return v
         }
 
         //保留值須能通過與外部寫入同一套寫入前驗證(外審 sol R4): 保留之歷史值若含會被 clearXSS 改寫之標記或非純量, 入庫時被改寫而使引用改指他名(增權), 一律不保留(視為空, 收嚴)
+        if (!isKeepable(o[key])) {
+            nSkip++
+            return v
+        }
+        nKeep++
+        return { ...v, [key]: o[key] }
+    })
+    return { rows: out, nKeep, nSkip, nConflict }
+}
+
+
+/**
+ * grups 列缺 cpemis 鍵、pemis 列缺 crules 鍵者, 以庫內同一 from 之同一實體之值取代(run08; 與 keepAssignOnMissing 同一精神: 指派欄屬後台, 同步不得靜默清掉; 含該鍵則以外部為準)
+ *
+ * 實體身分(群組／權限無登入對應鍵, 不適用 mappingBy 之矛盾檢查): 有 id 者依 id 對到庫內同一 from 之列; 無 id 者(寫入時 ORM 補隨機主鍵, 身分不穩定)依名稱, 與引用連帶(refCascade.fillIdlessIds)同一口徑:
+ * 對庫內同一 from 中 id 未被本批帶用、名稱相同之列, 須恰 1 筆(同名多筆為歷史同名, 不取首筆); 對不到者視為新實體, 維持缺鍵之預設('').
+ * 收嚴(原則 3, 不保留並計入 nConflict, 供呼叫端記 warn): ①無 id 而同名命中多筆; ②同 id 但名稱不同(改名)且 cascadeRename 為假——引用不跟著改時名稱即授權身分,
+ * 把舊名之指派移轉給新名, 會使原引用新名之使用者(懸空)取得該授權; ③同 id 改名而新舊名稱有一方非字串(歷史資料)——級聯無從處理(缺欄視 '', 同 refCascade.entName), 保留同樣會增權(run08 外審 sol #1).
+ *
+ * @param {Object} p 輸入參數物件
+ * @param {Array} p.rows 輸入已 ltdtmapping 並帶 from 之本批列
+ * @param {Array} p.hasKey 輸入 markHasKey 之結果(與 rows 同序同長)
+ * @param {Array} p.rowsOldSameFrom 輸入庫內同一 from 之既有列
+ * @param {String} p.key 輸入指派欄名稱('cpemis'｜'crules')
+ * @param {Boolean} [p.cascadeRename=true] 輸入改名是否連帶更新引用(opt.cascadeRename), 預設 true
+ * @param {Function} [p.isKeepable] 輸入判斷庫內值是否可保留之函數(收庫內值, 回布林), 預設恆可; 不可保留者不保留並計入 nSkip
+ * @returns {Object} 回傳 { rows, nKeep, nSkip, nConflict }: rows 為新陣列(被保留值之列為複本, 其餘同一參考), nKeep 為保留筆數, nSkip 為因 isKeepable 為假而未保留之筆數, nConflict 為因身分不確定而未保留之筆數
+ */
+function keepAssignByEntity({ rows, hasKey, rowsOldSameFrom, key, cascadeRename = true, isKeepable = () => true }) {
+    let nameOf = (r) => (r.name === undefined ? '' : r.name) //同 refCascade.entName: 缺欄視 ''
+    let idsBatch = new Set()
+    rows.forEach((v) => {
+        let id = toId(v)
+        if (id !== null) {
+            idsBatch.add(id)
+        }
+    })
+    let oldById = new Map()
+    let oldByName = new Map() //名稱 → 本批未帶用其 id 之既有列陣列(無 id 者之對應池)
+    rowsOldSameFrom.forEach((o) => {
+        if (!isObj(o) || !isStr(o.id)) {
+            return
+        }
+        oldById.set(o.id, o)
+        if (isStr(o.name) && !idsBatch.has(o.id)) {
+            if (!oldByName.has(o.name)) {
+                oldByName.set(o.name, [])
+            }
+            oldByName.get(o.name).push(o)
+        }
+    })
+    let nKeep = 0
+    let nSkip = 0
+    let nConflict = 0
+    let out = rows.map((v, k) => {
+        if (hasKey[k] === true || !isObj(v)) {
+            return v
+        }
+        let id = toId(v)
+        let o = null
+        if (id !== null) {
+            o = oldById.has(id) ? oldById.get(id) : null
+
+            //改名(同 id 異名)須「引用跟著改」才算同一實體: cascadeRename 為假時引用不跟著改; 為真時級聯只處理新舊名稱皆為字串之改名(refCascade.diffRefTargets: 缺欄視 '', 非字串不成實體),
+            //舊名稱為歷史非字串者無從級聯, 新名稱撞懸空名之檢查(renameCascadeNameInUse)亦不會觸發, 保留會把舊列之指派帶給原指向新名之懸空引用者, 同樣不保留(run08 外審 sol #1)
+            if (o !== null && nameOf(o) !== nameOf(v) && (cascadeRename === false || !isStr(nameOf(o)) || !isStr(nameOf(v)))) {
+                o = null
+                nConflict++
+            }
+        }
+        else if (isStr(v.name) && oldByName.has(v.name)) {
+            let cands = oldByName.get(v.name)
+            if (cands.length === 1) {
+                o = cands[0]
+            }
+            else {
+                nConflict++
+            }
+        }
+        if (o === null || !hasOwn(o, key)) {
+            return v
+        }
+
+        //保留值須能通過與外部寫入同一套寫入前驗證(同 keepAssignOnMissing): 不通過者不保留(視為空, 收嚴)
         if (!isKeepable(o[key])) {
             nSkip++
             return v
@@ -146,4 +236,4 @@ function countIdRenumber(rowsOldSameFrom, rows) {
 }
 
 
-export { markHasKey, keepAssignOnMissing, countIdRenumber }
+export { markHasKey, keepAssignOnMissing, keepAssignByEntity, countIdRenumber }

@@ -11,7 +11,7 @@ import validateRowsBeforeWrite from './validateRows.mjs'
 //  ① 全部預檢(含引用端改寫列之欄位驗證)於任何寫入之前完成, 失敗零變更;
 //  ② 先寫引用端(僅改寫之欄位, 經 procOrm 以操作者記為更新者), 再寫主體; 任一步以例外失敗, 即以「寫入前之原值」還原引用端(補償, 精確還原該欄位與更新者／更新時間),
 //     使資料回到寫入前之狀態再回報原錯誤, 重新操作不依賴「冪等重存」; 主體部分寫入之舊限制不變(ADR-013: 整表寫入為 del → insert → save 非交易, 其部分寫入之處置維持「重新整理後確認」, 本檔不補償主體);
-//  ③ 補償本身失敗(雙重故障)時回 saveCascadePartial 並記 srLog(event refCascade-restore-error, 帶引用端表名與列數, 不記個資值), 由稽核工具(test/tools/authRefsAudit.mjs)列出懸空引用後人工處置;
+//  ③ 補償本身失敗(雙重故障)時回 saveCascadePartial 並記 srLog(event refCascade-restore-error, 帶引用端表名與列數, 不記個資值), 由稽核工具(server/tools/authRefsAudit.mjs)列出懸空引用後人工處置;
 //  ④ 行程於引用端寫入後、主體寫入前崩潰者不在補償範圍(記憶體內無日誌), 同③以稽核工具處置.
 //鎖: 呼叫端須已以 withTabLocks 取得被引用表與引用端表之鎖(server/keyCheck.mjs); 本檔不取鎖.
 

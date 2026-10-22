@@ -41,7 +41,7 @@ import planRefChanges, { REF_OF, diffRefTargets } from '../src/js/refCascade.mjs
 import { findDupIndex, findKeyOtherFrom, withTabLocks, mapKeyOf, checkMapKeyBatch, pickUniqueUser } from './keyCheck.mjs'
 import { checkCascadePlan, writeWithCascade, buildSyncRowsNew } from './cascadeWrite.mjs'
 import { createAuthorizeExec, wrapOperOrm } from './dataChannel.mjs'
-import { markHasKey, keepAssignOnMissing, countIdRenumber } from './syncKeep.mjs'
+import { markHasKey, keepAssignOnMissing, keepAssignByEntity, countIdRenumber } from './syncKeep.mjs'
 
 
 /**
@@ -664,8 +664,10 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                 return Promise.reject(`invalidRows`)
             }
 
-            //hasCgrups: users 列是否自帶 cgrups 鍵(須於 ltdtmapping 缺鍵補 '' 之前記錄); 缺該鍵者於下方保留庫內指派(F-23, 指派欄屬後台, 見 syncKeep.mjs)
-            let hasCgrups = (keyTable === 'users') ? markHasKey(rows, 'cgrups') : null
+            //keyAssign／hasAssign: 後台可寫之指派欄(users.cgrups／grups.cpemis／pemis.crules; targets 無)及各列是否自帶該鍵(須於 ltdtmapping 缺鍵補 '' 之前記錄);
+            //缺該鍵者於下方保留庫內指派(F-23, 指派欄屬後台, 見 syncKeep.mjs)
+            let keyAssign = (keyTable === 'users') ? 'cgrups' : ((keyTable === 'grups') ? 'cpemis' : ((keyTable === 'pemis') ? 'crules' : null))
+            let hasAssign = (keyAssign !== null) ? markHasKey(rows, keyAssign) : null
 
             //save from
             rows = map(rows, (v, k) => {
@@ -789,13 +791,14 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                 }
             }
 
-            //外部同步 payload 缺 cgrups 鍵之 users 列保留庫內值(F-23; 主控定案: 指派欄屬後台, 同步不得清掉後台指派; 含該鍵則以外部為準): 修正前 ltdtmapping 缺鍵補 ''、delAll＋insert 即清空後台已指派之群組.
-            //只在確有缺鍵之列時才讀庫內(同一 from); 對應先依 id、無 id 者依 mappingBy(email／name)恰命中 1 筆, 對不到者視為新使用者(cgrups 維持 ''). grups.cpemis／pemis.crules 不在此列(未經主控裁示, 缺鍵仍清空,
-            //為較嚴之既有行為); select 失敗之處置同上段(toOutKey, 尚未寫入任何資料)
-            if (hasCgrups !== null && hasCgrups.some((b) => b === false)) {
+            //外部同步 payload 缺指派欄鍵之列保留庫內值(F-23; 主控定案: 指派欄屬後台, 同步不得清掉後台指派; 含該鍵則以外部為準): 修正前 ltdtmapping 缺鍵補 ''、delAll＋insert 即清空後台已指派者.
+            //三個指派欄(users.cgrups／grups.cpemis／pemis.crules; run08 起 cpemis／crules 比照 cgrups)皆是; 只在確有缺鍵之列時才讀庫內(同一 from).
+            //users: 對應先依 id、無 id 者依 mappingBy(email／name)恰命中 1 筆, 對不到者視為新使用者(維持 ''), 對應鍵矛盾者不保留(keepAssignOnMissing);
+            //grups／pemis: 無登入對應鍵, 實體身分依 id(無 id 者依名稱恰 1 筆; 改名而 cascadeRename 為假者不保留; keepAssignByEntity). select 失敗之處置同上段(toOutKey, 尚未寫入任何資料)
+            if (hasAssign !== null && hasAssign.some((b) => b === false)) {
                 let rsSame = null
                 try {
-                    rsSame = await woItems[keyTable].select({ from }) //此處 keyTable 恆為 users(hasCgrups 非 null); 非登入查找, 不經 pickUniqueUser(SITE-KC-004 只管登入反查)
+                    rsSame = await woItems[keyTable].select({ from }) //此處 keyTable 為 users／grups／pemis(hasAssign 非 null); users 非登入查找, 不經 pickUniqueUser(SITE-KC-004 只管登入反查)
                 }
                 catch (err) {
                     let raw = (typeof err === 'string') ? err : ((err && err.message) || String(err))
@@ -804,16 +807,17 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                     return Promise.reject(key)
                 }
                 //isKeepable: 保留值於 delAll 之前須再通過一次寫入前驗證(上方 validateRowsBeforeWrite 看到的是補出之空字串, 外審 sol R4); 不過者不保留(視為空, 收嚴), 只記筆數
-                let kr = keepAssignOnMissing({ rows, hasKey: hasCgrups, rowsOldSameFrom: rsSame, mappingBy, isKeepable: (val) => validateRowsBeforeWrite([{ id: 'keep', cgrups: val }]) === null })
+                let isKeepable = (val) => validateRowsBeforeWrite([{ id: 'keep', [keyAssign]: val }]) === null
+                let kr = (keyTable === 'users') ? keepAssignOnMissing({ rows, hasKey: hasAssign, rowsOldSameFrom: rsSame, mappingBy, isKeepable }) : keepAssignByEntity({ rows, hasKey: hasAssign, rowsOldSameFrom: rsSame, key: keyAssign, cascadeRename, isKeepable })
                 rows = kr.rows
                 if (kr.nKeep > 0) {
-                    srLog.info({ event: 'syncAndReplaceTabs-keepAssign', keyTable, from, field: 'cgrups', n: kr.nKeep })
+                    srLog.info({ event: 'syncAndReplaceTabs-keepAssign', keyTable, from, field: keyAssign, n: kr.nKeep })
                 }
                 if (kr.nSkip > 0) {
-                    srLog.warn({ event: 'syncAndReplaceTabs-keepAssign-skip', keyTable, from, field: 'cgrups', n: kr.nSkip, reason: 'notKeepable' })
+                    srLog.warn({ event: 'syncAndReplaceTabs-keepAssign-skip', keyTable, from, field: keyAssign, n: kr.nSkip, reason: 'notKeepable' })
                 }
                 if (kr.nConflict > 0) {
-                    srLog.warn({ event: 'syncAndReplaceTabs-keepAssign-skip', keyTable, from, field: 'cgrups', n: kr.nConflict, reason: 'mapKeyConflict' }) //對應鍵與 id 指向不同使用者, 指派不移轉而清空(收嚴須附提示; 不含個資值)
+                    srLog.warn({ event: 'syncAndReplaceTabs-keepAssign-skip', keyTable, from, field: keyAssign, n: kr.nConflict, reason: (keyTable === 'users') ? 'mapKeyConflict' : 'identityConflict' }) //users: 對應鍵與 id 指向不同使用者; grups／pemis: 同名多筆無從對應或改名而引用不跟著改; 指派不移轉而清空(收嚴須附提示; 不含個資值)
                 }
             }
 

@@ -1,5 +1,5 @@
 //來源欄 from 之離線維運工具之單元測試(run07 TOOLS; F-23 外部列受保護、規則帳本 R-PRINCIPLE-00 原則 5; 升版工具 g_fixFromType.mjs／g_purgeFrom.mjs).
-//受測站點: src/js/fromAudit.mjs(auditFrom／planFixFromType／planPurgeFrom／applyPurgePlan／planPurgeChain)、test/tools/fromTools.mjs(runAuditFrom／runFixFromType／runPurgeFrom／checkDbNotInUse／報告)、
+//受測站點: src/js/fromAudit.mjs(auditFrom／planFixFromType／planPurgeFrom／applyPurgePlan／planPurgeChain)、server/tools/fromTools.mjs(runAuditFrom／runFixFromType／runPurgeFrom／checkDbNotInUse／報告)、
 //          g_fixFromType.mjs、g_purgeFrom.mjs(連庫 CLI)、test/tools/dbHolder.mjs(測試輔助: 模擬後端占用資料庫).
 //
 //規格句(使用者裁示 run07 設計摘要 §1／§2, TOOLS 派工單):
@@ -44,7 +44,7 @@ import { isExternalRow } from '../src/js/externalRows.mjs'
 import { getDelImpact } from '../src/js/getDelRefCount.mjs'
 import { TABLE_ORDER, auditFrom, planFixFromType, planPurgeFrom, applyPurgePlan, planPurgeChain } from '../src/js/fromAudit.mjs'
 import { getUserRules } from '../src/plugins/mShare.mjs'
-import { checkDbNotInUse, formatFixReport, formatFromAudit, formatPurgeReport, runAuditFrom, runFixFromType, runPurgeFrom } from './tools/fromTools.mjs'
+import { checkDbNotInUse, formatFixReport, formatFromAudit, formatPurgeReport, runAuditFrom, runFixFromType, runPurgeFrom } from '../server/tools/fromTools.mjs'
 import { mkTable } from './tools/unitOrm.mjs'
 
 
@@ -1992,13 +1992,14 @@ describe('unit-fromAudit (來源欄 from 之稽核、型別正規化與整來源
         let read = (rel) => fs.readFileSync(path.join(projRoot, rel), 'utf8')
         //可執行碼行: 略過整行註解與行尾 // 註解(// 前須有空白)
         let codeOf = (rel) => read(rel).split(/\r?\n/).filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).map((l) => l.replace(/\s\/\/.*$/, '')).join('\n')
-        const FILES = ['src/js/fromAudit.mjs', 'test/tools/fromTools.mjs', 'g_fixFromType.mjs', 'g_purgeFrom.mjs']
+        const FILES = ['src/js/fromAudit.mjs', 'server/tools/fromTools.mjs', 'g_fixFromType.mjs', 'g_purgeFrom.mjs']
 
         it('FA-190 不寫 srLog、不引用 server／後端模組(離線工具; id 僅輸出至 stdout)', function() {
             for (let rel of FILES) {
                 let c = codeOf(rel)
                 assert.ok(!/\bsrLog\b/.test(c), `${rel} 不得出現 srLog`)
-                assert.ok(!/from\s+['"][^'"]*\bserver\//.test(c), `${rel} 不得匯入 server/`)
+                assert.ok(!/from\s+['"][^'"]*\bserver\/(?!tools\/)/.test(c), `${rel} 不得匯入 server/ 之後端模組(僅允許 server/tools/ 之離線工具核心)`)
+                assert.ok(!/from\s+['"]\.\.\/(?!\.\.\/)/.test(c), `${rel} 不得匯入 server/ 同層之後端模組(../x.mjs)`)
             }
         })
 
@@ -2025,7 +2026,7 @@ describe('unit-fromAudit (來源欄 from 之稽核、型別正規化與整來源
         })
 
         it('FA-193 刪除只經 fromTools.delRows 一處且僅 ORM 之 del(無 delAll／無 ORM insert／無 fs.rm* 於工具與腳本); 寫入前之占用偵測先於開啟資料庫', function() {
-            let t = codeOf('test/tools/fromTools.mjs')
+            let t = codeOf('server/tools/fromTools.mjs')
             assert.strictEqual((t.match(/\.del\(/g) || []).length, 1, 'ORM del 僅一處')
             assert.ok(!/delAll\(/.test(t) && !/\.insert\(/.test(t))
             assert.ok(!/fs\.(rm|rmdir|unlink)\w*\(/.test(t), '工具不刪檔')

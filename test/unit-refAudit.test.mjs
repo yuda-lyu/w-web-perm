@@ -1,5 +1,5 @@
 //懸空引用稽核與一次性清理之單元測試(run06 audit; 規則帳本 R-REF-CASCADE-01 之配套、適用表 n 之舊資料升版清理; Q9 auditRefs 稽核工具).
-//受測站點: src/js/refAudit.mjs(auditRefs)、test/tools/authRefsAudit.mjs(離線 CLI)、test/tools/authRefsClean.mjs(runClean)、g_authRefsClean.mjs(連庫 CLI).
+//受測站點: src/js/refAudit.mjs(auditRefs)、server/tools/authRefsAudit.mjs(離線 CLI)、server/tools/authRefsClean.mjs(runClean)、g_authRefsClean.mjs(連庫 CLI).
 //
 //規格句(使用者裁示, run06 設計摘要):
 //  S1 懸空引用＝引用名稱查無實體(users.cgrups→grups.name、grups.cpemis→pemis.name、pemis.crules→targets.id); 比對同伺服端 findRefRows(===、缺 name 視為 ''), crules 以 getPropKey 轉屬性鍵; 歷史同名(對到多列)不是懸空.
@@ -11,7 +11,7 @@
 //測試組成:
 //  RA-001～012  auditRefs(三種引用×物件／陣列×啟用／停用×OR／AND／mode 缺、widen／counts、歷史同名、空名稱、__proto__／constructor、非字串名稱、壞 JSON、changes 逐字、個資、冪等、與 findRefRows 互驗、Infinity／NaN 之 unsafe(外審 R2))
 //  RA-020～021  語意不變式(以真 src/plugins/mShare.mjs 之 getUserRules): 清理後＝自原始字串刪懸空項目後之結果(隨機宇宙 ≥ 2000 組、固定種子)、只放寬不收嚴、widen 旗標之健全性
-//  RA-030～037  離線 CLI test/tools/authRefsAudit.mjs(子行程, 逾時 30 秒); RA-035 unsafe 之報告; RA-036a～e／037 --clean-out 不得與輸入匯出檔為同一檔(外審 R3: 同一路徑、大小寫、相對／絕對、硬連結、符號連結、對照組)
+//  RA-030～037  離線 CLI server/tools/authRefsAudit.mjs(子行程, 逾時 30 秒); RA-035 unsafe 之報告; RA-036a～e／037 --clean-out 不得與輸入匯出檔為同一檔(外審 R3: 同一路徑、大小寫、相對／絕對、硬連結、符號連結、對照組)
 //  RA-040～049, 056～057  runClean(單元級 ORM 替身 mkTable); RA-056 unsafe 列不寫且寫後殘留不誤判失敗; RA-057 --backup 與既有檔同一檔之別名一律拒絕(wx)
 //  RA-050～055, 058  runClean 與 g_authRefsClean.mjs 對真 lmdb 臨時庫(test/_tmp/refAudit/<tag>/): 備份檔先於寫入、寫後 0 懸空、備份失敗零寫入; 預設連線(g_mOrm.mjs)於臨時工作目錄下驗證
 //站點全集(規則帳本盤點指令): rg -n "refAudit|authRefsAudit|authRefsClean|g_authRefsClean" src test g_*.mjs --glob '!tmp/**'
@@ -29,13 +29,13 @@ import ds from '../src/schema/index.mjs'
 import auditRefs from '../src/js/refAudit.mjs'
 import findRefRows from '../src/js/findRefRows.mjs'
 import { getUserRules } from '../src/plugins/mShare.mjs'
-import { buildReport, formatReport, cleanOutOf } from './tools/authRefsAudit.mjs'
-import { runClean } from './tools/authRefsClean.mjs'
+import { buildReport, formatReport, cleanOutOf } from '../server/tools/authRefsAudit.mjs'
+import { runClean } from '../server/tools/authRefsClean.mjs'
 import { mkTable } from './tools/unitOrm.mjs'
 
 
 const projRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
-const TOOL_AUDIT = path.join(projRoot, 'test', 'tools', 'authRefsAudit.mjs')
+const TOOL_AUDIT = path.join(projRoot, 'server', 'tools', 'authRefsAudit.mjs')
 const TOOL_CLEAN = path.join(projRoot, 'g_authRefsClean.mjs')
 const TMP = path.join(projRoot, 'test', '_tmp', 'refAudit')
 const DB_NAME = 'wperm' //同 g_getSettings.mjs
@@ -768,7 +768,7 @@ describe('unit-refAudit (懸空引用稽核與一次性清理)', function() {
     // 離線 CLI
     // ---------------------------------------------------------------
 
-    describe('離線 CLI(test/tools/authRefsAudit.mjs)', function() {
+    describe('離線 CLI(server/tools/authRefsAudit.mjs)', function() {
 
         let runAudit = (args, cwd = projRoot) => spawnSync(process.execPath, [TOOL_AUDIT, ...args], { encoding: 'utf8', timeout: 30000, cwd })
 
@@ -1159,6 +1159,39 @@ describe('unit-refAudit (懸空引用稽核與一次性清理)', function() {
             let res2 = await runClean({ woItems: wo2, apply: true, log, backupPath: mkDir('t48b'), backupDb: async () => {} })
             assert.strictEqual(res2.ok, false)
             assert.strictEqual(res2.stage, 'verify')
+        })
+
+        it('RA-059 備份保真(run08 外審 sol #2, 與 fromTools.backupBefore 同一判準 isJsonLossy): 四表任一列含無法 JSON 往返之值(NaN／Infinity／bigint／Date／自有 undefined／陣列內 undefined／Buffer)→ apply 於任何備份與寫入之前中止(stage backupFidelity), 零寫入、不備份資料庫、備份檔不產生; 預設只列不改與無須清理不受影響', async function() {
+            let bads = {
+                nan: { description: NaN },
+                inf: { description: Infinity },
+                big: { description: 10n },
+                date: { description: new Date('2020-01-02T00:00:00.000Z') },
+                undef: { description: undefined },
+                arrUndef: { tags: [undefined] },
+                buf: { blob: Buffer.from('ab') },
+            }
+            for (let [k, extra] of Object.entries(bads)) {
+                let fx = dirtyFx()
+                fx.targets[0] = { ...fx.targets[0], ...extra } //被備份但不被改寫之表亦須保真(備份含四表全部列)
+                let wo = mkWo(fx)
+                let fp = mkDir(`t59-${k}`)
+                let backups = 0
+                let { log } = mkLog()
+                let res = await runClean({ woItems: wo, apply: true, log, backupPath: fp, backupDb: async () => { backups++ } })
+                assert.strictEqual(res.ok, false, `${k}: 應中止`)
+                assert.strictEqual(res.stage, 'backupFidelity', `${k}: stage`)
+                assert.strictEqual(cntOf(wo), 0, `${k}: 零寫入`)
+                assert.strictEqual(backups, 0, `${k}: 不備份資料庫`)
+                assert.strictEqual(fs.existsSync(fp), false, `${k}: 備份檔不產生`)
+            }
+            //只列不改: 不檢查(不備份)
+            let fx2 = dirtyFx()
+            fx2.users[0] = { ...fx2.users[0], description: NaN }
+            let wo2 = mkWo(fx2)
+            let r2 = await runClean({ woItems: wo2, log: () => {}, backupPath: mkDir('t59-list'), backupDb: async () => {} })
+            assert.strictEqual(r2.ok, true)
+            assert.strictEqual(r2.stage, 'audit')
         })
 
         it('RA-049 參數檢查: woItems 缺表或缺 select/save 回 check 失敗而非拋出; 壞 JSON 列不被改動', async function() {

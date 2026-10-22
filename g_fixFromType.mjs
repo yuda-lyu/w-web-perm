@@ -4,7 +4,7 @@ import WOrm from 'w-orm-lmdb/src/WOrmLmdb.mjs'
 import WServOrm from 'w-serv-orm/src/WServOrm.mjs'
 import ds from './src/schema/index.mjs'
 import getSettings from './g_getSettings.mjs'
-import { checkDbNotInUse, runFixFromType } from './test/tools/fromTools.mjs'
+import { checkDbNotInUse, runFixFromType } from './server/tools/fromTools.mjs'
 
 
 //來源欄 from 之型別正規化(升版工具; F-23 外部列受保護, 規則帳本 R-PRINCIPLE-00 原則 5): 升版後後台寫入起拒收非字串 from, 既有資料中 from 為 null／數字／布林／物件／陣列者須先正規化為 ''(後台列).

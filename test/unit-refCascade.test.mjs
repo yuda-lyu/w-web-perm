@@ -2288,8 +2288,10 @@ describe('unit-refCascade (引用連帶純函數: 改名級聯與刪除清理, R
         })
 
         it('RC-503 server 端不得自行解析／序列化授權欄位: 無 JSON5 匯入; 無同一行同時出現 cgrups／cpemis／crules 與 JSON.parse／JSON.stringify／JSON5; 無直接賦值授權欄位', function() {
-            let j5 = scan(SERVER, /\bJSON5\b/)
+            //server/tools/nameDupReport.mjs(run08 自 test/tools 搬入, 隨套件出貨之離線唯讀稽核, R-SHIP-TOOLS-01)以 JSON5 解碼引用字串列出同名組之引用處, 為其本質且不改寫任何授權欄位; 此為唯一登記之例外(其餘檔案仍不得出現 JSON5)
+            let j5 = scan(SERVER.filter((fp) => rel(fp) !== 'server/tools/nameDupReport.mjs'), /\bJSON5\b/)
             assert.strictEqual(j5.length, 0, `server 端出現 JSON5:\n  ${fmt(j5)}`)
+            assert.ok(scan(SERVER.filter((fp) => rel(fp) === 'server/tools/nameDupReport.mjs'), /\bJSON5\b/).length >= 1, '登記之例外確實使用 JSON5(例外過期即應移除)')
             let both = scan(SERVER, /(cgrups|cpemis|crules)[^\n]*JSON\.(parse|stringify)|JSON\.(parse|stringify)[^\n]*(cgrups|cpemis|crules)/)
             assert.strictEqual(both.length, 0, `server 端自寫授權欄位序列化:\n  ${fmt(both)}`)
             let asg = scan(SERVER, reAssignAuth)

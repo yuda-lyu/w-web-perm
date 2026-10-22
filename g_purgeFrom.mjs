@@ -4,7 +4,7 @@ import WOrm from 'w-orm-lmdb/src/WOrmLmdb.mjs'
 import WServOrm from 'w-serv-orm/src/WServOrm.mjs'
 import ds from './src/schema/index.mjs'
 import getSettings from './g_getSettings.mjs'
-import { checkDbNotInUse, runAuditFrom, runPurgeFrom } from './test/tools/fromTools.mjs'
+import { checkDbNotInUse, runAuditFrom, runPurgeFrom } from './server/tools/fromTools.mjs'
 
 
 //來源欄 from 之整來源清除(升版工具; F-23 外部列受保護, 規則帳本 R-PRINCIPLE-00 原則 5): 升版後 from 為非空字串之列為外部列, 後台唯讀(不得改、不得刪);

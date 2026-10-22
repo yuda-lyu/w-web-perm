@@ -13,7 +13,7 @@
 //  SK-S3 庫內該列無此欄位(自有屬性)時不保留; 回傳 { rows, nKeep, nSkip }: rows 為新陣列(不改輸入), nKeep 為保留筆數, nSkip 為「可對應且庫內有該欄位, 但 isKeepable 為假而未保留」之筆數.
 //  SK-S6 (run07 外審 sol R4) 保留值須能原樣通過寫入前驗證: 呼叫端傳入 isKeepable(收庫內值, 回布林; 預設恆可), 為假者不保留(列原樣、不補鍵、計入 nSkip 不計 nKeep);
 //        庫內歷史值若含會被 clearXSS 改寫之標記或非純量, 入庫時被 ORM 改寫而使引用改指他名(增權), 一律不保留(視為空, 收嚴). isKeepable 只對「已對應到庫內列、庫內有該欄位且非含鍵列」之值呼叫(對不到／含鍵／矛盾者不呼叫).
-//        站點接線(server/WWebPerm.mjs:syncAndReplaceTabs): isKeepable = (val) => validateRowsBeforeWrite([{ id: 'keep', cgrups: val }]) === null, 位於 delAll 之前, nSkip>0 記 warn(syncAndReplaceTabs-keepAssign-skip, 不含值);
+//        站點接線(server/WWebPerm.mjs:syncAndReplaceTabs): isKeepable = (val) => validateRowsBeforeWrite([{ id: 'keep', [keyAssign]: val }]) === null(keyAssign 於 users 為 cgrups; run08 起 grups／pemis 之 cpemis／crules 共用同一接線, 其純函數見 unit-syncKeepEntity), 位於 delAll 之前, nSkip>0 記 warn(syncAndReplaceTabs-keepAssign-skip, 不含值);
 //        真後端行為由 API 層另測(本檔只做純函數層與站點之靜態斷言).
 //  SK-S4 id 重編偵測(外部 id 不穩定時, id 消失＝刪除會每次清理引用而抹掉後台指派, 故以 warn log 與頁面橫幅提示): 本批列帶 id 與其名稱, 庫內同一 from 有「同名、不同 id、且該舊 id 不在本批」之列 → 計入;
 //        同名同 id、舊 id 仍在本批、本批列無 id、非物件元素 → 不計; 筆數以本批列計.
@@ -338,6 +338,22 @@ describe('unit-syncKeep (外部同步保留指派欄與 id 重編偵測, F-23)',
             assert.ok(/if \(kr\.nConflict > 0\) \{[\s\S]{0,200}syncAndReplaceTabs-keepAssign-skip[\s\S]{0,200}mapKeyConflict/.test(txt))
         })
 
+        it('SK-041 (run08 外審 sol #3) 無 id、mappingBy=email／name 而對應鍵命中庫內同來源多筆(如同值之啟用與停用列)→ 不取首筆、不保留, 且計入 nConflict(收嚴須附提示; WWebPerm 記 mapKeyConflict); 命中 0 筆(新使用者)與恰 1 筆不計 nConflict; 不計格(SK-040 同型之補充)', function() {
+            let oldRows = [{ id: 'a', email: 'e@x.test', name: 'n1', cgrups: 'A' }, { id: 'b', email: 'e@x.test', name: 'n2', cgrups: 'B' }, { id: 'c', email: 'solo@x.test', name: 'n3', cgrups: 'C' }]
+            let run = (rows, mappingBy) => keepAssignOnMissing({ rows, hasKey: rows.map(() => false), rowsOldSameFrom: oldRows, mappingBy })
+            let multi = run([{ email: 'e@x.test' }], 'email')
+            assert.strict.equal('cgrups' in multi.rows[0], false)
+            assert.strict.deepEqual([multi.nKeep, multi.nSkip, multi.nConflict], [0, 0, 1])
+            let multiName = keepAssignOnMissing({ rows: [{ name: 'dup' }], hasKey: [false], rowsOldSameFrom: [{ id: 'a', name: 'dup', cgrups: 'A' }, { id: 'b', name: 'dup', cgrups: 'B' }], mappingBy: 'name' })
+            assert.strict.deepEqual([multiName.nKeep, multiName.nConflict], [0, 1])
+            let mixed = run([{ email: 'solo@x.test' }, { email: 'new@x.test' }, { email: 'e@x.test' }], 'email')
+            assert.strict.deepEqual(mixed.rows.map((r) => r.cgrups), ['C', undefined, undefined])
+            assert.strict.deepEqual([mixed.nKeep, mixed.nConflict], [1, 1], '恰 1 筆保留; 0 筆不計; 多筆計 1')
+            //mappingBy 為 id(預設)時無 id 者不依對應鍵對應, 不算矛盾
+            let byId = run([{ email: 'e@x.test' }], 'id')
+            assert.strict.deepEqual([byId.nKeep, byId.nConflict], [0, 0])
+        })
+
         //--- 批次、次序、不改輸入 ---
         it('SK-030 混合批次: 次序保持、各列獨立判定、nKeep 為被保留之列數', function() {
             cells.KA++
@@ -530,13 +546,15 @@ describe('unit-syncKeep (外部同步保留指派欄與 id 重編偵測, F-23)',
 
             let code = () => sourceLines(path.join(projRoot, 'server/WWebPerm.mjs'), 'code').map((l) => l.text).join('\n')
 
-            it('SITE-SK-001 syncAndReplaceTabs 呼叫 keepAssignOnMissing 時傳入 isKeepable, 其以 validateRowsBeforeWrite([{ id: \'keep\', cgrups: val }]) === null 判定; 呼叫位於 delAll 之前(保留值於破壞性寫入前驗證)', function() {
+            it('SITE-SK-001 syncAndReplaceTabs 呼叫 keepAssignOnMissing 時傳入 isKeepable, 其以 validateRowsBeforeWrite([{ id: \'keep\', [keyAssign]: val }]) === null 判定(run08 起 keyAssign 於 users 為 cgrups, 見 unit-syncKeepEntity SITE-KE-001); 呼叫位於 delAll 之前(保留值於破壞性寫入前驗證)', function() {
                 let c = code()
                 assert.strict.ok(/import validateRowsBeforeWrite from '\.\/validateRows\.mjs'/.test(c), '須匯入 validateRowsBeforeWrite')
-                let m = /keepAssignOnMissing\(\{([^\n]*)\}\)/.exec(c)
+                let m = /keepAssignOnMissing\(\{([^\n]*?)\}\)/.exec(c)
                 assert.strict.ok(m, '找不到 keepAssignOnMissing({...}) 呼叫')
-                assert.strict.ok(m[1].includes(`isKeepable: (val) => validateRowsBeforeWrite([{ id: 'keep', cgrups: val }]) === null`), `isKeepable 須以 validateRowsBeforeWrite 判定: ${m[1]}`)
+                assert.strict.ok(c.includes(`let isKeepable = (val) => validateRowsBeforeWrite([{ id: 'keep', [keyAssign]: val }]) === null`), 'isKeepable 須以 validateRowsBeforeWrite 判定')
+                assert.strict.ok(m[1].includes('isKeepable'), `須傳入 isKeepable: ${m[1]}`)
                 assert.strict.ok(m[1].includes('mappingBy'), '須傳入 mappingBy(R3 需要)')
+                assert.strict.ok(c.includes(`let keyAssign = (keyTable === 'users') ? 'cgrups'`), 'users 之指派欄須為 cgrups')
                 let iKeep = c.indexOf('keepAssignOnMissing({')
                 let iDelAll = c.indexOf('.delAll({ from })')
                 assert.strict.ok(iKeep > 0 && iDelAll > 0 && iKeep < iDelAll, 'keepAssignOnMissing 須位於 delAll 之前')
@@ -545,8 +563,8 @@ describe('unit-syncKeep (外部同步保留指派欄與 id 重編偵測, F-23)',
 
             it('SITE-SK-002 nSkip>0 記 warn 事件 syncAndReplaceTabs-keepAssign-skip, 只帶表名／來源／欄位／筆數／原因(不含值); nKeep>0 之 info 事件仍在', function() {
                 let c = code()
-                assert.strict.ok(/if \(kr\.nSkip > 0\) \{\s*srLog\.warn\(\{ event: 'syncAndReplaceTabs-keepAssign-skip', keyTable, from, field: 'cgrups', n: kr\.nSkip, reason: 'notKeepable' \}\)\s*\}/.test(c), 'warn 事件之條件與欄位')
-                assert.strict.ok(/if \(kr\.nKeep > 0\) \{\s*srLog\.info\(\{ event: 'syncAndReplaceTabs-keepAssign', keyTable, from, field: 'cgrups', n: kr\.nKeep \}\)\s*\}/.test(c), 'info 事件仍在')
+                assert.strict.ok(/if \(kr\.nSkip > 0\) \{\s*srLog\.warn\(\{ event: 'syncAndReplaceTabs-keepAssign-skip', keyTable, from, field: keyAssign, n: kr\.nSkip, reason: 'notKeepable' \}\)\s*\}/.test(c), 'warn 事件之條件與欄位(field 為 keyAssign, run08 起三表共用)')
+                assert.strict.ok(/if \(kr\.nKeep > 0\) \{\s*srLog\.info\(\{ event: 'syncAndReplaceTabs-keepAssign', keyTable, from, field: keyAssign, n: kr\.nKeep \}\)\s*\}/.test(c), 'info 事件仍在')
             })
 
         })
