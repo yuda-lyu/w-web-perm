@@ -1,0 +1,11 @@
+[quiet-run] exit=0 time=13m43s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261023-155216-perm-late2.log (5 行, 1 KB)
+[quiet-run] cmd: node tmp/perm-run01/late.mjs 12880 16:11 apiext,extEng
+[quiet-run] lock: 取得並已釋放(等待 4m40s)
+[quiet-run] 注意: 鎖 web-tests-b 之持有者 pid 12880 已不存在(殘留鎖,未自動移除,請告知主控): owner=w-web-perm pid=12880 since=Fri Oct 23 2026 14:44:32 GMT+0800 (台北標準時間) cmd=node tmp/perm-run01/chain.mjs 16:02 users,grups,pemis,targets,relaug,relagp,extrows,relapr,refcas,ce,apiaff,af
+== 最後 5 行(非空,不含上列失敗段落) ==
+[late] 15:56:57 主鏈 pid 12880 已結束
+[late] 15:56:57 開始 apiext
+[late] 15:58:34 結束 apiext: {"state":"pass","exit":0,"passing":87,"failing":0,"pending":0,"min":1.63,"end":"15:58:34"}
+[late] 15:58:34 開始 extEng
+[late] 16:05:59 結束 extEng: {"state":"FAIL","exit":3,"passing":27,"failing":3,"pending":0,"min":7.42,"end":"16:05:59"}
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)

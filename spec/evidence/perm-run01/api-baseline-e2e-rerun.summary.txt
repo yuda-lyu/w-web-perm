@@ -1,0 +1,22 @@
+[quiet-run] exit=0 time=16m52s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261023-141209-ce-ab-full2.log (68 行, 14 KB)
+[quiet-run] cmd: node node_modules/mocha/bin/mocha.js --no-parallel test/api-baseline.test.mjs test/e2e-concurrent-edit.test.mjs --reporter list --timeout 300000 --exit
+[quiet-run] lock: 取得並已釋放(等待 7m00s)
+== 統計 ==
+  60 passing (10m)
+== 最後 15 行(非空,不含上列失敗段落) ==
+    e2e-concurrent-edit (cht) E2E-011-pemis-open-editor-is-draft:   ✔ e2e-concurrent-edit (cht) E2E-011-pemis-open-editor-is-draft: 11604ms
+    e2e-concurrent-edit (cht) E2E-012-targets-open-editor-is-draft:   ✔ e2e-concurrent-edit (cht) E2E-012-targets-open-editor-is-draft: 11599ms
+    e2e-concurrent-edit (cht) E2E-013-users-open-editor-escape-then-rebuild:   ✔ e2e-concurrent-edit (cht) E2E-013-users-open-editor-escape-then-rebuild: 10598ms
+    e2e-concurrent-edit (cht) E2E-014-users-dialog-subject-replaced:   ✔ e2e-concurrent-edit (cht) E2E-014-users-dialog-subject-replaced: 10867ms
+    e2e-concurrent-edit (cht) E2E-015-grups-dialog-subject-replaced:   ✔ e2e-concurrent-edit (cht) E2E-015-grups-dialog-subject-replaced: 10760ms
+    e2e-concurrent-edit (cht) E2E-016-users-dialog-subject-replaced-then-edit:   ✔ e2e-concurrent-edit (cht) E2E-016-users-dialog-subject-replaced-then-edit: 11520ms
+    e2e-concurrent-edit (cht) E2E-017-users-reorder-by-other-detected:   ✔ e2e-concurrent-edit (cht) E2E-017-users-reorder-by-other-detected: 10506ms
+    e2e-concurrent-edit (cht) E2E-018-grups-reorder-by-other-detected:   ✔ e2e-concurrent-edit (cht) E2E-018-grups-reorder-by-other-detected: 10627ms
+    e2e-concurrent-edit (cht) E2E-019-users-external-order-shift-not-blocked:   ✔ e2e-concurrent-edit (cht) E2E-019-users-external-order-shift-not-blocked: 12088ms
+    e2e-concurrent-edit (cht) E2E-020-users-legacy-baseline-rejected:   ✔ e2e-concurrent-edit (cht) E2E-020-users-legacy-baseline-rejected: 10100ms
+    e2e-concurrent-edit (cht) E2E-021-users-frontend-baseline-equals-server:   ✔ e2e-concurrent-edit (cht) E2E-021-users-frontend-baseline-equals-server: 10390ms
+    e2e-concurrent-edit (cht) E2E-022-grups-frontend-baseline-equals-server:   ✔ e2e-concurrent-edit (cht) E2E-022-grups-frontend-baseline-equals-server: 10465ms
+    e2e-concurrent-edit (cht) E2E-023-pemis-frontend-baseline-equals-server:   ✔ e2e-concurrent-edit (cht) E2E-023-pemis-frontend-baseline-equals-server: 11391ms
+    e2e-concurrent-edit (cht) E2E-024-targets-frontend-baseline-equals-server:   ✔ e2e-concurrent-edit (cht) E2E-024-targets-frontend-baseline-equals-server: 10373ms
+  60 passing (10m)
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)

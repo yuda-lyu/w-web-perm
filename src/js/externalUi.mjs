@@ -1,4 +1,4 @@
-import { isExternalRow, getLockFields } from './externalRows.mjs'
+import { isExternalRow, getLockFields, normC } from './externalRows.mjs'
 
 
 //清單頁(標的／權限／群組／使用者)之外部列(from 為非空字串者)前端輔助純函數(F-23; R-PRINCIPLE-00 原則 3、5; 規則帳本 R-EXT-OWN-01; ADR-037): 不依賴 Vue／DOM／語系檔,
@@ -7,10 +7,6 @@ import { isExternalRow, getLockFields } from './externalRows.mjs'
 
 let isStr = (v) => typeof v === 'string'
 let isObj = (v) => v !== null && typeof v === 'object'
-
-
-//normV: 比對用正規化, 同 externalRows 之 checkExternalWrite(缺欄與 '' 視為同一; 其餘以 JSON 字串比對)
-let normV = (v) => JSON.stringify(v === undefined ? '' : v)
 
 
 /**
@@ -143,7 +139,7 @@ function getExternalEdits({ keyTable, keys, rowsNew, rowsOld }) {
             return
         }
         let r = newById.get(o.id)
-        if (r === undefined || fields.some((f) => normV(r[f]) !== normV(o[f]))) {
+        if (r === undefined || fields.some((f) => normC(r[f], f) !== normC(o[f], f))) {
             n++
             if (froms.indexOf(o.from) < 0 && froms.length < 5) {
                 froms.push(o.from)

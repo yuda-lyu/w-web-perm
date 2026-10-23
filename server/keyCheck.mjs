@@ -4,6 +4,8 @@ import findTouchedDup from '../src/js/findTouchedDup.mjs' //判準單一擁有�
 
 //名稱唯一(F-02)與使用者對應鍵(F-14)之判準, 單一擁有者(規則帳本 R-NAME-UNIQ-01／02、R-MAPKEY-01／02／03, ADR-034):
 //  外部同步(WWebPerm.mjs:syncAndReplaceTabs)、後台整表寫入(procCore.mjs:updateTabItems)、登入查找(WWebPerm.mjs:getTokenUser／getGenUserByKV)只呼叫本檔, 不複製判準.
+//同表寫入互斥(外審 sol R10): 外部同步與後台整表寫入對同一張表須共用同一把鎖(否則兩者各自「先檢查名稱／對應鍵、後寫入」可交錯而略過 F-02／F-14);
+//perm-run01 起該鎖即 w-serv-orm 實例之 withTabLocks(每表一鍵), 由下方 withTabLocks 以階層巢狀取得, 不再有套內自建之鎖鍵(tabWriteKey 已移除).
 //比對一律精確 ===(與伺服端 arrFinder 與 getTokenUser 之 select 一致; 不做大小寫／空白正規化: 正規化後比對會放行伺服端視為不同之名稱, 或拒絕伺服端視為不同之鍵).
 //鍵之值非字串者不參與重複比對(空／非字串另由呼叫端之 isestr 檢查負責). 以 Map／Set 計, 免原型鍵名(constructor、__proto__)誤判(規則帳本 R-KEY-01).
 
@@ -97,37 +99,26 @@ function findKeyOtherFrom(rows, rowsExist, from, key, opt = {}) {
 }
 
 
-/**
- * 同表寫入互斥鍵(外審 sol R10, D2 設計稿 (a) 之最小版): 外部同步(syncAndReplaceTabs)與後台整表寫入(updateTabItems)對同一張表須共用同一個 kmx 鍵,
- * 否則兩者各自「先檢查名稱／對應鍵、後寫入」可交錯——檢查後、寫入前對方已完成寫入, F-02／F-14 之全域唯一性被略過(終態同名兩列、授權取決於列序).
- * 兩條路徑內都不得再取同一個鍵(kmx 非可重入, 巢狀同鍵即死結): syncAndReplaceTabs 內只呼叫 procOrm／woItems, 不呼叫 updateTabItems.
- *
- * @param {String} keyTable 表名
- * @returns {String} 回傳 kmx 鍵
- */
-function tabWriteKey(keyTable) {
-    return 'tabWrite:' + keyTable
-}
-
-
-//取鎖階層(規則帳本 R-WRITE-LOCK-02, ADR-036): 引用鏈序「被引用者先、引用端後」targets → pemis → grups → users(引用端之階層恆高於被引用者); 所有需持多把表鎖之路徑(後台整表寫入、外部同步、日後之外部列保護／清源)只能經 withTabLocks 取鎖,
-//同一把鎖不巢狀(pmKeyMutex 非可重入, 巢狀同鍵與相反次序皆死結, D1 設計稿 probe-mutex 實測); 持鎖後才讀取、預檢與寫入, 使預檢與寫入涵蓋同一版本(外審 A.3)
+//取鎖階層(規則帳本 R-WRITE-LOCK-02, ADR-036; perm-run01 起鎖管理器改為 w-serv-orm 實例之 withTabLocks, R-LOCK-CORE-01): 引用鏈序「被引用者先、引用端後」targets → pemis → grups → users(引用端之階層恆高於被引用者);
+//所有寫入入口(後台整表寫入、外部同步、引用連帶之引用端寫入)取得的是**同一個**鎖管理器(WServOrm 回傳之 withTabLocks, 每表一鍵、不可重入), 與 w-serv-orm 之 guardWrite 共鎖.
+//多把表鎖一律由外而內「依階層」逐表巢狀取鎖(每層一次只宣告一張表), 不使用核心之多表一次宣告(其碼元序與階層序不同, 混用即成環);
+//同一把鎖不巢狀, 持鎖後才讀取、預檢與寫入, 使預檢與寫入涵蓋同一版本(外審 A.3)
 let TAB_LOCK_RANK = { targets: 0, pemis: 1, grups: 2, users: 3 }
 
 
 /**
- * 依取鎖階層取齊指定表鎖後執行 fn(單一取鎖函數): 表名去重、依 targets → pemis → grups → users 排序(階層外之表名排最後、彼此依字典序), 由外而內巢狀取 kmx(tabWriteKey(表));
+ * 依取鎖階層取齊指定表鎖後執行 fn(單一取鎖函數): 表名去重、依 targets → pemis → grups → users 排序(階層外之表名排最後、彼此依字典序), 由外而內巢狀取 lockTabs([表]);
  * 各路徑取鎖次序一致故不成環.
  * 分段取鎖: 先取被引用表之鎖、依該表之新舊資料判定須改寫引用端後, 才在內層以 held 指明已持之表再取引用端表之鎖(寫入引用端表不涉改名／刪除者免取, 免無謂之互等);
  * held 非空時, keyTables 之階層須全數高於 held(否則拋錯, 即違反階層, 不嘗試取鎖).
  *
- * @param {Function} kmx 輸入 pmKeyMutex 實例
+ * @param {Function} lockTabs 輸入 w-serv-orm 實例之 withTabLocks(tableNames, fn)
  * @param {Array} keyTables 輸入須持鎖之表名陣列
  * @param {Function} fn 輸入持鎖後執行之 async 函數
  * @param {Array} [held=[]] 輸入呼叫端已持有鎖之表名陣列(內層分段取鎖用)
  * @returns {Promise} 回傳 fn 之結果
  */
-function withTabLocks(kmx, keyTables, fn, held = []) {
+function withTabLocks(lockTabs, keyTables, fn, held = []) {
     let rank = (t) => (Object.prototype.hasOwnProperty.call(TAB_LOCK_RANK, t) ? TAB_LOCK_RANK[t] : Infinity)
     let ts = [...new Set(keyTables)].sort((a, b) => (rank(a) - rank(b)) || (a < b ? -1 : (a > b ? 1 : 0)))
     if (held.length > 0) {
@@ -139,8 +130,8 @@ function withTabLocks(kmx, keyTables, fn, held = []) {
     let run = fn
     for (let k = ts.length - 1; k >= 0; k--) {
         let inner = run
-        let key = tabWriteKey(ts[k])
-        run = () => kmx(key, inner)
+        let t = ts[k]
+        run = () => lockTabs([t], inner)
     }
     return run()
 }
@@ -278,4 +269,4 @@ function pickUniqueUser(rs) {
 }
 
 
-export { findDupIndex, hasDupKey, findKeyOtherFrom, findTouchedDup, tabWriteKey, withTabLocks, mapKeyOf, checkMapKeyBatch, checkUsersWrite, pickUniqueUser }
+export { findDupIndex, hasDupKey, findKeyOtherFrom, findTouchedDup, withTabLocks, mapKeyOf, checkMapKeyBatch, checkUsersWrite, pickUniqueUser }

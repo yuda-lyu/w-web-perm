@@ -9,6 +9,7 @@ import cloneDeep from 'lodash-es/cloneDeep.js'
 import merge from 'lodash-es/merge.js'
 import getMapOrm from 'w-serv-orm/src/getMapOrm.mjs'
 import getProc from 'w-serv-orm/src/getProc.mjs'
+import WServOrm from 'w-serv-orm/src/WServOrm.mjs'
 
 const MAX_KEY_BYTES = 1978
 
@@ -33,7 +34,12 @@ export function mkTable(rows0 = [], fail = {}) {
         select: async (find) => {
             let rs = [...kp.values()].map((v) => cloneDeep(v))
             if (find && typeof find === 'object') {
-                rs = rs.filter((v) => Object.keys(find).every((k) => v[k] === find[k]))
+                //條件: 欄位值相等, 或 { $in: [...] }(w-serv-orm 1.1.17 mustExist 之存在檢查用 select({ id: { $in: [...] } }))
+                let hit = (v, k) => {
+                    let c = find[k]
+                    return (c !== null && typeof c === 'object' && Array.isArray(c.$in)) ? c.$in.indexOf(v[k]) >= 0 : v[k] === c
+                }
+                rs = rs.filter((v) => Object.keys(find).every((k) => hit(v, k)))
             }
             return rs
         },
@@ -108,6 +114,23 @@ export function mkTable(rows0 = [], fail = {}) {
 //mkProcOrm: 以 getMapOrm → getProc 組出真 procOrm(WServOrm 內部同一組裝; 不帶 opt, w-serv-orm 1.1.10 已無設定鍵)
 export function mkProcOrm(ds, woItems) {
     return getProc(getMapOrm(ds, woItems)).procOrm
+}
+
+//mkCore: 以**真的** WServOrm(w-serv-orm 1.1.17)包住替身資料表, 取得同一實例之 procOrm、withTabLocks、guardWrite(多人同時編輯之共用核心, 每實例一個鎖管理器; 規則帳本 R-LOCK-CORE-01):
+//  WOrm 以替身建構子代之(建構子回傳既有替身表, 故 woItems 即傳入之替身, 測試對替身所做之故障注入與快照照常有效);
+//  使測試走真 procOrm(含 mustExist)、真 withTabLocks／guardWrite, 與 WWebPerm 內 WServOrm(ds, WOrm, url, db) 回傳物件同一組裝
+export function mkCore(ds, woItems) {
+    function WOrmReplica(opt) {
+        return woItems[opt.cl]
+    }
+    let so = WServOrm(ds, WOrmReplica, 'replica', 'replica')
+    return {
+        so,
+        procOrm: so.procOrm,
+        withTabLocks: so.withTabLocks,
+        guardWrite: so.guardWrite,
+        lock: { withTabLocks: so.withTabLocks, guardWrite: so.guardWrite }, //可直接展開進 proc(woItems, procOrm, { srLog, ...core.lock, lockSave })
+    }
 }
 
 //mkSrLog: 收集 srLog 呼叫(info/warn/error)之替身

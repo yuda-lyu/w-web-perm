@@ -7,17 +7,16 @@
 //  P4 歷史重複存在時: 再新增第三個同名列、把他列改成該名、把重複中一列改成已被他列使用之名稱 → 皆拒;
 //  P5 比對為精確 ===(僅大小寫或空白不同視為不同名稱); 空／非字串名稱仍為 saveRowFieldInvalid; users 以 email、targets 以 id 之 saveRowFieldDuplicate 不變.
 //
-//受測: server/procCore.mjs 之 updateGrups／updatePemis(kpFunExt 之實際入口, 內走 updateTabItems); 注入接縫: proc(woItems, procOrm, { srLog, kmx, lockSave })之 woItems
-//(test/tools/unitOrm.mjs 之 mkTable 替身, 其 cnt 計 insert／save／del／delAll 次數, 供斷言「被拒時零寫入」), procOrm 為真(getMapOrm → getProc).
+//受測: server/procCore.mjs 之 updateGrups／updatePemis(kpFunExt 之實際入口, 內走 updateTabItems); 注入接縫: proc(woItems, procOrm, { srLog, withTabLocks, guardWrite, lockSave })之 woItems
+//(test/tools/unitOrm.mjs 之 mkTable 替身, 其 cnt 計 insert／save／del／delAll 次數, 供斷言「被拒時零寫入」), procOrm／withTabLocks／guardWrite 為真(mkCore: 真 WServOrm 包住替身表; perm-run01: 原 mkProcOrm＋kmx 改 mkCore).
 //跑法: npx mocha test/unit-procCore-nameUniq.test.mjs --reporter list --timeout 30000
 import assert from 'assert'
 import cloneDeep from 'lodash-es/cloneDeep.js'
-import pmKeyMutex from 'wsemi/src/pmKeyMutex.mjs'
 import cacheSt from 'wsemi/src/cacheSt.mjs'
 import ds from '../src/schema/index.mjs'
 import proc from '../server/procCore.mjs'
 import createLockSave from '../server/lockSave.mjs'
-import { mkTable, mkProcOrm, mkSrLog } from './tools/unitOrm.mjs'
+import { mkTable, mkCore, mkSrLog } from './tools/unitOrm.mjs'
 
 
 const PH = '{新增}' //前端新列之稽核欄位佔位字
@@ -82,7 +81,8 @@ describe('unit-procCore-nameUniq (後台整表寫入之群組／權限名稱唯�
         }
         let { srLog, logs } = mkSrLog()
         let cst = cacheSt()
-        let pc = proc(woItems, mkProcOrm(ds, woItems), { srLog, kmx: pmKeyMutex(), lockSave: createLockSave(cst) })
+        let core = mkCore(ds, woItems) //perm-run01: 原 mkProcOrm(ds, woItems)＋kmx: pmKeyMutex() 改 mkCore(真 WServOrm 之 procOrm／withTabLocks／guardWrite)
+        let pc = proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) })
         env = { seed, woItems, logs, cst, pc }
         return env
     }
@@ -451,7 +451,8 @@ describe('unit-procCore-nameUniq (後台整表寫入之群組／權限名稱唯�
         let woItems = { users: mkTable(users), targets: mkTable(targets), grups: mkTable([]), pemis: mkTable([]) }
         let { srLog } = mkSrLog()
         let cst = cacheSt()
-        let pc = proc(woItems, mkProcOrm(ds, woItems), { srLog, kmx: pmKeyMutex(), lockSave: createLockSave(cst) })
+        let core = mkCore(ds, woItems) //perm-run01: 原 mkProcOrm＋kmx 改 mkCore
+        let pc = proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) })
         let dupU = [...(await woItems.users.select()), { ...users[0], id: 'id-u3', email: 'b@example.com' }]
         let r1 = await pc.updateUsers('id-admin', dupU).then(() => null, (e) => e)
         assert.strict.equal(r1, 'saveRowFieldDuplicate')

@@ -338,6 +338,49 @@ describe('unit-externalUi (清單頁外部列前端輔助與接線, F-23 / R-EXT
                 }
             }
         })
+
+        it('EU-305 空值等價前後端同判準(perm-run01 外審 sol#2): 外部列鎖定欄 description 於 null／""／缺欄互換 → 前端不判違規、伺服端(真 ltdtDiffByKey／dropServerOnlyDiff／checkExternalWrite)亦通過; 空值 ↔ 0／false／非空 → 兩端皆判違規; from 欄 null／"" 改動 → 兩端皆判違規(from 不適用空值等價)', function() {
+            const MISSING = Symbol('missing')
+            let judge = (table, field, ov, nv) => {
+                let keys = KEYS[table]
+                let base = mkBase(table)
+                if (ov === MISSING) {
+                    delete base[0][field]
+                }
+                else {
+                    base[0][field] = ov
+                }
+                let rowsNew = cloneDeep(base)
+                if (nv === MISSING) {
+                    delete rowsNew[0][field]
+                }
+                else {
+                    rowsNew[0][field] = nv
+                }
+                let fe = getExternalEdits({ keyTable: table, keys, rowsNew, rowsOld: base }) !== null
+                let rs = restoreExternalOrder(cloneDeep(rowsNew), base)
+                let r = dropServerOnlyDiff({ keys, r: ltdtDiffByKey(base, rs, 'id'), ltdtOld: base })
+                let ex = checkExternalWrite({ keyTable: table, keys, r, ltdtOld: base, lockExternalRows: true })
+                return { fe, sv: ex !== null }
+            }
+            let show = (v) => (v === MISSING ? '〈缺欄〉' : JSON.stringify(v))
+            let EQ = [['', null], ['', MISSING], [null, ''], [null, MISSING], [MISSING, ''], [MISSING, null]]
+            let NE = [['', 0], ['', false], [null, 0], [null, false], ['x', null], ['x', ''], [0, null], [false, '']]
+            for (let table of ['grups', 'pemis', 'users', 'targets']) {
+                for (let [ov, nv] of EQ) {
+                    let j = judge(table, 'description', ov, nv)
+                    assert.strict.deepEqual(j, { fe: false, sv: false }, `${table} description ${show(ov)} → ${show(nv)}: 空值等價, 前後端皆不判違規`)
+                }
+                for (let [ov, nv] of NE) {
+                    let j = judge(table, 'description', ov, nv)
+                    assert.strict.deepEqual(j, { fe: true, sv: true }, `${table} description ${show(ov)} → ${show(nv)}: 非空值等價, 前後端皆判違規`)
+                }
+                for (let nv of ['', null]) {
+                    let j = judge(table, 'from', 'teamA', nv)
+                    assert.strict.deepEqual(j, { fe: true, sv: true }, `${table} 外部列 from teamA → ${show(nv)}: 前後端皆判違規`)
+                }
+            }
+        })
     })
 
 

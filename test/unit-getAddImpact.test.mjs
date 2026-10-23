@@ -647,7 +647,8 @@ describe('unit-getAddImpact (新增撞懸空名之影響與確認框, 設計原�
         })
 
         it('SITE-AI-003 四頁: $fapi.updateXxx 帶 { baseline }; baseline 與 rows 同一刻擷取(cloneDeep(vo.baseline)); changeParams 內 baseline 與 items 同一處由同一份來源列產生', function() {
-            let ALL = [['LayoutContentGrups', 'updateGrups(rows, { baseline })', 'makeBaseline(grups, vo.$ds.grups.keys)'], ['LayoutContentPemis', 'updatePemis(rows, { baseline })', 'makeBaseline(pemis, vo.$ds.pemis.keys)'], ['LayoutContentTargets', 'updateTargets(rowsSend, { baseline })', 'makeBaseline(items, vo.$ds.targets.keys)'], ['LayoutContentUsers', 'updateUsers(rows, { baseline })', 'makeBaseline(items, vo.$ds.users.keys)']]
+            //perm-run01: 原 updateXxx(rows, { baseline })／makeBaseline(列, vo.$ds.<表>.keys) 改為 updateXxx(rows, { baseline, returnRows: true })(存檔回傳寫入後之列, 規格第 8 節)／makeBaseline(列, '<表名>')(第 2 參改表名字串)
+            let ALL = [['LayoutContentGrups', 'updateGrups(rows, { baseline, returnRows: true })', `makeBaseline(grups, 'grups')`], ['LayoutContentPemis', 'updatePemis(rows, { baseline, returnRows: true })', `makeBaseline(pemis, 'pemis')`], ['LayoutContentTargets', 'updateTargets(rowsSend, { baseline, returnRows: true })', `makeBaseline(items, 'targets')`], ['LayoutContentUsers', 'updateUsers(rows, { baseline, returnRows: true })', `makeBaseline(items, 'users')`]]
             for (let [fn, call, mk] of ALL) {
                 let c = code(`src/components/${fn}.vue`)
                 assert.strict.ok(c.includes(`vo.$fapi.${call}`), `${fn} ${call}`)

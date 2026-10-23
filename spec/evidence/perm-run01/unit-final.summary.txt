@@ -1,0 +1,37 @@
+[quiet-run] exit=0 time=5m40s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261023-143237-unit-final.log (4167 行, 507 KB)
+[quiet-run] cmd: node node_modules/mocha/bin/mocha.js --no-parallel test/unit-applySaved.test.mjs test/unit-authMerge.test.mjs test/unit-cellEditing.test.mjs test/unit-cvKpToObj.test.mjs test/unit-dataChannel.test.mjs…
+== 統計 ==
+  3244 passing (6m)
+  1 pending
+== 錯誤行(去重,至多 15) ==
+  ✔ DCU-004 wrapOperOrm: 成功原樣回傳; ORM 拒絕(原文字串或 Error) → reject anUnexpectedErrorOccurred, 原文只入 srLog
+  ✔ RW-417 雙重故障(補償亦失敗, 補償錯誤為Error且文字含 id[<原 id>]), 引用端 id 為 "prefix]private@example.com" → refCascade-restore-error.raw／rawRestore 皆遮罩; 回 saveCascadePartial; srLog 不含個資片段
+  ✔ RW-417 雙重故障(補償亦失敗, 補償錯誤為Error且文字含 id[<原 id>]), 引用端 id 為 "a]b]c" → refCascade-restore-error.raw／rawRestore 皆遮罩; 回 saveCascadePartial; srLog 不含個資片段
+  ✔ RW-417 雙重故障(補償亦失敗, 補償錯誤為Error且文字含 id[<原 id>]), 引用端 id 為 "line1\nsecret-line2" → refCascade-restore-error.raw／rawRestore 皆遮罩; 回 saveCascadePartial; srLog 不含個資片段
+  ✔ RW-417 雙重故障(補償亦失敗, 補償錯誤為Error且文字含 id[<原 id>]), 引用端 id 為 "[lead-private@example.com" → refCascade-restore-error.raw／rawRestore 皆遮罩; 回 saveCascadePartial; srLog 不含個資片段
+  ✔ RW-417 雙重故障(補償亦失敗, 補償錯誤為Error且文字含 id[<原 id>]), 引用端 id 為 "[x]private@example.com" → refCascade-restore-error.raw／rawRestore 皆遮罩; 回 saveCascadePartial; srLog 不含個資片段
+  ✔ RW-508 fn 同步拋錯／reject／拋非 Error 值之後鎖皆釋放: 後續呼叫可取(5 秒內完成, 否則視為死結)
+  ✔ RW-727 raw／rawRestore 遮罩: 原文中之 id[…](ORM 逐筆失敗訊息, 可能為引用端 id)一律記為 id[*], Error 取其 message, 其他值取 String(); refCascade-restored(warn)亦帶遮罩後之 raw
+  ✔ RW-418 writeWithCascade 直接單元: 引用端 id 為 "prefix]private@example.com" → 引用端階段之錯誤(字串與 Error 兩形)重新拋出前完整遮罩, 同一 id 出現多次皆遮罩, raw 亦遮罩, 整份 log 不含個資片段
+  ✔ RW-418 writeWithCascade 直接單元: 引用端 id 為 "a]b]c" → 引用端階段之錯誤(字串與 Error 兩形)重新拋出前完整遮罩, 同一 id 出現多次皆遮罩, raw 亦遮罩, 整份 log 不含個資片段
+  ✔ RW-418 writeWithCascade 直接單元: 引用端 id 為 "line1\nsecret-line2" → 引用端階段之錯誤(字串與 Error 兩形)重新拋出前完整遮罩, 同一 id 出現多次皆遮罩, raw 亦遮罩, 整份 log 不含個資片段
+  ✔ RW-418 writeWithCascade 直接單元: 引用端 id 為 "[lead-private@example.com" → 引用端階段之錯誤(字串與 Error 兩形)重新拋出前完整遮罩, 同一 id 出現多次皆遮罩, raw 亦遮罩, 整份 log 不含個資片段
+  ✔ RW-418 writeWithCascade 直接單元: 引用端 id 為 "[x]private@example.com" → 引用端階段之錯誤(字串與 Error 兩形)重新拋出前完整遮罩, 同一 id 出現多次皆遮罩, raw 亦遮罩, 整份 log 不含個資片段
+  ✔ RW-729 R5 引用端寫入階段之錯誤於重新拋出前遮罩 id[…]→id[*](字串遮罩; Error 以遮罩後 message 建新 Error; 非字串非 Error 原樣); 主體階段之錯誤原樣拋出(含群組 id)
+== 最後 15 行(非空,不含上列失敗段落) ==
+    ✔ WRAP-006-error-object
+    ✔ WRAP-007-sync-throw
+    ✔ WRAP-008-other-reject-types
+    ✔ WRAP-009-onFail-throws-or-missing
+  unit-wrapInjected-sites
+    ✔ WRAP-SITE-001-wrap-assignments-after-srLog-init
+    ✔ WRAP-SITE-002-no-direct-use-of-originals-before-wrap
+  unit-wwebperm-init (已移除設定之 fail-fast、資料通道授權、建構錯誤入 srLog, ADR-026)
+    ✔ INIT-001 已移除之三鍵給予非 null/false 之值 → 建構即拋(訊息為 w-serv-orm 之 checkOptRemoved 原文), 資料庫未開啟 (1425ms)
+    ✔ INIT-002 三鍵之拒絕記 srLog event WWebPerm-init-error(msg 為原文) (991ms)
+    ✔ SITE-OPT-001 WWebPerm 可執行碼不讀取、不轉交三鍵; checkOptRemoved 於 srLogInit 之後、WServOrm 之前
+    ✔ SITE-WSD-001 WServHapiServer 之選項: useDbOrm:true、methodsExec 只含 select、authorizeExec 與 operOrm 經 dataChannel 之包裝
+    ✔ SITE-INIT-001 new WServHapiServer 包在 try 內, catch 記 srLog event WServHapiServer-init-error 並轉拋
+  3244 passing (6m)
+  1 pending
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)

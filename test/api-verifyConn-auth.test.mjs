@@ -90,7 +90,7 @@ describe('api-verifyConn-auth', function() {
 
     // ============ 資料通道只開 select（ADR-026、ADR-015 Update；規則帳本 R-WSD-01）============
     //政策：methodsExec:['select']＋authorizeExec 只放行 select。修正前（methodsExec 含 insert/save/del/delAll）已認證者可直呼裸表操作，
-    //繞過 updateXxx 之 lockSave、kmx、寫入前驗證與整表比對；前端與測試之寫入皆經 kpFunExt、同步只用 select。
+    //繞過 updateXxx 之 lockSave、表鎖(perm-run01 起為 w-serv-orm 之 guardWrite，原 kmx)、寫入前驗證與整表比對；前端與測試之寫入皆經 kpFunExt、同步只用 select。
     const TABLES_DC = ['grups', 'pemis', 'targets', 'users']
     const KP_FUN_EXT = ['getWebInfor', 'updateTargets', 'updatePemis', 'updateGrups', 'updateUsers', 'getStaEvent', 'getStaEventTable']
 

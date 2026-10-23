@@ -13,7 +13,7 @@ import validateRowsBeforeWrite from './validateRows.mjs'
 //     使資料回到寫入前之狀態再回報原錯誤, 重新操作不依賴「冪等重存」; 主體部分寫入之舊限制不變(ADR-013: 整表寫入為 del → insert → save 非交易, 其部分寫入之處置維持「重新整理後確認」, 本檔不補償主體);
 //  ③ 補償本身失敗(雙重故障)時回 saveCascadePartial 並記 srLog(event refCascade-restore-error, 帶引用端表名與列數, 不記個資值), 由稽核工具(server/tools/authRefsAudit.mjs)列出懸空引用後人工處置;
 //  ④ 行程於引用端寫入後、主體寫入前崩潰者不在補償範圍(記憶體內無日誌), 同③以稽核工具處置.
-//鎖: 呼叫端須已以 withTabLocks 取得被引用表與引用端表之鎖(server/keyCheck.mjs); 本檔不取鎖.
+//鎖: 呼叫端須已以 withTabLocks 取得被引用表與引用端表之鎖(server/keyCheck.mjs, 其底層即 w-serv-orm 實例之 withTabLocks); 本檔不取鎖.
 
 
 /**
@@ -90,7 +90,7 @@ async function writeWithCascade({ plan, holdersOld, woItems, procOrm, userId, sr
     let rm = null
     let stage = 'holder'
     try {
-        await procOrm(userId, plan.holder, 'save', post) //須使用procOrm才有辦法自動給予更新者與更新時間
+        await procOrm(userId, plan.holder, 'save', post, { mustExist: true }) //須使用procOrm才有辦法自動給予更新者與更新時間; 只改不增: 引用端列於持鎖後新鮮讀取, 理論上必在, 不在即 rowNotFound 零寫入(已刪之列不復活, 規格第 6 節)
         stage = 'main'
         rm = await writeMain()
     }

@@ -9,7 +9,8 @@
 //  S4 外部列之 order 由外部擁有: 後台儲存(含重排)不重編, 後台列依陣列位置 k+1。外部列僅伺服器管理欄(建立者／時間)不同者(外部同步重寫後, 後台持舊快照送回)視為無變更, 不回退其建立者／時間。
 //  S5 載入基準 baseline(第 3 參 { baseline }, 草稿開啟時由其所依據之列算 [[id, digest]]): 本次將寫入(新增／修改／刪除)之列, 其庫內版本須與基準相同, 否則整次拒收 saveStale
 //     (修改／刪除之列不在基準或指紋不同; 新增之列主鍵已在基準內＝復活); 未異動之列不檢查, 故開框後他人新增而草稿原樣帶回之列、內容未變之外部列不使存檔作廢;
-//     基準格式不合(非 [[字串, 字串], …])→ saveRowFieldInvalid(於任何讀寫之前)。
+//     基準格式不合(非共用核心 h1 版 [[id, 'h1:…'], …]; perm-run01 起)→ saveBaselineFormat(原 saveRowFieldInvalid; 於任何讀寫之前)。
+//     〔perm-run01〕基準改用 w-serv-orm 共用核心(h1): 序即名次, 他人只重排即不符(rowReordered); order 數值與伺服器專有欄不入摘要(系統重編號而名次不變不誤擋)。
 //  S5b 〔run07 主責語意修訂, 以此二條為準, 不以現況碼為準〕(i) 修改列之內容指紋(排除 order 與伺服器管理欄)與庫內相同(僅 order／審計欄不同)者不檢查基準、不算過期(C-1: 開框後他人新增之列依 order 序帶回,
 //     其 order 於本次依位置重編而異動, 但內容未覆蓋他人版本); (ii) 有基準者先比對基準(saveStale)再做外部列守門: 草稿已過期(外部同步於開啟後改了外部列內容、或移除該外部列)而使用者只編修後台列時
 //     回 saveStale(提示重新載入), 不回 saveExternalRowChanged／saveFromNotAllowed; 基準新鮮而仍違規者由守門拒收; 無基準而改外部列指派欄仍 saveBaselineRequired。
@@ -27,7 +28,7 @@
 //   × 操作 { 新增非空 from〔已測 EX-001〕, 新增 from:''／缺欄〔EX-002〕, 刪外部列〔EX-003〕, 改外部列身分欄〔各表各鎖定欄 EX-004〕, 改外部列 id〔EX-004b〕,
 //            改外部列指派欄〔users／grups／pemis; targets 無指派欄 EX-005〕, 改外部列 from〔EX-006〕, 後台列改成非空 from／非字串〔EX-007〕, 複製外部列〔EX-008〕,
 //            僅送回外部列之舊審計欄〔EX-009〕, 外部列 order／後台列 k+1〔EX-010〕, 新增 from 非字串〔EX-011〕 }
-//   × 基準 { 不帶〔已測〕, 正確〔已測〕, 過期〔已測: 他人改該列／外部同步改內容／開框後他人新增再刪／復活〕, 格式不合〔已測: 10 種〕, 空陣列〔已測〕 }
+//   × 基準 { 不帶〔已測〕, 正確〔已測〕, 過期〔已測: 他人改該列／外部同步改內容／開框後他人新增再刪／復活〕, 格式不合〔已測: 19 種, 含 perm-run01 新增之舊版指紋／h1 壞格式／重複 id〕, 空陣列〔已測〕 }
 //   × lockExternalRows { 預設 'y'〔A 區〕, 'n'〔D 區: 舊行為迴歸, 含 from 非字串仍拒〕 }
 //  基準 × 後台列修改(EX-006b)、基準 × 新增列(原樣帶回／刪除／復活, EX-007b); 指派欄 × 基準(EX-005)。
 //  外部同步 × 缺 cgrups 鍵(EX-020〔id 對應〕、B 區 mappingBy=email／C 區 mappingBy=name〔無 id 依該欄位、須恰命中 1 筆、新使用者〕)、grups.cpemis／pemis.crules 缺鍵(run08: EX-021〔id 對應、含鍵、新實體、他分區、log〕／021b〔無 id 依名稱〕／021c〔改名, cascadeRename 預設〕／021d〔F 區 cascadeRename=false 不保留＋warn〕)、
@@ -97,8 +98,10 @@ const AV = {
 }
 //後台列(base seed)之編修對象
 const BO = { users: 'id-for-john', grups: 'id-for-權限群組M3', pemis: 'id-for-權限P3', targets: '專案A/頁A/區塊A' }
-//格式不合之基準(須為 [[字串, 字串], …])
-const BAD_BASELINES = ['abc', '', 5, 0, true, false, {}, [['a']], [['a', 'b', 'c']], [[1, 'b']], [['a', 1]], [null], [['a', 'b'], 'x'], [[['a'], 'b']]]
+//格式不合之基準(perm-run01: 須為共用核心 h1 版 [[id, 'h1:'+14 位小寫 16 進位], …]、id 不重複; 不合者一律伺服端 saveBaselineFormat〔原 saveRowFieldInvalid〕, 於任何讀寫之前)
+//  後 5 項為 perm-run01 新增: 套內舊版指紋(無 h1: 前綴)、h1 長度不足／大寫 16 進位／版本前綴大寫、重複 id——皆不得被當成合法基準放行或降級為不帶基準
+const BAD_BASELINES = ['abc', '', 5, 0, true, false, {}, [['a']], [['a', 'b', 'c']], [[1, 'b']], [['a', 1]], [null], [['a', 'b'], 'x'], [[['a'], 'b']],
+    [['a', 'b']], [['a', 'h1:0123456789ab']], [['a', 'h1:0123456789ABCD']], [['a', 'H1:0123456789abcd']], [['a', 'h1:0123456789abcd'], ['a', 'h1:0123456789abcd']]]
 //非字串 from
 const BAD_FROMS = [null, 0, false, 123]
 //身分欄之變更函數(逐欄產生「必不同於原值」之新值; EX-004、EX-052、EX-054 共用)
@@ -125,7 +128,7 @@ let extOf = async (kt, from = F) => (await selectAll(kt)).filter((r) => r.from =
 let rowOf = async (kt, id) => (await selectAll(kt)).find((r) => r.id === id)
 let omit = (o, ks) => Object.fromEntries(Object.entries(o).filter(([k]) => !ks.includes(k)))
 let patch = (rows, id, o) => rows.map((r) => (r.id === id ? { ...r, ...o } : r))
-let baselineOf = (kt, rows) => makeBaseline(rows, ds[kt].keys) //測試端依 ds[kt].keys 算正確基準
+let baselineOf = (kt, rows) => makeBaseline(rows, kt) //測試端依表名算正確基準(perm-run01: 原 makeBaseline(rows, ds[kt].keys) 改傳表名字串)
 let ext = (kt, k = 0) => FX[kt][k].id //外部夾具列之主鍵
 //新增列(from 預設 ''; targets 之 id 為路徑)
 let nid = (kt, tag) => (kt === 'targets' ? `專案EX/新增/${tag}` : `id-ex-new-${tag}`)
@@ -380,7 +383,7 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
         // ---------- 改外部列之指派欄 × 基準 ----------
 
         for (let kt of ['users', 'grups', 'pemis']) {
-            it(`EX-005 改外部列指派欄(${kt}.${T[kt].assign}) × 基準{不帶、格式不合、正確、空陣列、過期}: 不帶→saveBaselineRequired; 格式不合→saveRowFieldInvalid; 正確→成功且僅指派欄變; 空陣列／過期→saveStale; 外部同步重寫(內容未變)不使基準作廢`, async function() {
+            it(`EX-005 改外部列指派欄(${kt}.${T[kt].assign}) × 基準{不帶、格式不合、正確、空陣列、過期}: 不帶→saveBaselineRequired; 格式不合→saveBaselineFormat; 正確→成功且僅指派欄變; 空陣列／過期→saveStale; 外部同步重寫(內容未變)不使基準作廢`, async function() {
                 await freshState()
                 let af = T[kt].assign
                 let id = ext(kt, 0)
@@ -393,9 +396,9 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 }
                 await expectReject(`${kt} 指派欄無基準＋後台列編修`, kt, patch(mk(rows, AV[kt][0]), BO[kt], { description: 'bo-edit' }), 'saveBaselineRequired')
 
-                //(d) 格式不合基準 → saveRowFieldInvalid(於任何讀寫之前; 即使其他一切合法)
+                //(d) 格式不合基準 → saveBaselineFormat(於任何讀寫之前; 即使其他一切合法; perm-run01: 原 saveRowFieldInvalid)
                 for (let b of BAD_BASELINES) {
-                    await expectReject(`${kt} 格式不合基準 ${JSON.stringify(b)}`, kt, mk(rows, AV[kt][0]), 'saveRowFieldInvalid', { baseline: b })
+                    await expectReject(`${kt} 格式不合基準 ${JSON.stringify(b)}`, kt, mk(rows, AV[kt][0]), 'saveBaselineFormat', { baseline: b })
                 }
 
                 //(b) 正確基準 → 成功; 僅指派欄變, from／鎖定欄／order 不變
@@ -452,8 +455,11 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
         })
 
 
-        it('EX-005d 指紋排除 order: 他人重排(只改 order, 內容不變)後, 持舊基準編修別列仍成功(他人改內容則 saveStale 見 EX-006b); 四表', async function() {
+        it('EX-005d 名次入基準、order 數值不入摘要(perm-run01 原則 10): 他人重排(只改 order 致名次改變, 內容不變)後持舊基準 → saveStale/rowReordered、零寫入, 重新載入(新基準)後編修成功; 外部同步僅重編外部列 order 數值而名次不變 → 持舊基準編修別列仍成功; 四表', async function() {
+            //perm-run01: 原 EX-005d 預期「他人重排(只改 order)後持舊基準編修別列仍成功」(舊指紋排除 order 且不比名次); 共用核心 h1 基準把「序即名次」入基準, 他人只重排即不符(刻意語意變更, 規格原則 10),
+            //  故 A 段改為 saveStale/rowReordered; 原意圖「order 數值不使草稿作廢」改以 B 段(數值變而名次不變)承接
             for (let kt of KTS) {
+                //A. 他人重排 → 名次改變 → 持舊基準 saveStale(rowReordered)
                 await freshState()
                 let Y = BO[kt]
                 let R0 = await rowsOf(kt)
@@ -464,16 +470,31 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 await mustWrite(`${kt} 他人重排`, kt, [...[...bos].reverse(), ...exts])
                 let afterRe = await rowsOf(kt)
                 A.notEqual(afterRe.filter((r) => r.from !== F).map((r) => r.id).join(','), bos.map((r) => r.id).join(','), `前提(${kt}): 重排後後台列順序已改`)
-                //持舊基準編修別列(以重排後之當前列為底) → 成功
-                await mustWrite(`${kt} 他人重排後持舊基準編修`, kt, patch(afterRe, Y, { description: 'reorder-edit' }), { baseline: B0 })
+                //持舊基準編修別列(以重排後之當前列為底) → saveStale(僅名次不同: reason rowReordered), 零寫入
+                await expectStale(`${kt} 他人重排後持舊基準編修`, kt, patch(afterRe, Y, { description: 'reorder-edit' }), ['rowReordered'], { baseline: B0 })
+                A.notEqual((await rowOf(kt, Y)).description, 'reorder-edit', `${kt} 編修未落地`)
+                //重新載入(基準取自重排後之列)後 → 成功
+                await mustWrite(`${kt} 重新載入後編修`, kt, patch(afterRe, Y, { description: 'reorder-edit' }), { baseline: baselineOf(kt, afterRe) })
                 A.equal((await rowOf(kt, Y)).description, 'reorder-edit', `${kt} 編修落地`)
+
+                //B. 外部同步僅重編外部列之 order 數值(名次不變: 仍排在後台列之後) → 持舊基準編修別列成功(order 數值與伺服器管理欄不入摘要)
+                await freshState()
+                R0 = await rowsOf(kt)
+                B0 = baselineOf(kt, R0)
+                let rs = clone(FX[kt]).map((r) => ({ ...r, order: r.order * 10 }))
+                await mustSync(kt, { from: F, rows: rs })
+                let afterRn = await rowsOf(kt)
+                A.deepEqual(afterRn.filter((r) => r.from === F).map((r) => r.order), rs.map((r) => r.order), `前提(${kt}): 外部列 order 數值已重編`)
+                A.deepEqual(afterRn.map((r) => r.id), R0.map((r) => r.id), `前提(${kt}): 名次不變`)
+                await mustWrite(`${kt} 外部同步重編 order 數值後持舊基準編修別列`, kt, patch(afterRn, Y, { description: 'renumber-edit' }), { baseline: B0 })
+                A.equal((await rowOf(kt, Y)).description, 'renumber-edit', `${kt} 編修落地`)
             }
         })
 
 
         // ---------- 後台列 × 基準 ----------
 
-        it('EX-006b 改後台列(description) × 基準{不帶、正確、空陣列、格式不合、過期}: 不帶→成功(舊行為); 正確→成功; 空陣列／過期→saveStale; 格式不合→saveRowFieldInvalid; 過期＝表內任何列被他人改過(表級, 原則 7): 即使本次只改「未被他人改動」之別列亦 saveStale', async function() {
+        it('EX-006b 改後台列(description) × 基準{不帶、正確、空陣列、格式不合、過期}: 不帶→成功(舊行為); 正確→成功; 空陣列／過期→saveStale; 格式不合→saveBaselineFormat; 過期＝表內任何列被他人改過(表級, 原則 7): 即使本次只改「未被他人改動」之別列亦 saveStale', async function() {
             for (let kt of KTS) {
                 await freshState()
                 let id = BO[kt]
@@ -484,10 +505,10 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 await mustWrite(`${kt} 後台列無基準`, kt, mk(rows, 'nb-1'))
                 A.equal((await rowOf(kt, id)).description, 'nb-1')
 
-                //格式不合 → saveRowFieldInvalid
+                //格式不合 → saveBaselineFormat(perm-run01: 原 saveRowFieldInvalid)
                 rows = await rowsOf(kt)
                 for (let b of BAD_BASELINES) {
-                    await expectReject(`${kt} 後台列格式不合基準 ${JSON.stringify(b)}`, kt, mk(rows, 'nb-x'), 'saveRowFieldInvalid', { baseline: b })
+                    await expectReject(`${kt} 後台列格式不合基準 ${JSON.stringify(b)}`, kt, mk(rows, 'nb-x'), 'saveBaselineFormat', { baseline: b })
                 }
 
                 //正確基準 → 成功
@@ -1045,7 +1066,8 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 { label: 'fromType', run: () => write('users', [...rows, newRow('users', 'lg2', { from: null, description: 'LOGSECRET-VALUE' })]), ev: 'updateTabItems-external-error', reason: 'fromType', msg: 'saveFromNotAllowed', n: 1, froms: [] },
                 { label: 'externalAssignNoBaseline', run: () => write('users', patch(rows, u1, { cgrups: AV.users[0] })), ev: 'updateTabItems-stale-error', reason: 'externalAssignNoBaseline', msg: 'saveBaselineRequired' },
                 { label: 'rowAdded', run: () => write('users', patch(rows, u1, { cgrups: AV.users[0] }), { baseline: [] }), ev: 'updateTabItems-stale-error', reason: 'rowAdded', msg: 'saveStale', n: rows.length },
-                { label: 'baselineInvalid', run: () => write('users', patch(rows, u1, { cgrups: AV.users[0] }), { baseline: 'LOGSECRET-VALUE' }), ev: 'updateTabItems-validate-error', reason: 'baselineInvalid', msg: 'saveRowFieldInvalid' },
+                //perm-run01: 原 ev updateTabItems-validate-error／reason baselineInvalid／msg saveRowFieldInvalid 改為 updateTabItems-stale-error／baselineFormat／saveBaselineFormat(n: 0)
+                { label: 'baselineFormat', run: () => write('users', patch(rows, u1, { cgrups: AV.users[0] }), { baseline: 'LOGSECRET-VALUE' }), ev: 'updateTabItems-stale-error', reason: 'baselineFormat', msg: 'saveBaselineFormat', n: 0 },
             ]
             for (let c of cases) {
                 let mark = await markSrLog()
@@ -1432,14 +1454,14 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
             }
         })
 
-        it('EX-043 n 模式下基準仍生效: 給基準時過期／空陣列→saveStale、格式不合→saveRowFieldInvalid; 外部列指派欄帶正確基準成功', async function() {
+        it('EX-043 n 模式下基準仍生效: 給基準時過期／空陣列→saveStale、格式不合→saveBaselineFormat; 外部列指派欄帶正確基準成功', async function() {
             await freshState()
             for (let kt of ['users', 'grups', 'pemis']) {
                 let af = T[kt].assign
                 let rows = await rowsOf(kt)
                 let B = baselineOf(kt, rows)
                 await expectReject(`${kt} n 模式空陣列基準`, kt, patch(rows, ext(kt, 0), { [af]: AV[kt][0] }), 'saveStale', { baseline: [] })
-                await expectReject(`${kt} n 模式格式不合基準`, kt, patch(rows, ext(kt, 0), { [af]: AV[kt][0] }), 'saveRowFieldInvalid', { baseline: 'abc' })
+                await expectReject(`${kt} n 模式格式不合基準`, kt, patch(rows, ext(kt, 0), { [af]: AV[kt][0] }), 'saveBaselineFormat', { baseline: 'abc' }) //perm-run01: 原 saveRowFieldInvalid
                 await mustWrite(`${kt} n 模式正確基準改外部列指派欄`, kt, patch(rows, ext(kt, 0), { [af]: AV[kt][0] }), { baseline: B })
                 await expectReject(`${kt} n 模式過期基準`, kt, patch(await rowsOf(kt), ext(kt, 0), { [af]: AV[kt][1] }), 'saveStale', { baseline: B })
             }

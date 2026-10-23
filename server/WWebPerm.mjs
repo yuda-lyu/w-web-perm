@@ -22,14 +22,13 @@ import fsIsFile from 'wsemi/src/fsIsFile.mjs'
 import replace from 'wsemi/src/replace.mjs'
 import strdelleft from 'wsemi/src/strdelleft.mjs'
 import ltdtmapping from 'wsemi/src/ltdtmapping.mjs'
-import pmKeyMutex from 'wsemi/src/pmKeyMutex.mjs'
 import cacheSt from 'wsemi/src/cacheSt.mjs'
 import WServHapiServer from 'w-serv-hapi/src/WServHapiServer.mjs'
 import WServOrm from 'w-serv-orm/src/WServOrm.mjs'
 import checkOptRemoved from 'w-serv-orm/src/checkOptRemoved.mjs'
 import ds from '../src/schema/index.mjs'
 import { getUserRules } from '../src/plugins/mShare.mjs'
-import procCore, { toOutKey, isRowObj } from './procCore.mjs'
+import procCore, { toOutKey, isRowObj, pickClientOpt } from './procCore.mjs'
 import createLockSave from './lockSave.mjs'
 import procLang from './procLang.mjs'
 import srLogInit from './srLog.mjs'
@@ -318,9 +317,11 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     let { woItems, procOrm } = wp
 
 
-    //pmKeyMutex: per-key in-memory mutex, 同 key 序列化、不同 key 並行.
-    //perm 為「整表批次 diff」寫入, key 粒度為整表: tabWriteKey(keyTable)(= 'tabWrite:' + keyTable), 外部同步與後台整表寫入共用同鍵, 防同表並行 race (lost update) 與唯一性檢查被交錯略過 (R-WRITE-LOCK-01).
-    let kmx = pmKeyMutex()
+    //lockTabs, guardWrite: w-serv-orm 1.1.17 的每表一鍵表鎖與原子防護(多人同時編輯規格第 6、7 節; 規則帳本 R-LOCK-CORE-01), 取自 WServOrm 回傳物件——**唯一**的鎖管理器.
+    //perm 為「整表批次 diff」寫入, 鎖粒度為整表: 後台整表寫入(procCore.updateTabItems 之 guardWrite)、外部同步(syncAndReplaceTabs)與引用連帶之引用端寫入皆取同一把表鎖, 防同表並行 race (lost update) 與唯一性檢查被交錯略過 (R-WRITE-LOCK-01).
+    //不再自建 pmKeyMutex／鎖鍵(原 tabWriteKey 已移除); 鎖不可重入, 多表依階層巢狀取鎖見 keyCheck.withTabLocks(R-WRITE-LOCK-02)
+    let lockTabs = wp.withTabLocks
+    let guardWrite = wp.guardWrite
 
 
     //syncWarns: 外部同步「同一 from 同名異 id」(疑似 id 重編)之提示登錄(記憶體, 重啟即清; 主控定案: 不加開關, 記 warn log 並使頁面可提示):
@@ -339,13 +340,13 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
 
     //lockSave: 後台整表寫入(updateTabItems)之雙擊防護(後端, 見 lockSave.mjs, ADR-025): 以「updateTabItems:{表名}:{操作者 id}」於 cacheSt 原子占位,
-    //同一操作者之同表寫入處理中再送出即 reject 'saveInProgress'(不排隊); 包在 kmx 之外層, 不同操作者之並行仍由 kmx 序列化(ADR-012)
+    //同一操作者之同表寫入處理中再送出即 reject 'saveInProgress'(不排隊); 包在表鎖之外層, 不同操作者之並行仍由表鎖序列化(ADR-012)
     let cst = cacheSt()
     let lockSave = createLockSave(cst)
 
 
     //procCore: 整表批次 diff 寫入邏輯 (updateTabItems + updateTargets/Pemis/Grups/Users)
-    let pc = procCore(woItems, procOrm, { srLog, kmx, lockSave, mappingBy, cascadeRename, lockExternalRows }) //mappingBy 供 users 整表寫入的對應鍵檢查(R-PRINCIPLE-00 適用表 h); cascadeRename 供群組／權限改名之引用級聯(適用表 m); lockExternalRows 供後台對外部列之守門(F-23)
+    let pc = procCore(woItems, procOrm, { srLog, withTabLocks: lockTabs, guardWrite, lockSave, mappingBy, cascadeRename, lockExternalRows }) //mappingBy 供 users 整表寫入的對應鍵檢查(R-PRINCIPLE-00 適用表 h); cascadeRename 供群組／權限改名之引用級聯(適用表 m); lockExternalRows 供後台對外部列之守門(F-23)
 
 
     //procStaInfor: 統計資訊, fdLog 對齊 srLog 使用同一目錄(讀 settings.logFd, fallback 邏輯同 srLog.mjs); mock 由 settings.staEventMock 注入(e2e 統計圖穩定用)
@@ -629,9 +630,10 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     let syncAndReplaceTabs = async (userId, inp, keyTable) => {
 
         //序列化同表之並行整表 delAll+insert: 防 lost update (同 keyTable 序列化, 不同表並行)
-        //與後台整表寫入(procCore.updateTabItems)共用同表互斥鍵 tabWriteKey: 兩者各自先檢查名稱／對應鍵唯一後寫入, 鍵不同則交錯可略過 F-02／F-14(外審 sol R10);
+        //與後台整表寫入(procCore.updateTabItems)共用同一個鎖管理器(w-serv-orm 實例之 withTabLocks, 每表一鍵; R-LOCK-CORE-01): 兩者各自先檢查名稱／對應鍵唯一後寫入, 鎖不同則交錯可略過 F-02／F-14(外審 sol R10);
         //有改名或刪除而須改寫引用端時, 於內層依階層再取引用端表之鎖(同步群組／權限／標的時, 被刪除或改名者之引用須連帶清理／更新, R-REF-CASCADE-01), 皆經單一取鎖函數(R-WRITE-LOCK-02)
-        return await withTabLocks(kmx, [keyTable], async () => {
+        //外部同步為不帶基準之寫入(以外部為主, 原則 5): 取表鎖但不比對基準; 匯入語意(delAll({ from })＋insert)本輪不變(R-IMPORT-01 待另輪)
+        return await withTabLocks(lockTabs, [keyTable], async () => {
 
             //from
             let from = get(inp, 'from', '')
@@ -739,7 +741,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             //跨 from 同鍵(規則帳本 R-SYNC-01): 本批有給之主鍵若已屬其他 from, 整批拒絕且不進 delAll(本 from 與他 from 之既有列皆不變).
             //why: insert 對已存在之主鍵略過而整批仍回 success, 該列不會寫入本 from(靜默遺失); w-serv-orm 1.1.11 起數字主鍵存為其字串形式(原被換成隨機主鍵),
             //以流水號為主鍵之各應用即互撞(2026-10-14 w-serv-orm 實測). 此處直呼 woItems(不經 procOrm 之轉型), 查詢條件一律用 String(id)(R-ORM-04);
-            //同 from 之既有列不算衝突(隨後由 delAll 重寫); 本段與 delAll／insert 同在 kmx 內(同表之並行同步已序列化)
+            //同 from 之既有列不算衝突(隨後由 delAll 重寫); 本段與 delAll／insert 同在表鎖內(同表之並行同步已序列化)
             let keyOfId = (v) => {
                 let id = get(v, 'id')
                 return (isestr(id) || (typeof id === 'number' && Number.isFinite(id))) ? String(id) : null
@@ -881,7 +883,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             //有改名或刪除: 再取引用端表之鎖, 讀取引用端、規劃、預檢後寫入
             if (kind !== null && (kind.renames.length > 0 || kind.delNames.length > 0)) {
                 let holder = REF_OF[keyTable].holder
-                return await withTabLocks(kmx, [holder], async () => {
+                return await withTabLocks(lockTabs, [holder], async () => {
                     let holdersOld = null
                     try {
                         holdersOld = await woItems[holder].select()
@@ -1407,7 +1409,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         //operOrm: procOrm 之包裝(輸入為 userId, tableName, methodName, input), ORM 拒絕之原文只入 srLog、對前端回 key(規則帳本 R-ORM-02)
         operOrm: wrapOperOrm(procOrm, { srLog }),
         tableNamesExec,
-        //資料通道只開 select(ADR-026、ADR-015 Update; 規則帳本 R-WSD-01): 前端同步只用 select, 寫入一律經 kpFunExt 之 updateXxx(lockSave、kmx、寫入前驗證、整表比對);
+        //資料通道只開 select(ADR-026、ADR-015 Update; 規則帳本 R-WSD-01): 前端同步只用 select, 寫入一律經 kpFunExt 之 updateXxx(lockSave、表鎖、寫入前驗證、整表比對);
         //裸 insert/save/del/delAll 繞過上述不變式, 2026-10-14 起不開放(直呼回 invalid func[表名.方法]); 對自寫客戶端直呼裸表操作之部署方為行為變更(README Upgrade Notes)
         methodsExec: ['select'],
         //authorizeExec: w-serv-webdata 1.1.7 起 useDbOrm:true 必填; 只對已取得 userId 之 select 放行(methodsExec 之外之第二道), 拒絕記 srLog event 'authorizeExec'.
@@ -1418,13 +1420,13 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
             getWebInfor,
 
-            //updateXxx 第 3 參 opt 為用戶端給之 { baseline }(草稿載入基準, F-26, R-BASELINE-01), 其餘鍵一律不採納(pickKeysOnly 等為伺服端設定); 未給(舊客戶端)見 procCore 之處置
+            //updateXxx 第 3 參 opt 為用戶端給之 { baseline, returnRows }(草稿載入基準, F-26, R-BASELINE-01; 是否於成功回傳附寫入後之列, 規格第 8 節), 其餘鍵一律不採納(pickKeysOnly 等為伺服端設定, 更不轉給 procOrm); 未給(舊客戶端)見 procCore 之處置
             updateTargets: (userId, rows, opt) => pc.updateTargets(userId, rows, opt),
             updatePemis: (userId, rows, opt) => pc.updatePemis(userId, rows, opt),
             updateGrups: (userId, rows, opt) => pc.updateGrups(userId, rows, opt),
             //updateUsers, modeEditUsers='for:grups' 時 API 與 UI 一致只採納既有使用者之 cgrups 變更, 身分欄/新增/刪除/順序以資料庫為準
             updateUsers: (userId, rows, optClient) => {
-                let opt = (optClient !== null && typeof optClient === 'object' && optClient.baseline !== undefined && optClient.baseline !== null) ? { baseline: optClient.baseline } : {}
+                let opt = pickClientOpt(optClient)
                 if (modeEditUsers === 'for:grups') {
                     opt.pickKeysOnly = ['cgrups']
                 }

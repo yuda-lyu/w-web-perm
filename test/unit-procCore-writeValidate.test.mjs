@@ -1,20 +1,19 @@
 //procCore 整表寫入之「可預判寫入失敗於第一個破壞步驟之前擋下」與「ORM 原文不外送」(規則帳本 R-ORM-01、R-ORM-02、R-KEY-01; ADR-026)
 //
 //受測: server/procCore.mjs 之 updateTargets / updatePemis / updateGrups / updateUsers(kpFunExt 之實際入口, 內走 updateTabItems),
-//依賴一律真實: w-serv-orm 之 getMapOrm → getProc 組出之 procOrm(真 adjustData / clearXSS / 主鍵標記檢查 / 逐筆結果檢查)、wsemi pmKeyMutex、
+//依賴一律真實: w-serv-orm 之 WServOrm(mkCore)組出之 procOrm(真 adjustData / clearXSS / 主鍵標記檢查 / 逐筆結果檢查)與 withTabLocks／guardWrite(perm-run01: 原 wsemi pmKeyMutex 之 kmx 改此)、
 //cacheSt + server/lockSave.mjs; 只有資料表以 test/tools/unitOrm.mjs 之替身取代 w-orm-lmdb(對齊 1.0.38 之對外語意: insert ifNoExists 與鍵長整批拒、
 //save/del 逐筆結果).
 //每案斷言「被拒時資料表零變更」(逐列快照比對)——修正前之 del → insert → save 於 insert 被拒時舊列已刪(資料遺失)、save 被拒時已部分寫入.
 //跑法: npx mocha test/unit-procCore-writeValidate.test.mjs --timeout 30000
 import assert from 'assert'
 import cloneDeep from 'lodash-es/cloneDeep.js'
-import pmKeyMutex from 'wsemi/src/pmKeyMutex.mjs'
 import cacheSt from 'wsemi/src/cacheSt.mjs'
 import ds from '../src/schema/index.mjs'
 import proc from '../server/procCore.mjs'
 import * as procMod from '../server/procCore.mjs'
 import createLockSave from '../server/lockSave.mjs'
-import { mkTable, mkProcOrm, mkSrLog } from './tools/unitOrm.mjs'
+import { mkTable, mkCore, mkSrLog } from './tools/unitOrm.mjs'
 
 
 const PH = '{新增}' //前端新列之稽核欄位佔位字
@@ -87,7 +86,8 @@ describe('unit-procCore-writeValidate (寫入前驗證與寫入失敗回 key, AD
         }
         let { srLog, logs } = mkSrLog()
         let cst = cacheSt()
-        let pc = proc(woItems, mkProcOrm(ds, woItems), { srLog, kmx: pmKeyMutex(), lockSave: createLockSave(cst) })
+        let core = mkCore(ds, woItems) //perm-run01: 原 mkProcOrm＋kmx: pmKeyMutex() 改 mkCore
+        let pc = proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) })
         env = { seed, woItems, logs, cst, pc }
         return env
     }
@@ -210,7 +210,8 @@ describe('unit-procCore-writeValidate (寫入前驗證與寫入失敗回 key, AD
         }
         let { srLog } = mkSrLog()
         let cst = cacheSt()
-        let pc = proc(woItems, mkProcOrm(ds, woItems), { srLog, kmx: pmKeyMutex(), lockSave: createLockSave(cst) })
+        let core = mkCore(ds, woItems) //perm-run01: 原 mkProcOrm＋kmx 改 mkCore
+        let pc = proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) })
         env = { cst }
         let rows = (await woItems.targets.select()).sort((a, b) => a.order - b.order)
         rows[0].description = 'changed'

@@ -24,6 +24,12 @@ let isObj = (v) => v !== null && typeof v === 'object'
 let normV = (v) => JSON.stringify(v === undefined ? '' : v)
 
 
+//normC: 內容欄比對用——另視 null 與 ''／缺欄為同一空值(寫入契約之空值等價, 與基準 digestRow 同口徑; 0／false 仍異於空值).
+//  基準已視 null≡'' 為相同而通過, 此處若仍視為不同, 會對合法存檔回 saveExternalRowChanged(外審 sol#2, 2026-10-23); 相同者亦不重寫, 庫內原表示(null)不被改成 ''.
+//  from 欄不適用: null 與 '' 之 from 有別(歷史後台列, 見 checkExternalWrite), 一律用 normV.
+let normC = (v, k) => (k === 'from' ? normV(v) : JSON.stringify(v === undefined || v === null ? '' : v))
+
+
 /**
  * 判斷是否為外部列(from 為非空字串)
  *
@@ -85,15 +91,17 @@ function restoreExternalOrder(rows, ltdtOld) {
  * 將「外部列且僅伺服器管理欄(建立者／時間、更新者／時間)不同」之 diff 列移入 same(視為無變更, 不寫入)
  *
  * 外部同步每次整來源重寫, 使外部列之 timeUpdate／timeCreate／userId 隨之更新; 持舊快照之後台存檔若原樣送回該列, 其內容與庫內相同而僅伺服器管理欄較舊,
- * 寫入會把建立者與建立時間回退為舊值(D2 設計稿 S2). 內容相同即無須寫入. 只處理外部列, 後台列之 diff 判定不變.
+ * 寫入會把建立者與建立時間回退為舊值(D2 設計稿 S2). 內容相同即無須寫入. 預設只處理外部列, 後台列之 diff 判定不變.
+ * all 為真時不分外部列或後台列一律處理(perm-run01: 寫入契約 serverOnly——伺服器專有欄位存檔不採用客戶端值, 規格第 4、6 節; R-CONTRACT-01).
  *
  * @param {Object} p 輸入參數物件
  * @param {Array} p.keys 輸入該表 schema 欄位名陣列
  * @param {Object} p.r 輸入 ltdtDiffByKey 結果 { add, del, diff, same }
  * @param {Array} p.ltdtOld 輸入該表庫內全部列
+ * @param {Boolean} [p.all=false] 輸入是否不分外部列或後台列(預設只外部列)
  * @returns {Object} 回傳新之 { add, del, diff, same }
  */
-function dropServerOnlyDiff({ keys, r, ltdtOld }) {
+function dropServerOnlyDiff({ keys, r, ltdtOld, all = false }) {
     let oldById = new Map()
     ltdtOld.forEach((o) => {
         if (isObj(o) && isStr(o.id)) {
@@ -105,7 +113,7 @@ function dropServerOnlyDiff({ keys, r, ltdtOld }) {
     let same = [...r.same]
     r.diff.forEach((row) => {
         let o = isObj(row) && isStr(row.id) ? oldById.get(row.id) : undefined
-        if (o !== undefined && isExternalRow(o) && fields.every((k) => normV(row[k]) === normV(o[k]))) {
+        if (o !== undefined && (all === true || isExternalRow(o)) && fields.every((k) => normC(row[k], k) === normC(o[k], k))) {
             same.push(row)
         }
         else {
@@ -121,14 +129,16 @@ function dropServerOnlyDiff({ keys, r, ltdtOld }) {
  *
  * 伺服器管理欄由伺服器擁有(procOrm save 只覆寫 userIdUpdate／timeUpdate, 建立者與建立時間取自送入之列); 外部同步每次整來源重寫使外部列之建立者／建立時間更新,
  * 持舊草稿(前端保留未存編輯, 見 draftSync)送回該列時, 基準因排除伺服器管理欄而通過(內容未變), 若原樣寫入就把較新之建立者與建立時間回退為舊值(R-EXT-OWN-01 S2 之同一缺陷, 外審 sol 第 3 點).
- * 故改動之外部列一律以庫內之伺服器管理欄寫入. 只處理庫內為外部列者(後台列之寫入不變); 庫內無該欄者不補.
+ * 故改動之外部列一律以庫內之伺服器管理欄寫入. 預設只處理庫內為外部列者(後台列之寫入不變); 庫內無該欄者(歷史列)不補、亦不採用客戶端送入之值(刪除該欄, 保留庫內值＝仍無該欄; perm-run01 外審 sol#3).
+ * all 為真時不分外部列或後台列一律處理(perm-run01: 寫入契約 serverOnly, 見 dropServerOnlyDiff).
  *
  * @param {Object} p 輸入參數物件
  * @param {Object} p.r 輸入 ltdtDiffByKey(及 dropServerOnlyDiff)結果 { add, del, diff, same }
  * @param {Array} p.ltdtOld 輸入該表庫內全部列
+ * @param {Boolean} [p.all=false] 輸入是否不分外部列或後台列(預設只外部列)
  * @returns {Object} 回傳新之 { add, del, diff, same }(不改輸入; 未改動之列為同一物件)
  */
-function restoreServerFields({ r, ltdtOld }) {
+function restoreServerFields({ r, ltdtOld, all = false }) {
     let oldById = new Map()
     ltdtOld.forEach((o) => {
         if (isObj(o) && isStr(o.id)) {
@@ -137,13 +147,17 @@ function restoreServerFields({ r, ltdtOld }) {
     })
     let diff = r.diff.map((row) => {
         let o = isObj(row) && isStr(row.id) ? oldById.get(row.id) : undefined
-        if (o === undefined || !isExternalRow(o)) {
+        if (o === undefined || (all !== true && !isExternalRow(o))) {
             return row
         }
         let out = { ...row }
         SERVER_FIELDS.forEach((k) => {
             if (hasOwn(o, k)) {
                 out[k] = o[k]
+            }
+            else {
+                //庫內無該欄(歷史列): 不採用客戶端送入之值(寫入契約 serverOnly: 保留庫內值＝仍無該欄; 外審 sol#3, 2026-10-23)
+                delete out[k]
             }
         })
         return out
@@ -218,7 +232,7 @@ function checkExternalWrite({ keyTable, keys, r, ltdtOld, lockExternalRows = tru
             if (nf !== o.from) {
                 push('saveExternalRowChanged', 'fromChanged', k, o.from)
             }
-            else if (lockFields.some((f) => normV(row[f]) !== normV(o[f]))) {
+            else if (lockFields.some((f) => normC(row[f], f) !== normC(o[f], f))) {
                 push('saveExternalRowChanged', 'fieldChanged', k, o.from)
             }
         }
@@ -262,5 +276,5 @@ function hasExternalDiff({ r, ltdtOld }) {
 }
 
 
-export { SERVER_FIELDS, ASSIGN_FIELD, isExternalRow, getLockFields, restoreExternalOrder, dropServerOnlyDiff, restoreServerFields, checkExternalWrite, hasExternalDiff }
+export { SERVER_FIELDS, ASSIGN_FIELD, isExternalRow, getLockFields, restoreExternalOrder, dropServerOnlyDiff, restoreServerFields, checkExternalWrite, hasExternalDiff, normC }
 export default isExternalRow

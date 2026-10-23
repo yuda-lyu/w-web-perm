@@ -4,7 +4,7 @@ import isestr from 'wsemi/src/isestr.mjs'
 //資料通道(w-serv-webdata, useDbOrm:true)之表操作授權與 ORM 呼叫包裝(規則帳本 R-WSD-01、R-ORM-02; spec/設計要點與取捨.md ADR-026、ADR-015 Update)
 //
 //政策: 資料通道只開 select(methodsExec:['select'] 為第一道, 本授權函數只放行 select 為第二道).
-//why: 裸 insert/save/del/delAll 繞過 procCore 之 lockSave、kmx、ckKey、寫入前驗證與整表比對(ADR-009/012/025/026 之不變式只在 kpFunExt 成立),
+//why: 裸 insert/save/del/delAll 繞過 procCore 之 lockSave、表鎖(w-serv-orm withTabLocks／guardWrite)、ckKey、寫入前驗證與整表比對(ADR-009/012/025/026 之不變式只在 kpFunExt 成立),
 //同表兩條寫入路徑不對稱; 前端與測試皆只用 kpFunExt 寫入、同步只用 select(2026-10-14 Grep `\$fapi\.`、`callRpc(` 實證).
 //連線者之身分授權仍在 verifyConn(getAndVerifyClientUser), 本函數不重做.
 

@@ -1,0 +1,94 @@
+{
+ "users": {
+  "state": "pass",
+  "exit": 0,
+  "passing": 24,
+  "failing": 0,
+  "pending": 0,
+  "min": 9.75,
+  "end": "14:54:17"
+ },
+ "grups": {
+  "state": "pass",
+  "exit": 0,
+  "passing": 20,
+  "failing": 0,
+  "pending": 0,
+  "min": 10.14,
+  "end": "15:04:26"
+ },
+ "pemis": {
+  "state": "pass",
+  "exit": 0,
+  "passing": 20,
+  "failing": 0,
+  "pending": 0,
+  "min": 10.16,
+  "end": "15:14:35"
+ },
+ "targets": {
+  "state": "pass",
+  "exit": 0,
+  "passing": 26,
+  "failing": 0,
+  "pending": 0,
+  "min": 12.49,
+  "end": "15:27:04"
+ },
+ "relaug": {
+  "state": "pass",
+  "exit": 0,
+  "passing": 20,
+  "failing": 0,
+  "pending": 0,
+  "min": 10.31,
+  "end": "15:37:23"
+ },
+ "relagp": {
+  "state": "pass",
+  "exit": 0,
+  "passing": 14,
+  "failing": 0,
+  "pending": 0,
+  "min": 9.1,
+  "end": "15:46:28"
+ },
+ "extrows": {
+  "state": "skipped-no-time",
+  "at": "15:46:28",
+  "est": 27
+ },
+ "relapr": {
+  "state": "pass",
+  "exit": 0,
+  "passing": 12,
+  "failing": 0,
+  "pending": 0,
+  "min": 5.03,
+  "end": "15:51:30"
+ },
+ "refcas": {
+  "state": "pass",
+  "exit": 0,
+  "passing": 16,
+  "failing": 0,
+  "pending": 0,
+  "min": 3.97,
+  "end": "15:55:28"
+ },
+ "ce": {
+  "state": "skipped-no-time",
+  "at": "15:55:28",
+  "est": 14
+ },
+ "apiaff": {
+  "state": "skipped-no-time",
+  "at": "15:55:28",
+  "est": 12
+ },
+ "af": {
+  "state": "skipped-no-time",
+  "at": "15:55:28",
+  "est": 11
+ }
+}

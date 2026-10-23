@@ -1,0 +1,20 @@
+[quiet-run] exit=0 time=82m57s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261023-143232-perm-chain.log (115 行, 4 KB)
+[quiet-run] cmd: node tmp/perm-run01/chain.mjs 16:02 users,grups,pemis,targets,relaug,relagp,extrows,relapr,refcas,ce,apiaff,af
+[quiet-run] lock: 取得並已釋放(等待 12m00s)
+== 最後 15 行(非空,不含上列失敗段落) ==
+  "state": "skipped-no-time",
+  "at": "15:55:28",
+  "est": 14
+ },
+ "apiaff": {
+  "state": "skipped-no-time",
+  "at": "15:55:28",
+  "est": 12
+ },
+ "af": {
+  "state": "skipped-no-time",
+  "at": "15:55:28",
+  "est": 11
+ }
+}
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)

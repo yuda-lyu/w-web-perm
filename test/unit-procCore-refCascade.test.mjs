@@ -9,12 +9,13 @@
 //  P3 三種拒絕(renameCascadeDupGroup／renameCascadeNameInUse／renameCascadeConflict)與引用端改寫列含標記(htmlMarkupNotAllowed): 整次拒存, 四表逐位元不變、cnt 不增, srLog 記 updateTabItems-refCascade-error 且不含個資值.
 //  P4 失敗回復(引用端先寫、主體後寫; 任一步例外 → 以寫入前原值補償還原引用端, 逐位元含 userIdUpdate／timeUpdate; 補償亦失敗 → saveCascadePartial＋srLog refCascade-restore-error;
 //     互換／鏈式／批內新增三形狀於補償後重送同一份資料須成功且結果正確; 主體 del → insert → save 之部分寫入為 ADR-013 既有限制, 補償不還原主體, 測試如實釘住); 成功時 srLog refCascade-done 計數正確且不含引用端 id 與個資.
-//  P5 鎖(R-WRITE-LOCK-02): 單一取鎖函數 withTabLocks, 階層 targets < pemis < grups < users 與輸入順序無關、去重、held 守門、失敗釋放、相反次序不死結; 分段取鎖(無改名／刪除不取引用端鎖; 有才取); 並行 updateGrups ∥ updateUsers ∥ updatePemis ∥ updateTargets 多輪隨機交錯不死結且終態等價於某一依序執行;
-//     站點不變式: procCore.mjs 與 WWebPerm.mjs 不得直接 kmx(, 取引用端表鎖處須帶 held 參數 [keyTable].
+//  P5 鎖(R-WRITE-LOCK-02; perm-run01 起鎖管理器為 w-serv-orm 實例之 withTabLocks／guardWrite, R-LOCK-CORE-01): 單一取鎖函數 keyCheck.withTabLocks(lockTabs, …), 階層 targets < pemis < grups < users 與輸入順序無關、去重、held 守門、失敗釋放、相反次序不死結; 分段取鎖(無改名／刪除不取引用端鎖; 有才取); 並行 updateGrups ∥ updateUsers ∥ updatePemis ∥ updateTargets 多輪隨機交錯不死結且終態等價於某一依序執行;
+//     站點不變式: procCore.mjs 與 WWebPerm.mjs 不得自建鎖(pmKeyMutex／kmx( 皆不得出現; 取表鎖只經 keyCheck.withTabLocks 或 w-serv-orm 的 guardWrite／withTabLocks), 取引用端表鎖處須帶 held 參數 [keyTable].
 //  P6 updateUsers: users 為引用鏈末端(引用端 = 無), 整表寫入(含 pickKeysOnly)不觸發任何級聯、不取其他表鎖、不寫其他表.
 //
 //受測: server/procCore.mjs 之 updateGrups／updatePemis／updateTargets／updateUsers(kpFunExt 之實際入口, 內走 updateTabItems)、server/cascadeWrite.mjs、server/keyCheck.mjs 之 withTabLocks.
-//注入接縫: proc(woItems, procOrm, { srLog, kmx, lockSave, cascadeRename })之 woItems(test/tools/unitOrm.mjs 之 mkTable 替身; 故障以包裝其方法注入: 第 k 次呼叫失敗), procOrm 為真(getMapOrm → getProc), 授權比對用真 getUserRules.
+//注入接縫: proc(woItems, procOrm, { srLog, withTabLocks, guardWrite, lockSave, cascadeRename })之 woItems(test/tools/unitOrm.mjs 之 mkTable 替身; 故障以包裝其方法注入: 第 k 次呼叫失敗), procOrm／withTabLocks／guardWrite 為真(mkCore: 真 WServOrm 包住替身表), 授權比對用真 getUserRules;
+//  需記錄取鎖軌跡者以 traceLock 包裝真鎖(記錄後仍呼叫真的).
 //跑法: npx mocha test/unit-procCore-refCascade.test.mjs --timeout 120000
 import assert from 'assert'
 import fs from 'fs'
@@ -22,17 +23,16 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import cloneDeep from 'lodash-es/cloneDeep.js'
 import JSON5 from 'json5'
-import pmKeyMutex from 'wsemi/src/pmKeyMutex.mjs'
 import cacheSt from 'wsemi/src/cacheSt.mjs'
 import clearXSS from 'wsemi/src/clearXSS.mjs'
 import ds from '../src/schema/index.mjs'
 import proc from '../server/procCore.mjs'
 import createLockSave from '../server/lockSave.mjs'
-import { withTabLocks, tabWriteKey } from '../server/keyCheck.mjs'
+import { withTabLocks } from '../server/keyCheck.mjs'
 import { checkCascadePlan, writeWithCascade, buildSyncRowsNew } from '../server/cascadeWrite.mjs'
 import planRefChanges, { fillIdlessIds } from '../src/js/refCascade.mjs'
 import { getUserRules } from '../src/plugins/mShare.mjs'
-import { mkTable, mkProcOrm, mkSrLog } from './tools/unitOrm.mjs'
+import { mkTable, mkCore, mkSrLog } from './tools/unitOrm.mjs'
 import { stripLineComment, takeParen } from './tools/srcScan.mjs'
 
 
@@ -112,7 +112,29 @@ let addRows = (seed, table, ...list) => {
 }
 
 
-//createEnv: 每案一組全新之資料表替身、kmx、占位與 procCore(procOrm 以 w-serv-orm 之 getMapOrm → getProc 組出)
+//traceLock: 取鎖軌跡記錄器(perm-run01: 原注入假 kmx 記錄 `acq <tabWriteKey>`／`rel <tabWriteKey>`, 改包裝真鎖——記錄後仍呼叫真的, 互斥照常):
+//  wrap(core) 回 { withTabLocks, guardWrite } 供展開進 proc 之選項; 記錄 `acq <表名>`／`rel <表名>`(同一次呼叫內之多表依真鎖之碼元序取、反序放).
+//  兩條路徑都須包: procCore 本表鎖經 guardWrite(w-serv-orm 內部直接用其閉包內之 withTabLocks, 不經注入之 withTabLocks), 引用端表鎖經 keyCheck.withTabLocks(lockTabs, …) 呼叫注入之 withTabLocks
+function traceLock() {
+    let log = []
+    let wrapRun = (tables, run) => {
+        let ts = [...new Set(tables)].sort()
+        ts.forEach((t) => log.push(`acq ${t}`))
+        return run().finally(() => {
+            ;[...ts].reverse().forEach((t) => log.push(`rel ${t}`))
+        })
+    }
+    return {
+        log,
+        wrap: (core) => ({
+            withTabLocks: (tableNames, fn) => wrapRun(tableNames, () => core.withTabLocks(tableNames, fn)),
+            guardWrite: (p) => wrapRun(p.tables, () => core.guardWrite(p)),
+        }),
+    }
+}
+
+//createEnv: 每案一組全新之資料表替身、真鎖(mkCore: 真 WServOrm 包住替身表之 procOrm／withTabLocks／guardWrite)、占位與 procCore;
+//  opt.lockOf(core) 回 { withTabLocks, guardWrite } 時改注入之(供 traceLock.wrap 記錄取鎖軌跡; perm-run01: 原 opt.proc.kmx 假鎖注入改此)
 let envs = []
 function createEnv(opt = {}) {
     let seed = opt.seed || seedRows()
@@ -122,9 +144,10 @@ function createEnv(opt = {}) {
     }
     let { srLog, logs } = mkSrLog()
     let cst = cacheSt()
-    let kmx = pmKeyMutex()
-    let pc = proc(woItems, mkProcOrm(ds, woItems), { srLog, kmx, lockSave: createLockSave(cst), ...(opt.proc || {}) })
-    let env = { seed, woItems, logs, cst, kmx, pc }
+    let core = mkCore(ds, woItems) //perm-run01: 原 mkProcOrm(ds, woItems)＋kmx: pmKeyMutex() 改 mkCore
+    let lock = opt.lockOf ? opt.lockOf(core) : core.lock
+    let pc = proc(woItems, core.procOrm, { srLog, ...lock, lockSave: createLockSave(cst), ...(opt.proc || {}) })
+    let env = { seed, woItems, logs, cst, core, pc }
     envs.push(env)
     return env
 }
@@ -1005,25 +1028,16 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
         })
 
         it('RW-221i 取鎖軌跡: 整表缺 id 且名稱不變 → 無須改寫引用端, 只取本表鎖(grups); 缺 id 改名(視為刪除)→ 再取引用端鎖(grups → users)', async function() {
+            //perm-run01: 原注入假 kmx 記 acq 鍵 tabWriteKey(表), 改以 traceLock 包裝真鎖(記 acq 表名; 本表經 guardWrite、引用端經 withTabLocks 皆記)
             let acq = (log) => log.filter((x) => x.startsWith('acq ')).map((x) => x.slice(4))
-            let mkTrace = () => {
-                let log = []
-                return {
-                    log,
-                    kmx: async (key, fn) => {
-                        log.push(`acq ${key}`)
-                        return fn()
-                    },
-                }
-            }
-            let t1 = mkTrace()
-            let env = createEnv({ proc: { kmx: t1.kmx } })
+            let t1 = traceLock()
+            let env = createEnv({ lockOf: t1.wrap })
             assert.strict.deepEqual(await run(env.pc, 'grups', noId(await rowsOf(env.woItems, 'grups'))), OKR)
-            assert.strict.deepEqual(acq(t1.log), [tabWriteKey('grups')])
-            let t2 = mkTrace()
-            let env2 = createEnv({ proc: { kmx: t2.kmx } })
+            assert.strict.deepEqual(acq(t1.log), ['grups'])
+            let t2 = traceLock()
+            let env2 = createEnv({ lockOf: t2.wrap })
             assert.strict.deepEqual(await run(env2.pc, 'grups', noId(edit(await rowsOf(env2.woItems, 'grups'), 'id-g1', { name: 'G1y' }))), OKR)
-            assert.strict.deepEqual(acq(t2.log), [tabWriteKey('grups'), tabWriteKey('users')])
+            assert.strict.deepEqual(acq(t2.log), ['grups', 'users'])
         })
 
         it('RW-220 crules 之物件值形式與陣列形式: 刪標的 T1 → 物件形式移除 T1 鍵(值物件之他鍵不動)、陣列形式移除該元素且仍為陣列', async function() {
@@ -1514,7 +1528,8 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
                 let u = woItems.users.get(id)
                 assert.strict.ok(!hasOwn(u, 'userIdUpdate') && !hasOwn(u, 'timeUpdate'), `${id}: 補償後該二鍵仍不存在`)
             }
-            assert.strict.deepEqual(calls.map((c) => [c.m, c.option]), [['save', undefined], ['save', { merge: false }]], '第 1 次為級聯寫入(合併)、第 2 次為補償(整列覆寫)')
+            //perm-run01: 第 1 次(級聯寫入)原 option 為 undefined(合併、可插入); 引用端 save 改帶 procOrm { mustExist: true }(只改不增, R-ONLYMOD-01), w-serv-orm 轉為 wo.save(data, { autoInsert: false })——仍是合併寫入(無 merge:false), 且禁止插入
+            assert.strict.deepEqual(calls.map((c) => [c.m, c.option]), [['save', { autoInsert: false }], ['save', { merge: false }]], '第 1 次為級聯寫入(合併、只改不增)、第 2 次為補償(整列覆寫)')
         })
 
         it('RW-413 R4 兩位引用者皆缺稽核欄位, 第一次 save 一位成功一位 ok:0, 補償全成功 → 四表完整快照回到寫入前原值', async function() {
@@ -1644,7 +1659,7 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
                 let plan = planRefChanges({ keyTable: 'grups', rowsOld, rowsNew, holdersOld })
                 assert.strict.ok(plan.changes.some((c) => c.id === w.id), '前提: 該長 id 使用者為引用端改寫列')
                 let { srLog, logs: logs2 } = mkSrLog()
-                let e = await writeWithCascade({ plan, holdersOld, woItems, procOrm: mkProcOrm(ds, woItems), userId: 'id-op', srLog, writeMain: async () => 'MAIN' }).then(() => 'RESOLVED', (err) => err)
+                let e = await writeWithCascade({ plan, holdersOld, woItems, procOrm: env.core.procOrm, userId: 'id-op', srLog, writeMain: async () => 'MAIN' }).then(() => 'RESOLVED', (err) => err) //perm-run01: 原 mkProcOrm(ds, woItems) 改 env.core.procOrm(mkCore 之真 procOrm, 同一組替身表)
                 assert.strict.notEqual(e, 'RESOLVED')
                 let msg = (typeof e === 'string') ? e : e.message
                 assert.strict.equal(msg, 'failed to save data: id[*]')
@@ -1817,21 +1832,22 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
 
         const RANK = { targets: 0, pemis: 1, grups: 2, users: 3 }
         const ORDER = ['targets', 'pemis', 'grups', 'users']
-        let K = (t) => tabWriteKey(t)
-
-        //traceKmx: 記錄取鎖／放鎖次序之替身(不互斥; 供單元驗證 withTabLocks 之取鎖次序, 與供 procCore 取鎖軌跡之驗證)
-        let traceKmx = () => {
+        //perm-run01: 原 K(t)＝tabWriteKey(t)(kmx 之鍵)與 traceKmx(假 kmx 記 `acq <鍵>`／`rel <鍵>`)——套內鎖鍵已移除, 鎖管理器改為 w-serv-orm 實例之 withTabLocks(tableNames, fn)(每表一鍵, 以表名取鎖):
+        //  freshCore: 全新之真鎖(四表空替身); traceLockTabs(real): 記錄 `acq <表名>`／`rel <表名>` 之假 lockTabs(tableNames, fn)——real 給了則記錄後呼叫真的(互斥照常), 不給則直接執行 fn
+        //  (供階層外表名之案例: 真鎖只認本實例之資料表, 拼錯表名即拋錯)
+        let freshCore = () => mkCore(ds, Object.fromEntries(TABLE_KEYS.map((k) => [k, mkTable([])])))
+        let traceLockTabs = (real = null) => {
             let log = []
-            let kmx = async (key, fn) => {
-                log.push(`acq ${key}`)
+            let lockTabs = async (tableNames, fn) => {
+                tableNames.forEach((t) => log.push(`acq ${t}`))
                 try {
-                    return await fn()
+                    return await (real !== null ? real(tableNames, fn) : fn())
                 }
                 finally {
-                    log.push(`rel ${key}`)
+                    ;[...tableNames].reverse().forEach((t) => log.push(`rel ${t}`))
                 }
             }
-            return { kmx, log }
+            return { lockTabs, log }
         }
         let acqOf = (log) => log.filter((x) => x.startsWith('acq ')).map((x) => x.slice(4))
 
@@ -1848,11 +1864,11 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
 
         //expectViolation: held 守門須拋 tab lock order violation(同步拋或 reject 皆可), 且 fn 未被呼叫、未取任何鎖
         let expectViolation = async (keyTables, held) => {
-            let { kmx, log } = traceKmx()
+            let { lockTabs, log } = traceLockTabs(freshCore().withTabLocks)
             let called = false
             let err = null
             try {
-                await withTabLocks(kmx, keyTables, async () => {
+                await withTabLocks(lockTabs, keyTables, async () => {
                     called = true
                 }, held)
             }
@@ -1868,16 +1884,16 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
 
             it('RW-501 取鎖次序恆為 targets < pemis < grups < users, 與輸入順序無關(四表 24 種排列皆同)', async function() {
                 for (let perm of permutations(ORDER)) {
-                    let { kmx, log } = traceKmx()
-                    await withTabLocks(kmx, perm, async () => {
+                    let { lockTabs, log } = traceLockTabs(freshCore().withTabLocks)
+                    await withTabLocks(lockTabs, perm, async () => {
                         log.push('fn')
                     })
-                    assert.strict.deepEqual(acqOf(log), ORDER.map(K), `輸入 ${perm}`)
-                    assert.strict.deepEqual(log, [...ORDER.map((t) => `acq ${K(t)}`), 'fn', ...[...ORDER].reverse().map((t) => `rel ${K(t)}`)], '由外而內巢狀: 先取者後放')
+                    assert.strict.deepEqual(acqOf(log), ORDER, `輸入 ${perm}`)
+                    assert.strict.deepEqual(log, [...ORDER.map((t) => `acq ${t}`), 'fn', ...[...ORDER].reverse().map((t) => `rel ${t}`)], '由外而內巢狀: 先取者後放')
                 }
             })
 
-            it('RW-502 子集之次序同階層、表名去重(同一把鎖不重複取, 否則 pmKeyMutex 非可重入而死結)', async function() {
+            it('RW-502 子集之次序同階層、表名去重(同一把鎖不重複取, 否則表鎖非可重入而死結)', async function() {
                 let cases = [
                     [['users', 'grups'], ['grups', 'users']],
                     [['pemis', 'targets', 'pemis'], ['targets', 'pemis']],
@@ -1887,26 +1903,27 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
                     [[], []],
                 ]
                 for (let [inp, exp] of cases) {
-                    let { kmx, log } = traceKmx()
-                    await withTabLocks(kmx, inp, async () => {})
-                    assert.strict.deepEqual(acqOf(log), exp.map(K), `輸入 ${JSON.stringify(inp)}`)
+                    let { lockTabs, log } = traceLockTabs(freshCore().withTabLocks)
+                    await withTimeout(withTabLocks(lockTabs, inp, async () => {}), 5000, `去重 輸入 ${JSON.stringify(inp)}`) //記錄器內仍呼叫真鎖: 未去重即同表巢狀取兩次而死結, 以 5 秒逾時偵測(而非拖到 mocha 逾時)
+                    assert.strict.deepEqual(acqOf(log), exp, `輸入 ${JSON.stringify(inp)}`)
                 }
-                //真 kmx: 重複表名不得死結
-                let kmx = pmKeyMutex()
-                await withTimeout(withTabLocks(kmx, ['grups', 'grups', 'users', 'users'], async () => 'ok'), 5000, 'dedupe')
+                //真鎖: 重複表名不得死結(keyCheck 逐表巢狀呼叫真 withTabLocks([t]); 未去重即同一把鎖巢狀取兩次)
+                let core = freshCore()
+                await withTimeout(withTabLocks(core.withTabLocks, ['grups', 'grups', 'users', 'users'], async () => 'ok'), 5000, 'dedupe')
             })
 
             it('RW-503 階層外之表名排在階層內之後、彼此依字典序; 原型鍵名(constructor／__proto__／toString)不被誤判為階層內之表', async function() {
-                let { kmx, log } = traceKmx()
-                await withTabLocks(kmx, ['zzz', 'constructor', 'users', '__proto__', 'aaa', 'toString', 'targets'], async () => {})
-                assert.strict.deepEqual(acqOf(log), ['targets', 'users', '__proto__', 'aaa', 'constructor', 'toString', 'zzz'].map(K))
+                //階層外表名真鎖不認(只認本實例資料表), 故此案用純記錄之 lockTabs(不呼叫真鎖), 只驗 keyCheck 的取鎖次序
+                let { lockTabs, log } = traceLockTabs()
+                await withTabLocks(lockTabs, ['zzz', 'constructor', 'users', '__proto__', 'aaa', 'toString', 'targets'], async () => {})
+                assert.strict.deepEqual(acqOf(log), ['targets', 'users', '__proto__', 'aaa', 'constructor', 'toString', 'zzz'])
             })
 
             it('RW-504 回傳 fn 之結果; fn reject 之值原樣 bubble', async function() {
-                let kmx = pmKeyMutex()
-                assert.strict.equal(await withTabLocks(kmx, ['grups'], async () => 'RESULT'), 'RESULT')
+                let lockTabs = freshCore().withTabLocks
+                assert.strict.equal(await withTabLocks(lockTabs, ['grups'], async () => 'RESULT'), 'RESULT')
                 let sentinel = { x: 1 }
-                let got = await withTabLocks(kmx, ['grups'], async () => Promise.reject(sentinel)).then(() => null, (e) => e)
+                let got = await withTabLocks(lockTabs, ['grups'], async () => Promise.reject(sentinel)).then(() => null, (e) => e)
                 assert.strict.equal(got, sentinel)
             })
 
@@ -1918,10 +1935,10 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
                             await expectViolation([r], [h])
                         }
                         else {
-                            let { kmx, log } = traceKmx()
-                            let v = await withTabLocks(kmx, [r], async () => 'ran', [h])
+                            let { lockTabs, log } = traceLockTabs(freshCore().withTabLocks)
+                            let v = await withTabLocks(lockTabs, [r], async () => 'ran', [h])
                             assert.strict.equal(v, 'ran')
-                            assert.strict.deepEqual(acqOf(log), [K(r)], `held=${h} 再取 ${r}`)
+                            assert.strict.deepEqual(acqOf(log), [r], `held=${h} 再取 ${r}`)
                         }
                     }
                 }
@@ -1936,9 +1953,9 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
                 await expectViolation(['users'], ['users']) //同鍵巢狀即死結, 守門須擋
                 await expectViolation(['grups'], ['pemis', 'grups']) //多個 held 取最高者
                 await expectViolation(['pemis', 'users'], ['pemis', 'grups'])
-                let { kmx, log } = traceKmx()
-                await withTabLocks(kmx, ['users'], async () => {}, ['pemis', 'grups'])
-                assert.strict.deepEqual(acqOf(log), [K('users')])
+                let { lockTabs, log } = traceLockTabs(freshCore().withTabLocks)
+                await withTabLocks(lockTabs, ['users'], async () => {}, ['pemis', 'grups'])
+                assert.strict.deepEqual(acqOf(log), ['users'])
             })
 
             it('RW-507 held 為階層外之表名時: 階層外表視為最低階(Infinity)——再取任何表皆須更高, 而階層內之表皆不夠高 → 拋', async function() {
@@ -1948,7 +1965,7 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
             })
 
             it('RW-508 fn 同步拋錯／reject／拋非 Error 值之後鎖皆釋放: 後續呼叫可取(5 秒內完成, 否則視為死結)', async function() {
-                let kmx = pmKeyMutex()
+                let lockTabs = freshCore().withTabLocks
                 let tables = ['grups', 'users', 'targets']
                 let thrown = [
                     () => {
@@ -1961,25 +1978,25 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
                     async () => Promise.reject(null),
                 ]
                 for (let f of thrown) {
-                    let e = await withTabLocks(kmx, tables, f).then(() => 'RESOLVED', (err) => err)
+                    let e = await withTabLocks(lockTabs, tables, f).then(() => 'RESOLVED', (err) => err)
                     assert.strict.notEqual(e, 'RESOLVED')
-                    let ok = await withTimeout(withTabLocks(kmx, tables, async () => 'after'), 5000, '失敗後再取鎖')
+                    let ok = await withTimeout(withTabLocks(lockTabs, tables, async () => 'after'), 5000, '失敗後再取鎖')
                     assert.strict.equal(ok, 'after')
                 }
             })
 
             it('RW-509 巢狀: 外層取本表、內層以 held 取引用端表(分段取鎖)可完成; 並行之另一任務僅取引用端表亦不死結', async function() {
-                let kmx = pmKeyMutex()
+                let lockTabs = freshCore().withTabLocks
                 let seq = []
-                let a = withTabLocks(kmx, ['grups'], async () => {
+                let a = withTabLocks(lockTabs, ['grups'], async () => {
                     seq.push('A.outer')
                     await flush(3)
-                    return await withTabLocks(kmx, ['users'], async () => {
+                    return await withTabLocks(lockTabs, ['users'], async () => {
                         seq.push('A.inner')
                         await flush(3)
                     }, ['grups'])
                 })
-                let b = withTabLocks(kmx, ['users'], async () => {
+                let b = withTabLocks(lockTabs, ['users'], async () => {
                     seq.push('B')
                     await flush(3)
                 })
@@ -1988,10 +2005,10 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
             })
 
             it('RW-510 相反輸入順序之兩任務(withTabLocks([grups,users]) 與 ([users,grups]))並行 200 輪, 皆於 5 秒內完成(不死結)', async function() {
-                let kmx = pmKeyMutex()
+                let lockTabs = freshCore().withTabLocks
                 let rand = mulberry32(510)
                 let n = 0
-                let task = (tabs) => withTabLocks(kmx, tabs, async () => {
+                let task = (tabs) => withTabLocks(lockTabs, tabs, async () => {
                     await jitter(rand)
                     n++
                     await jitter(rand)
@@ -2004,13 +2021,13 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
                 assert.strict.equal(n, 400)
             })
 
-            it('RW-511 四表全排列(24 任務)同時對同一 kmx 取鎖(各以不同輸入順序), 皆於 5 秒內完成且互斥(同一時刻每表至多一個持有者)', async function() {
-                let kmx = pmKeyMutex()
+            it('RW-511 四表全排列(24 任務)同時對同一真鎖管理器取鎖(各以不同輸入順序), 皆於 5 秒內完成且互斥(同一時刻每表至多一個持有者)', async function() {
+                let lockTabs = freshCore().withTabLocks
                 let rand = mulberry32(511)
                 let holding = new Map()
                 let violated = []
                 let n = 0
-                let task = (tabs) => withTabLocks(kmx, tabs, async () => {
+                let task = (tabs) => withTabLocks(lockTabs, tabs, async () => {
                     for (let t of tabs) {
                         holding.set(t, (holding.get(t) || 0) + 1)
                         if (holding.get(t) > 1) {
@@ -2028,19 +2045,20 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
                 assert.strict.deepEqual(violated, [], '不得有兩個任務同時持有同一表之鎖')
             })
 
-            it('RW-512 對照(證明死結偵測有效): 兩任務以相反次序巢狀直接取 kmx(不經 withTabLocks)→ 死結, 逾時被偵測', async function() {
-                let kmx = pmKeyMutex()
+            //perm-run01: 原直接以 kmx('A')／kmx('B') 相反次序巢狀取鎖; 改對真鎖管理器(w-serv-orm withTabLocks, 以表名 users／grups)直接相反次序巢狀取鎖, 同樣必死結(證明逾時偵測與死結成形條件有效)
+            it('RW-512 對照(證明死結偵測有效): 兩任務以相反次序巢狀直接對真鎖管理器取鎖(不經 keyCheck.withTabLocks)→ 死結, 逾時被偵測', async function() {
+                let lockTabs = freshCore().withTabLocks
                 let gA = 0
                 let barrier = () => flush(5)
-                let t1 = kmx('A', async () => {
+                let t1 = lockTabs(['users'], async () => {
                     gA++
                     await barrier()
-                    return kmx('B', async () => 'x')
+                    return lockTabs(['grups'], async () => 'x')
                 })
-                let t2 = kmx('B', async () => {
+                let t2 = lockTabs(['grups'], async () => {
                     gA++
                     await barrier()
-                    return kmx('A', async () => 'y')
+                    return lockTabs(['users'], async () => 'y')
                 })
                 let err = await withTimeout(Promise.all([t1, t2]), 300, '對照死結').then(() => null, (e) => e)
                 assert.strict.ok(err && /TIMEOUT/.test(err.message), '直接相反次序巢狀取鎖應死結(逾時)')
@@ -2070,13 +2088,15 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
             ]
             for (let t of TRACE) {
                 it(`RW-520 取鎖軌跡: ${t.tag} → ${t.exp.join(' → ')}`, async function() {
-                    let { kmx, log } = traceKmx()
-                    let env = createEnv({ proc: { kmx, ...(t.proc || {}) }, seed: t.seed ? t.seed() : undefined })
+                    //perm-run01: 原注入假 kmx 改 traceLock 包裝真鎖(本表鎖經 guardWrite、引用端鎖經 withTabLocks; 記表名而非 tabWriteKey 鍵)
+                    let tr = traceLock()
+                    let env = createEnv({ lockOf: tr.wrap, proc: { ...(t.proc || {}) }, seed: t.seed ? t.seed() : undefined })
+                    let log = tr.log
                     let r = await run(env.pc, t.table, t.mk(await rowsOf(env.woItems, t.table)))
                     assert.strict.equal(r.ok, !t.reject, `結果 ${JSON.stringify(r)}`)
-                    assert.strict.deepEqual(acqOf(log), t.exp.map(K), '取鎖序列')
+                    assert.strict.deepEqual(acqOf(log), t.exp, '取鎖序列')
                     //巢狀釋放: 先取者後放
-                    assert.strict.deepEqual(log.filter((x) => x.startsWith('rel ')).map((x) => x.slice(4)), [...t.exp].reverse().map(K))
+                    assert.strict.deepEqual(log.filter((x) => x.startsWith('rel ')).map((x) => x.slice(4)), [...t.exp].reverse())
                 })
             }
 
@@ -2084,18 +2104,19 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
 
         describe('分段取鎖之實際互斥(他方持有某表鎖時, 無需該鎖之寫入不被擋、需要者被擋至釋放後才完成, 且被擋期間任何表不被寫)', function() {
 
-            let hold = (kmx, tab) => {
+            //perm-run01: 原 kmx(tabWriteKey(表), () => gate) 改對真鎖管理器以表名取鎖(env.core.withTabLocks([表], …), 與 guardWrite／引用端取鎖同一把)
+            let hold = (core, tab) => {
                 let release = null
                 let gate = new Promise((resolve) => {
                     release = resolve
                 })
-                let held = kmx(K(tab), () => gate)
+                let held = core.withTabLocks([tab], () => gate)
                 return { release: () => release(), held }
             }
 
             //expectNotBlocked: 持鎖期間操作完成
             let expectNotBlocked = async (env, holdTab, table, rows) => {
-                let h = hold(env.kmx, holdTab)
+                let h = hold(env.core, holdTab)
                 try {
                     let r = await withTimeout(run(env.pc, table, rows), 5000, `持有 ${holdTab} 時 ${FN[table]} 不應被擋`)
                     assert.strict.deepEqual(r, OKR)
@@ -2108,7 +2129,7 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
 
             //expectBlocked: 持鎖期間不完成且四表零寫入, 釋放後完成
             let expectBlocked = async (env, holdTab, table, rows) => {
-                let h = hold(env.kmx, holdTab)
+                let h = hold(env.core, holdTab)
                 let done = false
                 let p = run(env.pc, table, rows).then((r) => {
                     done = true
@@ -2400,21 +2421,49 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
                 return calls
             }
 
+            //perm-run01: 原 RW-550「不得直接 kmx( 取鎖」改為「不得自建鎖(pmKeyMutex／kmx( 皆不得出現; 取表鎖只經 keyCheck.withTabLocks 或 w-serv-orm 的 guardWrite／withTabLocks)」;
+            //原 RW-551「withTabLocks( 恰兩處, 外層 withTabLocks(kmx, [keyTable], …)、內層 withTabLocks(kmx, [holder], …, [keyTable])」, 新碼:
+            //  procCore.mjs: 本表鎖由 guardWrite({ tables: [keyTable], … }) 承擔(w-serv-orm 內部取鎖, 不再有外層 withTabLocks( 呼叫), 故僅內層一處 keyCheck.withTabLocks(lockTabs, [holder], …, [keyTable]);
+            //  WWebPerm.mjs: 外部同步外層 withTabLocks(lockTabs, [keyTable], …)、內層 withTabLocks(lockTabs, [holder], …, [keyTable]) 共兩處.
+            //  兩檔之內層(引用端表鎖)皆須帶 held 參數 [keyTable](階層守門, 防巢狀同鍵／反向).
             for (let rel of ['server/procCore.mjs', 'server/WWebPerm.mjs']) {
-                it(`RW-550 ${rel}: 不得直接 kmx( 取鎖(一律經 withTabLocks, 否則可能違反階層而死結)`, function() {
-                    assert.strict.equal((readCode(rel).match(/\bkmx\(/g) || []).length, 0)
-                })
-
-                it(`RW-551 ${rel}: 全部 withTabLocks( 呼叫恰兩處——先取本表 [keyTable], 內層取引用端表 [holder] 時帶 held 參數 [keyTable](階層守門, 防巢狀同鍵／反向)`, function() {
-                    let calls = withTabLocksCalls(readCode(rel))
-                    assert.strict.equal(calls.length, 2, `${rel} 之 withTabLocks( 呼叫數`)
-                    let outer = calls.filter((a) => /^\s*kmx,\s*\[keyTable\]\s*,/.test(a))
-                    let inner = calls.filter((a) => /^\s*kmx,\s*\[holder\]\s*,/.test(a))
-                    assert.strict.equal(outer.length, 1, '外層取本表鎖 withTabLocks(kmx, [keyTable], …)')
-                    assert.strict.equal(inner.length, 1, '內層取引用端表鎖 withTabLocks(kmx, [holder], …)')
-                    assert.strict.ok(/,\s*\[keyTable\]\s*$/.test(inner[0]), '內層須帶 held 參數 [keyTable]')
+                it(`RW-550 ${rel}: 不得自建鎖(pmKeyMutex／kmx( 皆不得出現; 取表鎖只經 keyCheck.withTabLocks 或 w-serv-orm 的 guardWrite／withTabLocks, 否則可能違反階層而死結)`, function() {
+                    let code = readCode(rel)
+                    assert.strict.equal((code.match(/\bkmx\(/g) || []).length, 0, 'kmx( 不得出現')
+                    assert.strict.equal((code.match(/\bpmKeyMutex\b/g) || []).length, 0, 'pmKeyMutex 不得出現(鎖管理器只有 w-serv-orm 實例一個)')
+                    assert.strict.equal((code.match(/\btabWriteKey\b/g) || []).length, 0, 'tabWriteKey 不得復活')
                 })
             }
+
+            it('RW-551a server/procCore.mjs: 本表鎖只經 guardWrite({ tables: [keyTable], … }) 一處; 引用端表鎖 withTabLocks( 恰一處且帶 held 參數 [keyTable](階層守門, 防巢狀同鍵／反向)', function() {
+                let code = readCode('server/procCore.mjs')
+                assert.strict.equal((code.match(/\bguardWrite\(\{/g) || []).length, 1, 'guardWrite({ 呼叫恰一處')
+                assert.strict.ok(/guardWrite\(\{\s*tables:\s*\[keyTable\]/.test(code), '本表鎖 guardWrite({ tables: [keyTable], … })')
+                let calls = withTabLocksCalls(code)
+                assert.strict.equal(calls.length, 1, 'procCore.mjs 之 withTabLocks( 呼叫數(僅引用端表鎖)')
+                assert.strict.ok(/^\s*lockTabs,\s*\[holder\]\s*,/.test(calls[0]), '內層取引用端表鎖 withTabLocks(lockTabs, [holder], …)')
+                assert.strict.ok(/,\s*\[keyTable\]\s*$/.test(calls[0]), '內層須帶 held 參數 [keyTable]')
+                //引用端鎖在 guardWrite 的 write 回呼內(先持本表鎖才取引用端鎖)
+                assert.strict.ok(code.indexOf('guardWrite({') < code.indexOf('withTabLocks(lockTabs, [holder]'), '引用端鎖須在 guardWrite 之後(write 回呼內)')
+            })
+
+            it('RW-551b server/WWebPerm.mjs: 全部 withTabLocks( 呼叫恰兩處——先取本表 [keyTable], 內層取引用端表 [holder] 時帶 held 參數 [keyTable](階層守門, 防巢狀同鍵／反向)', function() {
+                let calls = withTabLocksCalls(readCode('server/WWebPerm.mjs'))
+                assert.strict.equal(calls.length, 2, 'WWebPerm.mjs 之 withTabLocks( 呼叫數')
+                let outer = calls.filter((a) => /^\s*lockTabs,\s*\[keyTable\]\s*,/.test(a))
+                let inner = calls.filter((a) => /^\s*lockTabs,\s*\[holder\]\s*,/.test(a))
+                assert.strict.equal(outer.length, 1, '外層取本表鎖 withTabLocks(lockTabs, [keyTable], …)')
+                assert.strict.equal(inner.length, 1, '內層取引用端表鎖 withTabLocks(lockTabs, [holder], …)')
+                assert.strict.ok(/,\s*\[keyTable\]\s*$/.test(inner[0]), '內層須帶 held 參數 [keyTable]')
+            })
+
+            it('RW-551c procCore.mjs 與 WWebPerm.mjs 之鎖來源: 皆取自注入之 w-serv-orm 實例(procCore 收 withTabLocks／guardWrite 注入; WWebPerm 取 WServOrm 回傳物件之 withTabLocks／guardWrite), 不自行建構', function() {
+                let pcCode = readCode('server/procCore.mjs')
+                assert.strict.ok(/function proc\(woItems, procOrm, \{[^}]*\bwithTabLocks: lockTabs\b[^}]*\bguardWrite\b[^}]*\}\)/.test(pcCode), 'proc 須收 withTabLocks(別名 lockTabs)／guardWrite 注入')
+                let wpCode = readCode('server/WWebPerm.mjs')
+                assert.strict.ok(/let lockTabs = wp\.withTabLocks/.test(wpCode) && /let guardWrite = wp\.guardWrite/.test(wpCode), 'WWebPerm 之鎖取自 WServOrm 回傳物件')
+                assert.strict.ok(/procCore\(woItems,\s*procOrm,\s*\{[^}]*\bwithTabLocks: lockTabs\b[^}]*\bguardWrite\b[^}]*\}\)/.test(wpCode), 'WWebPerm 須把同一組 withTabLocks／guardWrite 注入 procCore(與外部同步共鎖)')
+            })
 
             it('RW-552 引用端表之取得只經 REF_OF[keyTable].holder(單一對照表), 不另寫死表名', function() {
                 for (let rel of ['server/procCore.mjs', 'server/WWebPerm.mjs']) {
@@ -2476,7 +2525,7 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
             let gate = new Promise((resolve) => {
                 release = resolve
             })
-            let helds = ['targets', 'pemis', 'grups'].map((t) => env.kmx(tabWriteKey(t), () => gate))
+            let helds = ['targets', 'pemis', 'grups'].map((t) => env.core.withTabLocks([t], () => gate)) //perm-run01: 原 env.kmx(tabWriteKey(t), …) 改對真鎖管理器以表名取鎖
             try {
                 let r1 = await withTimeout(run(env.pc, 'users', edit(await rowsOf(env.woItems, 'users'), 'id-u1', { description: 'x' })), 5000, 'updateUsers 持他表鎖')
                 assert.strict.deepEqual(r1, OKR)
@@ -2491,16 +2540,14 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
         })
 
         it('RW-604 users 之取鎖軌跡僅 users 一把(整表與 pickKeysOnly 皆然), 與是否刪除／改名使用者無關', async function() {
-            let log = []
-            let kmx = async (key, fn) => {
-                log.push(key)
-                return fn()
-            }
-            let env = createEnv({ proc: { kmx } })
+            //perm-run01: 原注入假 kmx 記鍵 tabWriteKey('users'), 改 traceLock 包裝真鎖, 記表名 'users'(本表鎖經 guardWrite; users 無引用端故不經 withTabLocks)
+            let tr = traceLock()
+            let log = tr.log
+            let env = createEnv({ lockOf: tr.wrap })
             await run(env.pc, 'users', drop(edit(await rowsOf(env.woItems, 'users'), 'id-u1', { name: 'renamed' }), 'id-u5'))
             //run07 U1 修正: 原改外部列 id-u2 之 cgrups(無基準 → 被 saveBaselineRequired 拒收而本案未檢回傳值, 取鎖軌跡仍為一把而掩蓋了該次其實未成功); 改以後台列 id-u4 並斷言成功, 使「pickKeysOnly 路徑取一把鎖」確實走完寫入
             assert.strict.deepEqual(await run(env.pc, 'users', edit(await rowsOf(env.woItems, 'users'), 'id-u4', { cgrups: J({ G1: OR }) }), { pickKeysOnly: ['cgrups'] }, 'id-admin2'), OKR)
-            assert.strict.deepEqual(log, [tabWriteKey('users'), tabWriteKey('users')])
+            assert.strict.deepEqual(log, ['acq users', 'rel users', 'acq users', 'rel users'], '兩次寫入(整表、pickKeysOnly)各只取 users 一把鎖、各自釋放')
         })
 
     })

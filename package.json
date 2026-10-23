@@ -9,7 +9,7 @@
     "w-data-collector": "^1.0.47",
     "w-echarts-vue": "^1.0.19",
     "w-serv-hapi": "^1.1.7",
-    "w-serv-orm": "^1.1.15",
+    "w-serv-orm": "^1.1.17",
     "w-syslog": "^1.0.34",
     "w-ui-loginout": "^1.0.33",
     "wsemi": "^1.9.21"

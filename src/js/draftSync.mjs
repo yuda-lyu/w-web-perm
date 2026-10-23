@@ -56,15 +56,91 @@ function planDraftSync({ first, editChanged, storeChanged, hasDraft, saving }) {
  * 草稿所依據之基準相對於目前 store 整表是否已過期(供顯示「資料已被更新」提示; 判準同伺服端 checkBaseline, 單一擁有者 rowDigest.compareBaseline)
  *
  * @param {Object} p 輸入參數物件
- * @param {Array} p.keys 輸入該表 schema 欄位名陣列
+ * @param {String} p.keyTable 輸入表名(targets／pemis／grups／users; 依其寫入契約計算)
  * @param {Array} p.rows 輸入目前 store 之該表列
  * @param {Array} p.baseline 輸入草稿載入時之基準
- * @returns {Boolean} 回傳是否過期(有任一列內容不同或列被增刪; 僅 order／伺服器管理欄不同不算)
+ * @returns {Boolean} 回傳是否過期(有任一列內容摘要不同、列被增刪或名次不同; 僅 order 數值改變而名次不變、或僅伺服器專有欄不同不算)
  */
-function isDraftStale({ keys, rows, baseline }) {
-    return isBaselineStale({ keys, rows, baseline })
+function isDraftStale({ keyTable, rows, baseline }) {
+    return isBaselineStale({ keyTable, rows, baseline })
 }
 
 
-export { refsChanged, planDraftSync, isDraftStale }
+/**
+ * 是否有未存之草稿: 已提交之未存修改(isModified), 或**儲存格編輯器開啟中**(已輸入、未按 Enter 或未失焦——編輯器內的輸入尚未進 rows, 但重建清單會直接丟棄它; 第 115 項, R-DRAFT-KEEP-01 規則 10)
+ *
+ * 四清單頁(changeParams 的 hasDraft)與兩對話框(planDialogSync)共用, 口徑單一.
+ *
+ * @param {Object} p 輸入參數物件
+ * @param {Boolean} p.dirty 輸入是否有已提交之未存修改(isModified 鏡像)
+ * @param {Boolean} p.editing 輸入儲存格編輯器是否開啟中(ag-grid getEditingCells 非空)
+ * @returns {Boolean} 回傳是否視為有草稿
+ */
+function hasDraftNow({ dirty, editing }) {
+    return dirty === true || editing === true
+}
+
+
+/**
+ * 反向關聯對話框(開著時)收到 store 推播之處置(第 114／115 項、修 (b); R-PRINCIPLE-00 原則 10「無未存修改時照舊重建」; 規則帳本 R-DRAFT-KEEP-01 規則 10～12)
+ *
+ * - 'none': 不須處置——未顯示、store 未變、表內容未異於載入基準(推播內容與載入時相同)、或此推播是自己存檔所致(saving)而無草稿
+ * - 'rebuild': 無未存修改(含無開啟中之儲存格編輯器)且表已異於載入基準 → 以新資料重建對話框內容並更新基準(對話框開而未編輯時不應停在過期的資料上)
+ * - 'keep': 有未存修改或開啟中之編輯器 → 保留草稿、凍結基準; 呼叫端依 stale 顯示「資料已被更新」提示
+ * - 'keepQuiet': 自己之存檔進行中(伺服端已寫入、回應未到)所致之推播, 不是他人更新 → 保留、不提示
+ *
+ * @param {Object} p 輸入參數物件
+ * @param {Boolean} p.show 輸入對話框是否顯示中
+ * @param {Boolean} p.storeChanged 輸入來源 store 是否變新(參照改變)
+ * @param {Boolean} p.stale 輸入表是否已異於對話框載入時之基準(isDraftStale)
+ * @param {Boolean} p.dirty 輸入是否有已提交之未存修改
+ * @param {Boolean} p.editing 輸入儲存格編輯器是否開啟中
+ * @param {Boolean} p.saving 輸入自己之存檔是否進行中
+ * @returns {String} 回傳 'none'｜'rebuild'｜'keep'｜'keepQuiet'
+ */
+function planDialogSync({ show, storeChanged, stale, dirty, editing, saving }) {
+    if (show !== true || storeChanged !== true) {
+        return 'none'
+    }
+    if (saving === true) {
+        return 'keepQuiet'
+    }
+    if (stale !== true) {
+        return 'none'
+    }
+    return hasDraftNow({ dirty, editing }) ? 'keep' : 'rebuild'
+}
+
+
+/**
+ * 驗證關聯對話框之主體(被編輯其歸屬之群組／權限)於存檔當下仍是開框時那一個實體(第 114 項; R-PRINCIPLE-00 原則 3、6; 規則帳本 R-SUBJECT-ID-01)
+ *
+ * 反向對話框以**名稱**引用主體(使用者 cgrups／群組 cpemis 的鍵是名稱), 不驗主體身分: 開框後主體被刪除並以同名重建(id 不同), 引用會靜默指向新實體(原則 6: 不得讓引用被同名新資料接管);
+ * 故以主體 id 與開框時之摘要(id、名稱、開框時是否已儲存)比對存檔當下的主體表: id 仍在、名稱未變才算同一實體. 不符一律拒收(收嚴, 原則 3), 提示重新載入.
+ * 開框時主體尚未儲存(store 查無該 id; 清單頁新增列未存即開對話框)者沿用既有行為(引用先指向尚不存在之名稱), 但其後 store 出現「同名而 id 不同」之另一實體時亦拒收(引用會被該實體接管).
+ *
+ * @param {Object} p 輸入參數物件
+ * @param {Object} p.subject 輸入開框時之主體摘要 { id, name, saved }(saved: 開框時 store 已有該 id)
+ * @param {Array} p.rows 輸入存檔當下之主體表列(store 的 grups 或 pemis)
+ * @returns {String} 回傳 'ok'｜'gone'(開框時已儲存之 id 現已不在: 已刪除或以同名重建)｜'renamed'(id 仍在但名稱不同)｜'taken'(開框時未儲存之主體, 現有同名而 id 不同之另一實體)｜'noSubject'(未提供有效之開框摘要, 收嚴拒收)
+ */
+function checkSubject({ subject, rows }) {
+    let id = (subject !== null && typeof subject === 'object') ? subject.id : undefined
+    let name = (subject !== null && typeof subject === 'object') ? subject.name : undefined
+    if (typeof id !== 'string' || id === '' || typeof name !== 'string' || name === '') {
+        return 'noSubject'
+    }
+    let list = (Array.isArray(rows) ? rows : []).filter((r) => r !== null && typeof r === 'object')
+    let hit = list.find((r) => r.id === id)
+    if (hit !== undefined) {
+        return hit.name === name ? 'ok' : 'renamed'
+    }
+    if (subject.saved === true) {
+        return 'gone'
+    }
+    return list.some((r) => r.name === name) ? 'taken' : 'ok'
+}
+
+
+export { refsChanged, planDraftSync, isDraftStale, hasDraftNow, planDialogSync, checkSubject }
 export default planDraftSync

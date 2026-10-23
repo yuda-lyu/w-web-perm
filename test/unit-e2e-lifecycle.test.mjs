@@ -207,7 +207,7 @@ describe('unit-e2e-lifecycle (e2e 檔 DB 收尾對稱, R-E2E-ISO-01)', function(
         }
         assert.strict.deepEqual(bad, [], bad.join('\n'))
         //站點全集(2026-10-22 run09 盤點): 新增建立外部列夾具之檔須同步更新此清單與規則帳本 R-TEST-EXT-CLEAN-01 站點表
-        assert.strict.deepEqual(makers, ['api-authMerge.test.mjs', 'api-cleanExternal.test.mjs', 'api-externalRows.test.mjs', 'api-getPermUserInfor.test.mjs', 'api-keyProp.test.mjs', 'api-mapKey.test.mjs', 'api-refCascade.test.mjs', 'api-syncAndReplaceTabs.test.mjs', 'api-tokenSafety.test.mjs', 'api-updateTabs.test.mjs', 'e2e-array-form.test.mjs', 'e2e-external-rows.test.mjs', 'e2e-init.test.mjs', 'e2e-ref-cascade.test.mjs'])
+        assert.strict.deepEqual(makers, ['api-authMerge.test.mjs', 'api-baseline.test.mjs', 'api-cleanExternal.test.mjs', 'api-externalRows.test.mjs', 'api-getPermUserInfor.test.mjs', 'api-keyProp.test.mjs', 'api-mapKey.test.mjs', 'api-refCascade.test.mjs', 'api-syncAndReplaceTabs.test.mjs', 'api-tokenSafety.test.mjs', 'api-updateTabs.test.mjs', 'e2e-array-form.test.mjs', 'e2e-concurrent-edit.test.mjs', 'e2e-external-rows.test.mjs', 'e2e-init.test.mjs', 'e2e-ref-cascade.test.mjs'])
     })
 
     it('LC-004b LC-004 的判定器本身: 自寫 delAll({ from }) 被抓、以 id 刪後台列不算; 同步入口與收尾入口各自辨識', function() {

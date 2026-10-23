@@ -308,7 +308,9 @@ import { getSavePreview } from '../js/getCascadePreview.mjs'
 import { getAddImpact, getAddConfirmText } from '../js/getAddImpact.mjs'
 import { isExternalRow } from '../js/externalRows.mjs'
 import { makeBaseline } from '../js/rowDigest.mjs'
-import { refsChanged, planDraftSync, isDraftStale } from '../js/draftSync.mjs'
+import { refsChanged, planDraftSync, isDraftStale, hasDraftNow } from '../js/draftSync.mjs'
+import { applySavedRows } from '../js/applySaved.mjs'
+import { isCellEditing, bindCellEditingStopRetry } from '../js/cellEditing.mjs'
 import { fmtVars, getBannerLines, splitCheckedRows, getExternalEdits } from '../js/externalUi.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
 import WSwitch from 'w-component-vue/src/components/WSwitch.vue'
@@ -595,14 +597,14 @@ export default {
                 first: vo.syncMark.refs === null || vo.syncMark.tick !== vo.syncTick, //首次載入或使用者按了「重新載入」(syncTick 遞增)
                 editChanged: vo.syncMark.editable !== isEditable,
                 storeChanged: refsChanged(vo.syncMark.refs, [rows, kpUse]),
-                hasDraft: () => vo.syncMark.dirty === true,
+                hasDraft: () => hasDraftNow({ dirty: vo.syncMark.dirty === true, editing: isCellEditing(get(vo, '$refs.rftable', null)) }), //未存修改, 或儲存格編輯器開啟中(已輸入、未按 Enter; 第 115 項, R-DRAFT-KEEP-01 規則 10)
                 saving: () => vo.saveMark.saving === true, //自己之存檔請求進行中所致之推播 → 'keepQuiet'(不改過期提示)
             })
             if (act === 'rebuild') {
                 vo.rebuildDraft(rows, kpUse, isEditable)
             }
             else if (act === 'keep') {
-                vo.staleNotice = isDraftStale({ keys: vo.$ds.pemis.keys, rows, baseline: vo.syncMark.baseline })
+                vo.staleNotice = isDraftStale({ keyTable: 'pemis', rows, baseline: vo.syncMark.baseline })
             }
 
             return ''
@@ -779,7 +781,7 @@ export default {
             let kpUsePemiGrup = cloneDeep(kpUse)
 
             //baseline, 與 items 同一處由同一份來源列(pemis, genItems 之前)計算: 草稿所依據之版本(F-26), 重建 items 時一併更新, 存檔時不重算
-            let baseline = makeBaseline(pemis, vo.$ds.pemis.keys)
+            let baseline = makeBaseline(pemis, 'pemis')
 
             //items
             let items = vo.genItems(pemis, kpUsePemiGrup)
@@ -798,12 +800,33 @@ export default {
             //firstLoading
             vo.firstLoading = false
 
+            //第 115 項: 重建後元件可能重建, 對新的 ag-grid 重綁「儲存格編輯結束」監聽(同一 api 只綁一次)
+            vo.$nextTick(() => {
+                vo.bindEditing()
+            })
+
         },
 
         curRefs: function() {
             //目前各來源 store 之參照(與 changeParams 之 refsChanged 同一組)
             let vo = this
             return [vo.pemis, vo.kpUsePemiGrup]
+        },
+
+        bindEditing: function() {
+            //第 115 項(R-DRAFT-KEEP-01 規則 10): 儲存格編輯器開啟中視為有草稿(changeParams 的 hasDraft 以 ag-grid 的 getEditingCells 判定); 編輯結束(提交、Esc、失焦)時補做保留期間跳過之重建
+            let vo = this
+            bindCellEditingStopRetry(() => get(vo, '$refs.rftable', null), () => {
+                vo.afterEditing()
+            })
+        },
+
+        afterEditing: function() {
+            //儲存格編輯結束: 無未存修改(isModified 為假; 提交者此刻已由 rowsChange 設為真)而 store 於編輯期間已變新者, 補上一次重建; 有未存修改者維持保留(isModified 的 watch 於儲存或放棄後補重建)
+            let vo = this
+            if (vo.isModified !== true && vo.syncMark.refs !== null && refsChanged(vo.syncMark.refs, vo.curRefs())) {
+                vo.reloadDraft()
+            }
         },
 
         reloadDraft: function() {
@@ -1417,7 +1440,7 @@ export default {
                     }
 
                     //草稿所依據之表於編輯器開啟後已被改動(整表指紋與開框時之基準不同; 僅 order／伺服器管理欄不同不算): 放棄回填並提示重新載入(同伺服端 saveStale 之語意)
-                    if (isDraftStale({ keys: vo.$ds.pemis.keys, rows: vo.baseRows, baseline: baseline0 })) {
+                    if (isDraftStale({ keyTable: 'pemis', rows: vo.baseRows, baseline: baseline0 })) {
                         vo.$alert(`${vo.$t('saveStale')}`, { type: 'warning' })
                         return
                     }
@@ -1521,15 +1544,17 @@ export default {
 
                 //4) updatePemis, 各自 catch + 旗標短路; 第 2 參 { baseline } 為載入基準(伺服端於表鎖內比對本次將寫入之列是否仍與草稿所依據之版本相同, 否則整次拒收 saveStale)
                 let okSave = false
+                let savedRes = null //伺服端回傳(成功 msg key 字串, 或 { msg, rows, others }: 寫入後之列, 鎖內新鮮讀取; 規格第 8 節)
                 vo.saveMark.saving = true //自己之存檔請求進行中: 此期間之推播不是他人更新(changeParams 的 planDraftSync 回 'keepQuiet'); 回應(成功或失敗)一到即歸零
-                await vo.$fapi.updatePemis(rows, { baseline })
-                    .then(() => {
+                await vo.$fapi.updatePemis(rows, { baseline, returnRows: true })
+                    .then((res) => {
                         okSave = true
+                        savedRes = res
                         vo.saveMark.saving = false
                     })
                     .catch(async (err) => {
                         vo.saveMark.saving = false
-                        vo.staleNotice = isDraftStale({ keys: vo.$ds.pemis.keys, rows: vo.pemis, baseline: vo.syncMark.baseline }) //失敗(含 saveStale 被拒): 請求進行中被安靜保留之推播, 此時依目前 store 重算過期提示(同 changeParams 之保留分支)
+                        vo.staleNotice = isDraftStale({ keyTable: 'pemis', rows: vo.pemis, baseline: vo.syncMark.baseline }) //失敗(含 saveStale 被拒): 請求進行中被安靜保留之推播, 此時依目前 store 重算過期提示(同 changeParams 之保留分支)
                         vo.$ui.updateLoading(false) //showCheckYes 前關 loading（modal 阻斷期間避免 loading 疊在底下）
                         await vo.$dg.showCheckYes(`${vo.$t('pemiSavePemisFail')}: ${vo.$tErr(err)}`)
                     })
@@ -1538,6 +1563,11 @@ export default {
                 //isModified; postSaving 自此至成功訊息框關閉後 300ms 內排除 rowsChange(見 data 註解)
                 vo.postSaving = true
                 vo.isModified = false
+                vo.syncMark.dirty = false //watch 為非同步, 此處同步歸零: 下面 commit 引起之 changeParams 重算須視為「無草稿」而重建
+
+                //存檔成功後新基準取自伺服端且須立即取得(規格第 8 節; R-SAVED-ROWS-01): 以回傳之寫入後之列(鎖內新鮮讀取)更新 store, 本頁依既有流程以之重建畫面與基準;
+                //其後抵達之同內容推播摘要相同, 不視為他人更新. 不以自己送出之值當新基準(clearXSS 等會改寫字串). 回傳不含列(舊伺服端、讀回失敗)時退回等推播
+                applySavedRows('pemis', savedRes, (t, rs) => vo.$store.commit(vo.$store.types.UpdateTableData, { tableName: t, data: rs, source: 'savedRows' }))
 
                 //alert（showCheckYes 前關 loading，避免 modal 等待期間 loading 疊在底下）
                 vo.$ui.updateLoading(false)

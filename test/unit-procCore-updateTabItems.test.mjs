@@ -9,14 +9,12 @@
 //跑法: npx mocha test/unit-procCore-updateTabItems.test.mjs --timeout 30000
 import assert from 'assert'
 import cloneDeep from 'lodash-es/cloneDeep.js'
-import pmKeyMutex from 'wsemi/src/pmKeyMutex.mjs'
 import cacheSt from 'wsemi/src/cacheSt.mjs'
 import ds from '../src/schema/index.mjs'
 import proc from '../server/procCore.mjs'
 import createLockSave from '../server/lockSave.mjs'
-import { tabWriteKey } from '../server/keyCheck.mjs'
 import reuseDeletedIds from '../src/plugins/reuseDeletedIds.mjs'
-import { mkTable, mkProcOrm, mkSrLog } from './tools/unitOrm.mjs'
+import { mkTable, mkCore, mkSrLog } from './tools/unitOrm.mjs'
 
 
 //PH: 前端新列之佔位字(清單頁 addItem / copyItem 把 userId / timeCreate / userIdUpdate / timeUpdate 設為 `{${$t('xxxAddIdNew')}}`)
@@ -99,7 +97,8 @@ describe('unit-procCore-updateTabItems (後台整表寫入之雙擊防護, ADR-0
         }
         let { srLog, logs } = mkSrLog()
         let cst = cacheSt()
-        let pc = proc(woItems, mkProcOrm(ds, woItems), { srLog, kmx: pmKeyMutex(), lockSave: createLockSave(cst) })
+        let core = mkCore(ds, woItems)
+        let pc = proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) })
         env = { seed, woItems, logs, cst, pc }
         return env
     }
@@ -223,14 +222,14 @@ describe('unit-procCore-updateTabItems (後台整表寫入之雙擊防護, ADR-0
         }
         let { srLog } = mkSrLog()
         let cst = cacheSt()
-        let kmx = pmKeyMutex()
-        let pc = proc(woItems, mkProcOrm(ds, woItems), { srLog, kmx, lockSave: createLockSave(cst) })
+        let core = mkCore(ds, woItems)
+        let pc = proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) })
         env = { cst }
         let release = null
         let gate = new Promise((resolve) => {
             release = resolve
         })
-        let held = kmx(tabWriteKey('grups'), async () => {
+        let held = core.withTabLocks(['grups'], async () => {
             await gate
         })
         let nr = newRow('grups', '013')

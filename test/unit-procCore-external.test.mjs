@@ -1,6 +1,6 @@
 //外部列保護與過期快照基準之伺服端寫入整合單元測試(F-23／F-26; R-PRINCIPLE-00 原則 3、5; 規則帳本 R-EXT-OWN-01、R-BASELINE-01; ADR-037; run07 U1)
 //
-//受測: server/procCore.mjs 之 updateTargets／updatePemis／updateGrups／updateUsers(kpFunExt 之實際入口, 內走 updateTabItems; 真 proc、真 procOrm〔w-serv-orm getMapOrm→getProc〕、真 kmx〔pmKeyMutex〕、真 lockSave),
+//受測: server/procCore.mjs 之 updateTargets／updatePemis／updateGrups／updateUsers(kpFunExt 之實際入口, 內走 updateTabItems; 真 proc、真 procOrm／withTabLocks／guardWrite〔w-serv-orm 實例, 測試輔助 mkCore; perm-run01: 原 getMapOrm→getProc＋真 kmx〔pmKeyMutex〕〕、真 lockSave),
 //僅資料表以 test/tools/unitOrm.mjs 之 mkTable 替身取代 w-orm-lmdb(其 cnt 計 insert／save／del／delAll, 供斷言「被拒時零寫入」), 不起服務.
 //純函數之窮舉見 unit-externalRows／unit-rowDigest／unit-syncKeep; 本檔驗「接線」: 守門於何時、何序、何鎖內生效, 與四表零寫入、log、級聯、並行。
 //
@@ -9,36 +9,40 @@
 //         非字串 from 後台一律拒收(不論 lockExternalRows; 歷史 null 原樣送回不拒); 外部列 order 由外部擁有(後台儲存不重編; 後台列 order 仍 k+1).
 //         違規整次拒收(saveFromNotAllowed／saveExternalRowChanged)、四表零寫入、不靜默忽略.(設計摘要 §要解決什麼 1、2)
 //  EXT-S2 過期快照基準(run11 改寫為表級; 使用者 2026-10-22 裁示 R-PRINCIPLE-00 原則 7「以表雜湊比對, 先動先贏」, run07 版「只比對本次將寫入之列」之案作廢或重寫): 草稿開啟時之整表逐列內容指紋隨 RPC 第 3 參 { baseline } 帶入;
-//         於表鎖內比對整表——庫內任何一列內容(排除 order 與伺服器管理欄)與基準不同、或有列增刪, 不論是否為本次將寫入之列, 一律整次拒收 saveStale(reason rowChanged／rowRemoved／rowAdded)、零寫入;
-//         未帶基準之舊客戶端: 後台列維持舊行為; 但修改外部列之指派欄無基準即拒收 saveBaselineRequired(外審 B.2); 基準格式不合 → saveRowFieldInvalid(零寫入).(設計摘要 §3)
-//  EXT-S3 外部列僅伺服器管理欄(建立者／建立時間／更新者／更新時間)不同之舊快照視為無變更, 不寫入、不把建立者與建立時間回退為舊值.
-//  EXT-S4 守門順序(run11 修訂: 表級基準不需 diff 結果, 提前至 select 之後第一個檢查; run07: 依 U1 觀察 1 與 API 子代理 C-1 缺陷, 基準先於外部列守門): select → 有基準者 checkBaseline(saveStale) → 還原外部列 order → 重複檢查 →
-//         ltdtDiffByKey → 外部列僅伺服器欄不同者移入 same → 外部列守門(saveFromNotAllowed／saveExternalRowChanged) → 無基準且 lock 且有外部列 diff 才 saveBaselineRequired → 寫入前驗證 → 引用連帶 → 寫入;
+//         於表鎖內比對整表——庫內任何一列內容(排除 order 與伺服器管理欄)與基準不同、或有列增刪、或名次(order 排序)不同〔perm-run01 原則 10: 名次入基準, 僅 order 數值改變而名次不變仍相符〕, 不論是否為本次將寫入之列, 一律整次拒收 saveStale(reason rowChanged／rowRemoved／rowAdded／rowReordered)、零寫入;
+//         未帶基準之舊客戶端: 後台列維持舊行為; 但修改外部列之指派欄無基準即拒收 saveBaselineRequired(外審 B.2); 基準格式不識(h1 以外之版本、套內舊版指紋、重複 id、壞結構)→ saveBaselineFormat(零寫入, 不降級為不帶基準; perm-run01: 原 saveRowFieldInvalid／validate-error baselineInvalid).(設計摘要 §3)
+//  EXT-S3 外部列僅伺服器管理欄(建立者／建立時間／更新者／更新時間)不同之舊快照視為無變更, 不寫入、不把建立者與建立時間回退為舊值;
+//         perm-run01(寫入契約 serverOnly)起不分外部列或後台列、亦不論 lockExternalRows, 伺服器專有欄位存檔一律不採用客戶端值(取庫內值; 見 EXT-E04、EXT-H08).
+//  EXT-S4 守門順序(run11 修訂: 表級基準不需 diff 結果, 提前至 select 之後第一個檢查; run07: 依 U1 觀察 1 與 API 子代理 C-1 缺陷, 基準先於外部列守門; perm-run01: 基準比對改由 w-serv-orm guardWrite 於同一表鎖內 read 之後、write 之前執行):
+//         guardWrite〔取鎖 → read(新鮮讀取) → 有基準者比對(saveStale)〕→ write〔還原外部列 order → 重複檢查 →
+//         ltdtDiffByKey → 外部列僅伺服器欄不同者移入 same → 外部列守門(saveFromNotAllowed／saveExternalRowChanged) → 無基準且 lock 且有外部列 diff 才 saveBaselineRequired → 寫入前驗證 → 引用連帶 → 寫入〕;
 //         全在表鎖內; 比對於鎖內(鎖前之他人寫入須被看見). 有基準而草稿已過期(外部同步於開啟後改了外部列內容或移除之)而使用者只編修後台列 → 回 saveStale(而非誤導之外部列不可修改); 基準新鮮而仍違規 → 仍由守門拒收.
 //  EXT-S8 (run11 取代 run07 同編號「內容同庫內之 diff 不計」: 表級比對下不再有 diff 跳過規則) 他人在草稿之後新增 X, 草稿帶原基準(無 X)送出——即使原樣帶回 X、只編修一個後台列, 亦 saveStale/rowAdded(先動先贏, 不部分變更);
 //         重新載入(基準含 X)後重送則成功, X 內容不變、建立者沿用. 見 O 區段.
 //  EXT-S5 引用連帶(群組／權限改名與刪除)由伺服端發動, 引用端(含外部 users 列之 cgrups)改寫不受守門影響; 外部列之群組／權限／標的不可被後台改名或刪除(整次拒收, 引用端零寫入).
 //  EXT-S6 srLog: 事件 updateTabItems-external-error(含 keyTable、userId、msg、reason、n、froms)與 updateTabItems-stale-error(含 keyTable、userId、msg、reason[、n]);
 //         不含任何列 id、名稱、email 之值(只記鍵、原因、筆數、來源名稱).
-//  EXT-S7 用戶端 opt 只採納 baseline(updateTargets／Pemis／Grups 經 pickClientOpt; updateUsers 經 WWebPerm 之 kpFunExt 只組 { baseline } 與伺服端之 pickKeysOnly).
+//  EXT-S7 用戶端 opt 只採納 baseline 與 returnRows(updateTargets／Pemis／Grups 經 pickClientOpt; updateUsers 經 WWebPerm 之 kpFunExt 亦經 pickClientOpt, 再加伺服端之 pickKeysOnly).
 //
-//輸入空間表(軸 × 案數; 案數為 mocha 實測, 共 307 案〔run07 U1b 修訂: 238 → 291, +A02b 4、+SITE-EX-003b 1、+O 區段 48; run07 U1c 修訂: 291 → 307, +J 區段 EXT-J03 重複 id 基準 12、+EXT-J03b 對照 4〕; 軸與格之展開見各 describe):
+//輸入空間表(軸 × 案數; 案數為 mocha 實測, 共 334 案〔run07 U1b 修訂: 238 → 291, +A02b 4、+SITE-EX-003b 1、+O 區段 48; run07 U1c 修訂: 291 → 307, +J 區段 EXT-J03 重複 id 基準 12、+EXT-J03b 對照 4;
+//  perm-run01 修訂: 307 → 334〔含重新點算前即已存在而未入表之差 +6〕, +C05b 名次改變 4、+J01 三種 h1 形似壞基準 12、+J04 舊版指紋基準 4、+G11 pickClientOpt 1〕; 軸與格之展開見各 describe):
 //  A 守門拒收    22 項(A01 逐表×違規種類: 新增非空 from／複製繼承 from／非字串 from×3(null,123,true)／刪外部列／改外部 from×2(''、pz)／改鎖定欄 description／改身分欄 name|email／後台改成外部 pz, 共 11 種 × 表 4, targets 無身分欄故 43 案)＋ A02 復活(未帶基準 → 守門)4 ＋ A02b 復活(附基準 → saveStale/rowRemoved)4 ＋ A03 多違規 froms ＋ A04 整次拒收不靜默 ＋ A05 指派欄可寫 = 54; 每案斷言 key、四表逐位元不變且零寫入、集中 errLog、external-error 欄位(keyTable／userId／msg／reason／n／froms)
 //  B 指派欄      表 3(users／grups／pemis)× {有基準可寫, 無基準 saveBaselineRequired, 基準過期 saveStale, 後台列無基準舊行為} 12 ＋ targets 無指派欄 ＋ 外部指派與後台編修並行寫入 ＋ 無外部 diff 無須基準 = 15
-//  C B.1 過期    表 4 × {他人改同列, 他人新增列而草稿將其刪除, 草稿原樣帶回他人新增列(舊基準 → saveStale/rowAdded; 重新載入後成功), 復活他人已刪列, 同版與外部同步重寫伺服器欄／order(不作廢)} 20 ＋ 表 3 外部指派被他人改後送回舊值 3 ＋ 基準先於守門(C07 外部說明被同步改、C08 外部列被同步移除; 原為「守門先於基準」之舊語意, 已重寫)2 ＋ 表 4 空基準 [](≠未帶基準)4 = 29
+//  C B.1 過期    表 4 × {他人改同列, 他人新增列而草稿將其刪除, 草稿原樣帶回他人新增列(舊基準 → saveStale/rowAdded; 重新載入後成功), 復活他人已刪列, 同版與外部同步重寫伺服器欄／order 數值(名次不變, 不作廢)} 20 ＋ [perm-run01] C05b 外部同步使外部列名次改變 → saveStale/rowReordered 4 ＋ 表 3 外部指派被他人改後送回舊值 3 ＋ 基準先於守門(C07 外部說明被同步改、C08 外部列被同步移除; 原為「守門先於基準」之舊語意, 已重寫)2 ＋ 表 4 空基準 [](≠未帶基準)4 = 33
 //  D B.2         無基準舊指派送回(整表／pickKeysOnly)2 ＋ 重新載入後可存 1 = 3
-//  E 僅伺服器欄  表 4 ×{有基準,無基準} 8 ＋ 無實質編修零寫入 1 ＋ [run11 外審 sol 第 3 點] EXT-E03 外部列持舊管理欄改指派欄(users／grups／pemis)3 ＋ EXT-E04 後台列不受影響 1 = 13
+//  E 僅伺服器欄  表 4 ×{有基準,無基準} 8 ＋ 無實質編修零寫入 1 ＋ [run11 外審 sol 第 3 點] EXT-E03 外部列持舊管理欄改指派欄(users／grups／pemis)3 ＋ EXT-E04 後台列亦取庫內伺服器專有欄(perm-run01; 原為後台列維持舊行為) 1 = 13
 //  F order       表 4 ×{外部列移前不重編且不致成 diff, lockExternalRows:false 重編, 外部列居中} = 12
-//  G pickKeysOnly／opt  users × {基準通過且身分欄被忽略／缺列不刪／新增不採納, 無基準, 基準過期, 後台列與基準缺列項, 僅被忽略欄位之變更} 5 ＋ 表 3 用戶端 opt 只採 baseline 3 = 8
-//  H 舊行為迴歸  lockExternalRows:false × 表 4 × {改身分欄, 刪除, 新增非空 from, 改 from, 非字串 from 仍拒} 20 ＋ 無基準外部指派放行 ＋ 基準仍檢(過期／壞格式)＋ 不做僅伺服器欄不同之移除(舊快照照寫)= 23
+//  G pickKeysOnly／opt  users × {基準通過且身分欄被忽略／缺列不刪／新增不採納, 無基準, 基準過期, 後台列與基準缺列項, 僅被忽略欄位之變更} 5 ＋ 表 3 用戶端 opt 只採 baseline 3 ＋ [perm-run01] G11 pickClientOpt 只採 baseline／returnRows 1 = 9
+//  H 舊行為迴歸  lockExternalRows:false × 表 4 × {改身分欄, 刪除, 新增非空 from, 改 from, 非字串 from 仍拒} 20 ＋ 無基準外部指派放行 ＋ 基準仍檢(過期／壞格式 → saveBaselineFormat)＋ H08 關閉後仍不採用客戶端伺服器專有欄(perm-run01; 原為「不做僅伺服器欄不同之移除, 舊快照照寫」)= 23
 //  I from 型別   歷史 null 之列 {原樣送回改他欄 × lock{真,假}} 8 ＋ 表 4 ×{改成 ''／改成 pz(拒), 缺 from 視為 '', 可被刪除} 12 = 20
-//  J 基準格式    壞基準 10 種 × 表 4 = 40 ＋ null／未給視為舊客戶端 × 表 4 = 44 ＋ [run07 外審 sol R8] 同 id 重複之基準 {同指紋, 舊前現後, 現前舊後} × 表 4 = 12(EXT-J03: saveRowFieldInvalid/baselineInvalid、零寫入; 另 EXT-J03b 對照 × 表 4 = 4, 基準不重複則成功) = 60
+//  J 基準格式    壞基準 13 種(原 10 種＋perm-run01 增 h2 版本前綴／h1 長度不足／h1 大寫十六進位 3 種)× 表 4 = 52(EXT-J01: saveBaselineFormat、stale-error/baselineFormat/n 0、零寫入) ＋ null／未給視為舊客戶端 × 表 4 = 56 ＋ [perm-run01] EXT-J04 套內舊版指紋(base36)基準結構正確仍拒收、不降級 × 表 4 = 60 ＋
+//                [run07 外審 sol R8] 同 id 重複之基準 {同指紋, 舊前現後, 現前舊後} × 表 4 = 12(EXT-J03: saveBaselineFormat、零寫入; 另 EXT-J03b 對照 × 表 4 = 4, 基準不重複則成功) = 76
 //  K 級聯×守門   後台群組改名／刪除連帶改寫外部 users 2 ＋ 外部群組改名／刪除被拒且引用端零寫入 2 ＋ 外部權限改名／刪除、外部標的刪除被拒 1 ＋ 級聯使舊基準失效 1 = 6
 //  L srLog       external／stale／級聯等路徑之鍵集合與無個資 4
 //  M 並行        同表兩操作者同基準(後台列、外部指派)2 ＋ 跨表 1 ＋ 鎖內比對(等待鎖期間他人已改／已納為外部列)2 = 5
 //  O 基準先於守門(run07 修訂; run11 表級改寫: C-1 他人新增 X 後以舊基準送出即 saveStale/rowAdded, 重新載入後成功)  表 4 ×{C-1 舊基準 saveStale 後重新載入成功, X 被再改而帶舊版 saveStale/rowAdded, 基準含 X 舊版而庫內已變 saveStale/rowChanged, 列新基準舊 saveStale 後新基準成功} 16 ＋ lockExternalRows:false 之 C-1 1 ＋
 //                表 4 ×{外部同步改外部列 → saveStale, 外部同步移除外部列 → saveStale/rowRemoved, 新鮮基準改外部身分欄／新增非空 from／刪外部列／帶回已移除外部列 → 守門, 過期且違規 → saveStale} 28 ＋ 無基準且違規 → 守門(users／grups／pemis)3 = 48
-//  N 靜態站點    updateTabItems 之呼叫位置／次序(基準先於守門)／鎖內／單點／lock 守護 7 ＋ WWebPerm kpFunExt 簽名與 opt 採納 3 = 10; 另 EXT-999 區段存在核對 1
+//  N 靜態站點    updateTabItems 之呼叫位置／次序(基準先於守門; perm-run01: 以 guardWrite 之 read:／baseline:／write: 與 .catch(mapGuardErr)、引用端 withTabLocks(lockTabs, [holder] 釘住)／鎖內／單點／lock 守護 9 ＋ WWebPerm kpFunExt 簽名與 opt 採納 3 = 12; 另 EXT-999 區段存在核對 1
 //  刻意不測: 真後端端到端(api 層); 外部同步入口(api-syncAndReplaceTabs 與 unit-syncKeep); 前端唯讀／橫幅(e2e); 前端 baseline 之建立時機(UI1／UI2 之測試).
 //  未測: 無.
 //跑法: npx mocha test/unit-procCore-external.test.mjs --reporter list --timeout 120000
@@ -47,14 +51,12 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import cloneDeep from 'lodash-es/cloneDeep.js'
-import pmKeyMutex from 'wsemi/src/pmKeyMutex.mjs'
 import cacheSt from 'wsemi/src/cacheSt.mjs'
 import ds from '../src/schema/index.mjs'
-import proc from '../server/procCore.mjs'
+import proc, { pickClientOpt } from '../server/procCore.mjs'
 import createLockSave from '../server/lockSave.mjs'
-import { tabWriteKey } from '../server/keyCheck.mjs'
 import { makeBaseline } from '../src/js/rowDigest.mjs'
-import { mkTable, mkProcOrm, mkSrLog } from './tools/unitOrm.mjs'
+import { mkTable, mkCore, mkSrLog } from './tools/unitOrm.mjs'
 import { SPEC_DIGEST } from './tools/unitExt.mjs'
 import { stripLineComment } from './tools/srcScan.mjs'
 
@@ -151,7 +153,8 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
 
     let envs = []
 
-    //createEnv: 每案一組全新之資料表替身、kmx、占位與 procCore
+    //createEnv: 每案一組全新之資料表替身、w-serv-orm 實例(mkCore: procOrm／withTabLocks／guardWrite)、占位與 procCore
+    //perm-run01: 原 kmx = pmKeyMutex() ＋ mkProcOrm 改為 mkCore(env.core.withTabLocks 供測試模擬他人持有表鎖)
     function createEnv(opt = {}) {
         let seed = opt.seed ? opt.seed(seedRows()) : seedRows()
         let woItems = {}
@@ -160,9 +163,9 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
         }
         let { srLog, logs } = mkSrLog()
         let cst = cacheSt()
-        let kmx = pmKeyMutex()
-        let pc = proc(woItems, mkProcOrm(ds, woItems), { srLog, kmx, lockSave: createLockSave(cst), ...(opt.proc || {}) })
-        let env = { seed, woItems, logs, cst, kmx, pc }
+        let core = mkCore(ds, woItems)
+        let pc = proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst), ...(opt.proc || {}) })
+        let env = { seed, woItems, logs, cst, core, pc }
         envs.push(env)
         return env
     }
@@ -186,7 +189,7 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
     let writes = (t) => t.cnt.insert + t.cnt.save + t.cnt.del + t.cnt.delAll
     let writesAll = (w) => TABLE_KEYS.reduce((a, k) => a + writes(w[k]), 0)
     let snapAll = (w) => JSON.stringify(TABLE_KEYS.map((k) => w[k].snapshot()))
-    let blOf = (table, rows) => makeBaseline(rows, ds[table].keys)
+    let blOf = (table, rows) => makeBaseline(rows, table) //perm-run01: 原 makeBaseline(rows, ds[table].keys) 之第 2 參改為表名
     let findLog = (logs, event) => logs.find((l) => l.event === event)
     let subset = (log, exp) => Object.fromEntries(Object.keys(exp).map((k) => [k, log[k]]))
 
@@ -448,15 +451,36 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
                 assert.strict.equal(findLog(env.logs, 'updateTabItems-stale-error').reason, 'rowRemoved')
             })
 
-            it(`EXT-C05 ${t}: 基準與庫內同版 → 編修成功; 外部同步重寫外部列之伺服器欄與 order(內容未變)不使草稿作廢`, async function() {
+            //perm-run01: 原 order: 20 使外部列(原居第 2 位)移到最末, 名次改變——新基準把名次納入(orderKey, 原則 10), 該情境改由 EXT-C05b 釘住為 saveStale/rowReordered;
+            //本案改 order 為 2.5(僅數值改變、名次不變: 仍介於 order 1 與 3 之間), 保有原意「外部同步重寫伺服器欄與 order 數值(內容未變、名次未變)不使草稿作廢」
+            it(`EXT-C05 ${t}: 基準與庫內同版 → 編修成功; 外部同步重寫外部列之伺服器欄與 order 數值(內容未變、名次不變)不使草稿作廢`, async function() {
                 let env = createEnv()
                 let rows0 = await rowsOf(env.woItems, t)
                 let bl = blOf(t, rows0)
                 let ext = rows0.find((r) => r.id === ids.ext)
-                await env.woItems[t].save([{ ...ext, userId: 'rid-sync', timeCreate: 'tc-new', userIdUpdate: 'rid-sync', timeUpdate: 'tu-new', order: 20 }]) //外部同步整來源重寫
+                await env.woItems[t].save([{ ...ext, userId: 'rid-sync', timeCreate: 'tc-new', userIdUpdate: 'rid-sync', timeUpdate: 'tu-new', order: 2.5 }]) //外部同步整來源重寫(order 數值變、名次不變)
                 env.woItems[t].cnt.save = 0
                 let rows = edit(rows0, ids.b1, { description: 'client-edit' }) //外部列仍帶舊伺服器欄
                 assert.strict.deepEqual(await run(env.pc, t, rows, { baseline: bl }), OKR)
+                assert.strict.equal(env.woItems[t].get(ids.b1).description, 'client-edit')
+            })
+
+            //perm-run01 新增(刻意語意變更, 原則 10「名次入基準」): 外部同步重寫使外部列名次改變(order 20, 移到最末)而內容未變, 持舊基準之草稿存檔 → saveStale/rowReordered, 零寫入(舊版指紋不含名次而相符)
+            it(`EXT-C05b ${t}: 外部同步重寫使外部列名次改變(內容未變)→ 持舊基準之草稿 saveStale/rowReordered n=1, 零寫入, 編修未落地`, async function() {
+                let env = createEnv()
+                let rows0 = await rowsOf(env.woItems, t)
+                let bl = blOf(t, rows0)
+                let ext = rows0.find((r) => r.id === ids.ext)
+                await env.woItems[t].save([{ ...ext, order: 20 }]) //外部列從第 2 位移到最末
+                env.woItems[t].cnt.save = 0
+                let rows = edit(rows0, ids.b1, { description: 'client-edit' })
+                await expectReject(env, t, rows, { baseline: bl }, 'saveStale', `${t} 名次改變`)
+                let lg = findLog(env.logs, 'updateTabItems-stale-error')
+                assert.strict.deepEqual(subset(lg, { msg: 1, reason: 1, n: 1 }), { msg: 'saveStale', reason: 'rowReordered', n: 1 })
+                assert.strict.notEqual(env.woItems[t].get(ids.b1).description, 'client-edit', '草稿之編修未落地')
+                //對照: 以重新載入(名次已變)之基準重送 → 成功
+                let fresh = await rowsOf(env.woItems, t)
+                assert.strict.deepEqual(await run(env.pc, t, edit(fresh, ids.b1, { description: 'client-edit' }), { baseline: blOf(t, fresh) }, 'id-admin2'), OKR)
                 assert.strict.equal(env.woItems[t].get(ids.b1).description, 'client-edit')
             })
         }
@@ -619,17 +643,22 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
             })
         }
 
-        it('EXT-E04 後台列不受影響: 後台列持舊伺服器管理欄改內容 → 照舊寫入該列(restoreServerFields 只處理庫內為外部列者; 後台列寫入行為不變)', async function() {
+        //perm-run01(寫入契約 serverOnly, 規格第 4、6 節): 原本為「後台列持舊伺服器管理欄改內容 → 以送入之列為準寫入(不介入)」, 舊行為已作廢——
+        //伺服器專有欄位存檔不再採用客戶端值, 後台列亦一律取庫內值(不分外部列或後台列, 見 EXT-E03 同理); 本案改釘「後台列不回退」
+        it('EXT-E04 後台列亦不採用客戶端之伺服器專有欄(perm-run01): 後台列持舊伺服器管理欄改內容 → 內容照寫, 但建立者／建立時間維持庫內較新之值(不回退為草稿之舊值)', async function() {
             let env = createEnv()
             let rows0 = await rowsOf(env.woItems, 'grups')
             let b1 = rows0.find((r) => r.id === IDS.grups.b1)
             await env.woItems.grups.save([{ ...b1, userId: 'rid-other', timeCreate: '2026-03-03T00:00:00.000+08:00' }]) //後台列之建立者被他人改(模擬庫內較新)
             env.woItems.grups.cnt.save = 0
             let rows = edit(rows0, IDS.grups.b1, { description: 'client-edit' }) //草稿持舊 userId／timeCreate
+            assert.strict.notEqual(rows.find((r) => r.id === IDS.grups.b1).userId, 'rid-other', '前提: 草稿持舊建立者')
             assert.strict.deepEqual(await run(env.pc, 'grups', rows, { baseline: blOf('grups', rows0) }), OKR)
             let after = env.woItems.grups.get(IDS.grups.b1)
             assert.strict.equal(after.description, 'client-edit')
-            assert.strict.equal(after.userId, b1.userId, '後台列維持舊行為: 以送入之列為準(不介入)')
+            assert.strict.equal(after.userId, 'rid-other', '後台列之建立者取庫內值(不回退為草稿之舊值)')
+            assert.strict.equal(after.timeCreate, '2026-03-03T00:00:00.000+08:00', '後台列之建立時間取庫內值(不回退)')
+            assert.strict.equal(after.userIdUpdate, 'id-admin', '更新者為操作者(procOrm save 覆寫)')
         })
 
     })
@@ -756,6 +785,17 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
             assert.strict.equal(env.woItems.users.get('rid-u2').isAdmin, 'n')
         })
 
+        //EXT-G11(perm-run01 新增; 取代原 SITE-EX-011 對 `{ baseline: optClient.baseline }` 之字面釘住): 用戶端 opt 只採納 baseline 與 returnRows(=== true), 其餘鍵一律不採納(pickClientOpt 為 kpFunExt 與 procCore 共用之單點)
+        it('EXT-G11 pickClientOpt: 只採 baseline(非 null／undefined)與 returnRows(僅 true); pickKeysOnly／mustExist／lockExternalRows／cascadeRename／mappingBy 等鍵與非 true 之 returnRows 一律不採納', function() {
+            let bl = [['a', 'h1:0123456789abcd']]
+            assert.strict.deepEqual(pickClientOpt({ baseline: bl, returnRows: true, pickKeysOnly: ['x'], mustExist: true, lockExternalRows: false, cascadeRename: false, mappingBy: 'name', merge: false }), { baseline: bl, returnRows: true })
+            assert.strict.deepEqual(pickClientOpt({ baseline: null, returnRows: 'true', pickKeysOnly: ['x'] }), {}, 'baseline null 視同未給; returnRows 非布林 true 不採納')
+            assert.strict.deepEqual(pickClientOpt({ returnRows: 1 }), {})
+            for (let bad of [undefined, null, 'x', 0, [], () => 1]) {
+                assert.strict.deepEqual(pickClientOpt(bad), {}, `opt 非物件(${typeof bad})視同空`)
+            }
+        })
+
         for (let t of ['targets', 'pemis', 'grups']) {
             it(`EXT-G10 ${t}: 用戶端 opt 只採納 baseline——即使給 pickKeysOnly／lockExternalRows:false／cascadeRename:false, 仍為整表 diff 且守門照常`, async function() {
                 let env = createEnv()
@@ -823,25 +863,28 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
             assert.strict.equal(env.woItems.users.get('rid-u2').cgrups, '{}')
         })
 
-        it('EXT-H08 舊行為: 關閉後不做「外部列僅伺服器管理欄不同視為無變更」(該段屬外部列保護) → 舊快照送回之外部列照舊被寫入(建立者／建立時間回退為快照值)', async function() {
+        //perm-run01(寫入契約 serverOnly): 原本為「關閉後不做外部列僅伺服器管理欄不同視為無變更 → 舊快照送回之外部列照舊被寫入(建立者／建立時間回退為快照值)」,
+        //該舊行為已作廢: dropServerOnlyDiff／restoreServerFields 改為不分外部列或後台列、亦不論 lockExternalRows 一律套用(all: true), 伺服器專有欄位不採用客戶端值
+        it('EXT-H08 伺服器專有欄位不採用客戶端值與 lockExternalRows 開關無關(perm-run01): 關閉後舊快照送回之外部列(僅伺服器管理欄較舊)仍視為無變更 → 零寫入, 建立者／建立時間維持庫內較新之值(不回退)', async function() {
             let env = createEnv(OFF)
             let rows0 = await rowsOf(env.woItems, 'grups') //舊快照
             let ext = rows0.find((r) => r.id === 'rid-g2')
             await env.woItems.grups.save([{ ...ext, userId: 'rid-sync', timeCreate: '2026-02-02T00:00:00.000+08:00' }]) //外部同步之後, 庫內建立者／建立時間較新
             env.woItems.grups.cnt.save = 0
             assert.strict.deepEqual(await run(env.pc, 'grups', rows0), OKR)
-            assert.strict.equal(env.woItems.grups.cnt.save, 1, '舊行為: 該外部列被視為 diff 而寫入')
-            assert.strict.equal(env.woItems.grups.get('rid-g2').userId, 'rid-seed', '舊行為: 建立者回退為舊快照之值')
+            assert.strict.equal(env.woItems.grups.cnt.save, 0, '僅伺服器專有欄不同之列視為無變更, 不寫入')
+            assert.strict.equal(env.woItems.grups.get('rid-g2').userId, 'rid-sync', '建立者維持庫內值(不回退為舊快照之值)')
+            assert.strict.equal(env.woItems.grups.get('rid-g2').timeCreate, '2026-02-02T00:00:00.000+08:00', '建立時間維持庫內值(不回退)')
         })
 
-        it('EXT-H07 基準仍被檢查(與守門開關無關): 過期基準 → saveStale; 壞格式基準 → saveRowFieldInvalid', async function() {
+        it('EXT-H07 基準仍被檢查(與守門開關無關): 過期基準 → saveStale; 壞格式基準 → saveBaselineFormat(perm-run01: 原 saveRowFieldInvalid)', async function() {
             let env = createEnv(OFF)
             let rows0 = await rowsOf(env.woItems, 'grups')
             let bl = blOf('grups', rows0)
             await env.woItems.grups.save([{ ...rows0[0], description: 'by-other' }])
             env.woItems.grups.cnt.save = 0
             await expectReject(env, 'grups', edit(rows0, 'rid-g1', { description: 'mine' }), { baseline: bl }, 'saveStale', 'OFF 過期')
-            await expectReject(env, 'grups', rows0, { baseline: 'garbage' }, 'saveRowFieldInvalid', 'OFF 壞基準')
+            await expectReject(env, 'grups', rows0, { baseline: 'garbage' }, 'saveBaselineFormat', 'OFF 壞基準')
         })
 
     })
@@ -914,18 +957,40 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
             ['元素長度 3', [['a', 'b', 'c']]],
             ['id 為數字', [[1, 'x']]],
             ['含 null 元素', [['a', 'b'], null]],
+            //perm-run01 新增: 格式形似而非 h1 者(isBaselineValid: 'h1:' 加 14 位小寫 16 進位)
+            ['摘要為不識之版本前綴(h2:)', [['a', 'h2:0123456789abcd']]],
+            ['摘要為 h1: 但十六進位長度不足', [['a', 'h1:abc']]],
+            ['摘要為 h1: 但為大寫十六進位', [['a', 'h1:0123456789ABCD']]],
         ]
+        //perm-run01: 基準格式不識改回 saveBaselineFormat(原 saveRowFieldInvalid), srLog 事件由 updateTabItems-validate-error/baselineInvalid
+        //改為 updateTabItems-stale-error(msg saveBaselineFormat, reason baselineFormat, n 0; 無 row 欄); 仍於任何讀寫之前拒收、四表零寫入
+        let expectBadFormat = (lg, t) => {
+            assert.strict.ok(lg, '應記 updateTabItems-stale-error')
+            assert.strict.deepEqual(subset(lg, { keyTable: 1, userId: 1, msg: 1, reason: 1, n: 1 }), { keyTable: t, userId: 'id-admin', msg: 'saveBaselineFormat', reason: 'baselineFormat', n: 0 })
+        }
         for (let t of TABLE_KEYS) {
             for (let [title, bl] of BAD) {
-                it(`EXT-J01 ${t}: 壞基準(${title})→ saveRowFieldInvalid, 四表零寫入, log reason=baselineInvalid`, async function() {
+                it(`EXT-J01 ${t}: 壞基準(${title})→ saveBaselineFormat, 四表零寫入, log stale-error reason=baselineFormat`, async function() {
                     let env = createEnv()
                     let rows = edit(await rowsOf(env.woItems, t), IDS[t].b1, { description: 'e' })
-                    await expectReject(env, t, rows, { baseline: bl }, 'saveRowFieldInvalid', `${t} 壞基準 ${title}`)
-                    let lg = findLog(env.logs, 'updateTabItems-validate-error')
-                    assert.strict.ok(lg)
-                    assert.strict.deepEqual(subset(lg, { keyTable: 1, msg: 1, reason: 1, row: 1 }), { keyTable: t, msg: 'saveRowFieldInvalid', reason: 'baselineInvalid', row: -1 })
+                    await expectReject(env, t, rows, { baseline: bl }, 'saveBaselineFormat', `${t} 壞基準 ${title}`)
+                    expectBadFormat(findLog(env.logs, 'updateTabItems-stale-error'), t)
+                    assert.strict.equal(findLog(env.logs, 'updateTabItems-validate-error'), undefined, '不再記 validate-error/baselineInvalid')
                 })
             }
+
+            //EXT-J04(perm-run01 新增, 舊格式基準專案): 套內舊版指紋(base36 字串, 無 'h1:' 前綴)之基準, 結構完全正確([[id, 指紋]], 每列一項、id 不重複、與庫內整表一一對應)——
+            //一律拒收 saveBaselineFormat(提示重新載入), 不得降級為「未帶基準」(降級則外部列指派欄/後台列編修會被放行為最後寫入者勝)、不得誤判為 saveStale 或 saveRowFieldInvalid; 零寫入、編修未落地
+            it(`EXT-J04 ${t}: 舊版指紋基準(結構正確、摘要為 base36 無 h1: 前綴)→ saveBaselineFormat, 不降級為不帶基準, 零寫入, log reason=baselineFormat`, async function() {
+                let env = createEnv()
+                let rows0 = await rowsOf(env.woItems, t)
+                let legacy = blOf(t, rows0).map(([id, d]) => [id, parseInt(d.slice(3), 16).toString(36)]) //新基準逐項改寫成舊版 base36 形狀
+                assert.strict.ok(legacy.length === rows0.length && legacy.every((e) => /^[0-9a-z]+$/.test(e[1])), '前提: 每列一項、摘要為 base36')
+                let rows = edit(rows0, IDS[t].b1, { description: 'e-legacy' })
+                await expectReject(env, t, rows, { baseline: legacy }, 'saveBaselineFormat', `${t} 舊版指紋基準`)
+                expectBadFormat(findLog(env.logs, 'updateTabItems-stale-error'), t)
+                assert.strict.notEqual(env.woItems[t].get(IDS[t].b1).description, 'e-legacy', '編修未落地(未降級為不帶基準)')
+            })
 
             it(`EXT-J02 ${t}: baseline 為 null 或未給 → 視為舊客戶端(不拒; 後台列編修成功)`, async function() {
                 let env = createEnv()
@@ -934,14 +999,14 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
                 assert.strict.equal(env.woItems[t].get(IDS[t].b1).description, 'e2')
             })
 
-            //EXT-J03(run07 外審 sol R8): 同 id 於基準重複出現 = 矛盾之基準, 不論指紋同異與次序, 一律 saveRowFieldInvalid(reason baselineInvalid)、四表零寫入;
+            //EXT-J03(run07 外審 sol R8): 同 id 於基準重複出現 = 矛盾之基準, 不論指紋同異與次序, 一律拒收、四表零寫入(perm-run01: 鍵改為 saveBaselineFormat, reason baselineFormat; 原 saveRowFieldInvalid/baselineInvalid);
             //修正前 isBaselineValid 接受, checkBaseline 之 Map 取最後一項, 故 [[id,舊版],[id,現版]] 通過、次序交換後卻回 saveStale(結果由次序決定)
             for (let [title, mk] of [
                 ['同指紋重複', (id, d0, d1) => [[id, d1], [id, d1]]],
                 ['異指紋(舊版在前、庫內現版在後; 修正前會通過)', (id, d0, d1) => [[id, d0], [id, d1]]],
                 ['異指紋(庫內現版在前、舊版在後; 修正前回 saveStale)', (id, d0, d1) => [[id, d1], [id, d0]]],
             ]) {
-                it(`EXT-J03 ${t}: 基準同 id 重複(${title})→ saveRowFieldInvalid, 四表零寫入, log reason=baselineInvalid, 後台列合法編修亦不寫入`, async function() {
+                it(`EXT-J03 ${t}: 基準同 id 重複(${title})→ saveBaselineFormat, 四表零寫入, log stale-error reason=baselineFormat, 後台列合法編修亦不寫入`, async function() {
                     let env = createEnv()
                     let rows0 = await rowsOf(env.woItems, t)
                     let row = rows0.find((v) => v.id === IDS[t].b1)
@@ -951,10 +1016,8 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
                     let others = blOf(t, rows0.filter((v) => v.id !== IDS[t].b1))
                     let bl = [...others, ...mk(IDS[t].b1, d0, d1)]
                     let rows = edit(rows0, IDS[t].b1, { description: 'e-dup' })
-                    await expectReject(env, t, rows, { baseline: bl }, 'saveRowFieldInvalid', `${t} 基準同 id 重複 ${title}`)
-                    let lg = findLog(env.logs, 'updateTabItems-validate-error')
-                    assert.strict.ok(lg)
-                    assert.strict.deepEqual(subset(lg, { keyTable: 1, msg: 1, reason: 1, row: 1 }), { keyTable: t, msg: 'saveRowFieldInvalid', reason: 'baselineInvalid', row: -1 })
+                    await expectReject(env, t, rows, { baseline: bl }, 'saveBaselineFormat', `${t} 基準同 id 重複 ${title}`)
+                    expectBadFormat(findLog(env.logs, 'updateTabItems-stale-error'), t)
                     assert.strict.equal(env.woItems[t].get(IDS[t].b1).description, row.description, '後台列未被寫入')
                 })
             }
@@ -1072,7 +1135,7 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
             assert.strict.deepEqual(hasSentinel(env.logs), [])
         })
 
-        it('EXT-L03 baselineInvalid／守門／級聯各路徑之全部 srLog(含 info)皆不含列 id、名稱、email 之值', async function() {
+        it('EXT-L03 baselineFormat(perm-run01: 原 baselineInvalid)／守門／級聯各路徑之全部 srLog(含 info)皆不含列 id、名稱、email 之值', async function() {
             let env = createEnv()
             await run(env.pc, 'grups', edit(await rowsOf(env.woItems, 'grups'), 'rid-g2', { name: 'x' }))
             await run(env.pc, 'grups', await rowsOf(env.woItems, 'grups'), { baseline: 'bad' })
@@ -1143,7 +1206,7 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
             let gate = new Promise((resolve) => {
                 release = resolve
             })
-            let held = env.kmx(tabWriteKey('grups'), () => gate) //持有 grups 表鎖(模擬他人寫入進行中)
+            let held = env.core.withTabLocks(['grups'], () => gate) //持有 grups 表鎖(模擬他人寫入進行中; perm-run01: 原 env.kmx(tabWriteKey('grups'), () => gate))
             let p = run(env.pc, 'grups', edit(rows0, 'rid-g1', { description: 'mine' }), { baseline: bl })
             await new Promise((resolve) => setTimeout(resolve, 50)) //使 p 進入等待
             await env.woItems.grups.save([{ ...rows0[0], description: 'by-other-before-release' }]) //他人於鎖釋放前完成寫入
@@ -1162,7 +1225,7 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
             let gate = new Promise((resolve) => {
                 release = resolve
             })
-            let held = env.kmx(tabWriteKey('targets'), () => gate)
+            let held = env.core.withTabLocks(['targets'], () => gate) //perm-run01: 原 env.kmx(tabWriteKey('targets'), () => gate)
             let p = run(env.pc, 'targets', edit(rows0, T1, { description: 'mine' }))
             await new Promise((resolve) => setTimeout(resolve, 50))
             await env.woItems.targets.save([{ ...rows0[0], from: 'pz' }]) //同步把 T1 納為外部列
@@ -1424,19 +1487,33 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
             let body = code.slice(iFn)
             let at = (re) => body.search(re)
 
+            //perm-run01: 基準比對由套內自呼 checkBaseline(...)(於 withTabLocks(kmx, [keyTable]) 內、select 之後)改為交由 w-serv-orm 實例之 guardWrite 宣告式執行——
+            //guardWrite({ tables: [keyTable], read, baseline, contract, write }) 於同一把表鎖內「read(新鮮讀取)→ 有 baseline 者 compareBaseline → write(ltdtOld)」, 比對不符即 throw(帶 key)而不進 write, 由 .catch(mapGuardErr) 轉語系鍵.
+            //故以下原「checkBaseline( 位置」之釘住, 一律改釘 guardWrite 的 read:／baseline:／write: 三鍵之相對位置(baseline 在 read 之後、write 之前即在 write 內一切檢查之前); 原意不變.
+            //站點正規式(本區共用): 位置以 body.search 取字元索引, 註解已由 readCode 剝除
+            const RE_GUARD = /\bguardWrite\(\{\s*tables:\s*\[keyTable\]/
+            const RE_READ = /\bread:\s*\(\)\s*=>\s*woItems\[keyTable\]\.select\(\)/
+            const RE_BASE = /\bbaseline:\s*baseline === null \? undefined : baseline/
+            const RE_WRITE = /\bwrite:\s*async \(ltdtOld\)\s*=>/
+
             it('SITE-EX-001 外部列守門／基準各呼叫恰一處(單一站點, 不分散)', function() {
                 assert.strict.ok(iFn > 0)
-                for (let name of ['restoreExternalOrder', 'dropServerOnlyDiff', 'checkExternalWrite', 'hasExternalDiff', 'checkBaseline']) {
+                for (let name of ['restoreExternalOrder', 'dropServerOnlyDiff', 'restoreServerFields', 'checkExternalWrite', 'hasExternalDiff']) {
                     assert.strict.equal(count(body, new RegExp(`\\b${name}\\(`, 'g')), 1, `${name}( 呼叫數`)
                 }
+                //perm-run01: 原 checkBaseline( 恰一處 → guardWrite( 恰一處, 其 baseline／contract 各一處(基準比對之單一站點)
+                assert.strict.equal(count(body, /\bguardWrite\(/g), 1, 'guardWrite( 呼叫數')
+                assert.strict.equal(count(body, new RegExp(RE_BASE.source, 'g')), 1, 'baseline: 傳入 guardWrite 之站點數')
+                assert.strict.equal(count(body, /\bcontract:\s*getContract\(keyTable\)/g), 1, 'contract: 傳入 guardWrite 之站點數')
                 assert.strict.equal(count(body, /\bisBaselineValid\(/g), 1)
             })
 
-            it('SITE-EX-002 checkExternalWrite／hasExternalDiff／dropServerOnlyDiff 之呼叫位於 ltdtDiffByKey 之後、第一個 procOrm( 寫入之前; checkBaseline(表級, run11)位於 select 之後、第一個 procOrm( 之前', function() {
+            it('SITE-EX-002 checkExternalWrite／hasExternalDiff／dropServerOnlyDiff 之呼叫位於 ltdtDiffByKey 之後、第一個 procOrm( 寫入之前; 基準比對(guardWrite 之 baseline:, 表級, run11)位於 read: 之後、write: 之前即 ltdtDiffByKey 與第一個 procOrm( 之前', function() {
                 let iDiff = at(/\bltdtDiffByKey\(/)
                 let iOrm = at(/\bprocOrm\(/)
-                assert.strict.ok(iDiff > 0 && iOrm > 0)
-                assert.strict.ok(at(/\bcheckBaseline\(/) > 0 && at(/\bcheckBaseline\(/) < iDiff && at(/\bcheckBaseline\(/) < iOrm, 'checkBaseline 須在 ltdtDiffByKey 與 procOrm( 之前')
+                let [iRead, iBase, iWrite] = [RE_READ, RE_BASE, RE_WRITE].map((re) => at(re))
+                assert.strict.ok(iDiff > 0 && iOrm > 0 && iRead > 0 && iBase > 0 && iWrite > 0, JSON.stringify([iDiff, iOrm, iRead, iBase, iWrite]))
+                assert.strict.ok(iRead < iBase && iBase < iWrite && iWrite < iDiff && iBase < iOrm, 'guardWrite 之 baseline: 須在 read: 之後、write: 之前(即 ltdtDiffByKey 與 procOrm( 之前)')
                 for (let name of ['dropServerOnlyDiff', 'checkExternalWrite', 'hasExternalDiff']) {
                     let i = at(new RegExp(`\\b${name}\\(`))
                     assert.strict.ok(i > iDiff, `${name} 須在 ltdtDiffByKey 之後`)
@@ -1445,59 +1522,76 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
             })
 
             //SITE-EX-003 為 run11 修訂(原 run07: dropServerOnlyDiff → checkBaseline → checkExternalWrite; 表級基準不需要 diff 結果 r, 提前至 select 之後): 基準最先(select 之後、還原 order 與 ltdtDiffByKey 之前), 其後守門、無基準分支, 皆在寫入前驗證與第一個 procOrm( 之前
-            it('SITE-EX-003 次序: checkBaseline → restoreExternalOrder → ltdtDiffByKey → dropServerOnlyDiff → checkExternalWrite → hasExternalDiff(無基準分支) → validateRowsBeforeWrite → 第一個 procOrm( (基準最先; 外部列守門其次, 兩者皆先於寫入前驗證)', function() {
-                let order = ['checkBaseline', 'restoreExternalOrder', 'ltdtDiffByKey', 'dropServerOnlyDiff', 'checkExternalWrite', 'hasExternalDiff', 'validateRowsBeforeWrite', 'procOrm'].map((n) => at(new RegExp(`\\b${n}\\(`)))
+            //perm-run01: 「select → checkBaseline」改為 guardWrite 之「read: → baseline: → write:」(比對發生在 read 之後、write 之前); 另補 restoreServerFields( 於 dropServerOnlyDiff 之後
+            it('SITE-EX-003 次序: guardWrite → read: → baseline:(基準比對) → write: → restoreExternalOrder → ltdtDiffByKey → dropServerOnlyDiff → restoreServerFields → checkExternalWrite → hasExternalDiff(無基準分支) → validateRowsBeforeWrite → 第一個 procOrm( (基準最先; 外部列守門其次, 兩者皆先於寫入前驗證)', function() {
+                let order = [RE_GUARD, RE_READ, RE_BASE, RE_WRITE, ...['restoreExternalOrder', 'ltdtDiffByKey', 'dropServerOnlyDiff', 'restoreServerFields', 'checkExternalWrite', 'hasExternalDiff', 'validateRowsBeforeWrite', 'procOrm'].map((n) => new RegExp(`\\b${n}\\(`))].map((re) => at(re))
                 assert.strict.ok(order.every((i) => i > 0), JSON.stringify(order))
                 for (let k = 1; k < order.length; k++) {
                     assert.strict.ok(order[k] > order[k - 1], `次序錯: ${JSON.stringify(order)}`)
                 }
             })
 
-            it('SITE-EX-003b checkBaseline 僅在有基準時呼叫(if (baseline !== null) 區塊內, 被拒回 ck.key); checkExternalWrite 之被拒回 ex.key', function() {
-                assert.strict.ok(/if \(baseline !== null\) \{\s*let ck = checkBaseline\(\{[^}]*\}\)\s*if \(ck !== null\) \{[\s\S]*?Promise\.reject\(ck\.key\)/.test(body), 'checkBaseline 須包在 if (baseline !== null) 內並 reject ck.key')
+            //perm-run01: 原「checkBaseline 僅在有基準時呼叫(if (baseline !== null) 區塊內, 被拒回 ck.key)」改為: 僅在有基準時把 baseline 交給 guardWrite(null 已於上方轉 undefined 跳過比對, 見 guardWrite: useBaseline = baseline !== undefined),
+            //且 contract 緊隨其後; guardWrite 的拒絕(帶 key 之 Error)經 .catch(mapGuardErr(keyTable, userId)) 轉本套件語系鍵(kpRejectKey: baselineMismatch／rowNotFound → saveStale, baselineFormat → saveBaselineFormat)後 reject
+            it('SITE-EX-003b 僅在有基準時把 baseline 交給 guardWrite(null → undefined 跳過比對), 被拒經 mapGuardErr 轉語系鍵; checkExternalWrite 之被拒回 ex.key', function() {
+                assert.strict.ok(/\bbaseline:\s*baseline === null \? undefined : baseline,\s*contract:\s*getContract\(keyTable\),\s*write:/.test(body), 'baseline 須為 null → undefined 轉換並與 contract 一併傳入 guardWrite')
+                assert.strict.ok(/\bguardWrite\(\{[\s\S]*\}\)\.catch\(mapGuardErr\(keyTable, userId\)\)/.test(body), 'guardWrite 之拒絕須經 .catch(mapGuardErr(keyTable, userId))')
+                let pcode = readCode('server/procCore.mjs')
+                assert.strict.ok(/let kpRejectKey = \{\s*baselineMismatch:\s*'saveStale',\s*rowNotFound:\s*'saveStale',\s*baselineFormat:\s*'saveBaselineFormat',?\s*\}/.test(pcode), 'kpRejectKey: baselineMismatch／rowNotFound → saveStale, baselineFormat → saveBaselineFormat')
                 assert.strict.ok(/if \(ex !== null\) \{[\s\S]*?Promise\.reject\(ex\.key\)/.test(body), 'checkExternalWrite 被拒須 reject ex.key')
             })
 
-            it('SITE-EX-005 restoreServerFields 緊接 dropServerOnlyDiff 之後、同受 if (lockExternalRows) 守護, 且在 checkExternalWrite 之前', function() {
+            //perm-run01: 原 `r = restoreServerFields({ r, ltdtOld })` 與 dropServerOnlyDiff「同受 if (lockExternalRows) 守護」之舊行為已作廢——伺服器專有欄位存檔不再採用客戶端值(寫入契約 serverOnly), 後台列亦然,
+            //二者改為 all: true 且不論 lockExternalRows 一律套用(見 EXT-E04、EXT-H08); 本案改釘「緊接、同為 all: true、同一區塊層級、不受 if (lockExternalRows) 守護」
+            it('SITE-EX-005 restoreServerFields 緊接 dropServerOnlyDiff 之後、在 checkExternalWrite 之前; 二者皆 all: true 且與 keysTab 同一區塊層級(不受 if (lockExternalRows) 等條件守護)', function() {
                 let a = body.indexOf('r = dropServerOnlyDiff(')
-                let b = body.indexOf('r = restoreServerFields({ r, ltdtOld })')
+                let b = body.indexOf('r = restoreServerFields({ r, ltdtOld, all: true })')
                 let c = body.indexOf('checkExternalWrite({')
                 assert.strict.ok(a > 0 && b > a && c > b, 'restoreServerFields 須在 dropServerOnlyDiff 之後、checkExternalWrite 之前')
-                assert.strict.ok(/if \(lockExternalRows\) \{\s*r = dropServerOnlyDiff\([^\n]*\n\s*r = restoreServerFields\(/.test(body), '與 dropServerOnlyDiff 同受 lockExternalRows 守護')
+                assert.strict.ok(/\bdropServerOnlyDiff\(\{[^\n]*\ball: true\b[^\n]*\}\)/.test(body), 'dropServerOnlyDiff 須 all: true')
+                assert.strict.ok(/^( *)let keysTab = ds\[keyTable\]\.keys\n\1r = dropServerOnlyDiff\([^\n]*\n\1r = restoreServerFields\(/m.test(body), '二者與 keysTab 同縮排(同一區塊層級, 非條件式內)')
+                assert.strict.ok(!/if \([^)]*lockExternalRows[^)]*\) \{\s*r = dropServerOnlyDiff\(/.test(body), 'dropServerOnlyDiff 不得受 lockExternalRows 守護')
             })
 
-            it('SITE-EX-004 restoreExternalOrder 位於 order=k+1 重給與 select 之後、ltdtDiffByKey 之前; 且與 dropServerOnlyDiff 皆受 if (lockExternalRows) 守護', function() {
+            it('SITE-EX-004 restoreExternalOrder 位於 order=k+1 重給與鎖內新鮮讀取(write: async (ltdtOld))之後、ltdtDiffByKey 之前; 且受 if (lockExternalRows) 守護(dropServerOnlyDiff 已不受守護, 見 SITE-EX-005)', function() {
                 let iOrder = at(/r\.order\s*=\s*k\s*\+\s*1/)
-                let iSel = at(/ltdtOld\s*=\s*await woItems\[keyTable\]\.select\(\)/)
+                let iWrite = at(RE_WRITE) //perm-run01: 原 ltdtOld = await woItems[keyTable].select() 改為 guardWrite 傳入 write 之 ltdtOld(同一表鎖內 read 之結果)
                 let iRest = at(/\brestoreExternalOrder\(/)
                 let iDiff = at(/\bltdtDiffByKey\(/)
-                assert.strict.ok(iOrder > 0 && iSel > 0 && iRest > 0 && iDiff > 0, JSON.stringify([iOrder, iSel, iRest, iDiff]))
-                assert.strict.ok(iOrder < iRest && iSel < iRest && iRest < iDiff)
+                assert.strict.ok(iOrder > 0 && iWrite > 0 && iRest > 0 && iDiff > 0, JSON.stringify([iOrder, iWrite, iRest, iDiff]))
+                assert.strict.ok(iOrder < iRest && iWrite < iRest && iRest < iDiff)
                 assert.strict.ok(/if \(lockExternalRows\) \{\s*rows = restoreExternalOrder\(/.test(body))
-                assert.strict.ok(/if \(lockExternalRows\) \{\s*r = dropServerOnlyDiff\(/.test(body))
             })
 
             //SITE-EX-007 (run11 新增): 表級基準比對是 select 之後的第一個檢查——先於 findTouchedDup(撞名)、checkUsersWrite(email／對應鍵)、saveNewRowExists(新增列已存在),
             //使草稿過期時回「請重新載入」(saveStale), 而不是以過期畫面為前提的其他錯誤(R-PRINCIPLE-00 原則 7)
-            it('SITE-EX-007 checkBaseline 為 select 之後的第一個檢查: 先於 findTouchedDup、checkUsersWrite、saveNewRowExists、restoreExternalOrder、ltdtDiffByKey', function() {
-                let iSel = at(/ltdtOld\s*=\s*await woItems\[keyTable\]\.select\(\)/)
-                let order = [iSel, ...['checkBaseline', 'restoreExternalOrder', 'findTouchedDup', 'checkUsersWrite', 'saveNewRowExists', 'ltdtDiffByKey'].map((n) => at(new RegExp(`\\b${n}\\b`)))]
+            //perm-run01: 基準比對由 guardWrite 於 write 回呼之前執行, 故上列各檢查(皆在 write 回呼內)必在其後; 釘 read: → baseline: → write: → 各檢查之序
+            it('SITE-EX-007 基準比對(guardWrite 之 baseline:)為 read 之後的第一個檢查: 先於 write 回呼內之 findTouchedDup、checkUsersWrite、saveNewRowExists、restoreExternalOrder、ltdtDiffByKey', function() {
+                let order = [RE_READ, RE_BASE, RE_WRITE, ...['restoreExternalOrder', 'findTouchedDup', 'checkUsersWrite', 'saveNewRowExists', 'ltdtDiffByKey'].map((n) => new RegExp(`\\b${n}\\b`))].map((re) => at(re))
                 assert.strict.ok(order.every((i) => i > 0), JSON.stringify(order))
                 for (let k = 1; k < order.length; k++) {
                     assert.strict.ok(order[k] > order[k - 1], `次序錯: ${JSON.stringify(order)}`)
                 }
             })
 
-            it('SITE-EX-005 守門與基準比對皆在表鎖內(withTabLocks(kmx, [keyTable] 之後); 基準格式驗證在取鎖與任何讀寫之前(lockSave( 之前)', function() {
-                let iLock = at(/\bwithTabLocks\(kmx,\s*\[keyTable\]/)
-                assert.strict.ok(iLock > 0)
-                for (let name of ['checkExternalWrite', 'checkBaseline', 'hasExternalDiff', 'restoreExternalOrder']) {
-                    assert.strict.ok(at(new RegExp(`\\b${name}\\(`)) > iLock, `${name} 須在 withTabLocks 內`)
+            //perm-run01: 原「withTabLocks(kmx, [keyTable] 之後」改為 guardWrite({ tables: [keyTable] 之後(w-serv-orm 於同一把表鎖內執行 read → 比對 → write); 基準格式驗證仍在取鎖與任何讀寫之前;
+            //另釘引用端表鎖: 於 write 內以 withTabLocks(lockTabs, [holder], fn, [keyTable]) 依階層再取(held 帶本表鎖, 防反向／重入死鎖)
+            it('SITE-EX-005 守門與基準比對皆在表鎖內(guardWrite({ tables: [keyTable] 之 write 回呼與 baseline 比對); 基準格式驗證在取鎖與任何讀寫之前(lockSave( 與 guardWrite( 之前); 引用端表鎖於 write 內經 withTabLocks(lockTabs, [holder] 取得並帶 held [keyTable]', function() {
+                let iLock = at(RE_GUARD)
+                let iBase = at(RE_BASE)
+                let iWrite = at(RE_WRITE)
+                assert.strict.ok(iLock > 0 && iBase > iLock && iWrite > iBase, JSON.stringify([iLock, iBase, iWrite]))
+                for (let name of ['checkExternalWrite', 'hasExternalDiff', 'restoreExternalOrder', 'dropServerOnlyDiff', 'restoreServerFields', 'findTouchedDup', 'checkUsersWrite']) {
+                    assert.strict.ok(at(new RegExp(`\\b${name}\\(`)) > iWrite, `${name} 須在 guardWrite 之 write 回呼(表鎖內)`)
                 }
                 let iValid = at(/\bisBaselineValid\(/)
                 let iSave = at(/\blockSave\(/)
                 assert.strict.ok(iValid > 0 && iSave > 0 && iValid < iSave, 'isBaselineValid 須在 lockSave( 之前')
+                assert.strict.ok(iSave < iLock, 'lockSave( 占位須包在 guardWrite 表鎖之外層')
                 assert.strict.ok(iValid < at(/\.select\(\)/), 'isBaselineValid 須在第一個 select() 之前')
+                let iHolder = at(/\bwithTabLocks\(lockTabs,\s*\[holder\]/)
+                assert.strict.ok(iHolder > iWrite, '引用端表鎖須在 write 回呼內取得')
+                assert.strict.ok(/\bwithTabLocks\(lockTabs,\s*\[holder\],\s*async \(\) => \{[\s\S]*?\},\s*\[keyTable\]\)/.test(body), '引用端表鎖須帶 held [keyTable]')
             })
 
             //SITE-EX-006 為 run07 修訂: 原無基準分支寫成 `else if (lockExternalRows && hasExternalDiff(...))`(接在 if (baseline !== null) 之後)為舊結構; 新結構: 基準與守門之後獨立一支 if (baseline === null && lockExternalRows && hasExternalDiff(...))
@@ -1526,21 +1620,24 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
                 }
             })
 
-            it('SITE-EX-011 updateUsers 不把用戶端 optClient 整包傳入 pc.updateUsers(只採 baseline, pickKeysOnly 由伺服端 modeEditUsers 決定)', function() {
+            //perm-run01: 原 `{ baseline: optClient.baseline }` 逐鍵組裝之釘住, 改為經共用單點 pickClientOpt(optClient) 過濾(只採 baseline 與 returnRows; 行為見 EXT-G11), 其後才由伺服端加 pickKeysOnly
+            it('SITE-EX-011 updateUsers 不把用戶端 optClient 整包傳入 pc.updateUsers(經 pickClientOpt 過濾, 只採 baseline／returnRows; pickKeysOnly 由伺服端 modeEditUsers 決定)', function() {
                 let seg = wcode.slice(iK, iK + 3000)
                 let m = /updateUsers:\s*\(userId,\s*rows,\s*optClient\)\s*=>\s*\{([\s\S]*?)\n            \},/.exec(seg)
                 assert.strict.ok(m, '應能取得 updateUsers 函數本體')
                 let b = m[1]
                 assert.strict.ok(!/pc\.updateUsers\([^)]*optClient/.test(b), '不得把 optClient 傳入 pc.updateUsers')
                 assert.strict.ok(/pc\.updateUsers\(userId,\s*rows,\s*opt\)/.test(b))
-                assert.strict.ok(/optClient\.baseline/.test(b) && /\{\s*baseline:\s*optClient\.baseline\s*\}/.test(b), '只組 { baseline }')
+                assert.strict.ok(/let opt = pickClientOpt\(optClient\)/.test(b), 'opt 須由 pickClientOpt(optClient) 取得(只採 baseline／returnRows)')
                 assert.strict.ok(/modeEditUsers === 'for:grups'[\s\S]*opt\.pickKeysOnly\s*=\s*\['cgrups'\]/.test(b), 'pickKeysOnly 由伺服端 modeEditUsers 設定')
+                assert.strict.ok(b.indexOf('pickClientOpt(optClient)') < b.indexOf('opt.pickKeysOnly'), '先過濾用戶端 opt, 再由伺服端加 pickKeysOnly(順序反了則用戶端可蓋掉)')
             })
 
-            it('SITE-EX-012 procCore 之 updateTargets／Pemis／Grups 以 pickClientOpt(opt) 過濾用戶端 opt(只採 baseline); procCore 之 lockExternalRows 預設 true 並由 WWebPerm 帶入', function() {
+            //perm-run01: procCore 之 updateTargets／Pemis／Grups 由「updateTabItems(..., pickClientOpt(opt))」改為先 `let optc = pickClientOpt(opt)`(同函式內, 供成功回傳 outOf 讀 returnRows 共用同一份已過濾之 opt)再傳 optc 給 updateTabItems
+            it('SITE-EX-012 procCore 之 updateTargets／Pemis／Grups 以 pickClientOpt(opt) 過濾用戶端 opt(只採 baseline／returnRows)後傳入 updateTabItems; procCore 之 lockExternalRows 預設 true 並由 WWebPerm 帶入', function() {
                 for (let [fn, tb] of [['updateTargets', 'targets'], ['updatePemis', 'pemis'], ['updateGrups', 'grups']]) {
-                    let re = new RegExp(`updateTabItems\\('${tb}',\\s*userId,\\s*rows,\\s*'\\w+',\\s*pickClientOpt\\(opt\\)\\)`)
-                    assert.strict.ok(re.test(pcode), `${fn} 須以 pickClientOpt(opt) 呼叫 updateTabItems`)
+                    let re = new RegExp(`let ${fn} = async \\(userId, rows, opt = \\{\\}\\) => \\{[\\s\\S]*?let optc = pickClientOpt\\(opt\\)[\\s\\S]*?updateTabItems\\('${tb}',\\s*userId,\\s*rows,\\s*'\\w+',\\s*optc\\)`)
+                    assert.strict.ok(re.test(pcode), `${fn} 須以 pickClientOpt(opt) 過濾後呼叫 updateTabItems`)
                 }
                 assert.strict.ok(/lockExternalRows = true\s*\}\)/.test(pcode), 'proc 之 lockExternalRows 預設 true')
                 assert.strict.ok(/procCore\(woItems,\s*procOrm,\s*\{[^}]*\blockExternalRows\b[^}]*\}\)/.test(wcode), 'WWebPerm 須把 lockExternalRows 帶入 procCore')

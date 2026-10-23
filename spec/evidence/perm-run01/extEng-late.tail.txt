@@ -1,0 +1,13 @@
+
+  27 passing (7m)
+  3 failing
+
+  1) e2e-external-rows (eng)
+       E2E-011-stale-dialog-reject:
+     Error: waitUntilExist 超過 20000ms 仍找不到「saveStale 訊息框」 — 此為真實異常 (production race / 元件未渲染)
+      at fail (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/node_modules/w-package-tools-e2e/src/waitUntilExist.mjs:27:22)
+      at waitUntilExist (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/node_modules/w-package-tools-e2e/src/waitUntilExist.mjs:44:15)
+      at async waitUntilExist (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/tools/e2e-setup.mjs:836:5)
+      at async expectResultBoxAbove (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/tools/e2eExt.mjs:359:5)
+      at async Object.run (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/e2e-external-rows.test.mjs:563:13)
+      at async runBaselineCase (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/node_modules/w-package-tools-e2e/src/runBaselineCase.mjs:104:22)

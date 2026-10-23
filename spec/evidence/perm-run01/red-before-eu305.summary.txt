@@ -1,0 +1,25 @@
+[quiet-run] exit=1 time=0s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\perm-run01\mutrepo\tmp\quiet-run\20261023-144153-red-eu305.log (33 行, 2 KB)
+[quiet-run] cmd: node node_modules/mocha/bin/mocha.js --no-parallel test/unit-externalUi.test.mjs --grep EU-305 --timeout 120000 --exit
+== 統計 ==
+  0 passing (7ms)
+  1 failing
+== 失敗段落(前 18 行) ==
+  1) unit-externalUi (清單頁外部列前端輔助與接線, F-23 / R-EXT-OWN-01)
+       EU-3 getExternalEdits
+         EU-305 空值等價前後端同判準(perm-run01 外審 sol#2): 外部列鎖定欄 description 於 null／""／缺欄互換 → 前端不判違規、伺服端(真 ltdtDiffByKey／dropServerOnlyDiff／checkExternalWrite)亦通過; 空值 ↔ 0／false／非空 → 兩端皆判違規; from 欄 null／"" 改動 → 兩端皆判違規(from 不適用空值等價):
+      AssertionError [ERR_ASSERTION]: grups description "" → null: 空值等價, 前後端皆不判違規
++ actual - expected
+  {
++   fe: true,
+-   fe: false,
+    sv: false
+  }
+      + expected - actual
+       {
+      -  "fe": true
+      +  "fe": false
+         "sv": false
+       }
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/tmp/perm-run01/mutrepo/test/unit-externalUi.test.mjs:372:35)
+      at process.processImmediate (node:internal/timers:574:21)
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)

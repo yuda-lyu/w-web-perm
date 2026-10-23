@@ -11,11 +11,12 @@
 //  P5 mappingBy='id'(預設)或不合法值: 不檢查 name(users 允許 name 空／重複), 只有 P1／P2;
 //  P6 pickKeysOnly(modeEditUsers='for:grups'): 歷史重複／空值的庫, 群組指派照常成功(檢查跑在「庫內列＋cgrups」合併後之列上, 無任何列被觸及),
 //     且送入列的 email／name／isActive 變更不被採納;
-//  P7 被拒 → 四張表零變更(逐位元比對、零寫入); 檢查位於 kmx(tabWriteKey('users')) 內、任何破壞性寫入之前;
+//  P7 被拒 → 四張表零變更(逐位元比對、零寫入); 檢查位於 guardWrite({ tables: ['users'] }) 之 write 回呼內(持 users 表鎖; 新鮮讀取由 guardWrite 的 read 承擔)、任何破壞性寫入之前
+//     (perm-run01: 原「kmx(tabWriteKey('users')) 內」改為 w-serv-orm guardWrite; 同一把表鎖與外部同步共用, 行為以「他方持有 users 表鎖期間不判定、釋放後才判定」驗證);
 //  P8 被拒時 srLog 記 event=updateTabItems-ckKey-error、msg(錯誤鍵)、key(欄位)、reason、row(列索引), 不記 email／name 之值(個資; 修正前重複時記 value).
 //
 //受測: server/procCore.mjs 之 updateUsers(kpFunExt 之實際入口, 內走 updateTabItems; 注入 mappingBy 同 WWebPerm 之 procCore(...) 呼叫)與 server/keyCheck.mjs 之 checkUsersWrite;
-//替身: test/tools/unitOrm.mjs 之 mkTable(cnt 計 insert／save／del／delAll 次數, 供斷言「被拒時零寫入」), procOrm 為真(getMapOrm → getProc).
+//替身: test/tools/unitOrm.mjs 之 mkTable(cnt 計 insert／save／del／delAll 次數, 供斷言「被拒時零寫入」), procOrm／withTabLocks／guardWrite 為真(mkCore: 真 WServOrm 包住替身表).
 //輸入空間(報告用): mappingBy(id／email／name) × 情境(見 CASES, 共 N 格, 每格逐 mappingBy 列期望) ＋ checkUsersWrite 窮舉(見檔尾 describe).
 //跑法: npx mocha test/unit-procCore-usersKey.test.mjs --reporter list --timeout 300000
 import assert from 'assert'
@@ -23,13 +24,12 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import cloneDeep from 'lodash-es/cloneDeep.js'
-import pmKeyMutex from 'wsemi/src/pmKeyMutex.mjs'
 import cacheSt from 'wsemi/src/cacheSt.mjs'
 import ds from '../src/schema/index.mjs'
 import proc from '../server/procCore.mjs'
 import createLockSave from '../server/lockSave.mjs'
-import { checkUsersWrite, tabWriteKey } from '../server/keyCheck.mjs'
-import { mkTable, mkProcOrm, mkSrLog } from './tools/unitOrm.mjs'
+import { checkUsersWrite } from '../server/keyCheck.mjs'
+import { mkTable, mkCore, mkSrLog } from './tools/unitOrm.mjs'
 import { stripLineComment } from './tools/srcScan.mjs'
 
 
@@ -328,7 +328,7 @@ describe('unit-procCore-usersKey (後台整表寫入 users 之 email／對應鍵
 
     let envs = []
 
-    //createEnv: 四表替身(users 為受測種子, 其餘三表各一列供零寫入比對)＋真 procOrm＋真 kmx／lockSave; mappingBy 同 WWebPerm 之 procCore(...) 注入
+    //createEnv: 四表替身(users 為受測種子, 其餘三表各一列供零寫入比對)＋真 procOrm／withTabLocks／guardWrite(mkCore)＋真 lockSave; mappingBy 同 WWebPerm 之 procCore(...) 注入
     function createEnv(seedName, mappingBy) {
         let seed = SEEDS[seedName]().map((r, k) => ({ ...r, order: k + 1 }))
         let mk = (table, o) => ({ ...ds[table].funNew(), ...AUDIT, ...o })
@@ -340,13 +340,13 @@ describe('unit-procCore-usersKey (後台整表寫入 users 之 email／對應鍵
         }
         let { srLog, logs } = mkSrLog()
         let cst = cacheSt()
-        let kmx = pmKeyMutex()
-        let opt = { srLog, kmx, lockSave: createLockSave(cst) }
+        let core = mkCore(ds, woItems) //perm-run01: 原 mkProcOrm＋kmx: pmKeyMutex() 改 mkCore
+        let opt = { srLog, ...core.lock, lockSave: createLockSave(cst) }
         if (mappingBy !== OMIT) {
             opt.mappingBy = mappingBy
         }
-        let pc = proc(woItems, mkProcOrm(ds, woItems), opt)
-        let env = { seed, woItems, logs, cst, kmx, pc }
+        let pc = proc(woItems, core.procOrm, opt)
+        let env = { seed, woItems, logs, cst, core, pc }
         envs.push(env)
         return env
     }
@@ -448,17 +448,17 @@ describe('unit-procCore-usersKey (後台整表寫入 users 之 email／對應鍵
     })
 
 
-    // ===== P7: 檢查在 kmx(tabWriteKey('users')) 內 =====
+    // ===== P7: 檢查在 users 表鎖內(guardWrite 的 write 回呼) =====
 
     describe('鎖(P7)', function() {
-        it('UK-130 他方持有 tabWriteKey("users") 期間, 會被拒之更新既不回應也不記 log; 釋放後才以 saveRowFieldDuplicate 拒絕且零寫入(檢查與寫入在同一把鎖內, R-WRITE-LOCK-01)', async function() {
+        it('UK-130 他方持有 users 表鎖期間, 會被拒之更新既不回應也不記 log; 釋放後才以 saveRowFieldDuplicate 拒絕且零寫入(檢查與寫入在同一把鎖內, R-WRITE-LOCK-01)', async function() {
             let e = createEnv('clean', 'id')
             let before = snapAll(e.woItems)
             let release = null
             let gate = new Promise((resolve) => {
                 release = resolve
             })
-            let held = e.kmx(tabWriteKey('users'), async () => {
+            let held = e.core.withTabLocks(['users'], async () => { //perm-run01: 原 e.kmx(tabWriteKey('users'), …) 改對真鎖管理器以表名取鎖(與 guardWrite 同一把)
                 await gate
             })
             let settled = null
@@ -527,15 +527,24 @@ describe('unit-procCore-usersKey (後台整表寫入 users 之 email／對應鍵
     describe('站點不變式', function() {
         let readCode = (rel) => fs.readFileSync(path.join(projRoot, rel), 'utf8').split(/\r?\n/).map((ln) => stripLineComment(ln)).join('\n')
 
-        it('SITE-UK-001 procCore.updateTabItems: users 之檢查只經 keyCheck.checkUsersWrite, 位於 kmx(tabWriteKey) 內、ltdtOld 之 select 之後、第一個 procOrm 破壞步驟之前, 帶 mappingBy; 不得復活全表 ckKey(rows, \'email\')', function() {
+        //perm-run01: 原次序不變式「kmx 鎖 < select ltdtOld < checkUsersWrite < procOrm」(字串 withTabLocks(kmx, [keyTable] / let ltdtOld = await woItems[keyTable].select())
+        //改寫為新碼等價形: guardWrite({ tables: [keyTable], read: …select, write: async (ltdtOld) => { …checkUsersWrite… 第一個 procOrm 破壞步驟 } }):
+        //guardWrite 呼叫(取 users 表鎖) < tables: [keyTable] < read(新鮮讀取由 guardWrite 承擔) < write 回呼 < checkUsersWrite < 第一個 procOrm < guardWrite 呼叫結束(.catch(mapGuardErr)); 並不得在 write 回呼內另行 select ltdtOld
+        it('SITE-UK-001 procCore.updateTabItems: users 之檢查只經 keyCheck.checkUsersWrite, 位於 guardWrite({ tables: [keyTable] }) 之 write 回呼內(新鮮讀取由其 read 承擔)、第一個 procOrm 破壞步驟之前, 帶 mappingBy; 不得復活全表 ckKey(rows, \'email\')', function() {
             let code = readCode('server/procCore.mjs')
             assert.strict.ok(!/ckKey\(rows,\s*'email'/.test(code), '全表 email 檢查不得復活(歷史空值／重複會使所有存檔失敗)')
             assert.strict.equal((code.match(/checkUsersWrite\(/g) || []).length, 1, 'checkUsersWrite 呼叫點恰一處')
-            let iLock = code.indexOf('withTabLocks(kmx, [keyTable]')
-            let iOld = code.indexOf('let ltdtOld = await woItems[keyTable].select()')
+            assert.strict.equal((code.match(/guardWrite\(\{/g) || []).length, 1, 'guardWrite 呼叫點恰一處(後台整表寫入之唯一取鎖／新鮮讀取入口)')
+            let iGuard = code.indexOf('guardWrite({')
+            let iTables = code.indexOf('tables: [keyTable]')
+            let iRead = code.indexOf('read: () => woItems[keyTable].select()')
+            let iWrite = code.indexOf('write: async (ltdtOld)')
             let iCk = code.indexOf('checkUsersWrite(rows, ltdtOld, mappingBy)')
             let iOrm = code.indexOf('procOrm(userId, keyTable')
-            assert.strict.ok(iLock > 0 && iOld > iLock && iCk > iOld && iOrm > iCk, `次序須為 kmx 鎖 < select ltdtOld < checkUsersWrite < procOrm, 實得 ${[iLock, iOld, iCk, iOrm]}`)
+            let iEnd = code.indexOf('}).catch(mapGuardErr(')
+            assert.strict.ok(iGuard > 0 && iTables > iGuard && iRead > iTables && iWrite > iRead && iCk > iWrite && iOrm > iCk && iEnd > iOrm,
+                `次序須為 guardWrite < tables: [keyTable] < read(select) < write 回呼 < checkUsersWrite < procOrm < guardWrite 結束, 實得 ${[iGuard, iTables, iRead, iWrite, iCk, iOrm, iEnd]}`)
+            assert.strict.ok(!/let ltdtOld = await woItems\[keyTable\]\.select\(\)/.test(code), 'ltdtOld 須由 guardWrite 的 read 提供, 不得在 write 回呼內另行 select(否則與 guardWrite 的基準比對／新鮮讀取脫鉤)')
             assert.strict.ok(/function proc\(woItems, procOrm, \{[^}]*\bmappingBy\b[^}]*\}\)/.test(code), 'proc 須收 mappingBy 注入')
         })
 

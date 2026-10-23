@@ -15,7 +15,8 @@ import procLang from './procLang.mjs'
 import validateRowsBeforeWrite from './validateRows.mjs'
 import planRefChanges, { REF_OF, diffRefTargets, fillIdlessIds } from '../src/js/refCascade.mjs'
 import { restoreExternalOrder, dropServerOnlyDiff, restoreServerFields, checkExternalWrite, hasExternalDiff } from '../src/js/externalRows.mjs'
-import { isBaselineValid, checkBaseline } from '../src/js/rowDigest.mjs'
+import { isBaselineValid, getContract } from '../src/js/rowDigest.mjs'
+import { getRejectKey } from 'w-serv-orm/src/baseline.mjs'
 import { findTouchedDup, findDupIndex, withTabLocks, checkUsersWrite } from './keyCheck.mjs'
 import { checkCascadePlan, writeWithCascade } from './cascadeWrite.mjs'
 
@@ -63,16 +64,62 @@ function mergePickKeysOnly(ltdtDb, rowsIn, keyDetect, pickKeys) {
 }
 
 
+//拒收鍵(w-serv-orm baseline.mjs 之固定英文鍵) → 本套件語系鍵; 一律提示重新載入(規格第 6 節; R-BASELINE-01):
+//  baselineMismatch: 持舊畫面存檔(先動先贏); rowNotFound: 修改或刪除時該列已不存在(已被他人刪除, 不復活); baselineFormat: 基準格式或版本不識(含套內舊版指紋; 不得降級為不帶基準)
+let kpRejectKey = {
+    baselineMismatch: 'saveStale',
+    rowNotFound: 'saveStale',
+    baselineFormat: 'saveBaselineFormat',
+}
+
+
+/**
+ * 用戶端(kpFunExt 第 3 參)的 opt 只採納 baseline 與 returnRows(是否於回傳附寫入後之列, 布林), 不接受 pickKeysOnly 等伺服端設定, 更不轉給 procOrm 之 opt(規格第 6 節: procOrm 之 opt 只能由伺服端程式自組);
+ * 未給(undefined／null)之 baseline 視為舊客戶端／外部應用(不帶基準, 本 major 允許), 給了則一律比對, 格式不合即 baselineFormat(不降級為不帶基準)
+ *
+ * @param {*} opt 輸入用戶端給之 opt(任何值)
+ * @returns {Object} 回傳 { baseline?, returnRows? }
+ */
+function pickClientOpt(opt) {
+    let o = (opt !== null && typeof opt === 'object') ? opt : {}
+    let out = {}
+    if (o.baseline !== undefined && o.baseline !== null) {
+        out.baseline = o.baseline
+    }
+    if (o.returnRows === true) {
+        out.returnRows = true
+    }
+    return out
+}
+
+
 //mappingBy: 使用者對應鍵('id'｜'email'｜'name', WWebPerm 已正規化; 未給或其他值視同 'id'), 供 users 整表寫入的對應鍵檢查(R-PRINCIPLE-00 適用表 h, R-MAPKEY-03)
 //cascadeRename: 群組／權限改名時是否連帶更新引用(預設 true; 只管改名, 刪除連帶清理不受影響, R-REF-CASCADE-01)
 //lockExternalRows: 後台是否不得改外部列(from 為非空字串者)之身分／結構欄(預設 true, R-EXT-OWN-01; 'n' 時回到舊行為, 僅保留 from 型別檢查)
-function proc(woItems, procOrm, { srLog, kmx, lockSave, mappingBy = 'id', cascadeRename = true, lockExternalRows = true }) {
+//withTabLocks(別名 lockTabs), guardWrite: w-serv-orm 實例(WServOrm 回傳物件)之每表一鍵表鎖與原子防護(R-LOCK-CORE-01), 與外部同步(WWebPerm.syncAndReplaceTabs)共用同一個鎖管理器; 未注入即 TypeError(fail-closed, 不寫入)
+function proc(woItems, procOrm, { srLog, withTabLocks: lockTabs, guardWrite, lockSave, mappingBy = 'id', cascadeRename = true, lockExternalRows = true }) {
 
 
-    //pickClientOpt: 用戶端(kpFunExt 第 3 參)只採納 baseline, 不接受 pickKeysOnly 等伺服端設定; 未給(undefined／null)視為舊客戶端
-    let pickClientOpt = (opt) => {
-        let b = (opt !== null && typeof opt === 'object') ? opt.baseline : undefined
-        return (b === undefined || b === null) ? {} : { baseline: b }
+    //mapGuardErr: guardWrite／procOrm(mustExist)之拒收轉本套件語系鍵並記 srLog(只記錯誤鍵、原因與差異筆數, 不記列 id／個資值); rowsInvalid(庫內主鍵缺漏或重複)屬伺服端資料錯誤, 回 saveWriteFail 並記 log;
+    //其餘(語系鍵字串、ORM 失敗、非預期例外)原樣轉出(由 errLog／toOutKey 處置)
+    let mapGuardErr = (keyTable, userId) => (err) => {
+        let k = getRejectKey(err)
+        if (typeof k === 'string' && Object.prototype.hasOwnProperty.call(kpRejectKey, k)) {
+            let n = 0
+            let reason = k
+            if (err !== null && typeof err === 'object' && Array.isArray(err.changed)) {
+                n = err.changed.length + err.removed.length + err.added.length
+                reason = err.changed.length > 0 ? 'rowChanged' : (err.removed.length > 0 ? 'rowRemoved' : (err.added.length > 0 ? 'rowAdded' : (err.reordered === true ? 'rowReordered' : k)))
+                n = n > 0 ? n : (err.reordered === true ? 1 : 0)
+            }
+            srLog.error({ event: 'updateTabItems-stale-error', keyTable, userId, msg: kpRejectKey[k], reason, n })
+            return Promise.reject(kpRejectKey[k])
+        }
+        if (k === 'rowsInvalid') {
+            srLog.error({ event: 'updateTabItems-rows-invalid', keyTable, userId, msg: 'saveWriteFail', reason: 'rowsInvalid' })
+            return Promise.reject('saveWriteFail')
+        }
+        return Promise.reject(err)
     }
 
 
@@ -89,12 +136,16 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave, mappingBy = 'id', cascad
             return Promise.reject('saveRowFieldInvalid')
         }
 
-        //baseline: 草稿所依據之載入基準 [[id, digest], ...](F-26, R-BASELINE-01; 前端於開啟編輯時綁定); 未給(舊客戶端)為 null; 給了但格式不合視為無效請求, 於任何讀寫之前拒絕
+        //baseline: 草稿所依據之載入基準 [[id, digest], ...](h1 版, w-serv-orm baseline.mjs; F-26, R-BASELINE-01; 前端於開啟編輯時綁定); 未給(舊客戶端、外部應用)為 null;
+        //給了但格式或版本不識(含套內舊版指紋、非陣列)→ 拒收 saveBaselineFormat(提示重新載入, 不降級為不帶基準), 於任何讀寫之前
         let baseline = get(opt, 'baseline', null)
         if (baseline !== null && !isBaselineValid(baseline)) {
-            srLog.error({ event: 'updateTabItems-validate-error', keyTable, msg: 'saveRowFieldInvalid', reason: 'baselineInvalid', row: -1, field: '' })
-            return Promise.reject('saveRowFieldInvalid')
+            srLog.error({ event: 'updateTabItems-stale-error', keyTable, userId, msg: 'saveBaselineFormat', reason: 'baselineFormat', n: 0 })
+            return Promise.reject('saveBaselineFormat')
         }
+
+        //returnRows: 存檔成功後於同一表鎖內新鮮讀回該表全部列隨回傳附上(規格第 8 節): 前端立即以之更新畫面與基準, 不必等推播／輪詢; 不以前端送出之值當新基準(寫入時 clearXSS 等會改寫字串)
+        let returnRows = get(opt, 'returnRows', false) === true
 
         //pickKeysOnly, 僅採納既有列之指定欄位變更(見 mergePickKeysOnly), 未給則整表 diff 寫入
         let pickKeysOnly = get(opt, 'pickKeysOnly', null)
@@ -110,23 +161,9 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave, mappingBy = 'id', cascad
             })
         }
 
-        //雙擊防護(後端): 同一操作者之同表寫入處理中再送出即拒絕 'saveInProgress'(不排隊, 見 lockSave.mjs, ADR-025);
-        //占位包在 kmx 之外層, 不同操作者之並行寫入仍由 kmx 序列化、各自成功(ADR-012)
-        //序列化同表之並行整表批次寫入: 防 lost update (同 keyTable 序列化, 不同表並行)
-        //持鎖: 先取本表之鎖; 本表有改名或刪除而須改寫引用端時, 才於內層依階層再取引用端表之鎖(見下方「引用連帶」段). 皆經單一取鎖函數(R-WRITE-LOCK-02); 與外部同步(WWebPerm.syncAndReplaceTabs)共用同表互斥鍵(外審 sol R10)
-        return await lockSave(`updateTabItems:${keyTable}`, userId, () => withTabLocks(kmx, [keyTable], async () => {
-
-        //pickKeysOnly, 須於 mutex 內讀取資料庫為基底, 避免與並行寫入 race
-        if (isearr(pickKeysOnly)) {
-            //有限數字 id 先轉為字串形式再與庫內對應(外審 sol R7): mergePickKeysOnly 只認非空字串 id, 數字 id(如 1)對不上庫內之 '1' 而該列指派被靜默略過卻回成功(R-ORM-04 之同一正規化, 此處原晚於合併)
-            rows = map(rows, (r) => {
-                let id = get(r, 'id')
-                return (typeof id === 'number' && Number.isFinite(id)) ? { ...r, id: String(id) } : r
-            })
-            let ltdtDb = await woItems[keyTable].select()
-            rows = mergePickKeysOnly(ltdtDb, rows, keyDetect, pickKeysOnly)
-            srLog.info({ event: 'updateTabItems-pickKeysOnly', keyTable, userId, pickKeysOnly })
-        }
+        //prepRows: 寫入前之純函式前處理(不讀庫、不取鎖): ltdtmapping、重給 order、空值／重複檢查、主鍵正規化與重複主鍵檢查; 錯誤以 Promise.reject(語系鍵) 回報(次序與修正前同: 先於基準比對).
+        //非 pickKeysOnly 者在取鎖之前執行; pickKeysOnly(users 之 for:grups 模式)須以表鎖內新鮮讀取之庫內列為基底合併後才能前處理(見下方 write)
+        let prepRows = async (rows) => {
 
         //ltdtmapping
         rows = ltdtmapping(rows, ds[keyTable].keys)
@@ -207,19 +244,48 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave, mappingBy = 'id', cascad
             }
         }
 
-        //ltdtDiffByKey
-        let ltdtOld = await woItems[keyTable].select()
+        return rows
 
-        //表級載入基準比對(R-PRINCIPLE-00 原則 7, 規則帳本 R-BASELINE-01, ADR-037 Update(run11); 使用者 2026-10-22 裁示「多人同時編輯以表雜湊比對, 先動先贏」):
-        //有基準者, 草稿載入時之整表須與目前庫內整表相同(任一列內容指紋不同或列被增刪即過期), 否則整次拒收 saveStale、零寫入, 不部分變更、不上鎖; 指紋排除 order 與伺服器管理欄(見 rowDigest.getDigestFields).
-        //放在 select 之後、所有檢查與還原之前: 基準過期時下列各檢查之結果(撞名、新增列已存在、外部列守門…)皆以過期之畫面為前提, 應先回「請重新載入」而非誤導之其他訊息.
-        //無基準者(舊客戶端)不在此檢查: 後台列維持最後寫入者勝(ADR-013), 外部列之指派欄改動另於下方拒收(saveBaselineRequired). srLog 只記錯誤鍵、原因與差異筆數, 不記列 id／個資值
-        if (baseline !== null) {
-            let ck = checkBaseline({ keys: ds[keyTable].keys, ltdtOld, baseline })
-            if (ck !== null) {
-                srLog.error({ event: 'updateTabItems-stale-error', keyTable, userId, msg: ck.key, reason: ck.reason, n: ck.n })
-                return Promise.reject(ck.key)
-            }
+        }
+
+        //非 pickKeysOnly: 前處理在取鎖之前(純函式, 不讀庫)
+        let rowsPre = null
+        if (!isearr(pickKeysOnly)) {
+            rowsPre = await prepRows(rows)
+        }
+
+        //雙擊防護(後端): 同一操作者之同表寫入處理中再送出即拒絕 'saveInProgress'(不排隊, 見 lockSave.mjs, ADR-025);
+        //占位包在表鎖之外層, 不同操作者之並行寫入仍由表鎖序列化、各自成功(ADR-012)
+        //表鎖＝w-serv-orm 實例之 guardWrite(withTabLocks): 取鎖 → 新鮮讀取 → 載入基準比對 → write 於**同一把表鎖內**(規格第 6、7 節; R-LOCK-CORE-01), 防 lost update 與唯一性檢查被交錯略過;
+        //與外部同步(WWebPerm.syncAndReplaceTabs)共用同一個鎖管理器(外審 sol R10). 本表有改名或刪除而須改寫引用端時, 才於 write 內依階層再取引用端表之鎖(見下方「引用連帶」段, R-WRITE-LOCK-02)
+        return await lockSave(`updateTabItems:${keyTable}`, userId, () => guardWrite({
+            tables: [keyTable],
+
+            //新鮮讀取: 直讀 woItems(WServOrm 未開 useCache), 不經任何快取(規格第 12 節)
+            read: () => woItems[keyTable].select(),
+
+            //表級載入基準比對(R-PRINCIPLE-00 原則 7、使用者 2026-10-22 裁示原則 10「多人同時編輯以表雜湊比對, 先動先贏」; 規則帳本 R-BASELINE-01, ADR-037 Update(perm-run01)):
+            //有基準者, 草稿載入時之整表須與目前庫內整表相同(任一列內容摘要不同、列被增刪、名次不同即過期), 否則整次拒收 saveStale、零寫入, 不部分變更、不上鎖; 摘要依寫入契約(排除 order 與伺服器專有欄, 名次入基準).
+            //比對在 guardWrite 內、write 之前: 基準過期時下列各檢查之結果(撞名、新增列已存在、外部列守門…)皆以過期之畫面為前提, 應先回「請重新載入」而非誤導之其他訊息.
+            //無基準者(舊客戶端、外部應用)不比對(undefined 才跳過; null 不傳到此): 後台列維持最後寫入者勝(ADR-013), 外部列之指派欄改動另於下方拒收(saveBaselineRequired)
+            baseline: baseline === null ? undefined : baseline,
+            contract: getContract(keyTable),
+
+            write: async (ltdtOld) => {
+
+        //rows: 非 pickKeysOnly 為取鎖前已前處理者; pickKeysOnly 於鎖內以新鮮讀取之庫內列為基底合併(避免與並行寫入 race)再前處理
+        if (isearr(pickKeysOnly)) {
+            //有限數字 id 先轉為字串形式再與庫內對應(外審 sol R7): mergePickKeysOnly 只認非空字串 id, 數字 id(如 1)對不上庫內之 '1' 而該列指派被靜默略過卻回成功(R-ORM-04 之同一正規化, 此處原晚於合併)
+            rows = map(rows, (r) => {
+                let id = get(r, 'id')
+                return (typeof id === 'number' && Number.isFinite(id)) ? { ...r, id: String(id) } : r
+            })
+            rows = mergePickKeysOnly(ltdtOld, rows, keyDetect, pickKeysOnly)
+            srLog.info({ event: 'updateTabItems-pickKeysOnly', keyTable, userId, pickKeysOnly })
+            rows = await prepRows(rows)
+        }
+        else {
+            rows = rowsPre
         }
 
         //外部列之 order 由外部擁有(R-EXT-OWN-01): 上方 order=k+1 重編不得改外部列之順序, 還原為庫內值(使其不因後台存檔而成為 diff)
@@ -240,7 +306,7 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave, mappingBy = 'id', cascad
 
         //users 之 email／對應鍵(R-PRINCIPLE-00 適用表 h, 規則帳本 R-MAPKEY-03): 遭遇衝突就收嚴, 但只擋「本次造成或觸及」者, 歷史既有之空值／重複原樣送回不拒(否則已有歷史資料之庫無法在後台修復, 連群組指派 pickKeysOnly 也會失敗);
         //①全表 email 須為非空字串且不重複; ②mappingBy 為 email／name 時另對 isActive==='y' 之列檢查該欄位(含停用改啟用); 判準單一擁有者 keyCheck.checkUsersWrite(與外部同步 F-14 同口徑).
-        //放在 select 之後、saveNewRowExists 之前(次序同 pemis／grups 之 findTouchedDup), 於任何破壞性寫入之前(本函式在 kmx(tabWriteKey) 內, R-WRITE-LOCK-01); 被拒時資料表零變更.
+        //放在 select 之後、saveNewRowExists 之前(次序同 pemis／grups 之 findTouchedDup), 於任何破壞性寫入之前(本函式在 guardWrite 之表鎖內, R-WRITE-LOCK-01、R-LOCK-CORE-01); 被拒時資料表零變更.
         //srLog 只記錯誤鍵、原因、欄位與列索引, 不記 email／name 之值(個資; 修正前重複時記 value)
         if (keyTable === 'users') {
             let ck = checkUsersWrite(rows, ltdtOld, mappingBy)
@@ -286,11 +352,11 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave, mappingBy = 'id', cascad
         //②from 型別與外部列守門(checkExternalWrite): 新增列 from 須為 ''、外部列不可刪／不可改 from 與身分結構欄, 指派欄可寫(草稿新鮮而仍違規者在此被拒);
         //③無基準而修改外部列之指派欄: 無從證明快照新舊, Lv1 放行之指派欄不得因舊快照還原外部已撤銷之授權(外審 B.2), 依原則 3 拒收(saveBaselineRequired); 後台列無基準維持舊行為(最後寫入者勝, ADR-013).
         //srLog 只記錯誤鍵、原因、筆數與來源名稱, 不記列 id／個資值
+        //(perm-run01, 寫入契約 serverOnly: 伺服器專有欄位〔建立者／建立時間／更新者／更新時間〕存檔不採用客戶端值〔規格第 4、6 節; R-CONTRACT-01〕:
+        //dropServerOnlyDiff／restoreServerFields 改為不分外部列或後台列、亦不論 lockExternalRows 一律套用〔all: true〕——僅伺服器專有欄不同之列視為無變更, 確有改動之列改帶庫內之專有欄位寫入, 客戶端持舊列〔或偽造〕不得回寫.)
         let keysTab = ds[keyTable].keys
-        if (lockExternalRows) {
-            r = dropServerOnlyDiff({ keys: keysTab, r, ltdtOld })
-            r = restoreServerFields({ r, ltdtOld }) //改動之外部列帶庫內之伺服器管理欄: 持舊草稿(保留未存編輯期間外部同步重寫了該列)不得把較新之建立者／建立時間回退(外審 sol 第 3 點)
-        }
+        r = dropServerOnlyDiff({ keys: keysTab, r, ltdtOld, all: true })
+        r = restoreServerFields({ r, ltdtOld, all: true }) //改動之列帶庫內之伺服器管理欄: 持舊草稿(保留未存編輯期間外部同步重寫了該列)不得把較新之建立者／建立時間回退(外審 sol 第 3 點)
         let ex =checkExternalWrite({ keyTable, keys: keysTab, r, ltdtOld, lockExternalRows })
         if (ex !== null) {
             srLog.error({ event: 'updateTabItems-external-error', keyTable, userId, msg: ex.key, reason: ex.reason, n: ex.n, froms: ex.froms })
@@ -319,11 +385,13 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave, mappingBy = 'id', cascad
         }
 
         //writeMain
+        //修改只改不增、刪除未命中回報(規格第 6 節; R-ONLYMOD-01): del／save 帶 opt { mustExist: true }(伺服端自組, 不轉傳客戶端之任何參數), 列已不存在(同鎖內新鮮讀取之後仍不在, 理論上不會發生)→ 'rowNotFound' 零寫入、不復活;
+        //insert 為新增(主鍵已存在即略過之冪等新增, 不比對、不去重, 資料規則要求唯一者照其規則擋)
         let writeMain = async () => {
 
             //del
             if (size(r.del) > 0) {
-                await procOrm(userId, keyTable, 'del', r.del) //須使用procOrm才有辦法自動給予相關欄位
+                await procOrm(userId, keyTable, 'del', r.del, { mustExist: true }) //須使用procOrm才有辦法自動給予相關欄位
                 // .catch((err) => {
                 //     console.log('woItems[keyTable].del err', err)
                 // })
@@ -339,12 +407,33 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave, mappingBy = 'id', cascad
 
             //diff
             if (size(r.diff) > 0) {
-                await procOrm(userId, keyTable, 'save', r.diff) //須使用procOrm才有辦法自動給予相關欄位
+                await procOrm(userId, keyTable, 'save', r.diff, { mustExist: true }) //須使用procOrm才有辦法自動給予相關欄位
                 // .catch((err) => {
                 //     console.log('woItems[keyTable].save err', err)
                 // })
             }
 
+        }
+
+        //readAfter: 存檔成功後於同一表鎖內(含引用端鎖)新鮮讀回該表全部列(opt.returnRows 時; 規格第 8 節), 前端立即以之更新畫面與基準; 寫入已生效, 讀回失敗不使存檔失敗(回 null, 前端退回等推播), 失敗入 srLog
+        //holder 給了(引用連帶有改寫引用端表)時一併讀回引用端表(others[引用端表名])——該表亦被本次寫入改動, 前端同樣立即更新其基準, 免自己存檔後馬上去存引用端頁而被自己上一次之寫入誤擋
+        let readAfter = async (holder = null) => {
+            if (!returnRows) {
+                return null
+            }
+            try {
+                let rs = await woItems[keyTable].select()
+                let out = { rows: sortBy(rs, 'order'), others: {} }
+                if (holder !== null) {
+                    let rh = await woItems[holder].select()
+                    out.others[holder] = sortBy(rh, 'order')
+                }
+                return out
+            }
+            catch (err) {
+                srLog.error({ event: 'updateTabItems-readBack-error', keyTable, userId, msg: 'getDataError', raw: (typeof err === 'string') ? err : ((err && err.message) || String(err)) })
+                return null
+            }
         }
 
         //引用連帶(R-PRINCIPLE-00 原則 6、適用表 m／n, 規則帳本 R-REF-CASCADE-01, ADR-036): grups／pemis 改名(同 id 異名)與 grups／pemis／targets 刪除(舊 id 不在送入整表),
@@ -356,7 +445,7 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave, mappingBy = 'id', cascad
         let kind = arrHas(keyTable, ['targets', 'pemis', 'grups']) ? diffRefTargets({ keyTable, rowsOld: ltdtOld, rowsNew: rowsPlan, opt: { cascadeRename } }) : null
         if (kind !== null && (kind.renames.length > 0 || kind.delNames.length > 0)) {
             let holder = REF_OF[keyTable].holder
-            return await withTabLocks(kmx, [holder], async () => {
+            return await withTabLocks(lockTabs, [holder], async () => {
                 let holdersOld = await woItems[holder].select()
                 let plan = planRefChanges({ keyTable, rowsOld: ltdtOld, rowsNew: rowsPlan, holdersOld, opt: { cascadeRename } })
                 let errPlan = plan.err !== null ? plan.err : checkCascadePlan(plan)
@@ -365,15 +454,16 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave, mappingBy = 'id', cascad
                     return Promise.reject(errPlan)
                 }
                 await writeWithCascade({ plan, holdersOld, woItems, procOrm, userId, srLog, writeMain })
-                return ltdtNew
+                return await readAfter(plan.changes.length > 0 ? holder : null)
             }, [keyTable])
         }
 
         await writeMain()
 
-        return ltdtNew
+        return await readAfter()
 
-        }))
+            },
+        }).catch(mapGuardErr(keyTable, userId)))
     }
 
 
@@ -389,48 +479,62 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave, mappingBy = 'id', cascad
     }
 
 
+    //outOf: 成功回傳. 預設為成功 msg key 字串(既有呼叫端不變); 客戶端帶 returnRows:true 且讀回成功時改回 { msg, rows }(rows＝寫入後該表全部列, 鎖內新鮮讀取; 規格第 8 節)
+    //  others: 引用連帶有改寫引用端表時, 引用端表之寫入後全部列(鍵為表名); 無則為空物件
+    let outOf = (after, opt) => {
+        return (get(opt, 'returnRows', false) === true && after !== null && typeof after === 'object' && Array.isArray(after.rows)) ? { msg: 'saveTabItemsSuccess', rows: after.rows, others: after.others } : 'saveTabItemsSuccess'
+    }
+
+
     //updateTargets
     let updateTargets = async (userId, rows, opt = {}) => {
+        let rowsAfter = null
+        let optc = pickClientOpt(opt)
         try {
-            await updateTabItems('targets', userId, rows, 'id', pickClientOpt(opt))
+            rowsAfter = await updateTabItems('targets', userId, rows, 'id', optc)
         }
         catch (err) { throw errLog('updateTargets-error', userId, err) }
         srLog.info({ event: 'updateTargets-success', userId })
-        return 'saveTabItemsSuccess' //成功 msg key
+        return outOf(rowsAfter, optc) //成功 msg key
     }
 
 
     //updatePemis
     let updatePemis = async (userId, rows, opt = {}) => {
+        let rowsAfter = null
+        let optc = pickClientOpt(opt)
         try {
-            await updateTabItems('pemis', userId, rows, 'name', pickClientOpt(opt))
+            rowsAfter = await updateTabItems('pemis', userId, rows, 'name', optc)
         }
         catch (err) { throw errLog('updatePemis-error', userId, err) }
         srLog.info({ event: 'updatePemis-success', userId })
-        return 'saveTabItemsSuccess' //成功 msg key
+        return outOf(rowsAfter, optc) //成功 msg key
     }
 
 
     //updateGrups
     let updateGrups = async (userId, rows, opt = {}) => {
+        let rowsAfter = null
+        let optc = pickClientOpt(opt)
         try {
-            await updateTabItems('grups', userId, rows, 'name', pickClientOpt(opt))
+            rowsAfter = await updateTabItems('grups', userId, rows, 'name', optc)
         }
         catch (err) { throw errLog('updateGrups-error', userId, err) }
         srLog.info({ event: 'updateGrups-success', userId })
-        return 'saveTabItemsSuccess' //成功 msg key
+        return outOf(rowsAfter, optc) //成功 msg key
     }
 
 
     //updateUsers, opt.pickKeysOnly 給 ['cgrups'] 時僅採納既有使用者之群組指派變更(modeEditUsers='for:grups'; 伺服端設定, WWebPerm 組入, 不接受用戶端給);
-    //opt.baseline 為草稿載入基準(用戶端給, 其餘 opt 鍵不採納, 見 pickClientOpt 與 WWebPerm 之 kpFunExt)
+    //opt.baseline／opt.returnRows 為用戶端給(其餘 opt 鍵不採納, 見 pickClientOpt 與 WWebPerm 之 kpFunExt)
     let updateUsers = async (userId, rows, opt = {}) => {
+        let rowsAfter = null
         try {
-            await updateTabItems('users', userId, rows, 'id', opt)
+            rowsAfter = await updateTabItems('users', userId, rows, 'id', opt)
         }
         catch (err) { throw errLog('updateUsers-error', userId, err) }
         srLog.info({ event: 'updateUsers-success', userId })
-        return 'saveTabItemsSuccess' //成功 msg key
+        return outOf(rowsAfter, opt) //成功 msg key
     }
 
 
@@ -456,7 +560,7 @@ function toOutKey(err, keyFail = 'saveWriteFail') {
 }
 
 
-export { mergePickKeysOnly, toOutKey, isRowObj }
+export { mergePickKeysOnly, toOutKey, isRowObj, pickClientOpt }
 
 
 export default proc

@@ -118,7 +118,7 @@
   3. **每個建立外部列夾具之測試檔須在收尾呼叫 `cleanExternalFixtures`**(或其同系底層 `restoreTables`／`purgeExternalRows`／`createIsolation`)並**回驗**: 函式內建①經資料通道 `select` 偵測〔無待清者不 import `g_mOrm`, 不使本行程新增 lmdb 映射〕②移除③再 `select` 確認無殘留; 整檔只動外部夾具者加 `pristine:true`(各表主鍵集合＝種子, 後台多餘列即拋錯)。只清自己專屬之 `from`(`froms`), 不動他人分區; 收尾快照本身含外部列者以 `keepIds` 保留。
   4. **夾具各用專屬 `from`(檔名可辨)**: `assertPristineSeed` 訊息於多出之外部列主鍵後註記 `(from=…)`(如 `id-mk-dup(from=appE2eInit006)`), 前置檢查失敗時即可指向遺留之檔。
   5. 後台列夾具(`from` 為 `''`, 管理者寫入 RPC 或 `seedExtra` 旁路建立)之收尾不在本規則: 仍走 `restoreTables`／`restoreDbOnce`／`editTableRows`(管理者寫入可刪後台列; `restoreTables` 內已先 `purgeExternalRows`)。
-- **站點全集(2026-10-22 run09 盤點; `unit-e2e-lifecycle` LC-004 以靜態掃描釘住建立外部列夾具之 14 檔, 新增者須同步更新該清單與本表)**:
+- **站點全集(2026-10-22 run09 盤點; `unit-e2e-lifecycle` LC-004 以靜態掃描釘住建立外部列夾具之檔〔2026-10-23 perm-run01 起 16 檔; 原 14 檔〕, 新增者須同步更新該清單與本表)**:
 
 | 檔 | 外部列夾具之 `from` | 收尾 | 判定 |
 |---|---|---|---|
@@ -135,6 +135,8 @@
 | `e2e-array-form` | `appArrForm` | `restoreTables`; 旁路歷史同名列〔後台列〕段 `reseed` 後殘留則 `restoreTables` | 原已合規, 未動(本輪未擴大跑此檔: 未改其呼叫之任一函式之行為) |
 | `e2e-external-rows`／`e2e-ref-cascade` | `appExtU`／`appExtG`／`appExtWarn`／`appExtLate`／`appRefCascade` | `createIsolation().restore()` → `restoreTables` | 原已合規, 未動 |
 | `api-cleanExternal`(新) | `appCe-1`／`appCe-2` | 本入口之行為契約 CE-001～007 | 新增 |
+| `api-baseline`(perm-run01 新) | `appAbSync` | `purgeExternalRows`(`froms:[F_SYNC]`; 全表以 `keepIds` 保留種子列)後依「targets → pemis → grups → users」以管理者寫入還原四表(同 `api-refCascade` 之 `restoreAll`; 不用 `restoreTables`——其次序 users→grups→pemis 在群組改名連帶之後會使 grups 改回原名被 `renameCascadeNameInUse` 拒收) | 新增(2026-10-23) |
+| `e2e-concurrent-edit`(perm-run01 新) | `appCeX` | `createIsolation`(含本檔對 targets 表之擷取／還原: 共用快照只含 users／grups／pemis, 見 R-E2E-ISO-01) | 新增(2026-10-23) |
 
   其餘 `reseed` 站點: `api-verifyConn-auth` after(還原 admin `isActive`, 不建立多餘列, upsert 足夠)——不涉外部列。
 - **盤點指令(可重跑; 期望為 2026-10-22 run09 實測)**:

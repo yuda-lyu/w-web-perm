@@ -435,6 +435,21 @@ let kpLang = {
         eng: `Not saved: changing the assignment settings of rows synchronized from an external source requires the latest loaded data, which this request did not carry. Nothing was changed. Please reload the page and try again.`,
         cht: `未儲存：修改外部來源同步列之授權指派設定須附載入時之資料版本，此次請求未附。資料未變更，請重新整理頁面後再操作。`,
     },
+    //perm-run01(多人同時編輯共用核心; 規則帳本 R-BASELINE-01、R-SUBJECT-ID-01; ADR-037 Update):
+    //  saveBaselineFormat 基準格式或版本不識(升級前開啟之舊頁面所帶之套內舊版指紋, 或損壞之基準)→ 拒收、零寫入、提示重新載入(不降級為不帶基準; 原則 3);
+    //  relSubjectChangedGrup／relSubjectChangedPemi 反向關聯對話框存檔時, 主體(群組／權限)已被刪除、改名或刪除後以同名重建(id 不同)→ 拒收、零寫入、提示重新載入(原則 3、6; 引用以名稱為準, 主體身分變了即引用會指向另一個實體); {name} 為開框時之主體名稱
+    saveBaselineFormat: {
+        eng: `Not saved: this page was opened with a different version of the system and its data version cannot be recognized. Nothing was changed. Please reload the page and try again.`,
+        cht: `未儲存：此頁面是以不同版本載入，其資料版本無法辨識。資料未變更，請重新整理頁面後再操作。`,
+    },
+    relSubjectChangedGrup: {
+        eng: `Not saved: the group "{name}" this window was opened for has been deleted, renamed or replaced by another group since then. Nothing was changed. Please close this window, reload the page and try again.`,
+        cht: `未儲存：本視窗所編輯的群組「{name}」自開啟後已被刪除、改名或被另一個群組取代。資料未變更，請關閉本視窗並重新整理頁面後再操作。`,
+    },
+    relSubjectChangedPemi: {
+        eng: `Not saved: the permission "{name}" this window was opened for has been deleted, renamed or replaced by another permission since then. Nothing was changed. Please close this window, reload the page and try again.`,
+        cht: `未儲存：本視窗所編輯的權限「{name}」自開啟後已被刪除、改名或被另一個權限取代。資料未變更，請關閉本視窗並重新整理頁面後再操作。`,
+    },
     cannotGetUserId: {
         eng: `Cannot get the user id`,
         cht: `無法取得使用者 Id`,

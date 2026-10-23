@@ -33,13 +33,13 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import procLang from '../server/procLang.mjs'
-import { refsChanged, planDraftSync, isDraftStale } from '../src/js/draftSync.mjs'
+import { refsChanged, planDraftSync, isDraftStale, hasDraftNow, planDialogSync, checkSubject } from '../src/js/draftSync.mjs'
 import { makeBaseline } from '../src/js/rowDigest.mjs'
-import { TABLES, KEYS, mkRow, rowWith } from './tools/unitExt.mjs'
+import { TABLES, mkRow, rowWith } from './tools/unitExt.mjs'
 
 
 const projRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
-const cells = { DS1: 0, DS2: 0, DS3: 0, DS4: 0, DS5: 0 }
+const cells = { DS1: 0, DS2: 0, DS3: 0, DS4: 0, DS5: 0, DS6: 0, DS7: 0 }
 const readSrc = (rel) => fs.readFileSync(path.join(projRoot, rel), 'utf8').replace(/\r\n/g, '\n')
 
 
@@ -138,16 +138,19 @@ describe('unit-draftSync (清單頁草稿對推播之處置, R-PRINCIPLE-00 原�
     describe('isDraftStale(DS-3)', function() {
 
         for (let t of TABLES) {
-            let rows0 = [mkRow(t, { id: 'r1', order: 1 }), mkRow(t, { id: 'r2', order: 2 }), mkRow(t, { id: 'r3', order: 3 })]
-            let bl = makeBaseline(rows0, KEYS[t])
-            let st = (rows) => isDraftStale({ keys: KEYS[t], rows, baseline: bl })
+            let rows0 = [mkRow(t, { id: 'r1', order: 1, description: '' }), mkRow(t, { id: 'r2', order: 2, description: '' }), mkRow(t, { id: 'r3', order: 3, description: '' })]
+            let bl = makeBaseline(rows0, t)
+            let st = (rows) => isDraftStale({ keyTable: t, rows, baseline: bl })
+            //perm-run01: 基準改用共用核心(h1, 寫入契約): 名次入基準——他人重排被偵測(舊版〔排除 order〕不偵測); 系統重編號而名次不變、空值不同表示(null／'')、僅伺服器專有欄不同皆不算過期
             let CASES = [
                 ['整表一致', rows0, false],
                 ['他人改了一列內容', [rows0[0], rowWith(rows0[1], { description: 'by-other' }), rows0[2]], true],
                 ['他人刪了一列', [rows0[0], rows0[2]], true],
                 ['他人新增一列', [...rows0, mkRow(t, { id: 'rN', order: 4 })], true],
-                ['外部同步整批重寫但內容未變(order／四個伺服器管理欄皆變)', rows0.map((r, k) => rowWith(r, { order: 50 + k, userId: 'sync', timeCreate: 'T2', userIdUpdate: 'sync', timeUpdate: 'T2' })), false],
-                ['純列序重排(內容未變)', [...rows0].reverse().map((r, k) => rowWith(r, { order: k + 1 })), false],
+                ['外部同步整批重寫但內容未變(order 重編號而名次不變／四個伺服器管理欄皆變)', rows0.map((r, k) => rowWith(r, { order: 50 + k, userId: 'sync', timeCreate: 'T2', userIdUpdate: 'sync', timeUpdate: 'T2' })), false],
+                ['他人純列序重排(內容未變、名次改變; perm-run01 起視為過期, 修已知缺口 (e))', [...rows0].reverse().map((r, k) => rowWith(r, { order: k + 1 })), true],
+                ['系統重編號(order 值全變而名次不變)', rows0.map((r, k) => rowWith(r, { order: (k + 1) * 10 })), false],
+                ['空值不同表示(description null／缺欄／空字串; 修已知缺口 (d))', [rows0[0], rowWith(rows0[1], { description: null }), rowWith(rows0[2], { description: undefined })], false],
                 ['整表清空', [], true],
             ]
             for (let [title, rows, exp] of CASES) {
@@ -181,7 +184,8 @@ describe('unit-draftSync (清單頁草稿對推播之處置, R-PRINCIPLE-00 原�
 
             it(`DS-4a ${p.fn}: import draftSync; data 宣告 baseRows／staleNotice; created 建立 syncMark  [D5]`, function() {
                 cells.DS4++
-                assert.strict.ok(src.includes(`import { refsChanged, planDraftSync, isDraftStale } from '../js/draftSync.mjs'`))
+                assert.strict.ok(src.includes(`import { refsChanged, planDraftSync, isDraftStale, hasDraftNow } from '../js/draftSync.mjs'`), 'perm-run01: 增 hasDraftNow(儲存格編輯器開啟中視為有草稿)')
+                assert.strict.ok(src.includes(`import { applySavedRows } from '../js/applySaved.mjs'`) && src.includes(`import { isCellEditing, bindCellEditingStopRetry } from '../js/cellEditing.mjs'`))
                 assert.strict.ok(/\n {12}baseRows: \[\],/.test(src) && /\n {12}staleNotice: false,/.test(src) && /\n {12}syncTick: 0,/.test(src))
                 assert.strict.ok(/created: function\(\) \{[\s\S]*?this\.syncMark = \{ refs: null, editable: undefined, dirty: false, baseline: \[\], tick: 0 \}/.test(src))
             })
@@ -193,11 +197,12 @@ describe('unit-draftSync (清單頁草稿對推播之處置, R-PRINCIPLE-00 原�
                 assert.strict.ok(b.includes('first: vo.syncMark.refs === null || vo.syncMark.tick !== vo.syncTick,'), '[D7] 首次或重新載入(syncTick 遞增)皆視為 first')
                 assert.strict.ok(b.includes('editChanged: vo.syncMark.editable !== isEditable,'))
                 assert.strict.ok(b.includes(`storeChanged: refsChanged(vo.syncMark.refs, ${p.refs}),`))
-                assert.strict.ok(b.includes('hasDraft: () => vo.syncMark.dirty === true,'))
+                //perm-run01(第 115 項): 原 `hasDraft: () => vo.syncMark.dirty === true` 改為「未存修改鏡像, 或儲存格編輯器開啟中」(以 ag-grid getEditingCells 判定, 惰性求值)
+                assert.strict.ok(b.includes(`hasDraft: () => hasDraftNow({ dirty: vo.syncMark.dirty === true, editing: isCellEditing(get(vo, '$refs.rftable', null)) }),`))
                 assert.strict.ok(!/vo\.isModified/.test(b) && !/vo\.baseline\b/.test(b), 'changeParams 不得讀 vo.isModified／vo.baseline(否則成為響應式依賴)')
                 assert.strict.ok(b.includes(`if (act === 'rebuild') {`) && b.includes(p.rebuild))
                 let k = b.slice(b.indexOf(`else if (act === 'keep') {`))
-                assert.strict.ok(k.includes(`vo.staleNotice = isDraftStale({ keys: vo.$ds.${p.t}.keys, rows, baseline: vo.syncMark.baseline })`))
+                assert.strict.ok(k.includes(`vo.staleNotice = isDraftStale({ keyTable: '${p.t}', rows, baseline: vo.syncMark.baseline })`))
                 let keepBody = k.slice(0, k.indexOf('return'))
                 for (let bad of ['rebuildDraft', 'genOpt', 'vo.items', 'vo.baseline =', 'vo.opt', 'isModified']) {
                     assert.strict.ok(!keepBody.includes(bad), `keep 分支不得含 ${bad}`)
@@ -207,7 +212,7 @@ describe('unit-draftSync (清單頁草稿對推播之處置, R-PRINCIPLE-00 原�
             it(`DS-4c ${p.fn}: rebuildDraft 放棄未存編輯旗標與過期提示、記 baseRows 與 syncMark、基準與 items 同處由同一份列計算、genOpt 後 firstLoading=false  [D5]`, function() {
                 cells.DS4++
                 let b = methodBody(src, 'rebuildDraft')
-                assert.strict.ok(b.includes(`makeBaseline(`) && b.includes(`vo.$ds.${p.t}.keys)`))
+                assert.strict.ok(b.includes(`makeBaseline(`) && b.includes(`, '${p.t}')`), 'perm-run01: 基準依寫入契約(第 2 參為表名)')
                 assert.strict.ok(b.includes('vo.baseRows = rows'))
                 assert.strict.ok(b.includes('vo.isModified = false'))
                 assert.strict.ok(b.includes('vo.staleNotice = false'))
@@ -250,7 +255,7 @@ describe('unit-draftSync (清單頁草稿對推播之處置, R-PRINCIPLE-00 原�
             it(`DS-4g ${p.fn}: 存檔仍隨 RPC 送草稿載入時之基準(cloneDeep(vo.baseline)), 不因保留草稿而改送最新基準  [D1]`, function() {
                 cells.DS4++
                 assert.strict.ok(/let baseline = cloneDeep\(vo\.baseline\)/.test(src))
-                assert.strict.ok(new RegExp(`\\$fapi\\.update${p.t[0].toUpperCase()}${p.t.slice(1)}\\([^)]*\\{ baseline \\}\\)`).test(src))
+                assert.strict.ok(new RegExp(`\\$fapi\\.update${p.t[0].toUpperCase()}${p.t.slice(1)}\\([^)]*\\{ baseline, returnRows: true \\}\\)`).test(src), 'perm-run01: 存檔帶 returnRows:true 取回寫入後之列')
             })
 
             it(`DS-4l ${p.fn}: watch isModified 維護 syncMark.dirty 鏡像; 旗標歸零而 store 於保留草稿期間已變新者立即 reloadDraft(儲存成功之推播先於回應抵達之競爭); curRefs 與 changeParams 之 refs 同一組  [D4]`, function() {
@@ -275,11 +280,11 @@ describe('unit-draftSync (清單頁草稿對推播之處置, R-PRINCIPLE-00 原�
                 let api = `vo.$fapi.update${p.t[0].toUpperCase()}${p.t.slice(1)}(`
                 let iSet = sv.indexOf('vo.saveMark.saving = true')
                 let iApi = sv.indexOf(api)
-                let iThen = sv.indexOf('.then(() => {', iApi)
+                let iThen = sv.indexOf('.then((res) => {', iApi)
                 let iThenReset = sv.indexOf('vo.saveMark.saving = false', iThen)
                 let iCatch = sv.indexOf('.catch(async (err) => {', iApi)
                 let iCatchReset = sv.indexOf('vo.saveMark.saving = false', iCatch)
-                let iRecalc = sv.indexOf(`vo.staleNotice = isDraftStale({ keys: vo.$ds.${p.t}.keys, rows: vo.${p.t}, baseline: vo.syncMark.baseline })`, iCatch)
+                let iRecalc = sv.indexOf(`vo.staleNotice = isDraftStale({ keyTable: '${p.t}', rows: vo.${p.t}, baseline: vo.syncMark.baseline })`, iCatch)
                 let iFinally = sv.indexOf('.finally(() => {')
                 let iFinallyReset = sv.indexOf('vo.saveMark.saving = false', iFinally)
                 assert.strict.ok(iSet > 0 && iApi > iSet, 'saving 須於 API 呼叫之前設真')
@@ -313,22 +318,29 @@ describe('unit-draftSync (清單頁草稿對推播之處置, R-PRINCIPLE-00 原�
         }
 
         const DLGS = [
-            { fn: 'VeGrupBlngUsers', t: 'users', fmid: 'grup-blng-users-banner-stale' },
-            { fn: 'VePemiBlngGrups', t: 'grups', fmid: 'pemi-blng-grups-banner-stale' },
+            { fn: 'VeGrupBlngUsers', t: 'users', sub: 'grups', subVar: 'grup', fmid: 'grup-blng-users-banner-stale', langSubj: 'relSubjectChangedGrup' },
+            { fn: 'VePemiBlngGrups', t: 'grups', sub: 'pemis', subVar: 'pemi', fmid: 'pemi-blng-grups-banner-stale', langSubj: 'relSubjectChangedPemi' },
         ]
         for (let d of DLGS) {
             let src = readSrc(`src/components/${d.fn}.vue`)
 
-            it(`DS-4i ${d.fn}: watch ${d.t}(store 推播)於「開啟中、可編輯、有未存編輯」時以開框基準對推播後之${d.t}表判定並更新 staleNotice; 唯讀／未開框／無未存編輯不提示(照舊靜默); show() 歸零; 不重建草稿(show() 之外無 makeBaseline)  [D1][D6]`, function() {
+            it(`DS-4i ${d.fn}: watch ${d.t}／${d.sub}(store 推播)一律交 syncStore(); syncStore 以 planDialogSync 決定重建／保留／提示(無未存修改且表已異於基準 → rebuildDialog; 有未存修改或編輯器開啟 → 保留並提示; 自己存檔中 → 靜默); show() 歸零 staleNotice／subjectNotice; 基準只在 show() 與 rebuildDialog 計算  [D1][D6][perm-run01 (b)(c)]`, function() {
                 cells.DS4++
-                assert.strict.ok(src.includes(`import { isDraftStale } from '../js/draftSync.mjs'`))
-                let m = new RegExp(`watch: \\{[\\s\\S]*?\\n {8}${d.t}: function\\(rows\\) \\{([\\s\\S]*?)\\n {8}\\},\\n {4}\\},`).exec(src)
-                assert.strict.ok(m, '應有 watch.' + d.t)
-                assert.strict.ok(m[1].includes('!vo.bShow || !vo.isEditable || !vo.isModified || vo.ownSaving || !Array.isArray(vo.baseline)'))
-                assert.strict.ok(m[1].includes(`vo.staleNotice = isDraftStale({ keys: vo.$ds.${d.t}.keys, rows, baseline: vo.baseline })`))
-                assert.strict.ok(/\n {12}staleNotice: false,/.test(src), 'data 宣告 staleNotice')
-                assert.strict.ok(/vo\.isModified = false\n {12}vo\.staleNotice = false/.test(src), 'show() 歸零 staleNotice')
-                assert.strict.equal(src.split('makeBaseline(').length - 1, 1, '基準只在 show() 計算一次')
+                assert.strict.ok(src.includes(`import { isDraftStale, planDialogSync, checkSubject } from '../js/draftSync.mjs'`))
+                let m = new RegExp(`watch: \\{[\\s\\S]*?\\n {8}${d.t}: function\\(\\) \\{\\n {12}this\\.syncStore\\(\\)\\n {8}\\},\\n {8}${d.sub}: function\\(\\) \\{\\n {12}this\\.syncStore\\(\\)\\n {8}\\},\\n {4}\\},`).exec(src)
+                assert.strict.ok(m, `應有 watch.${d.t}／watch.${d.sub} 皆呼叫 syncStore()`)
+                let b = methodBody(src, 'syncStore')
+                assert.strict.ok(b.includes('if (!vo.bShow || !Array.isArray(vo.baseline)) {'))
+                assert.strict.ok(b.includes(`stale: isDraftStale({ keyTable: '${d.t}', rows: vo.${d.t}, baseline: vo.baseline }),`))
+                assert.strict.ok(b.includes('dirty: vo.isModified === true,') && b.includes(`editing: isCellEditing(get(vo, '$refs.rftable', null)),`) && b.includes('saving: vo.ownSaving === true,'))
+                assert.strict.ok(b.includes(`checkSubject({ subject: vo.subject, rows: vo.${d.sub} })`))
+                assert.strict.ok(/\n {12}staleNotice: false,/.test(src) && /\n {12}subjectNotice: false,/.test(src), 'data 宣告 staleNotice／subjectNotice')
+                assert.strict.ok(/vo\.isModified = false\n {12}vo\.staleNotice = false\n {12}vo\.subjectNotice = false/.test(src), 'show() 歸零 staleNotice／subjectNotice')
+                let codeOnly = src.split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n')
+                assert.strict.equal(codeOnly.split('makeBaseline(').length - 1, 2, '基準只在 show() 與 rebuildDialog 計算')
+                let rb = methodBody(src, 'rebuildDialog')
+                assert.strict.ok(rb.includes(`makeBaseline(`) && rb.includes('vo.$ui.markDataReload(vo)') && rb.includes('vo.genOpt()'), 'rebuildDialog 重建基準／items／opt, 並標記程式端重載(rowsChange 不視為使用者編輯)')
+                assert.strict.ok(src.includes('vo.firstLoading || vo.firstSetting || vo.systemProcing'), 'rowsChange 守門含 systemProcing')
             })
 
             it(`DS-4n ${d.fn}: 自己存檔所致之推播不提示——ownSaving 於 data 宣告、存檔 API 呼叫前設真、失敗(catch)歸零、show() 歸零  [D9]`, function() {
@@ -341,12 +353,12 @@ describe('unit-draftSync (清單頁草稿對推播之處置, R-PRINCIPLE-00 原�
                 let iReset = sv.indexOf('vo.ownSaving = false')
                 assert.strict.ok(iSet > 0 && iApi > iSet, 'ownSaving 須於 API 呼叫之前設真')
                 assert.strict.ok(iCatch > iApi && iReset > iCatch, '失敗(catch)須歸零')
-                assert.strict.ok(/vo\.staleNotice = false\n {12}vo\.ownSaving = false/.test(src), 'show() 歸零 ownSaving')
+                assert.strict.ok(/vo\.staleNotice = false\n {12}vo\.subjectNotice = false\n {12}vo\.ownSaving = false/.test(src), 'show() 歸零 ownSaving(perm-run01: 前面增 subjectNotice 歸零)')
             })
 
             it(`DS-4j ${d.fn}: 提示以 v-for 渲染(不用 v-if), data-fmid=${d.fmid}, 文字為 staleDraftNoticeDialog, 沿用橫幅色票(淡橘 #FFE0B2、文字 #444、邊線 #ddd)  [D6]`, function() {
                 cells.DS4++
-                assert.strict.ok(src.includes(`v-for="ks in (staleNotice ? 1 : 0)"`))
+                assert.strict.ok(src.includes(`v-for="ks in ((staleNotice || subjectNotice) ? 1 : 0)"`), 'perm-run01: 主體被刪除／改名／同名重建(subjectNotice)亦顯示同一提示')
                 let i = src.indexOf(`data-fmid="${d.fmid}"`)
                 assert.strict.ok(i > 0)
                 let seg = src.slice(i, i + 600)
@@ -368,53 +380,157 @@ describe('unit-draftSync (清單頁草稿對推播之處置, R-PRINCIPLE-00 原�
 
     })
 
-    describe('對話框 watcher 動態行為(DS-5, 取原始碼之 watcher 本體執行)', function() {
+    describe('對話框 syncStore 動態行為(DS-5, 取原始碼之 syncStore 本體執行)', function() {
 
+        //perm-run01: 原 watcher「有未存編輯才提示、無未存編輯照舊靜默」改為 syncStore——
+        //  無未存修改(含無開啟中之儲存格編輯器)而表已異於載入基準 → 重建(rebuildDialog, 修 (b)); 有未存修改或編輯器開啟 → 保留並提示(修 (c)); 自己存檔中 → 靜默; 主體被替換 → subjectNotice 且不重建(第 114 項)
         const DLGS = [
-            { fn: 'VeGrupBlngUsers', t: 'users' },
-            { fn: 'VePemiBlngGrups', t: 'grups' },
+            { fn: 'VeGrupBlngUsers', t: 'users', sub: 'grups', subLabel: '群組' },
+            { fn: 'VePemiBlngGrups', t: 'grups', sub: 'pemis', subLabel: '權限' },
         ]
+        let METHOD = (src, name) => {
+            let i0 = src.search(new RegExp(`^        ${name}: (async )?function`, 'm'))
+            let rest = src.slice(i0 + 10)
+            let m = rest.search(/^        [A-Za-z_$][\w$]*: (async )?function/m)
+            return rest.slice(0, m < 0 ? rest.length : m)
+        }
         for (let d of DLGS) {
             let src = readSrc(`src/components/${d.fn}.vue`)
-            let m = new RegExp(`watch: \\{[\\s\\S]*?\\n {8}${d.t}: function\\(rows\\) \\{([\\s\\S]*?)\\n {8}\\},\\n {4}\\},`).exec(src)
-            let watcher = m === null ? null : new Function('isDraftStale', `return function(rows) {${m[1]}\n}`)(isDraftStale)
-            let keys = KEYS[d.t]
-            let rows0 = [mkRow(d.t, { id: 'r1', order: 1 }), mkRow(d.t, { id: 'r2', order: 2 }), mkRow(d.t, { id: 'r3', order: 3 })]
-            let mk = (o = {}) => ({ bShow: true, isEditable: true, isModified: true, baseline: makeBaseline(rows0, keys), staleNotice: false, $ds: { [d.t]: { keys } }, ...o })
-            let run = (vo, rows) => {
-                watcher.call(vo, rows)
-                return vo.staleNotice
+            let body = METHOD(src, 'syncStore')
+            let get = (o, p, df) => {
+                let v = o
+                for (let k of p.split('.')) {
+                    v = (v !== null && v !== undefined) ? v[k] : undefined
+                }
+                return v === undefined ? df : v
             }
-            it(`DS-5 ${d.fn}: 取得 watcher 本體`, function() {
-                assert.strict.ok(watcher !== null, '找不到 watch.' + d.t)
+            let editingNow = false
+            let syncStore = new Function('get', 'isDraftStale', 'planDialogSync', 'checkSubject', 'isCellEditing', `return function() {${body.slice(body.indexOf('{') + 1, body.lastIndexOf('}'))}\n}`)(get, isDraftStale, planDialogSync, checkSubject, () => editingNow)
+            let rows0 = [mkRow(d.t, { id: 'r1', order: 1, description: '' }), mkRow(d.t, { id: 'r2', order: 2, description: '' }), mkRow(d.t, { id: 'r3', order: 3, description: '' })]
+            let subRows = [mkRow(d.sub, { id: 's1', name: 'S1', order: 1 })]
+            let mk = (o = {}) => {
+                let vo = { bShow: true, isEditable: true, isModified: false, ownSaving: false, baseline: makeBaseline(rows0, d.t), staleNotice: false, subjectNotice: false, subject: { id: 's1', name: 'S1', saved: true }, rebuilt: 0, [d.t]: rows0, [d.sub]: subRows, $refs: {}, ...o }
+                vo.rebuildDialog = () => {
+                    vo.rebuilt++
+                }
+                return vo
+            }
+            let other = [rows0[0], rowWith(rows0[1], { description: 'by-other' }), rows0[2]]
+            it(`DS-5 ${d.fn}: 取得 syncStore 本體`, function() {
+                assert.strict.ok(body.includes('planDialogSync('), '找不到 syncStore')
             })
             let CASES = [
-                ['他人改了一列內容', [rows0[0], rowWith(rows0[1], { description: 'by-other' }), rows0[2]], true],
-                ['他人刪了一列', [rows0[0], rows0[2]], true],
-                ['他人新增一列', [...rows0, mkRow(d.t, { id: 'rN', order: 4 })], true],
-                ['整表清空(外審 sol 第 7 點: 空表分支不得略過)', [], true],
-                ['外部同步整批重寫但內容未變(order／伺服器管理欄皆變)', rows0.map((r, k) => rowWith(r, { order: 50 + k, userId: 'sync', timeCreate: 'T2', userIdUpdate: 'sync', timeUpdate: 'T2' })), false],
-                ['純列序重排(內容未變)', [...rows0].reverse().map((r, k) => rowWith(r, { order: k + 1 })), false],
+                //[標題, vo 覆寫, 編輯器開啟, 推播後之 ${d.t} 表, 預期 { rebuilt, staleNotice, subjectNotice }]
+                ['無未存修改、表已異於基準(他人改一列) → 重建, 不提示', {}, false, other, { rebuilt: 1, staleNotice: false, subjectNotice: false }],
+                ['無未存修改、他人刪一列 → 重建', {}, false, [rows0[0], rows0[2]], { rebuilt: 1, staleNotice: false, subjectNotice: false }],
+                ['無未存修改、他人新增一列 → 重建', {}, false, [...rows0, mkRow(d.t, { id: 'rN', order: 4 })], { rebuilt: 1, staleNotice: false, subjectNotice: false }],
+                ['無未存修改、整表清空 → 重建(空表分支不得略過)', {}, false, [], { rebuilt: 1, staleNotice: false, subjectNotice: false }],
+                ['無未存修改、他人只重排(名次改變) → 重建(perm-run01: 名次入基準)', {}, false, [...rows0].reverse().map((r, k) => rowWith(r, { order: k + 1 })), { rebuilt: 1, staleNotice: false, subjectNotice: false }],
+                ['無未存修改、表未異於基準(外部同步整批重寫而內容未變) → 不重建', {}, false, rows0.map((r, k) => rowWith(r, { order: 50 + k, userId: 'sync', timeUpdate: 'T2' })), { rebuilt: 0, staleNotice: false, subjectNotice: false }],
+                ['有未存修改、表已異於基準 → 保留並提示, 不重建', { isModified: true }, false, other, { rebuilt: 0, staleNotice: true, subjectNotice: false }],
+                ['有未存修改、表未異於基準 → 不重建不提示', { isModified: true }, false, rows0, { rebuilt: 0, staleNotice: false, subjectNotice: false }],
+                ['儲存格編輯器開啟中(未提交)、表已異於基準 → 視為有草稿: 保留並提示, 不重建(第 115 項)', {}, true, other, { rebuilt: 0, staleNotice: true, subjectNotice: false }],
+                ['自己存檔中、表已異於基準 → 靜默(不是他人更新), 不重建', { ownSaving: true }, false, other, { rebuilt: 0, staleNotice: false, subjectNotice: false }],
+                ['自己存檔中且有未存修改 → 靜默', { ownSaving: true, isModified: true }, false, other, { rebuilt: 0, staleNotice: false, subjectNotice: false }],
+                ['未開框 → 不處置', { bShow: false }, false, other, { rebuilt: 0, staleNotice: false, subjectNotice: false }],
+                ['基準非陣列 → 不處置', { baseline: null }, false, other, { rebuilt: 0, staleNotice: false, subjectNotice: false }],
+                [`唯讀檢視(無存檔)、表已異於基準 → 重建(無草稿可言)`, { isEditable: false }, false, other, { rebuilt: 1, staleNotice: false, subjectNotice: false }],
             ]
-            for (let [title, rows, exp] of CASES) {
-                it(`DS-5 ${d.fn}: 開啟中、可編輯、有未存編輯: ${title} → ${exp ? '提示' : '不提示'}  [D1]`, function() {
+            for (let [title, o, editing, rows, exp] of CASES) {
+                it(`DS-5 ${d.fn}: ${title}  [D1][perm-run01 (b)(c)]`, function() {
                     cells.DS5++
-                    assert.strict.equal(run(mk(), rows), exp)
+                    editingNow = editing
+                    let vo = mk({ ...o, [d.t]: rows })
+                    syncStore.call(vo)
+                    assert.strict.deepEqual({ rebuilt: vo.rebuilt, staleNotice: vo.staleNotice, subjectNotice: vo.subjectNotice }, exp)
                 })
             }
-            let GUARDS = [
-                ['未開框', { bShow: false }],
-                ['唯讀檢視', { isEditable: false }],
-                ['無未存編輯(照舊靜默, 存檔時由伺服端拒收)', { isModified: false }],
-                ['自己存檔中(自己之寫入所致之推播不是他人更新)', { ownSaving: true }],
-                ['基準非陣列', { baseline: null }],
+            //第 114 項: 主體(${d.subLabel})被刪除、改名、刪除後以同名重建 → subjectNotice, 且不重建(無從續編)
+            let SUBJ = [
+                [`${d.subLabel}被刪除`, [], 'gone'],
+                [`${d.subLabel}被改名`, [mkRow(d.sub, { id: 's1', name: 'S1-renamed', order: 1 })], 'renamed'],
+                [`${d.subLabel}被刪除後以同名重建(id 不同)`, [mkRow(d.sub, { id: 's2', name: 'S1', order: 1 })], 'gone'],
+                [`${d.subLabel}原封不動(其他欄位改了)`, [mkRow(d.sub, { id: 's1', name: 'S1', order: 1, description: 'changed' })], 'ok'],
             ]
-            for (let [title, o] of GUARDS) {
-                it(`DS-5 ${d.fn}: 守門 ${title} → 他人改了一列也不提示  [D1]`, function() {
+            for (let [title, subRowsNow, kind] of SUBJ) {
+                it(`DS-5s ${d.fn}: ${title} → 主體比對 ${kind}; 表已異於基準時${kind === 'ok' ? '重建' : '不重建、顯示提示'}  [第 114 項]`, function() {
                     cells.DS5++
-                    assert.strict.equal(run(mk(o), [rows0[0], rowWith(rows0[1], { description: 'by-other' }), rows0[2]]), false)
+                    editingNow = false
+                    let vo = mk({ [d.t]: other, [d.sub]: subRowsNow })
+                    syncStore.call(vo)
+                    assert.strict.equal(vo.subjectNotice, kind !== 'ok')
+                    assert.strict.equal(vo.rebuilt, kind === 'ok' ? 1 : 0)
                 })
             }
+        }
+
+    })
+
+    describe('hasDraftNow／planDialogSync／checkSubject 純函數(DS-6／DS-7)', function() {
+
+        it('DS-6a hasDraftNow: dirty 或 editing 任一為真(嚴格 true)才算有草稿  [perm-run01 (c)]', function() {
+            cells.DS6 += 6
+            assert.strict.equal(hasDraftNow({ dirty: false, editing: false }), false)
+            assert.strict.equal(hasDraftNow({ dirty: true, editing: false }), true)
+            assert.strict.equal(hasDraftNow({ dirty: false, editing: true }), true)
+            assert.strict.equal(hasDraftNow({ dirty: true, editing: true }), true)
+            assert.strict.equal(hasDraftNow({ dirty: 1, editing: 'yes' }), false, '非布林真值不算')
+            assert.strict.equal(hasDraftNow({}), false)
+        })
+
+        //決策表(獨立於實作): 未顯示或 store 未變 → none; 自己存檔中 → keepQuiet; 表未異於基準 → none; 否則有草稿(dirty 或 editing) → keep, 無 → rebuild
+        let oracle = (show, storeChanged, stale, dirty, editing, saving) => {
+            if (!show || !storeChanged) {
+                return 'none'
+            }
+            if (saving) {
+                return 'keepQuiet'
+            }
+            if (!stale) {
+                return 'none'
+            }
+            return (dirty || editing) ? 'keep' : 'rebuild'
+        }
+        for (let show of [false, true]) {
+            for (let storeChanged of [false, true]) {
+                for (let stale of [false, true]) {
+                    for (let dirty of [false, true]) {
+                        for (let editing of [false, true]) {
+                            for (let saving of [false, true]) {
+                                it(`DS-6 planDialogSync show=${show} storeChanged=${storeChanged} stale=${stale} dirty=${dirty} editing=${editing} saving=${saving} → ${oracle(show, storeChanged, stale, dirty, editing, saving)}  [perm-run01 (b)(c)]`, function() {
+                                    cells.DS6++
+                                    assert.strict.equal(planDialogSync({ show, storeChanged, stale, dirty, editing, saving }), oracle(show, storeChanged, stale, dirty, editing, saving))
+                                })
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let S = (o = {}) => ({ id: 's1', name: 'S1', saved: true, ...o })
+        const SUBJ_CASES = [
+            ['原封不動', S(), [{ id: 's1', name: 'S1' }], 'ok'],
+            ['同 id 其他欄位改了', S(), [{ id: 's1', name: 'S1', description: 'x' }], 'ok'],
+            ['已儲存之主體被刪除', S(), [{ id: 's9', name: 'Z' }], 'gone'],
+            ['已儲存之主體被刪除後以同名重建(id 不同)', S(), [{ id: 's2', name: 'S1' }], 'gone'],
+            ['同 id 被改名', S(), [{ id: 's1', name: 'S1b' }], 'renamed'],
+            ['表清空', S(), [], 'gone'],
+            ['主體表非陣列', S(), null, 'gone'],
+            ['開框時未儲存之主體(store 無此 id), 現仍無同名實體 → 沿用既有行為', S({ saved: false }), [{ id: 's9', name: 'Z' }], 'ok'],
+            ['開框時未儲存之主體, 現出現同名而 id 不同之另一實體 → 引用會被接管而拒收', S({ saved: false }), [{ id: 's2', name: 'S1' }], 'taken'],
+            ['開框時未儲存之主體, 其後被儲存(同 id 同名出現)', S({ saved: false }), [{ id: 's1', name: 'S1' }], 'ok'],
+            ['摘要缺 id', { name: 'S1', saved: true }, [{ id: 's1', name: 'S1' }], 'noSubject'],
+            ['摘要 id 為空字串', S({ id: '' }), [{ id: '', name: 'S1' }], 'noSubject'],
+            ['摘要缺名稱', { id: 's1', saved: true }, [{ id: 's1', name: 'S1' }], 'noSubject'],
+            ['摘要為 null', null, [{ id: 's1', name: 'S1' }], 'noSubject'],
+            ['摘要為字串', 's1', [{ id: 's1', name: 'S1' }], 'noSubject'],
+        ]
+        for (let [title, subject, rows, exp] of SUBJ_CASES) {
+            it(`DS-7 checkSubject: ${title} → ${exp}  [第 114 項]`, function() {
+                cells.DS7++
+                assert.strict.equal(checkSubject({ subject, rows }), exp)
+            })
         }
 
     })
@@ -425,7 +541,7 @@ describe('unit-draftSync (清單頁草稿對推播之處置, R-PRINCIPLE-00 原�
             if (process.argv.some((a) => a === '--grep' || a === '-g' || a.startsWith('--grep='))) {
                 this.skip()
             }
-            assert.strict.deepEqual(cells, { DS1: 5, DS2: 32 + 3 + 3 + 3, DS3: 28, DS4: 4 * 10 + 3 + 2 * 3 + 1, DS5: 2 * (6 + 5) })
+            assert.strict.deepEqual(cells, { DS1: 5, DS2: 32 + 3 + 3 + 3, DS3: 4 * 9, DS4: 4 * 10 + 3 + 2 * 3 + 1, DS5: 2 * (14 + 4), DS6: 6 + 64, DS7: 15 })
         })
 
     })

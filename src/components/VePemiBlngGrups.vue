@@ -128,7 +128,7 @@
 
                     <!-- 資料已被更新提示(R-PRINCIPLE-00 原則 7): 開框後他人或外部同步改了群組表, 本視窗之草稿與基準維持開框時之版本、不重建, 存檔將被伺服端拒收; 以 v-for 渲染(無提示時不渲染任何節點) -->
                     <div
-                        v-for="ks in (staleNotice ? 1 : 0)"
+                        v-for="ks in ((staleNotice || subjectNotice) ? 1 : 0)"
                         :key="`stale-${ks}`"
                         data-fmid="pemi-blng-grups-banner-stale"
                         style="padding:5px 15px; border-top:1px solid #ddd; background:#FFE0B2; color:#444; font-size:0.8rem; overflow-wrap:anywhere;"
@@ -221,7 +221,9 @@ import getKpLossy from '../js/getKpLossy.mjs'
 import fmtLossyMsg from '../js/fmtLossyMsg.mjs'
 import pairRowsToSnapshot from '../js/pairRowsToSnapshot.mjs'
 import { makeBaseline } from '../js/rowDigest.mjs'
-import { isDraftStale } from '../js/draftSync.mjs'
+import { isDraftStale, planDialogSync, checkSubject } from '../js/draftSync.mjs'
+import { applySavedRows } from '../js/applySaved.mjs'
+import { isCellEditing, bindCellEditingStopRetry } from '../js/cellEditing.mjs'
 import { makeRowStates, getChangedIdx, buildRowsSend } from '../js/relDialogSend.mjs'
 import { getRefState, getRawModeMap, putRefEntry } from '../js/editorRefRows.mjs'
 import { getRefWarns, getRefWarnText } from '../js/getAuthWarn.mjs'
@@ -272,7 +274,10 @@ export default {
             //baseline 為草稿所依據之那份群組列之逐列內容指紋, 存檔隨 updateGrups 第 2 參送伺服端; rowStates 為開框時各列之歸屬狀態, 存檔時判定使用者有無變更該列
             baseline: null,
             rowStates: null,
-            staleNotice: false, //有未存編輯時收到推播、且群組表已異於本視窗載入時之基準(R-PRINCIPLE-00 原則 7): true 時顯示「資料已被更新」提示; 每次 show() 歸零
+            staleNotice: false, //有未存編輯(含開啟中之儲存格編輯器)時收到推播、且群組表已異於本視窗載入時之基準(R-PRINCIPLE-00 原則 7、10): true 時顯示「資料已被更新」提示; 每次 show() 歸零
+            subject: null, //開框時之主體摘要 { id, name, saved }(第 114 項, R-SUBJECT-ID-01): 本對話框以**名稱**引用權限(群組 cpemis 的鍵是權限名稱), 存檔時以 id 驗主體仍是同一個實體(未被刪除、改名、刪除後以同名重建)
+            subjectNotice: false, //主體(權限)於開框後已被刪除、改名或以同名重建(id 不同): true 時顯示「資料已被更新」提示, 存檔將被拒收; 每次 show() 歸零
+            systemProcing: false, //程式端重建對話框內容期間為 true, 用於排除非使用者操作之 rowsChange (見 $ui.markDataReload; 開框中因推播重建時須用)
 
             items: [],
             itemsCheck: [],
@@ -304,14 +309,12 @@ export default {
 
     },
     watch: {
-        //store 之群組表被推播更新(整表以新陣列取代): 本視窗不重建(草稿與基準維持開框時之版本, 見 show()). 此刻有未存編輯者, 若表已異於載入時之基準(任一列內容不同或列增刪; 僅 order／伺服器管理欄不同不算)
-        //即顯示「資料已被更新」提示, 存檔時由伺服端以表雜湊拒收(saveStale); 無未存編輯者維持原行為(靜默, 存檔時才由伺服端拒收). 唯讀檢視無存檔, 不提示
-        grups: function(rows) {
-            let vo = this
-            if (!vo.bShow || !vo.isEditable || !vo.isModified || vo.ownSaving || !Array.isArray(vo.baseline)) {
-                return
-            }
-            vo.staleNotice = isDraftStale({ keys: vo.$ds.grups.keys, rows, baseline: vo.baseline })
+        //store 之群組表或權限(主體)表被推播更新(整表以新陣列取代): 處置見 syncStore
+        grups: function() {
+            this.syncStore()
+        },
+        pemis: function() {
+            this.syncStore()
         },
     },
     computed: {
@@ -505,7 +508,7 @@ export default {
                         // console.log('rowsChange cloneDeep(vo.opt.rows)', cloneDeep(vo.opt.rows))
 
                         //check
-                        if (!vo.syncState || vo.firstLoading || vo.firstSetting) {
+                        if (!vo.syncState || vo.firstLoading || vo.firstSetting || vo.systemProcing) {
                             return
                         }
 
@@ -1034,17 +1037,92 @@ export default {
 
         },
 
+        syncStore: function() {
+            //store 之群組表或權限(主體)表被推播更新(整表以新陣列取代)時的處置(R-PRINCIPLE-00 原則 10; 規則帳本 R-DRAFT-KEEP-01 規則 11、12; draftSync.planDialogSync):
+            //  ① 無未存修改(含無開啟中之儲存格編輯器)而群組表已異於載入基準 → 以新資料重建對話框內容並更新基準(對話框開而未編輯時不停在過期資料上; 修 (b));
+            //  ② 有未存修改或開啟中之編輯器 → 保留草稿、凍結基準, 顯示「資料已被更新」提示, 存檔時由伺服端拒收(saveStale);
+            //  ③ 自己存檔進行中所致之推播不是他人更新 → 不重建、不提示;
+            //  ④ 主體(權限)已被刪除、改名或以同名重建(第 114 項) → 不重建(無從續編), 顯示同一提示, 存檔時前端與之比對 id 拒收.
+            let vo = this
+            if (!vo.bShow || !Array.isArray(vo.baseline)) {
+                return
+            }
+            let sc = checkSubject({ subject: vo.subject, rows: vo.pemis })
+            vo.subjectNotice = sc !== 'ok'
+            let act = planDialogSync({
+                show: true,
+                storeChanged: true,
+                stale: isDraftStale({ keyTable: 'grups', rows: vo.grups, baseline: vo.baseline }),
+                dirty: vo.isModified === true,
+                editing: isCellEditing(get(vo, '$refs.rftable', null)),
+                saving: vo.ownSaving === true,
+            })
+            if (act === 'rebuild') {
+                if (sc === 'ok') {
+                    vo.rebuildDialog()
+                }
+            }
+            else if (act === 'keep') {
+                vo.staleNotice = true
+            }
+        },
+
+        rebuildDialog: function() {
+            //開框中以目前 store 重建對話框內容與基準(無未存修改時; 同 show() 之內容組裝, 不動 pm／bShow／isEditable／subject)
+            let vo = this
+            let p = vo.pemis.find((r) => r.id === get(vo, 'subject.id', ''))
+            let pemi = { ...vo.pemi, ...cloneDeep(p) }
+            let grups = cloneDeep(vo.grups)
+            let baseline = makeBaseline(grups, 'grups')
+            let items = vo.genItems(pemi, grups)
+            let rowStates = makeRowStates(items)
+
+            //markDataReload: 重建 opt 屬程式端寫入, 其後非同步觸發之 rowsChange 不得視為使用者變更
+            vo.$ui.markDataReload(vo)
+
+            vo.pemi = pemi
+            vo.items = items
+            vo.baseline = baseline
+            vo.rowStates = rowStates
+            vo.isModified = false
+            vo.staleNotice = false
+            vo.genOpt()
+            vo.$nextTick(() => {
+                vo.bindEditing()
+            })
+        },
+
+        bindEditing: function() {
+            //第 115 項(R-DRAFT-KEEP-01 規則 10): 儲存格編輯器開啟中視為有草稿(syncStore 以 ag-grid 的 getEditingCells 判定); 編輯結束(提交、Esc、失焦)時補做保留期間跳過之重建
+            let vo = this
+            bindCellEditingStopRetry(() => get(vo, '$refs.rftable', null), () => {
+                vo.afterEditing()
+            })
+        },
+
+        afterEditing: function() {
+            //儲存格編輯結束: 無未存修改而表於編輯期間已變新者, 補上一次同步處置(重建); 有未存修改者維持保留
+            let vo = this
+            if (vo.isModified !== true) {
+                vo.syncStore()
+            }
+        },
+
         saveGrups: async function(rows, baseline) {
             // console.log('method saveGrups', rows, baseline)
 
             let vo = this
 
             //3) updateGrups, 各自 catch + okX 旗標短路 (canonical 五段結構; 空清單檢查已上移至 doSave core())
-            //第 2 參 { baseline }: 開框時綁定之草稿基準(由 doSave 於流程開頭取得並傳入, 不於此讀 vo.baseline——存檔進行中若再次 show() 會換成新草稿之基準); 伺服端比對「本次將寫入之列」之庫內版本, 草稿之後被改過即整次拒收 saveStale(失敗路徑沿用下方 catch 顯示語系文字)
+            //第 2 參 { baseline, returnRows }: baseline 為開框時綁定之草稿基準(由 doSave 於流程開頭取得並傳入, 不於此讀 vo.baseline——存檔進行中若再次 show() 會換成新草稿之基準); 伺服端比對「本次將寫入之列」之庫內版本, 草稿之後被改過即整次拒收 saveStale(失敗路徑沿用下方 catch 顯示語系文字);
+            //returnRows: 成功時回傳寫入後之列(鎖內新鮮讀取), 立即 commit 進 store(規格第 8 節; R-SAVED-ROWS-01), 其後再開此視窗時基準即為最新, 不會被自己上一次之存檔誤擋
             let okSave = false
             vo.ownSaving = true //自己之寫入所致之推播不提示(成功路徑維持至視窗關閉; show() 歸零)
-            await vo.$fapi.updateGrups(rows, { baseline })
-                .then(() => { okSave = true })
+            await vo.$fapi.updateGrups(rows, { baseline, returnRows: true })
+                .then((res) => {
+                    okSave = true
+                    applySavedRows('grups', res, (t, rs) => vo.$store.commit(vo.$store.types.UpdateTableData, { tableName: t, data: rs, source: 'savedRows' }))
+                })
                 .catch(async (err) => {
                     vo.ownSaving = false //失敗(含 saveStale 被拒): 視窗仍開著, 恢復監看
                     vo.$ui.updateLoading(false) //showCheckYes 前關 loading（modal 阻斷期間避免 loading 疊在底下）
@@ -1111,6 +1189,20 @@ export default {
                 //pemiName: 被編輯之權限名稱, 同樣於流程開頭(任何 await 之前)取得——等待後才讀 vo.pemi.name 會讀到新開啟之實體, 把舊草稿之歸屬寫成指派新實體(外審 sol R2)
                 let pemiName = get(vo, 'pemi.name', '')
 
+                //subject: 開框時之主體摘要 { id, name, saved }, 同樣於流程開頭取得並持有. isSubjectOk: 主體(權限)於存檔當下仍是開框時那一個實體(第 114 項, R-SUBJECT-ID-01; 原則 3、6):
+                //本對話框以名稱引用權限(群組 cpemis 的鍵是權限名稱)而不驗主體身分——開框後權限被刪除、改名, 或刪除後以同名重建(id 不同), 引用會靜默指向新實體(被同名新資料接管); 故以 id 比對存檔當下之權限表, 不符即整次拒存(零寫入)並提示重新載入
+                let subject = vo.subject
+                let isSubjectOk = () => checkSubject({ subject, rows: vo.pemis }) === 'ok'
+                let rejectSubject = async () => {
+                    vo.$ui.updateLoading(false)
+                    await vo.$dg.showCheckYes(vo.$t('relSubjectChangedPemi').split('{name}').join(get(subject, 'name', '')))
+                    return false
+                }
+                if (!isSubjectOk()) {
+                    unlockBtn()
+                    return await rejectSubject()
+                }
+
                 //1b) 無法無損表示之授權資料(R-AUTH-LOSSY-01, 主控複審 R4): 該列群組之 cpemis 含物件形式無法無損表示之格(getKpLossy)者, 本對話框不得改寫其字串——
                 //本對話框所管之歸屬／模式有變更 → 整次儲存拒絕並點名(原子, 其餘列亦不寫); 未變更 → 該列字串逐字元不動(見下方 kpLossyIdx)
                 //群組列之快照只取這一次: 有損檢查之值即下方寫入之值(外審 sol#2: 兩次讀取之間 store 可能被伺服器推送更新, 檢查與寫入看到不同資料)
@@ -1169,6 +1261,11 @@ export default {
 
                 //delay
                 await delay(300)
+
+                //主體身分複驗(第 114 項): 開 loading 與等待期間 store 可能再被推播更新, 送出前再比對一次
+                if (!isSubjectOk()) {
+                    return await rejectSubject()
+                }
 
                 //grups: 沿用 1b 之快照(見上)
 
@@ -1288,6 +1385,7 @@ export default {
             //default
             vo.isModified = false
             vo.staleNotice = false
+            vo.subjectNotice = false
             vo.ownSaving = false
 
             //isEditable, pemi
@@ -1297,12 +1395,15 @@ export default {
             //grup
             pemi = cloneDeep(pemi)
 
+            //subject: 開框時之主體摘要(第 114 項): 存檔時以 id 驗主體仍是同一個實體
+            let subject = { id: get(pemi, 'id', ''), name: get(pemi, 'name', ''), saved: vo.pemis.some((r) => r.id === get(pemi, 'id', '')) }
+
             //grups
             let grups = cloneDeep(vo.grups)
 
-            //baseline(F-26, R-BASELINE-01; 外審 B.1): 於生成 items 之同一處, 以 items 所依據之那份群組列(grups)計算並綁定為本次草稿之載入基準; 之後 store 推播變新不得更新它
-            //(存檔當下才由最新 store 取基準, 證明的是「store 新」而非「待存之編輯內容新」), 每次 show() 重新綁定. 欄位口徑與伺服端同一(vo.$ds.grups.keys 經 rowDigest.makeBaseline)
-            let baseline = makeBaseline(grups, vo.$ds.grups.keys)
+            //baseline(F-26, R-BASELINE-01; 外審 B.1): 於生成 items 之同一處, 以 items 所依據之那份群組列(grups)計算並綁定為本次草稿之載入基準; 之後 store 推播變新不得更新它,
+            //除非無未存修改時 syncStore 整個重建(存檔當下才由最新 store 取基準, 證明的是「store 新」而非「待存之編輯內容新」), 每次 show() 重新綁定. 摘要口徑與伺服端同一(寫入契約 grups, 經 rowDigest.makeBaseline／w-serv-orm buildBaseline)
+            let baseline = makeBaseline(grups, 'grups')
 
             //items
             let items = vo.genItems(pemi, grups)
@@ -1313,6 +1414,7 @@ export default {
             //save
             vo.isEditable = isEditable
             vo.pemi = pemi
+            vo.subject = subject
             vo.items = items
             vo.baseline = baseline
             vo.rowStates = rowStates
@@ -1322,6 +1424,11 @@ export default {
 
             //firstLoading
             vo.firstLoading = false
+
+            //第 115 項: 對話框內之 ag-grid 綁「儲存格編輯結束」監聽
+            vo.$nextTick(() => {
+                vo.bindEditing()
+            })
 
             //bShow
             vo.bShow = true

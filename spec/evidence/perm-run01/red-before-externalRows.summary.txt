@@ -1,0 +1,73 @@
+[quiet-run] exit=16 time=0s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261023-141759-red-ext.log (943 行, 75 KB)
+[quiet-run] cmd: node node_modules/mocha/bin/mocha.js --no-parallel test/unit-externalRows.test.mjs --timeout 120000 --exit
+== 統計 ==
+  562 passing (56ms)
+  16 failing
+== 失敗段落(前 35 行) ==
+  1) unit-externalRows (外部列受保護純函數, F-23, R-EXT-OWN-01)
+       dropServerOnlyDiff(EX-S4)
+         EX-044b 空值等價(外審 sol#2): 外部列 description 於庫內與送入之間 null／""／缺欄任意互換(雙向)+ 伺服器欄不同 → 皆移入 same(不重寫, 庫內原表示不被改成 ""):
+      AssertionError [ERR_ASSERTION]: 庫內 "" → 送入 null 應視為無內容變更
++ actual - expected
++ [
++   {
++     cpemis: 'v-cpemis',
++     description: null,
++     from: 'pd',
++     id: 'e1',
++     name: 'v-name',
++     order: 1,
++     timeCreate: 'v-timeCreate',
++     timeUpdate: 'newer',
++     userId: 'v-userId',
++     userIdUpdate: 'v-userIdUpdate'
++   }
++ ]
+- []
+      + expected - actual
+      -[
+      -  {
+      -    "cpemis": "v-cpemis"
+      -    "description": [null]
+      -    "from": "pd"
+      -    "id": "e1"
+      -    "name": "v-name"
+      -    "order": 1
+      -    "timeCreate": "v-timeCreate"
+      -    "timeUpdate": "newer"
+      -    "userId": "v-userId"
+      -    "userIdUpdate": "v-userIdUpdate"
+      -  }
+      -]
+== 錯誤行(去重,至多 15) ==
+  AssertionError [ERR_ASSERTION]: 庫內缺欄者不補、客戶端偽造值不採用(該欄不存在)
+  AssertionError [ERR_ASSERTION]: userId 不採用客戶端值
+  AssertionError [ERR_ASSERTION]: users/庫內 "" → 送入 null(空值等價, 視為同一): 應通過(null), 實得 {"key":"saveExternalRowChanged","reason":"fieldChanged","k":0,"n":1,"froms":["pd"]}
+  AssertionError [ERR_ASSERTION]: users/庫內 null → 送入 ""(空值等價, 視為同一): 應通過(null), 實得 {"key":"saveExternalRowChanged","reason":"fieldChanged","k":0,"n":1,"froms":["pd"]}
+  AssertionError [ERR_ASSERTION]: users/庫內 null → 送入缺欄(空值等價, 視為同一): 應通過(null), 實得 {"key":"saveExternalRowChanged","reason":"fieldChanged","k":0,"n":1,"froms":["pd"]}
+  AssertionError [ERR_ASSERTION]: grups/庫內 "" → 送入 null(空值等價, 視為同一): 應通過(null), 實得 {"key":"saveExternalRowChanged","reason":"fieldChanged","k":0,"n":1,"froms":["pd"]}
+  AssertionError [ERR_ASSERTION]: grups/庫內 null → 送入 ""(空值等價, 視為同一): 應通過(null), 實得 {"key":"saveExternalRowChanged","reason":"fieldChanged","k":0,"n":1,"froms":["pd"]}
+  AssertionError [ERR_ASSERTION]: grups/庫內 null → 送入缺欄(空值等價, 視為同一): 應通過(null), 實得 {"key":"saveExternalRowChanged","reason":"fieldChanged","k":0,"n":1,"froms":["pd"]}
+  AssertionError [ERR_ASSERTION]: pemis/庫內 "" → 送入 null(空值等價, 視為同一): 應通過(null), 實得 {"key":"saveExternalRowChanged","reason":"fieldChanged","k":0,"n":1,"froms":["pd"]}
+  AssertionError [ERR_ASSERTION]: pemis/庫內 null → 送入 ""(空值等價, 視為同一): 應通過(null), 實得 {"key":"saveExternalRowChanged","reason":"fieldChanged","k":0,"n":1,"froms":["pd"]}
+  AssertionError [ERR_ASSERTION]: pemis/庫內 null → 送入缺欄(空值等價, 視為同一): 應通過(null), 實得 {"key":"saveExternalRowChanged","reason":"fieldChanged","k":0,"n":1,"froms":["pd"]}
+  AssertionError [ERR_ASSERTION]: targets/庫內 "" → 送入 null(空值等價, 視為同一): 應通過(null), 實得 {"key":"saveExternalRowChanged","reason":"fieldChanged","k":0,"n":1,"froms":["pd"]}
+  AssertionError [ERR_ASSERTION]: targets/庫內 null → 送入 ""(空值等價, 視為同一): 應通過(null), 實得 {"key":"saveExternalRowChanged","reason":"fieldChanged","k":0,"n":1,"froms":["pd"]}
+  AssertionError [ERR_ASSERTION]: targets/庫內 null → 送入缺欄(空值等價, 視為同一): 應通過(null), 實得 {"key":"saveExternalRowChanged","reason":"fieldChanged","k":0,"n":1,"froms":["pd"]}
+== 最後 15 行(非空,不含上列失敗段落) ==
+     AssertionError [ERR_ASSERTION]: targets/庫內 null → 送入缺欄(空值等價, 視為同一): 應通過(null), 實得 {"key":"saveExternalRowChanged","reason":"fieldChanged","k":0,"n":1,"froms":["pd"]}
++ actual - expected
++ {
++   froms: [
++     'pd'
++   ],
++   k: 0,
++   key: 'saveExternalRowChanged',
++   n: 1,
++   reason: 'fieldChanged'
++ }
+- null
+      at assertCell (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/unit-externalRows.test.mjs:62:23)
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/unit-externalRows.test.mjs:706:21)
+      at process.processImmediate (node:internal/timers:574:21)
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)

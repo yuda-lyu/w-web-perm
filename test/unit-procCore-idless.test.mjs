@@ -1,6 +1,6 @@
 //後台整表寫入「缺 id 之列(API 直打, 視為新增)」之單元測試(run07 外審 sol R5; 規則帳本 R-NAME-UNIQ-02／ADR-034 缺 id 視為新增、不靜默忽略; R-PRINCIPLE-00 原則 3、5; run07 U1c)
 //
-//受測: server/procCore.mjs 之 updateUsers／updatePemis／updateGrups／updateTargets(kpFunExt 之實際入口, 內走 updateTabItems; 真 proc、真 procOrm〔w-serv-orm getMapOrm→getProc〕、真 kmx、真 lockSave),
+//受測: server/procCore.mjs 之 updateUsers／updatePemis／updateGrups／updateTargets(kpFunExt 之實際入口, 內走 updateTabItems; 真 proc、真 procOrm／withTabLocks／guardWrite〔w-serv-orm 實例, 測試輔助 mkCore; perm-run01: 原 getMapOrm→getProc＋真 kmx〕、真 lockSave),
 //資料表以 test/tools/unitOrm.mjs 之 mkTable 替身取代 w-orm-lmdb(其 cnt 計 insert／save／del／delAll), 不起服務.
 //
 //規格來源(期望由規格推導, 不抄實作):
@@ -24,13 +24,12 @@ import assert from 'assert'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import cloneDeep from 'lodash-es/cloneDeep.js'
-import pmKeyMutex from 'wsemi/src/pmKeyMutex.mjs'
 import cacheSt from 'wsemi/src/cacheSt.mjs'
 import ds from '../src/schema/index.mjs'
 import proc from '../server/procCore.mjs'
 import createLockSave from '../server/lockSave.mjs'
 import { makeBaseline } from '../src/js/rowDigest.mjs'
-import { mkTable, mkProcOrm, mkSrLog } from './tools/unitOrm.mjs'
+import { mkTable, mkCore, mkSrLog } from './tools/unitOrm.mjs'
 import { sourceLines } from './tools/srcScan.mjs'
 
 
@@ -98,8 +97,9 @@ describe('unit-procCore-idless (後台整表寫入缺 id 之列視為新增, run
         }
         let { srLog, logs } = mkSrLog()
         let cst = cacheSt()
-        let kmx = pmKeyMutex()
-        let pc = proc(woItems, mkProcOrm(ds, woItems), { srLog, kmx, lockSave: createLockSave(cst), ...(opt.proc || {}) })
+        //perm-run01: 原 kmx = pmKeyMutex() ＋ mkProcOrm 改為 mkCore(真 WServOrm 之 procOrm／withTabLocks／guardWrite, 展開 core.lock)
+        let core = mkCore(ds, woItems)
+        let pc = proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst), ...(opt.proc || {}) })
         let env = { seed, woItems, logs, cst, pc }
         envs.push(env)
         return env
@@ -166,7 +166,7 @@ describe('unit-procCore-idless (後台整表寫入缺 id 之列視為新增, run
                 let old = await rowsOf(env.woItems, t)
                 let before = old.map((v) => JSON.stringify(env.woItems[t].get(v.id)))
                 let sent = [idless(t, 1), idless(t, 2)]
-                assert.strict.deepEqual(await run(env.pc, t, [...old, ...sent], { baseline: makeBaseline(old, ds[t].keys) }), OKR)
+                assert.strict.deepEqual(await run(env.pc, t, [...old, ...sent], { baseline: makeBaseline(old, t) }), OKR) //perm-run01: 原 makeBaseline(old, ds[t].keys) 改為表名
                 await expectAllAdded(env, t, sent, 2, `${t} 混批`)
                 assert.strict.deepEqual(old.map((v) => JSON.stringify(env.woItems[t].get(v.id))), before, '既有列逐位元不變')
             })
@@ -224,7 +224,7 @@ describe('unit-procCore-idless (後台整表寫入缺 id 之列視為新增, run
             let env = createEnv()
             let old = await rowsOf(env.woItems, 'users')
             let sent = [idless('users', 1), idless('users', 2)]
-            assert.strict.deepEqual(await run(env.pc, 'users', [...old, ...sent], { baseline: makeBaseline(old, ds.users.keys) }), OKR)
+            assert.strict.deepEqual(await run(env.pc, 'users', [...old, ...sent], { baseline: makeBaseline(old, 'users') }), OKR) //perm-run01: 原 makeBaseline(old, ds.users.keys) 改為表名
             await expectAllAdded(env, 'users', sent, 2, 'users 帶基準')
         })
 

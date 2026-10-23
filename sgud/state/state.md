@@ -2,6 +2,13 @@
 
 本檔記本套件**當前已開發功能之最新狀態**;與規則帳本(`sgud/rule/rulebook.md`,藍圖)比對即知尚未做到者,接續工作先讀此檔.2026-10-22 主控遷移為 sgud 配置時建立,先移入原帳本之「已知缺口 / 待辦」;**各功能之完成狀態整理為下一次派工之待辦**(主責 agent 依規則帳本各節之「狀態」行與近期報告彙整至本檔).
 
+## 近期進度(2026-10-23, perm-run01:改用 w-serv-orm 共用核心＋修 1.1.13 已知缺口〔第三波〕;未發布,待主控全套)
+
+- 依賴 `w-serv-orm ^1.1.17`.**基準**改用共用核心 `w-serv-orm/src/baseline.mjs`(h1;名次入基準、空值等價),每表一份寫入契約 `src/schema/contracts/*.mjs`(R-CONTRACT-01);套內 `src/js/rowDigest.mjs` 縮為轉接層.**鎖**:後台整表存檔 `lockSave → guardWrite`、外部同步與引用端 `keyCheck.withTabLocks(lockTabs,…)`(階層巢狀,單一鎖管理器=w-serv-orm 實例;套內無 `pmKeyMutex`/`kmx`/`tabWriteKey`;R-LOCK-CORE-01).**只改不增**(`procOrm` `mustExist`)、伺服器專有欄位不採客戶端值(`all:true`).**舊格式基準**→ `saveBaselineFormat`.
+- 已修缺口(README 1.1.13 Known limitations (3)):(a) 存檔回傳寫入後之列並立即 commit 進 store(`returnRows`、`applySavedRows`;R-SAVED-ROWS-01);(b) 對話框開而未編輯時推播 → `syncStore/rebuildDialog` 重建並更新基準;(c)+第 115 項 儲存格編輯器開啟中視為草稿(`cellEditing.mjs`、`hasDraftNow`);(d) 空值等價(核心);(e) 名次入基準;第 114 項 反向對話框以主體 id 驗身分(`checkSubject`;R-SUBJECT-ID-01).
+- 測試:新增 `unit-applySaved`、`unit-cellEditing`、`unit-procCore-baseline`、`api-baseline`、`e2e-concurrent-edit`(24 案×2 語系,皆語意、無標準圖);改寫 `unit-rowDigest`、`unit-draftSync`;遷移(kmx→真 `WServOrm` 鎖,`mkCore`)`unit-procCore-*`、`unit-keyCheck`、`unit-getNameErrs`、`unit-relDialogs-baseline`、`api-externalRows` 等.本輪不跑全套(主控於最末輪跑);驗證數字見報告 `C:\opensrcOper\dnow\20261022221854\agent-out\perm-run01-實作報告.md`.
+- **未做**:外部匯入改 `srcKey` 差異同步(R-IMPORT-01;使用者正在確認匯入流程,本輪只改 `syncAndReplaceTabs` 取鎖,匯入語意不動).
+
 ## 近期進度(2026-10-22)
 
 - 第 101 項(主控任務 `C:\opensrcOper\dnow\20261021095534`)run01～run12 已完成、未發布:授權合併 S1、名稱唯一與對應鍵、衝突收嚴＋提示、刪除連帶清理與改名級聯(F-07 階段 1)、外部列受保護與過期快照基準(F-23/F-26)、離線工具出貨;待主控全套與獨立實操確認後發布.
@@ -22,11 +29,11 @@
 ## 已知缺口 / 待辦
 
 - **外部匯入(R-IMPORT-01,原則 11;`rulebook_sync.md`)**:**部分**.入口、權杖、表鎖、整批驗證、引用連帶已有.**未做** `srcKey` 差異同步:現為 `delAll({ from })`＋insert,未帶 id 者每次換新 id.排程:改用 w-serv-orm 共用核心之輪(opensrcOper 任務 `20261022221854`).
-- **`order` 未入表級基準(run11 決定 20;主控 2026-10-23 列為已知缺口)**:
-  - 現況:他人只拖曳排序後,持舊畫面存檔不被拒,順序被後者蓋回.
-  - 處置:依 `C:\opensrcOper\dspec\多人同時編輯之寫入契約.md` 第 5 節,改用共用核心時改「以名次入基準」.他人重排會被偵測,系統重編號(名次不變)不會誤擋.
-- **自己存檔後約 2 秒內再存被自己誤擋(上方 run11 已知限制⑤、run12 待裁示①)**:主控 2026-10-23 定修法於 `C:\opensrcOper\dspec\多人同時編輯之寫入契約.md` 第 8 節(存檔 API 回傳寫入後之列,前端立即以之更新畫面與基準),於改用共用核心之輪實作.
-- **反向對話框以名稱引用、不驗主體身分(run11 待裁示②;主控 2026-10-23 另案收嚴)**:開框後主體被刪並以同名重建,引用會指向新實體.原則 3、6.
+- **反向對話框主體身分之驗證在前端、不在伺服端(perm-run01 待裁示)**:現況已驗(存檔流程開頭與等待後各比對一次存檔當下之群組／權限表,被刪、改名、同名重建一律拒存),但對象是 store(與伺服端至多一個推播間隔之差);伺服端不知「主體」.若要伺服端強制,須另設 `opt.subject` 並對主體表取鎖驗證(R-SUBJECT-ID-01 規則 4).
+- **【待辦·最優先】`test/e2e-external-rows.test.mjs` 的 E2E-011／012／013 預期過時(2026-10-23 perm-run01 驗證發現;eng 實測 27 過／3 敗,cht 未跑)**:三案皆為『開反向關聯對話框(不編輯)→ 他人改表 → 才勾選並存檔 → 預期 saveStale』,與本輪規定(對話框未編輯時收到推播:重建並更新基準,R-DRAFT-KEEP-01 規則 11)相左——推播到達時對話框已重建,其後存檔成功。**非程式缺陷**。處置:先改 spec `流程_外部列保護與過期快照.md` 之 E2E-011～013(建議改為『先勾選形成草稿 → 他人改 → 存檔被拒』,並補〈已知落差〉留痕),再改測試;E2E-011 之 4 張標準圖(`external-rows-{eng,cht}-E2E-011-{1-click-save,2-stale-box}.png`)畫面會變,**須授權後重產並逐張審圖**(既有標準圖不得自行更動)。`e2e-array-form` 可能有同類案例(本輪未跑)。
+- **本輪未於凍結碼重跑**:`e2e-external-rows` 整檔(僅 eng 跑過)、`e2e-concurrent-edit` 整檔(最後整檔全綠為前端兩檔改動之前)、`e2e-array-form` 子集(AF-014[a-e]/026/027/037)、api 檔除 `api-externalRows`／`api-baseline` 外 13 檔。
+- **users `email`／對應鍵之「是否觸及」判定仍為嚴格相等(增量外審 sol#1,2026-10-23;既有行為、非本輪引入)**:`server/keyCheck.mjs:checkUsersWrite` 之 `findBad`(`v !== o[key]`)與前端 `src/js/getNameErrs.mjs`(`kpOldVal.get(id) === raw`)把歷史 `email: null` 與送入 `''` 視為「觸及」而要求有效值;基準比對已視 `null≡''`。實務上僅在使用者實際動過該儲存格並清成 `''` 時才會發生(結果:須補有效 email 才能存,fail-closed,不致資料錯寫)。若要與空值等價對齊,須同改伺服端與前端並補 e2e;未排程。
+- **存檔回傳列讀回失敗時(寫入已生效)回字串,前端退回等推播**:此時「存檔後立即再存」之窗口仍在(讀回與寫入同一表鎖內,機率極低);網路推播恰於存檔後以存檔前舊內容抵達者,store 暫回舊內容至下一輪推播(未實測).見 R-BASELINE-01 已知限制 ⑤⑥.
 
 - ~~**空表截圖之紅框壓在「No Rows To Show」上(2026-09-30 審圖發現; 待 w-package-tools-e2e 發布)**: 共用套件 `gridContentBox` 空表時以緊貼文字之 `.ag-overlay-no-rows-center` 矩形與標頭取聯集, 紅框內緣只距文字 1px, 框線壓在訊息底緣(違反技能 §7.3-8 框不壓字); 2026-09-28 改用此函式起即凍結於 `test/pics/targets/targets-{eng,cht}-E2E-009-2-all-deleted.png`(w-web-sso 另 4 張). 修法與測試交業主發布.~~ **已解除(2026-09-30)**: 業主發布 w-package-tools-e2e 1.0.3(建議檔已由業主刪除; 訊息矩形外擴 `noRowsPad`＝`INK_PAD` 4px 後取聯集), 本專案升 `^1.0.3`. `--write-mode changed` 重產 targets E2E-009 兩語系: 只寫 `E2E-009-2-all-deleted`(各 9863px), `-1`、`-3` 0px 保留, 產前後全目錄 514 張 md5 只變此 2 張; 審圖: 訊息墨跡至框內緣 eng 8px / cht 7px; 框頂與工具列紅色儲存鈕相切而不覆蓋(工具列與表頭間隙 6px、線寬 5px, 技能 §7.3-9① 之極限, 非缺陷; 量測見 w-web-sso ADR-078); 經 `runIsolatedE2e` 之 `targets` 比對 2 / 2 通過. 缺口解除.
 - **每操作兩張(技能 §7.1)分期(2026-09-28, 四專案同一定案, 見 w-web-sso ADR-072 ④⑦)**: 粒度——一步＝一個使用者操作(點擊、輸入一個欄位、勾選、選下拉項、拖曳、上傳), 每步點擊前(框操作目標整顆)與點擊後(框反應)各一張; 前步反應與後步目標相鄰(同一面板)時一張兼任; 共通進場路徑(切左側導覽至本流程頁)每專案以一個專用案例完整記錄一次, 其餘案例註明「進場路徑見 E2E-xxx」; 非決定性不是不拍之理由. **第 1 期(已完成)**: grups/pemis/targets/users 之 E2E-002(關閉編輯模式)由單張改點擊前／點擊後兩張(`E2E-002-1-click-edit-mode`、`E2E-002-2-edit-mode`〔users 為 `-edit-mode-off`〕). **第 2 期待辦**(2026-09-28 唯讀盤點, 數字為粗估、未扣第 1 期): users 11 案(約 22 張／語系)、grups 7 案(16)、pemis 7 案(16)、targets 9 案(22)、rela-user-grup 5 案(9)、rela-grup-pemi 2 案(3)、rela-pemi-rule 3 案(5)、stainfor 2 案(4), 合計 46 案約 97 張／語系; layout、init 已符合; 整案無圖: 無; 共通進場路徑之專用案例尚未建立(候選 users E2E-001). 升級須先改 spec 視覺項再改測試, 新圖依授權重產並逐張審圖.
@@ -53,4 +60,4 @@
   - ⑤~~S10(推播重建清單是否丟棄未存編輯)仍為未驗證之觀察~~ **已實證並修正(run11, verify01 情境 5; R-DRAFT-KEEP-01)**.
   - ⑥**e2e 夾具依 R-EXT-OWN-01 之改寫(進行中, 全數尚未實跑確認)**: 2026-10-22 07:31 後讀 `test/e2e-array-form.test.mjs` 所見, 其外部來源夾具(AF-036／037／038／039／041 之 ren-ext、ren-gx、del-ue、del-ge)已由「後台 RPC 新增 `from:'teamA'`」(會被 `saveFromNotAllowed` 拒收)改經外部同步端點推入分區 `EXT6='teamA'`(`syncRows`, `order` 由外部給 `EXT6_ORDER`), 其餘夾具(被改名／刪除之主體與其他引用端)為後台列, 收尾 `restoreTables` 先 `purgeExternalRows`; 「另一端整表反序」改由 `reverseTableByOtherEnd`(後台列經 `updateXxx`、外部列經同步端點改 `order`)合成. **仍待確認**: ①上列改寫之實跑結果; ②`test/tools/e2e-setup.mjs` 之 `resetDb`／`resetDbTables` 以 `$fapi.updateXxx(seed)`(後台 RPC, 無基準)還原 base seed, 庫內若留有外部列則缺列＝刪除外部列而被拒(依守門次序之推論, 未實跑); ③新檔 `test/e2e-external-rows.test.mjs`(N 子代理撰寫中, 對應預定 spec `spec/流程_外部列保護與過期快照.md`, 含新 flow 標準圖 `test/pics/external-rows/`, 產製須另行授權; 本帳本〈測試配置〉之 e2e 檔數與 R-TEST-SCOPE-01 之「11 檔」須於其定案後由 N 維護); 既有標準圖不得改變.
 
-- **run11(原則 7)待辦／已知限制**(細節見 R-BASELINE-01、R-DRAFT-KEEP-01 之已知限制與 ADR-037 Update Consequences): ①他人只拖曳排序(只改 `order`)不使存檔被拒、順序以後者為準(使用者可否決); ②外部端推送不帶 `id` 之列每次同步取得新隨機主鍵, 列集合改變即使開著之舊畫面過期(須保持 `id` 穩定); ③保留草稿期間切換語系不更新表頭、取自他表之顯示欄(所屬使用者／所屬群組)不隨推播更新, 按「重新載入」恢復; ④對話框提示僅於推播當下有未存編輯時出現(推播先於任何編輯者維持原行為, 存檔時由伺服端拒收; 若改為「異於基準即顯示」須授權重產 `E2E-011` 之 4 張既有標準圖); ⑤自己儲存成功後至推播抵達前之窗口內再編輯再存會因基準過舊被拒(未實測); ⑥`requireBaseline`(強制所有寫入必帶基準)仍下版再議——不帶基準之客戶端對後台列仍是後者蓋前者。
+- **run11(原則 7)待辦／已知限制**(細節見 R-BASELINE-01、R-DRAFT-KEEP-01 之已知限制與 ADR-037 Update Consequences): ①~~他人只拖曳排序(只改 `order`)不使存檔被拒、順序以後者為準(使用者可否決)~~ **已解除(perm-run01: 名次入基準, 他人只重排即被拒 `rowReordered`; e2e E2E-017／018)**; ②外部端推送不帶 `id` 之列每次同步取得新隨機主鍵, 列集合改變即使開著之舊畫面過期(須保持 `id` 穩定); ③保留草稿期間切換語系不更新表頭、取自他表之顯示欄(所屬使用者／所屬群組)不隨推播更新, 按「重新載入」恢復; ④對話框提示僅於推播當下有未存編輯時出現(推播先於任何編輯者維持原行為, 存檔時由伺服端拒收; 若改為「異於基準即顯示」須授權重產 `E2E-011` 之 4 張既有標準圖); ⑤~~自己儲存成功後至推播抵達前之窗口內再編輯再存會因基準過舊被拒(未實測)~~ **已解除(perm-run01: 存檔回傳列立即 commit 進 store 並更新基準; e2e E2E-001～004)**; ⑥`requireBaseline`(強制所有寫入必帶基準)仍下版再議——不帶基準之客戶端對後台列仍是後者蓋前者。

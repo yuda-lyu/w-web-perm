@@ -15,7 +15,6 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import cloneDeep from 'lodash-es/cloneDeep.js'
-import pmKeyMutex from 'wsemi/src/pmKeyMutex.mjs'
 import cacheSt from 'wsemi/src/cacheSt.mjs'
 import isEmail from 'wsemi/src/isEmail.mjs'
 import ds from '../src/schema/index.mjs'
@@ -27,7 +26,7 @@ import { countAndRefs } from '../src/js/getAuthWarn.mjs'
 import procLang from '../server/procLang.mjs'
 import { getNameErrs, mapNameKp } from '../src/js/getNameErrs.mjs'
 import { getDelRefCount, getDelImpact, getDelConfirmText } from '../src/js/getDelRefCount.mjs'
-import { mkTable, mkProcOrm, mkSrLog } from './tools/unitOrm.mjs'
+import { mkTable, mkCore, mkSrLog } from './tools/unitOrm.mjs'
 import { sourceLines } from './tools/srcScan.mjs'
 
 
@@ -240,7 +239,8 @@ describe('unit-getNameErrs (清單頁名稱／email 擋存與歷史警告判準,
                     }
                     let { srLog } = mkSrLog()
                     let cst = cacheSt()
-                    let pc = proc(woItems, mkProcOrm(ds, woItems), { srLog, kmx: pmKeyMutex(), lockSave: createLockSave(cst) })
+                    let core = mkCore(ds, woItems) //perm-run01: 原 mkProcOrm＋kmx: pmKeyMutex() 改為 w-serv-orm 實例之 procOrm＋withTabLocks／guardWrite
+                    let pc = proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) })
                     try {
                         //送入整表: 以基準列為底(依 order), 套用修改
                         let base = (await woItems[table].select()).sort((a, b) => a.order - b.order).map((v) => cloneDeep(v))
@@ -292,7 +292,8 @@ describe('unit-getNameErrs (清單頁名稱／email 擋存與歷史警告判準,
             }
             let { srLog } = mkSrLog()
             let cst = cacheSt()
-            let pc = proc(woItems, mkProcOrm(ds, woItems), { srLog, kmx: pmKeyMutex(), lockSave: createLockSave(cst) })
+            let core = mkCore(ds, woItems) //perm-run01: 原 mkProcOrm＋kmx: pmKeyMutex() 改為 w-serv-orm 實例之 procOrm＋withTabLocks／guardWrite
+            let pc = proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) })
             return { pc, cst }
         }
 

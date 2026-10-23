@@ -29,7 +29,6 @@ import fs from 'fs'
 import { fileURLToPath } from 'url'
 import JSON5 from 'json5'
 import cloneDeep from 'lodash-es/cloneDeep.js'
-import pmKeyMutex from 'wsemi/src/pmKeyMutex.mjs'
 import cacheSt from 'wsemi/src/cacheSt.mjs'
 import ds from '../src/schema/index.mjs'
 import proc from '../server/procCore.mjs'
@@ -39,9 +38,10 @@ import cvKpToObj from '../src/js/cvKpToObj.mjs'
 import getKpLossy from '../src/js/getKpLossy.mjs'
 import getOwn from '../src/js/getOwn.mjs'
 import { getRefState, getRawModeMap, putRefEntry } from '../src/js/editorRefRows.mjs'
-import { makeBaseline, isBaselineValid, checkBaseline, rowDigest } from '../src/js/rowDigest.mjs'
+//perm-run01: rowDigest(row, keys) 已刪, 改 digestRow(row, 寫入契約)(契約由 getContract(表名) 取); makeBaseline／checkBaseline 之表參數由 keys 陣列改為表名字串 keyTable
+import { makeBaseline, isBaselineValid, checkBaseline, digestRow, getContract } from '../src/js/rowDigest.mjs'
 import { getRowState, makeRowStates, getChangedIdx, buildRowsSend } from '../src/js/relDialogSend.mjs'
-import { mkTable, mkProcOrm, mkSrLog } from './tools/unitOrm.mjs'
+import { mkTable, mkCore, mkSrLog } from './tools/unitOrm.mjs'
 import { sourceLines } from './tools/srcScan.mjs'
 
 const projRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -50,8 +50,8 @@ const HM = { hasMode: true }
 
 //TAB: 兩個對話框之差異(users 對話框改 users.cgrups 不驗名稱; grups 對話框改 grups.cpemis 並驗名稱)
 const TAB = {
-    users: { refKey: 'cgrups', verify: [], fn: 'updateUsers', keys: ds.users.keys },
-    grups: { refKey: 'cpemis', verify: ['name'], fn: 'updateGrups', keys: ds.grups.keys },
+    users: { refKey: 'cgrups', verify: [], fn: 'updateUsers' },
+    grups: { refKey: 'cpemis', verify: ['name'], fn: 'updateGrups' },
 }
 
 
@@ -59,9 +59,9 @@ const TAB = {
 
 //show() 之模型: 以 items 所依據之那份列計算基準並綁定; items 由 genItems 之等價邏輯產生(本群組／權限之歸屬狀態; 未歸屬 enable 'n'、mode 'OR'); 再記下開框時各列狀態
 function openDialog(store, selfName, table) {
-    let { refKey, keys } = TAB[table]
+    let { refKey } = TAB[table]
     let src = cloneDeep(store) //show(): let users = cloneDeep(vo.users)
-    let baseline = makeBaseline(src, keys)
+    let baseline = makeBaseline(src, table) //perm-run01: 原 makeBaseline(src, keys) 改傳表名
     let rows = src.map((u) => {
         let kp = Object.create(null)
         try {
@@ -220,7 +220,8 @@ function createEnv() {
     }
     let { srLog, logs } = mkSrLog()
     let cst = cacheSt()
-    let pc = proc(woItems, mkProcOrm(ds, woItems), { srLog, kmx: pmKeyMutex(), lockSave: createLockSave(cst) })
+    let core = mkCore(ds, woItems) //perm-run01: 原 mkProcOrm＋kmx: pmKeyMutex() 改為 w-serv-orm 實例之 procOrm＋withTabLocks／guardWrite
+    let pc = proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) })
     let env = { seed, woItems, logs, cst, pc }
     envs.push(env)
     return env
@@ -425,28 +426,39 @@ describe('unit-relDialogs-baseline (關聯對話框: 開框綁基準＋整表以
         assert.strictEqual(r[0].cgrups, 'A')
     })
 
-    it('RB-007-基準口徑: 開框時之 makeBaseline(來源列, ds[表].keys) 即伺服端 checkBaseline 所比對之指紋(對庫內同版本列通過); 格式合法; 欄位與 rowDigest 排除 order 與伺服器管理欄一致  [spec P1／P5]', async function() {
+    it('RB-007-基準口徑: 開框時之 makeBaseline(來源列, 表名) 即伺服端 checkBaseline 所比對之摘要(對庫內同版本整表通過); 格式合法(h1: 前綴＋14 位 16 進位, 序即名次); 欄位與 digestRow 排除 order 與伺服器管理欄一致  [spec P1／P5]', async function() {
+        //perm-run01: 原 makeBaseline(來源列, ds[表].keys)／checkBaseline({ keys, r, ltdtOld, baseline })／rowDigest(row, keys) 改為
+        //  makeBaseline(來源列, 表名)／checkBaseline({ keyTable, ltdtOld, baseline })／digestRow(row, getContract(表名)); 原「對庫內同版本之任一列視為本次修改」之 r 已無(表級比對不分本次寫入之列)
         let { woItems } = createEnv()
         for (let table of ['users', 'grups']) {
             let store = await storeOf({ woItems }, table)
             let dlg = openDialog(store, table === 'users' ? 'G1' : 'P1', table)
             assert.ok(isBaselineValid(dlg.baseline), `${table} 基準格式`)
-            assert.deepStrictEqual(dlg.baseline, makeBaseline(store, ds[table].keys), `${table} 同一口徑`)
+            assert.deepStrictEqual(dlg.baseline, makeBaseline(store, table), `${table} 同一口徑`)
             assert.strictEqual(dlg.baseline.length, store.length)
-            //伺服端比對: 對庫內同版本之任一列「視為本次修改」→ 通過
+            assert.deepStrictEqual(dlg.baseline.map(([id]) => id), ids(store), `${table} 基準之序即名次(依 order)`)
+            for (let [, dg] of dlg.baseline) {
+                assert.ok(/^h1:[0-9a-f]{14}$/.test(dg), `${table} 摘要格式 h1:+14 位小寫 16 進位: ${dg}`)
+            }
+            //伺服端比對: 對庫內同版本整表 → 通過
             let ltdtOld = await woItems[table].select()
-            let r = { add: [], del: [], diff: ltdtOld, same: [] }
-            assert.strictEqual(checkBaseline({ keys: ds[table].keys, r, ltdtOld, baseline: dlg.baseline }), null)
-            //order／稽核欄變動不影響指紋(外部同步整來源重寫使每列稽核欄皆變, 不應使草稿作廢)
+            assert.strictEqual(checkBaseline({ keyTable: table, ltdtOld, baseline: dlg.baseline }), null)
+            //order／稽核欄變動不影響摘要(外部同步整來源重寫使每列稽核欄皆變, 不應使草稿作廢)
+            let ct = getContract(table)
             let moved = cloneDeep(store[0])
             moved.order = 99
             moved.timeUpdate = '2030-01-01T00:00:00.000+08:00'
             moved.userIdUpdate = 'someone'
-            assert.strictEqual(rowDigest(moved, ds[table].keys), rowDigest(store[0], ds[table].keys))
-            //內容欄變動則指紋不同
+            assert.strictEqual(digestRow(moved, ct), digestRow(store[0], ct))
+            //內容欄變動則摘要不同
             let edited = cloneDeep(store[0])
             edited[TAB[table].refKey] = ON('Z')
-            assert.notStrictEqual(rowDigest(edited, ds[table].keys), rowDigest(store[0], ds[table].keys))
+            assert.notStrictEqual(digestRow(edited, ct), digestRow(store[0], ct))
+            //伺服端比對: 庫內某列內容異於基準 → saveStale(rowChanged)
+            let drifted = cloneDeep(ltdtOld)
+            drifted.find((v) => v.id === store[0].id)[TAB[table].refKey] = ON('Z')
+            let ck = checkBaseline({ keyTable: table, ltdtOld: drifted, baseline: dlg.baseline })
+            assert.ok(ck !== null && ck.key === 'saveStale' && ck.reason === 'rowChanged', `${table} 內容異動 → saveStale/rowChanged: ${JSON.stringify(ck)}`)
         }
     })
 
@@ -456,8 +468,8 @@ describe('unit-relDialogs-baseline (關聯對話框: 開框綁基準＋整表以
         v2[0].cgrups = ON('G1') //開框後他人改了 u1
         v2.push(mk('users', { id: 'u9', order: 3, name: 'new', cgrups: '{}' })) //並新增 u9
         let dlg = openDialog(v1, 'G1', 'users')
-        let b1 = makeBaseline(v1, ds.users.keys)
-        let b2 = makeBaseline(v2, ds.users.keys)
+        let b1 = makeBaseline(v1, 'users')
+        let b2 = makeBaseline(v2, 'users')
         assert.notDeepStrictEqual(b1, b2, '兩版本之指紋不同(夾具有效)')
         assert.deepStrictEqual(dlg.baseline, b1, '開框時綁定之基準＝開框時來源列之指紋')
         //store 推播變新: 基準為開框時計算之值, 不隨 store 改變
@@ -607,7 +619,7 @@ describe('unit-relDialogs-baseline (關聯對話框: 開框綁基準＋整表以
         assert.deepStrictEqual(await call(e, 'users', res.rowsSend, res.baseline), { ok: false, v: 'saveStale' }, '開框基準 → 被拒')
         assert.strictEqual(byId(await storeOf(e, 'users'), 'u1').cgrups, ON('G5'))
         //對照: 存檔當下才由最新 store 取基準(不合格作法)→ 伺服端無從發現草稿已舊
-        let late = await call(e, 'users', res.rowsSend, makeBaseline(store2, ds.users.keys))
+        let late = await call(e, 'users', res.rowsSend, makeBaseline(store2, 'users'))
         assert.deepStrictEqual(late, { ok: true, v: 'saveTabItemsSuccess' }, '存檔當下取基準: 通過(證明的是 store 新, 不是待存內容新)')
     })
 
@@ -681,7 +693,9 @@ describe('unit-relDialogs-baseline (關聯對話框: 開框綁基準＋整表以
         assert.deepStrictEqual(res2, { rejected: 'authLossyBlocked', names: ['john'] })
     })
 
-    it('RB-SRV-010-開框後他人改了 order(store 排序變動): 送出整表依存檔當下 store 之 order 序(不依對話框列序), 成功且內容無誤  [spec P2: 送出之列順序沿用 store 排序]', async function() {
+    it('RB-SRV-010-開框後他人改了 order(store 排序變動): 送出整表仍依存檔當下 store 之 order 序(不依對話框列序), 但名次入基準 → 以開框基準送出被拒 saveStale、零寫入(perm-run01 原則 10); 重新開框後存檔成功且他人之排序保留  [spec P2／原則 10: 他人只重排 → 不符]', async function() {
+        //perm-run01: 原預期「他人只改 order(名次改變) → 成功」改為 saveStale——共用核心基準(h1)的摘要不含 order 數值但「序即名次」入基準, 他人重排被偵測(刻意語意變更, 規格原則 10; 舊版指紋排除 order 故放行);
+        //  原斷言之意圖(送出整表依存檔當下 store 序、他人之排序保留、內容無誤)仍保留於前端組裝與重新開框後的存檔
         let e = createEnv()
         let store1 = await storeOf(e, 'users')
         let dlg = openDialog(store1, 'G1', 'users')
@@ -691,10 +705,40 @@ describe('unit-relDialogs-baseline (關聯對話框: 開框綁基準＋整表以
         assert.deepStrictEqual(ids(store2), ['u2', 'u1', 'u3', 'ux'])
         toggle(dlg, 'u1', 'y', 'OR')
         let res = saveModel(dlg, store2, 'G1', 'users')
-        assert.deepStrictEqual(ids(res.rowsSend), ['u2', 'u1', 'u3', 'ux'])
-        assert.deepStrictEqual(await call(e, 'users', res.rowsSend, res.baseline), { ok: true, v: 'saveTabItemsSuccess' })
+        assert.deepStrictEqual(ids(res.rowsSend), ['u2', 'u1', 'u3', 'ux'], '送出整表依存檔當下 store 之 order 序')
+        assert.deepStrictEqual(await call(e, 'users', res.rowsSend, res.baseline), { ok: false, v: 'saveStale' }, '名次與開框時不同 → 表級過期')
+        assert.ok(e.logs.some((l) => l.level === 'error' && l.event === 'updateTabItems-stale-error' && l.msg === 'saveStale' && l.reason === 'rowReordered'), 'srLog 記 saveStale／rowReordered')
+        let mid = await storeOf(e, 'users')
+        assert.deepStrictEqual(ids(mid), ['u2', 'u1', 'u3', 'ux'], '零寫入: 他人之排序仍在')
+        assert.strictEqual(byId(mid, 'u1').cgrups, '{}', '零寫入: u1 未被改')
+        //重新開框(基準取自含新排序之 store)後再存: 成功, 他人之排序保留
+        let dlgB = openDialog(store2, 'G1', 'users')
+        toggle(dlgB, 'u1', 'y', 'OR')
+        let resB = saveModel(dlgB, store2, 'G1', 'users')
+        assert.deepStrictEqual(await call(e, 'users', resB.rowsSend, resB.baseline), { ok: true, v: 'saveTabItemsSuccess' })
         let after = await storeOf(e, 'users')
         assert.deepStrictEqual(ids(after), ['u2', 'u1', 'u3', 'ux'], '他人之排序保留')
+        assert.strictEqual(byId(after, 'u1').cgrups, ON('G1'))
+    })
+
+    it('RB-SRV-012-開框後 order 數值被系統重編號而名次不變(如外部同步整來源重寫): 勾選 u1 仍成功(order 數值不入摘要, 名次不變不誤擋), 內容無誤  [spec P1／P5／原則 10: 重編號名次不變 → 相符]', async function() {
+        //perm-run01 新增: 與 RB-SRV-010 成對(名次變 → 擋; 數值變而名次不變 → 放行)
+        let e = createEnv()
+        let store1 = await storeOf(e, 'users')
+        let dlg = openDialog(store1, 'G1', 'users')
+        let k = 10
+        for (let u of store1) {
+            await other.patch(e, 'users', u.id, { order: k })
+            k += 10
+        }
+        let store2 = await storeOf(e, 'users')
+        assert.deepStrictEqual(ids(store2), ids(store1), '名次不變')
+        assert.deepStrictEqual(store2.map((v) => v.order), [10, 20, 30, 40], '夾具有效: order 數值已變')
+        toggle(dlg, 'u1', 'y', 'OR')
+        let res = saveModel(dlg, store2, 'G1', 'users')
+        assert.deepStrictEqual(await call(e, 'users', res.rowsSend, res.baseline), { ok: true, v: 'saveTabItemsSuccess' })
+        let after = await storeOf(e, 'users')
+        assert.deepStrictEqual(ids(after), ids(store1))
         assert.strictEqual(byId(after, 'u1').cgrups, ON('G1'))
     })
 
@@ -799,14 +843,15 @@ describe('unit-relDialogs-baseline (關聯對話框: 開框綁基準＋整表以
     ]
     const count = (s, sub) => s.split(sub).length - 1
 
-    it('SITE-RB-001-show(): 與 items 同一處綁定基準與開框狀態: `let baseline = makeBaseline(<快照>, vo.$ds.<表>.keys)` 在 genItems 之前取自 items 所依據之那份快照, `makeRowStates(items)` 在 genItems 之後, 並存入 vo.baseline／vo.rowStates; 兩者皆 import  [spec P1]', function() {
+    it('SITE-RB-001-show(): 與 items 同一處綁定基準與開框狀態: `let baseline = makeBaseline(<快照>, \'<表名>\')` 在 genItems 之前取自 items 所依據之那份快照, `makeRowStates(items)` 在 genItems 之後, 並存入 vo.baseline／vo.rowStates; 兩者皆 import  [spec P1]', function() {
+        //perm-run01: 原 makeBaseline(<快照>, vo.$ds.<表>.keys) 改為 makeBaseline(<快照>, '<表名>')(第 2 參改表名字串)
         for (let v of VUES) {
             let txt = fs.readFileSync(fpOf(v.fn), 'utf8')
             assert.ok(txt.includes(`import { makeBaseline } from '../js/rowDigest.mjs'`), `${v.fn} 須 import makeBaseline`)
             assert.ok(txt.includes(`import { makeRowStates, getChangedIdx, buildRowsSend } from '../js/relDialogSend.mjs'`), `${v.fn} 須 import relDialogSend`)
             let s = methodBody(codeLines(fpOf(v.fn)), 'show')
             let iSnap = s.indexOf(`let ${v.snap} = cloneDeep(vo.${v.snap})`)
-            let iBase = s.indexOf(`let baseline = makeBaseline(${v.snap}, vo.$ds.${v.snap}.keys)`)
+            let iBase = s.indexOf(`let baseline = makeBaseline(${v.snap}, '${v.snap}')`)
             let iGen = s.indexOf('vo.genItems(')
             let iStates = s.indexOf('let rowStates = makeRowStates(items)')
             let iSaveItems = s.indexOf('vo.items = items')
@@ -815,6 +860,15 @@ describe('unit-relDialogs-baseline (關聯對話框: 開框綁基準＋整表以
             assert.ok(s.includes('vo.baseline = baseline') && s.includes('vo.rowStates = rowStates'), `${v.fn}.show: 須存入 vo.baseline／vo.rowStates`)
             assert.strictEqual(count(s, 'makeBaseline('), 1, `${v.fn}.show: 只在此處計算基準`)
             assert.ok(txt.includes('baseline: null,') && txt.includes('rowStates: null,'), `${v.fn} data 須宣告 baseline／rowStates`)
+            //perm-run01 新增: 開框中無未存修改時 syncStore 經 rebuildDialog 以目前 store 重建, 其基準與狀態亦須在同一處由同一份快照產生(口徑同 show()), 且仍只有 show／rebuildDialog 兩處計算基準
+            let rb = methodBody(codeLines(fpOf(v.fn)), 'rebuildDialog')
+            let jSnap = rb.indexOf(`let ${v.snap} = cloneDeep(vo.${v.snap})`)
+            let jBase = rb.indexOf(`let baseline = makeBaseline(${v.snap}, '${v.snap}')`)
+            let jGen = rb.indexOf('vo.genItems(')
+            let jStates = rb.indexOf('let rowStates = makeRowStates(items)')
+            assert.ok(jSnap >= 0 && jBase > jSnap && jGen > jBase && jStates > jGen, `${v.fn}.rebuildDialog: 基準須取自 genItems 所用之同一份快照且在 genItems 之前, makeRowStates 在 genItems 之後`)
+            assert.ok(rb.includes('vo.baseline = baseline') && rb.includes('vo.rowStates = rowStates') && rb.includes('vo.isModified = false'), `${v.fn}.rebuildDialog: 須存入 vo.baseline／vo.rowStates 並歸零 isModified`)
+            assert.strictEqual(count(codeLines(fpOf(v.fn)).map((l) => l.text).join('\n'), 'makeBaseline('), 2, `${v.fn}: 只在 show／rebuildDialog 兩處計算基準(import 與註解不計)`)
         }
     })
 
@@ -848,7 +902,8 @@ describe('unit-relDialogs-baseline (關聯對話框: 開框綁基準＋整表以
     it('SITE-RB-003-saveUsers／saveGrups: 以 `$fapi.<api>(rows, { baseline })` 送出, 基準取自參數(不讀 vo.baseline); 失敗路徑: catch 內先 updateLoading(false) 再 showCheckYes(非 success 型), 失敗回 false(對話框不關、儲存鈕可再按)  [spec: 失敗處置 saveStale 等沿用既有路徑]', function() {
         for (let v of VUES) {
             let b = methodBody(codeLines(fpOf(v.fn)), v.save)
-            assert.ok(b.includes(`vo.$fapi.${v.api}(rows, { baseline })`), `${v.fn}.${v.save} 須帶 { baseline }`)
+            //perm-run01: 原 `$fapi.<api>(rows, { baseline })` 改為 `{ baseline, returnRows: true }`(存檔成功回傳寫入後之列並立即 commit 進 store, 規格第 8 節)
+            assert.ok(b.includes(`vo.$fapi.${v.api}(rows, { baseline, returnRows: true })`), `${v.fn}.${v.save} 須帶 { baseline, returnRows: true }`)
             assert.ok(new RegExp(`^\\s*${v.save}: async function\\(rows, baseline\\) \\{`).test(b), `${v.fn}.${v.save} 簽名須為 (rows, baseline)`)
             assert.ok(!b.includes('vo.baseline'), `${v.fn}.${v.save} 不得讀 vo.baseline(存檔進行中 show() 會換掉)`)
             let iCatch = b.indexOf('.catch(async (err) => {')

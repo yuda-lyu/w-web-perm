@@ -8,7 +8,9 @@
 //  EX-S3 外部列之 order 由外部擁有: 後台儲存重編 order 時, 庫內為外部列者之 order 還原為庫內值; 後台列、庫內無之列不動; 不改輸入.
 //  EX-S4 外部列「僅伺服器管理欄不同」之 diff 列視為無變更(移入 same, 不回退建立者／建立時間); 後台列不適用, 內容有異者仍為 diff.
 //  EX-S4b (run11 外審 sol 第 3 點) 外部列之 diff 列(內容確有改動, 如指派欄)改帶庫內之伺服器管理欄(userId／timeCreate／userIdUpdate／timeUpdate), 免持舊草稿(保留未存編輯期間外部同步已重寫該列)把建立者與建立時間回退為舊值;
-//        只處理庫內為外部列者, 後台列、庫內無對應者原樣; 庫內缺該欄者不補; add／del／same 原樣; 不改輸入.
+//        只處理庫內為外部列者, 後台列、庫內無對應者原樣; 庫內缺該欄者(歷史列)不補、亦不採用客戶端送入之值(刪除該欄, 保留庫內值; perm-run01 外審 sol#3, 寫入契約 serverOnly); add／del／same 原樣; 不改輸入.
+//  EX-S8 (perm-run01 外審 sol#2) 空值等價: 內容欄之比對(dropServerOnlyDiff 的「僅伺服器欄不同」判定、checkExternalWrite 的鎖定欄異動判定)視 null／""／缺欄為同一空值(與基準 digestRow 同口徑), 0／false 仍異於空值;
+//        from 欄不適用(null 與 "" 之 from 有別: 歷史後台列). 否則基準已因空值等價而通過, 守門卻回 saveExternalRowChanged, 合法存檔被誤拒.
 //  EX-S5 守門(違規整次拒收、零寫入, 不靜默忽略):
 //        ①from 型別(不論 lockExternalRows): 新增列 from 須為字串(缺欄視為 ''); 修改列若把 from 改成非字串且異於庫內值 → 拒; 歷史非字串 from 原樣送回之 diff 列不拒(否則已有歷史資料之庫無法儲存);
 //        ②lockExternalRows 為真: 新增列 from 須為 ''(含復活他來源之列、複製繼承、手打); 外部列不可刪; 外部列不可改 from 與鎖定欄; 後台列不可改成非空 from;
@@ -22,13 +24,13 @@
 //  A isExternalRow          from 值{'pd','',undefined 值,缺欄,null,0,false,123,{},[],' '} 11 格 ＋ 列本身非物件{null,undefined,'x',5,true} 5 格 = 16, 全測
 //  B getLockFields          表4 × {精確集合, 排除項(含「鎖定欄∪排除項＝schema 全欄」), 依 keys 次序} 12 格 ＋ keys 非陣列 1 ＋ 表名未知／原型鍵名 1 ＋ 他表指派欄 1 = 15, 全測
 //  C restoreExternalOrder   庫內歸屬{外部 pd,外部 ' ',後台 '',缺欄,null} × 送入 from{同庫內,pd,''} 15 格 ＋ 混合／無 order／缺 order／庫內無／非陣列／雜訊／非物件元素／不改輸入／空陣列 9 格 = 24, 全測
-//  D dropServerOnlyDiff     表4 × 伺服器管理欄{單欄 4,全欄 1}=20 ＋ 表4 × 非伺服器欄逐欄(users 8、grups 5、pemis 5、targets 3)=21 ＋ 後台列{'',缺欄,null,0} 4 ＋ 陣列保持／缺欄≡''／庫內無／不改輸入 4 = 49, 全測
-//  D2 restoreServerFields   表4 × 伺服器管理欄{單欄 4,全欄 1}=20 ＋ 外部列改指派欄(三表)3 ＋ 後台列{'',缺欄,null,0} 4 ＋ 庫內無對應／缺 id 1 ＋ 庫內缺伺服器欄 1 ＋ add／del／same 原樣與同一物件 1 ＋ 不改輸入與回傳新物件 1 = 31, 全測
+//  D dropServerOnlyDiff     表4 × 伺服器管理欄{單欄 4,全欄 1}=20 ＋ 表4 × 非伺服器欄逐欄(users 8、grups 5、pemis 5、targets 3)=21 ＋ 後台列{'',缺欄,null,0} 4 ＋ 陣列保持／缺欄≡''／庫內無／不改輸入 4 ＋ 空值等價 3(null／缺欄互等且雙向、0／false 異於空值、from 欄不適用) = 52, 全測
+//  D2 restoreServerFields   表4 × 伺服器管理欄{單欄 4,全欄 1}=20 ＋ 外部列改指派欄(三表)3 ＋ 後台列{'',缺欄,null,0} 4 ＋ 庫內無對應／缺 id 1 ＋ 庫內缺伺服器欄(單欄／全欄／all:true 後台列)3 ＋ add／del／same 原樣與同一物件 1 ＋ 不改輸入與回傳新物件 1 = 33, 全測
 //  E checkExternalWrite     E_add 新增列 from 10 格 × lock{真,假} 2 × 表 4 = 80
 //                           E_del 刪除列之庫內歸屬 8 格({pd,' ',''、缺欄,null,0,123,false}) × 2 × 4 = 64
 //                           E_from 修改列之 from: 舊歸屬{外部 pd 11 新值,後台 '' 10,後台缺欄 9,歷史 null 7,歷史 0 4,歷史 123 3,歷史 false 3}=47 格 × 2 × 4 = 376
 //                           E_field 修改列逐欄: 表之全部非 id／from 欄(users 11、grups 8、pemis 8、targets 6)=33 × 舊歸屬{外部,後台,歷史 null} 3 × 2 = 198
-//                           E_norm 值正規化 4 格 × 表 4 = 16; E_multi 多違規之 k／n／froms／次序 10 格; E_robust 異常輸入 5 格
+//                           E_norm 值正規化 10 格(null／""／缺欄互為空值 4 格、異於空值〔"x" 變空 2 格、0、false〕4 格、型別與空白 2 格) × 表 4 = 40; E_multi 多違規之 k／n／froms／次序 10 格; E_robust 異常輸入 5 格
 //  F hasExternalDiff        庫內歸屬 6 格 ＋ 混合 ＋ add／del／same 不計 ＋ 無對應／缺 id／非物件 ＋ 歸屬以庫內為準 = 10, 全測
 //  刻意不測: diff 列在庫內無對應(ltdtDiffByKey 不會產生此輸入); 稀疏陣列(JSON 不會產生); keys 非陣列之 dropServerOnlyDiff(呼叫端恆給 schema keys).
 //  未測: 無.
@@ -342,6 +344,41 @@ describe('unit-externalRows (外部列受保護純函數, F-23, R-EXT-OWN-01)', 
             assert.strict.deepEqual(out.diff, [])
         })
 
+        it('EX-044b 空值等價(外審 sol#2): 外部列 description 於庫內與送入之間 null／""／缺欄任意互換(雙向)+ 伺服器欄不同 → 皆移入 same(不重寫, 庫內原表示不被改成 "")', function() {
+            cells.D++
+            let reps = [['', null], ['', MISSING], [null, ''], [null, MISSING], [MISSING, null], [MISSING, '']]
+            for (let [ov, nv] of reps) {
+                let old = [rowWith(ext('grups'), { description: ov })]
+                let row = rowWith(rowWith(ext('grups'), { description: nv }), { timeUpdate: 'newer' })
+                let out = dropServerOnlyDiff({ keys: KEYS.grups, r: { add: [], del: [], diff: [row], same: [] }, ltdtOld: old, all: true })
+                assert.strict.deepEqual(out.diff, [], `庫內 ${label(ov)} → 送入 ${label(nv)} 應視為無內容變更`)
+                assert.strict.deepEqual(out.same, [row])
+            }
+        })
+
+        it('EX-044c 空值等價不吞真實變更: 庫內為空值而送入 0／false／非空字串、或庫內非空而送入空值 → 仍為 diff', function() {
+            cells.D++
+            let reps = [['', 0], ['', false], [null, 0], [null, false], ['', 'x'], ['x', null], ['x', ''], [0, null], [false, '']]
+            for (let [ov, nv] of reps) {
+                let old = [rowWith(ext('grups'), { description: ov })]
+                let row = rowWith(ext('grups'), { description: nv })
+                let out = dropServerOnlyDiff({ keys: KEYS.grups, r: { add: [], del: [], diff: [row], same: [] }, ltdtOld: old, all: true })
+                assert.strict.deepEqual(out.diff, [row], `庫內 ${label(ov)} → 送入 ${label(nv)} 應仍為 diff`)
+                assert.strict.deepEqual(out.same, [])
+            }
+        })
+
+        it('EX-044d from 欄不適用空值等價: 庫內 from 為 null(歷史後台列)而送入 ""(或反之)→ 仍為 diff(all: true)', function() {
+            cells.D++
+            for (let [ov, nv] of [[null, ''], ['', null], [null, MISSING], [MISSING, null]]) {
+                let old = [rowWith(mkRow('grups', { id: 'b1' }), { from: ov })]
+                let row = rowWith(mkRow('grups', { id: 'b1' }), { from: nv })
+                let out = dropServerOnlyDiff({ keys: KEYS.grups, r: { add: [], del: [], diff: [row], same: [] }, ltdtOld: old, all: true })
+                //from 欄沿用 normV(缺欄≡''; null 與 ''／缺欄有別)
+                assert.strict.equal(out.diff.length, 1, `from ${label(ov)} → ${label(nv)} 應仍為 diff`)
+            }
+        })
+
         it('EX-045 庫內無對應 id 之 diff 列／diff 列缺 id → 留 diff, 不拋例外', function() {
             cells.D++
             let old = [ext('grups')]
@@ -423,13 +460,39 @@ describe('unit-externalRows (外部列受保護純函數, F-23, R-EXT-OWN-01)', 
             assert.strict.equal(out.diff[1], r2)
         })
 
-        it('EX-051 庫內該外部列缺某伺服器管理欄 → 不補(不憑空寫入 undefined), 草稿值保留', function() {
+        it('EX-051 庫內該外部列缺某伺服器管理欄 → 不補(不憑空寫入 undefined)、亦不採用客戶端送入之值(刪除該欄, 保留庫內值＝仍無該欄; perm-run01 外審 sol#3)', function() {
             cells.D2++
             let o = rowWith(ext('grups', SRV_OLD), { timeCreate: MISSING })
             let row = ext('grups', { ...SRV_STALE, description: 'edited' })
             let out = restoreServerFields({ r: { add: [], del: [], diff: [row], same: [] }, ltdtOld: [o] })
             assert.strict.equal(out.diff[0].userId, 'sync-new')
-            assert.strict.equal(out.diff[0].timeCreate, 'T-old', '庫內缺欄者不補, 草稿值原樣')
+            assert.strict.equal(Object.prototype.hasOwnProperty.call(out.diff[0], 'timeCreate'), false, '庫內缺欄者不補、客戶端偽造值不採用(該欄不存在)')
+            assert.strict.equal(out.diff[0].description, 'edited', '被改之內容欄照常')
+            assert.strict.equal(row.timeCreate, 'T-old', '輸入列不被改')
+        })
+
+        it('EX-051b 庫內歷史列四個伺服器管理欄全缺 → 客戶端送入之四欄皆不採用(全部不存在)', function() {
+            cells.D2++
+            let o = rowWith(ext('grups'), Object.fromEntries(SPEC_SERVER.map((f) => [f, MISSING])))
+            let row = ext('grups', { ...SRV_STALE, description: 'edited' })
+            let out = restoreServerFields({ r: { add: [], del: [], diff: [row], same: [] }, ltdtOld: [o] })
+            for (let f of SPEC_SERVER) {
+                assert.strict.equal(Object.prototype.hasOwnProperty.call(out.diff[0], f), false, `${f} 不採用客戶端值`)
+            }
+            assert.strict.equal(out.diff[0].description, 'edited')
+        })
+
+        it('EX-051c all: true 時後台列亦然: 庫內後台列缺伺服器管理欄 → 客戶端送入之值不採用; 預設(all 未給)後台列原樣(同一物件)', function() {
+            cells.D2++
+            let base = rowWith(mkRow('grups', { id: 'b1', from: '' }), Object.fromEntries(SPEC_SERVER.map((f) => [f, MISSING])))
+            let row = rowWith(base, { ...SRV_STALE, description: 'edited' })
+            let r = { add: [], del: [], diff: [row], same: [] }
+            let all = restoreServerFields({ r, ltdtOld: [base], all: true })
+            for (let f of SPEC_SERVER) {
+                assert.strict.equal(Object.prototype.hasOwnProperty.call(all.diff[0], f), false, `${f} 不採用客戶端值`)
+            }
+            let def = restoreServerFields({ r, ltdtOld: [base] })
+            assert.strict.equal(def.diff[0], row, '預設只處理外部列, 後台列原樣')
         })
 
         it('EX-052 add／del／same 原樣(同一陣列)', function() {
@@ -620,12 +683,18 @@ describe('unit-externalRows (外部列受保護純函數, F-23, R-EXT-OWN-01)', 
             }
         }
 
-        //值正規化: 缺欄視同 ""; 其餘依 JSON 值比對(字串之差異、數字與字串、前後空白皆為異動)
+        //值正規化: null／""／缺欄為同一空值(寫入契約空值等價, perm-run01 外審 sol#2); 其餘依 JSON 值比對(字串之差異、數字與字串、前後空白、0／false 皆為異動)
         const NORM = [
             ['庫內 "" → 送入缺欄(視為同一)', '', MISSING, OK],
             ['庫內 "x" → 送入缺欄(異動)', 'x', MISSING, FIELD],
             ['庫內 "5" → 送入數字 5(型別不同即異動)', '5', 5, FIELD],
             ['庫內 "a" → 送入 "a "(前後空白為異動)', 'a', 'a ', FIELD],
+            ['庫內 "" → 送入 null(空值等價, 視為同一)', '', null, OK],
+            ['庫內 null → 送入 ""(空值等價, 視為同一)', null, '', OK],
+            ['庫內 null → 送入缺欄(空值等價, 視為同一)', null, MISSING, OK],
+            ['庫內 "x" → 送入 null(異動)', 'x', null, FIELD],
+            ['庫內 "" → 送入 0(0 異於空值, 異動)', '', 0, FIELD],
+            ['庫內 "" → 送入 false(false 異於空值, 異動)', '', false, FIELD],
         ]
         for (let t of TABLES) {
             for (let [title, ov, nv, exp] of NORM) {
@@ -827,13 +896,13 @@ describe('unit-externalRows (外部列受保護純函數, F-23, R-EXT-OWN-01)', 
                 A: 16,
                 B: 15,
                 C: 24,
-                D: 49,
-                D2: 31,
+                D: 52,
+                D2: 33,
                 E_add: 80,
                 E_del: 64,
                 E_from: 376,
                 E_field: 198,
-                E_norm: 16,
+                E_norm: 40,
                 E_multi: 10,
                 E_robust: 5,
                 F: 10,
