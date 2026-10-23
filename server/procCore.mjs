@@ -14,7 +14,7 @@ import ds from '../src/schema/index.mjs'
 import procLang from './procLang.mjs'
 import validateRowsBeforeWrite from './validateRows.mjs'
 import planRefChanges, { REF_OF, diffRefTargets, fillIdlessIds } from '../src/js/refCascade.mjs'
-import { restoreExternalOrder, dropServerOnlyDiff, checkExternalWrite, hasExternalDiff } from '../src/js/externalRows.mjs'
+import { restoreExternalOrder, dropServerOnlyDiff, restoreServerFields, checkExternalWrite, hasExternalDiff } from '../src/js/externalRows.mjs'
 import { isBaselineValid, checkBaseline } from '../src/js/rowDigest.mjs'
 import { findTouchedDup, findDupIndex, withTabLocks, checkUsersWrite } from './keyCheck.mjs'
 import { checkCascadePlan, writeWithCascade } from './cascadeWrite.mjs'
@@ -210,6 +210,18 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave, mappingBy = 'id', cascad
         //ltdtDiffByKey
         let ltdtOld = await woItems[keyTable].select()
 
+        //表級載入基準比對(R-PRINCIPLE-00 原則 7, 規則帳本 R-BASELINE-01, ADR-037 Update(run11); 使用者 2026-10-22 裁示「多人同時編輯以表雜湊比對, 先動先贏」):
+        //有基準者, 草稿載入時之整表須與目前庫內整表相同(任一列內容指紋不同或列被增刪即過期), 否則整次拒收 saveStale、零寫入, 不部分變更、不上鎖; 指紋排除 order 與伺服器管理欄(見 rowDigest.getDigestFields).
+        //放在 select 之後、所有檢查與還原之前: 基準過期時下列各檢查之結果(撞名、新增列已存在、外部列守門…)皆以過期之畫面為前提, 應先回「請重新載入」而非誤導之其他訊息.
+        //無基準者(舊客戶端)不在此檢查: 後台列維持最後寫入者勝(ADR-013), 外部列之指派欄改動另於下方拒收(saveBaselineRequired). srLog 只記錯誤鍵、原因與差異筆數, 不記列 id／個資值
+        if (baseline !== null) {
+            let ck = checkBaseline({ keys: ds[keyTable].keys, ltdtOld, baseline })
+            if (ck !== null) {
+                srLog.error({ event: 'updateTabItems-stale-error', keyTable, userId, msg: ck.key, reason: ck.reason, n: ck.n })
+                return Promise.reject(ck.key)
+            }
+        }
+
         //外部列之 order 由外部擁有(R-EXT-OWN-01): 上方 order=k+1 重編不得改外部列之順序, 還原為庫內值(使其不因後台存檔而成為 diff)
         if (lockExternalRows) {
             rows = restoreExternalOrder(rows, ltdtOld)
@@ -268,25 +280,18 @@ function proc(woItems, procOrm, { srLog, kmx, lockSave, mappingBy = 'id', cascad
         }
         // console.log('ltdtDiffByKey r', r)
 
-        //外部列保護與載入基準(F-23／F-26; R-PRINCIPLE-00 原則 3、5; 規則帳本 R-EXT-OWN-01、R-BASELINE-01, ADR-037): 於任何寫入之前(含引用端), 違規整次拒收、資料表零變更, 不靜默忽略;
-        //①外部列僅伺服器管理欄不同者(外部同步重寫使其時間／建立者較新, 持舊快照送回)視為無變更, 免把建立者與建立時間回退為舊值(S2);
-        //②有基準者先逐列比對庫內版本(checkBaseline: 本次將寫入之列須與草稿所依據者相同, 否則 saveStale 提示重新載入): 先於外部列守門——草稿已過期時(外部同步在開啟後改了外部列或移除之,
-        //使送入之外部列與庫內不同)應回「資料已更新, 請重新載入」, 而不是誤導之「外部列不可修改」(run07 U1 觀察 1);
-        //③from 型別與外部列守門(checkExternalWrite): 新增列 from 須為 ''、外部列不可刪／不可改 from 與身分結構欄, 指派欄可寫(草稿新鮮而仍違規者在此被拒);
-        //④無基準而修改外部列之指派欄: 無從證明快照新舊, Lv1 放行之指派欄不得因舊快照還原外部已撤銷之授權(外審 B.2), 依原則 3 拒收(saveBaselineRequired); 後台列無基準維持舊行為(最後寫入者勝, ADR-013).
+        //外部列保護(F-23; R-PRINCIPLE-00 原則 3、5; 規則帳本 R-EXT-OWN-01, ADR-037): 於任何寫入之前(含引用端), 違規整次拒收、資料表零變更, 不靜默忽略;
+        //(載入基準之表級比對 checkBaseline 已在上方 select 之後先行, run11: 基準過期時應先回「請重新載入」, 而非誤導之「外部列不可修改」, run07 U1 觀察 1)
+        //①外部列僅伺服器管理欄不同者(外部同步重寫使其時間／建立者較新, 持舊快照送回)視為無變更, 免把建立者與建立時間回退為舊值(S2); 內容確有改動(指派欄)之外部列改帶庫內之伺服器管理欄寫入(restoreServerFields);
+        //②from 型別與外部列守門(checkExternalWrite): 新增列 from 須為 ''、外部列不可刪／不可改 from 與身分結構欄, 指派欄可寫(草稿新鮮而仍違規者在此被拒);
+        //③無基準而修改外部列之指派欄: 無從證明快照新舊, Lv1 放行之指派欄不得因舊快照還原外部已撤銷之授權(外審 B.2), 依原則 3 拒收(saveBaselineRequired); 後台列無基準維持舊行為(最後寫入者勝, ADR-013).
         //srLog 只記錯誤鍵、原因、筆數與來源名稱, 不記列 id／個資值
         let keysTab = ds[keyTable].keys
         if (lockExternalRows) {
             r = dropServerOnlyDiff({ keys: keysTab, r, ltdtOld })
+            r = restoreServerFields({ r, ltdtOld }) //改動之外部列帶庫內之伺服器管理欄: 持舊草稿(保留未存編輯期間外部同步重寫了該列)不得把較新之建立者／建立時間回退(外審 sol 第 3 點)
         }
-        if (baseline !== null) {
-            let ck = checkBaseline({ keys: keysTab, r, ltdtOld, baseline })
-            if (ck !== null) {
-                srLog.error({ event: 'updateTabItems-stale-error', keyTable, userId, msg: ck.key, reason: ck.reason, n: ck.n })
-                return Promise.reject(ck.key)
-            }
-        }
-        let ex = checkExternalWrite({ keyTable, keys: keysTab, r, ltdtOld, lockExternalRows })
+        let ex =checkExternalWrite({ keyTable, keys: keysTab, r, ltdtOld, lockExternalRows })
         if (ex !== null) {
             srLog.error({ event: 'updateTabItems-external-error', keyTable, userId, msg: ex.key, reason: ex.reason, n: ex.n, froms: ex.froms })
             return Promise.reject(ex.key)

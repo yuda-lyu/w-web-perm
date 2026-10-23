@@ -431,7 +431,7 @@ describe('unit-externalUi (清單頁外部列前端輔助與接線, F-23 / R-EXT
         it('SITE-EU-007 四頁送出前之外部列守門(貼上等路徑可繞過逐列唯讀): getExternalEdits 於開 loading 之前、早退前 unlockBtn、以 saveExternalRowChanged 之警告訊息框提示', function() {
             for (let [fn, table] of PAGES) {
                 let c = code(`src/components/${fn}.vue`)
-                let re = new RegExp(`if \\(vo\\.isLockExternal && getExternalEdits\\(\\{ keyTable: '${table}', keys: vo\\.\\$ds\\.${table}\\.keys, rowsNew: rows, rowsOld: vo\\.${table} \\}\\) !== null\\) \\{\\s*unlockBtn\\(\\)\\s*await vo\\.\\$dg\\.showCheckYes\\(vo\\.\\$t\\('saveExternalRowChanged'\\), \\{ type: 'warning' \\}\\)\\s*return\\s*\\}`)
+                let re = new RegExp(`if \\(vo\\.isLockExternal && getExternalEdits\\(\\{ keyTable: '${table}', keys: vo\\.\\$ds\\.${table}\\.keys, rowsNew: rows, rowsOld: vo\\.baseRows \\}\\) !== null\\) \\{\\s*unlockBtn\\(\\)\\s*await vo\\.\\$dg\\.showCheckYes\\(vo\\.\\$t\\('saveExternalRowChanged'\\), \\{ type: 'warning' \\}\\)\\s*return\\s*\\}`)
                 assert.strict.ok(re.test(c), `${fn} 外部列守門`)
                 let iGuard = c.indexOf('getExternalEdits({ keyTable')
                 let iLoad = c.indexOf('updateLoading(true)')
@@ -447,8 +447,9 @@ describe('unit-externalUi (清單頁外部列前端輔助與接線, F-23 / R-EXT
             }
             for (let [fn] of PAGES) {
                 let c = code(`src/components/${fn}.vue`)
-                assert.strict.ok(/\.catch\(async \(err\) => \{\s*vo\.\$ui\.updateLoading\(false\)\s*await vo\.\$dg\.showCheckYes\(`\$\{vo\.\$t\('\w+Fail'\)\}: \$\{vo\.\$tErr\(err\)\}`\)\s*\}\)/.test(c), `${fn} 失敗路徑: 先關 loading 再 showCheckYes(無 type: success)`)
-                assert.strict.ok(/\.finally\(\(\) => \{\s*vo\.\$ui\.updateLoading\(false\)\s*\}\)/.test(c), `${fn} finally 統一關 loading`)
+                //run12: 失敗路徑於關 loading 之前先歸零 saveMark.saving 並依目前 store 重算過期提示(自己存檔進行中被安靜保留之推播; 見 unit-draftSync DS-4o); 其後仍是先關 loading 再 showCheckYes
+                assert.strict.ok(/\.catch\(async \(err\) => \{\s*vo\.saveMark\.saving = false\s*vo\.staleNotice = isDraftStale\(\{[^\n]*\}\)\s*vo\.\$ui\.updateLoading\(false\)\s*await vo\.\$dg\.showCheckYes\(`\$\{vo\.\$t\('\w+Fail'\)\}: \$\{vo\.\$tErr\(err\)\}`\)\s*\}\)/.test(c), `${fn} 失敗路徑: 先關 loading 再 showCheckYes(無 type: success)`)
+                assert.strict.ok(/\.finally\(\(\) => \{\s*vo\.saveMark\.saving = false\s*vo\.\$ui\.updateLoading\(false\)\s*\}\)/.test(c), `${fn} finally 統一關 loading(並歸零 saveMark.saving)`)
             }
         })
     })

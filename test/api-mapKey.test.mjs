@@ -15,7 +15,7 @@ import assert from 'assert'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { startApi, TOKEN_ADMIN, TOKEN_APP, getWoItems, callRpc, urlSync } from './tools/api-setup.mjs'
+import { startApi, TOKEN_ADMIN, TOKEN_APP, getWoItems, callRpc, urlSync, cleanExternalFixtures } from './tools/api-setup.mjs'
 import { restartBackend, genTempSettings, apiBaseUrl } from './tools/e2e-setup.mjs'
 
 //run07(F-23 外部列守門)調整說明: MK-020／021 測的是「後台 updateUsers 對歷史重複／空對應鍵只擋本次造成或觸及者」(R-MAPKEY-03), 其「歷史資料」原以外部同步(from=appMk-9／appMk-10)造出,
@@ -54,12 +54,10 @@ describe('api-mapKey (F-14: 使用者對應鍵之外部同步檢查與登入多�
 
     after(async function() {
         this.timeout(300000)
-        //本檔寫入之 from 分區逐一 delAll(對稱於各測試之寫入; 只動本檔專屬之 appMk-* from, base seed 不動)。
+        //本檔寫入之 from 分區經 cleanExternalFixtures 移除(外部列夾具收尾之單一入口, R-TEST-EXT-CLEAN-01; 只動本檔專屬之 appMk-* from, base seed 不動)。
         //  reseed 於 mocha 進程持有 lmdb 映射時刪不掉 ./db 而退化為 upsert(見 e2e-setup wipeDbVerified), 不會移除測試列, 故須先自行清
         let woItems = await getWoItems()
-        for (let from of ['appMk-dup', 'appMk-1', 'appMk-2', 'appMk-3', 'appMk-4', 'appMk-5', 'appMk-6', 'appMk-6b', 'appMk-7', 'appMk-8']) {
-            await woItems.users.delAll({ from })
-        }
+        await cleanExternalFixtures({ kts: ['users'], froms: ['appMk-dup', 'appMk-1', 'appMk-2', 'appMk-3', 'appMk-4', 'appMk-5', 'appMk-6', 'appMk-6b', 'appMk-7', 'appMk-8'] })
         //MK-020／021(run05; run07 起歷史列為後台列, from ''): 以主鍵清除旁路追加列與其後台新增列, 並刪除 seed-extra.json
         await woItems.users.delAll({ id: { $in: SEED_EXTRA_IDS } })
         fs.rmSync(dirTmp, { recursive: true, force: true })

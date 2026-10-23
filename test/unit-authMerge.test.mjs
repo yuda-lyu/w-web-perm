@@ -1,6 +1,6 @@
 //授權合併(getUserRules 之 mergeRules)規格測試(第 101 項 run04; 前身為 run01 之現況刻畫 unit-authMerge-characterize, 2026-10-21 依使用者最終裁示改為規格)
 //
-//【規格】CLAUDE_rulebook.md 之 R-AUTH-MERGE-00(使用者裁示; spec/設計要點與取捨.md ADR-033 取代 ADR-001 之 AND 非對稱條):
+//【規格】sgud/rule/rulebook.md 之 R-AUTH-MERGE-00(使用者裁示; spec/設計要點與取捨.md ADR-033 取代 ADR-001 之 AND 非對稱條):
 //  1. 每一項之值: 有勾＝y; 給 n 或未給(未列)一律視同 n. 不存在「未列＝不約束」.
 //  2. 起點: 全部管理對象皆為 n.
 //  3. 先 OR 後 AND, 與排列順序無關: 先將所有 OR 項做聯集; 若該層沒有任何 OR 項, 以第一個 AND 項為基底(因第 1 條, 任何 AND 項當基底結果皆相同); 再與所有 AND 項做交集.

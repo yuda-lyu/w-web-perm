@@ -1,6 +1,6 @@
 //授權合併(getUserRules)規格參考實作、舊規則複製與稽核之共用工具(供 unit-authMerge 與 authMergeReport.mjs 使用)
 //
-//【定位】規則為 CLAUDE_rulebook.md 之 R-AUTH-MERGE-00 與 R-PRINCIPLE-00(使用者裁示; ADR-033 取代 ADR-001 之 AND 非對稱條)——
+//【定位】規則為 sgud/rule/rulebook.md 之 R-AUTH-MERGE-00 與 R-PRINCIPLE-00(使用者裁示; ADR-033 取代 ADR-001 之 AND 非對稱條)——
 //  每一項「未給」＝ n; 全對象 n 起點 → 所有 OR 聯集(無 OR 時第一個 AND 為基底)→ 與所有 AND 交集; 結果與排列順序無關;
 //  run05(R-PRINCIPLE-00 適用表 c／d／e): 引用查無實體(懸空)者以其 mode 參與、內容全 n; 引用之名稱對到多筆(歷史同名)者內容取各筆之交集;
 //  mode 缺或非 OR／AND 者為「限制項」(lim): 只作 AND 交集項、不當基底; 該層沒有任何 mode 合法之啟用項(含沒有任何項)→ 結果全 n(主責裁示: 各解讀〔OR／AND／不計入〕之交集,

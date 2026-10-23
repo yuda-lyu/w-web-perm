@@ -1,0 +1,42 @@
+start Fri Oct 23 2026 05:42:43 GMT+0800 (台北標準時間)
+sha-before {"src/plugins/dataReloadGuard.mjs":"0882754a13d6714cabdf96e34ae395374ef3cf98","src/components/LayoutContentUsers.vue":"7f6718575577f866f3015d27cda372de6c0772e6"}
+new-cases-fixed: exit=2 passing=6 failing=2 pending=0 142s 1) E2E-027-users-own-save-late-double-push || 2) E2E-027-users-own-save-late-double-push || 1) e2e-external-rows (eng) || 2) e2e-external-rows (cht)
+fixed-027-1: exit=2 passing=0 failing=2 pending=0 70s 1) E2E-027-users-own-save-late-double-push || 2) E2E-027-users-own-save-late-double-push || 1) e2e-external-rows (eng) || 2) e2e-external-rows (cht)
+fixed-027-2: exit=2 passing=0 failing=2 pending=0 69s 1) E2E-027-users-own-save-late-double-push || 2) E2E-027-users-own-save-late-double-push || 1) e2e-external-rows (eng) || 2) e2e-external-rows (cht)
+fixed-027-3: exit=2 passing=0 failing=2 pending=0 69s 1) E2E-027-users-own-save-late-double-push || 2) E2E-027-users-own-save-late-double-push || 1) e2e-external-rows (eng) || 2) e2e-external-rows (cht)
+af037-1: exit=0 passing=2 failing=0 pending=0 32s 
+af037-2: exit=0 passing=2 failing=0 pending=0 32s 
+af037-3: exit=0 passing=2 failing=0 pending=0 32s 
+af037-4: exit=0 passing=2 failing=0 pending=0 32s 
+af037-5: exit=0 passing=2 failing=0 pending=0 32s 
+af037-6: exit=0 passing=2 failing=0 pending=0 32s 
+af037-7: exit=0 passing=2 failing=0 pending=0 32s 
+af037-8: exit=1 passing=1 failing=1 pending=0 32s 1) AF-037-rename-pemi-preview [eng]: (spec 流程_後台權限清單 E2E-015 || 1) e2e-array-form run06 引用連帶: 改名預覽確認、刪除確認與清理、預檢被拒、cascadeRen
+af037-9: exit=0 passing=2 failing=0 pending=0 32s 
+af037-10: exit=0 passing=2 failing=0 pending=0 32s 
+af037-11: exit=0 passing=2 failing=0 pending=0 32s 
+af037-12: exit=0 passing=2 failing=0 pending=0 32s 
+af037-13: exit=0 passing=2 failing=0 pending=0 33s 
+af037-14: exit=0 passing=2 failing=0 pending=0 32s 
+af037-15: exit=0 passing=2 failing=0 pending=0 32s 
+af037-16: exit=0 passing=2 failing=0 pending=0 32s 
+af037-17: exit=0 passing=2 failing=0 pending=0 32s 
+af037-18: exit=0 passing=2 failing=0 pending=0 32s 
+af037-19: exit=0 passing=2 failing=0 pending=0 31s 
+af037-20: exit=0 passing=2 failing=0 pending=0 32s 
+mutation mutA-legacy-guard applied
+mutA-legacy-guard-1: exit=0 passing=2 failing=0 pending=0 32s 
+mutA-legacy-guard-2: exit=0 passing=2 failing=0 pending=0 32s 
+mutA-legacy-guard-3: exit=0 passing=2 failing=0 pending=0 33s 
+mutation mutA-legacy-guard restored sha=OK
+mutation mutB-no-saving applied
+mutB-no-saving-1: exit=2 passing=0 failing=2 pending=0 30s 1) E2E-028-users-own-save-push-before-response || 2) E2E-028-users-own-save-push-before-response || 1) e2e-external-rows (eng) || 2) e2e-external-rows (cht)
+mutB-no-saving-2: exit=2 passing=0 failing=2 pending=0 29s 1) E2E-028-users-own-save-push-before-response || 2) E2E-028-users-own-save-push-before-response || 1) e2e-external-rows (eng) || 2) e2e-external-rows (cht)
+mutation mutB-no-saving restored sha=OK
+sha-after {"src/plugins/dataReloadGuard.mjs":"0882754a13d6714cabdf96e34ae395374ef3cf98","src/components/LayoutContentUsers.vue":"7f6718575577f866f3015d27cda372de6c0772e6"} same=true
+FILE e2e-external-rows: exit=0 passing=60 failing=0 pending=0 799s 
+FILE e2e-array-form: exit=1 passing=0 failing=0 pending=0 0s 
+FILE e2e-users: exit=0 passing=24 failing=0 pending=0 591s 
+FILE e2e-grups: exit=0 passing=20 failing=0 pending=0 617s 
+FILE e2e-pemis: exit=0 passing=20 failing=0 pending=0 616s 
+FILE e2e-targets: exit=0 passing=26 failing=0 pending=0 757s 

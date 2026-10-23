@@ -1,5 +1,5 @@
 //授權與資料歸屬之查值: 供權限評估(src/plugins/mShare.mjs)、外部應用 SDK(src/perm.mjs)、後台整表寫入(server/procCore.mjs)與編輯對話框(VeCgrups／VeCpemis／VeCrules)共用
-//規則見 CLAUDE_rulebook.md「迭代使用端傳入之物件」之 R-AUTH-PATH-01
+//規則見 sgud/rule/rulebook.md「迭代使用端傳入之物件」之 R-AUTH-PATH-01
 //本檔無外部相依
 
 

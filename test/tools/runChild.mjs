@@ -1,4 +1,4 @@
-//子行程執行輔助(供 R-OBJ-ITER-01 之巨大 length 案例共用; 規則見 CLAUDE_rulebook.md「迭代使用端傳入之物件」)。
+//子行程執行輔助(供 R-OBJ-ITER-01 之巨大 length 案例共用; 規則見 sgud/rule/rulebook.md「迭代使用端傳入之物件」)。
 //why: 修正前 lodash 對帶 `length: 2**32-1` 之物件空轉約 80 秒(或配置記憶體至耗盡), 且為同步迴圈, mocha 之逾時無法中斷;
 //故巨大 length 一律放子行程執行並設逾時與堆積上限, 逾時即殺、以 timedOut 回報(修前紅, 修後毫秒內完成).
 import { spawnSync } from 'child_process'

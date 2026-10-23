@@ -7,7 +7,7 @@
 //  [P2] 送出之整表＝存檔當下 store 快照之全部列; 開框後他人／外部同步新增之列(不在對話框內)原樣帶回、不被刪(S4)
 //  [P3] 使用者於本次編輯有變更之列(相對開框時之歸屬狀態)才對存檔當下快照之字串只改本項(putRefEntry); 使用者未變更之列一律原樣帶回存檔當下 store 之版本(逐字不動), 不因草稿舊值而被改寫
 //  [P4] 對話框內有列所對應之使用者／群組於開框後被刪除(群組另含改名)→ 整次拒存 relationRowsStale(既有安全檢查, 不得放寬)
-//  [P5] 伺服端只對「本次將寫入之列」比對基準(same 不檢查): 故 [P3] 之未變更列即使開框後被他人改動, 帶回存檔當下 store 版本即不被拒; 使用者有變更之列若庫內已被改動 → saveStale
+//  [P5] (run11 改寫為表級, R-PRINCIPLE-00 原則 7: 先動先贏) 伺服端以開框時之整表基準比對庫內整表: 開框後表內任何一列被他人／外部同步改動或增刪(不論是否為使用者有變更之列, 含 [P3] 之未變更列)→ saveStale、零寫入; 須重新開框(基準取自新 store)後再存。run07 版「只比對本次將寫入之列(same 不檢查)」之案已改寫
 //  [P6] 外部列(from 非空)之指派可勾選: 附基準則可存, 且 from／名稱等欄位逐字帶回; 無基準 → saveBaselineRequired
 //
 //輸入空間表(軸 × 格; 已測／刻意不測／未測):
@@ -500,7 +500,7 @@ describe('unit-relDialogs-baseline (關聯對話框: 開框綁基準＋整表以
         assert.strictEqual(byId(after, 'ux').from, 'teamA')
     })
 
-    it('RB-SRV-002-S4 開框後他人新增列 u9: 整表含 u9(原樣帶回, 在其 order 位置), 存檔後 u9 仍在庫內; 對照修前行為(只送對話框之列)u9 被整表 diff 刪除  [spec P2]', async function() {
+    it('RB-SRV-002-S4 開框後他人新增列 u9: 前端整表仍含 u9(原樣帶回, 在其 order 位置), 但表級基準已過期 → 伺服端 saveStale、零寫入、u9 仍在庫內(run11 原則 7: 先動先贏; run07 版為成功); 重新開框(新基準)後再存成功且 u9 保留; 對照修前行為(只送對話框之列)u9 被整表 diff 刪除  [spec P2／原則 7]', async function() {
         let e = createEnv()
         let store1 = await storeOf(e, 'users')
         let dlg = openDialog(store1, 'G1', 'users')
@@ -511,8 +511,15 @@ describe('unit-relDialogs-baseline (關聯對話框: 開框綁基準＋整表以
         let res = saveModel(dlg, store2, 'G1', 'users')
         assert.deepStrictEqual(ids(res.rowsSend), ids(store2))
         assert.deepStrictEqual(byId(res.rowsSend, 'u9'), byId(store2, 'u9'), 'u9 逐字原樣帶回')
-        let r = await call(e, 'users', res.rowsSend, res.baseline)
-        assert.deepStrictEqual(r, { ok: true, v: 'saveTabItemsSuccess' })
+        assert.deepStrictEqual(await call(e, 'users', res.rowsSend, res.baseline), { ok: false, v: 'saveStale' }, '開框後表內多了 u9 → 表級過期')
+        let mid = await storeOf(e, 'users')
+        assert.ok(byId(mid, 'u9'), 'u9 仍在庫內')
+        assert.strictEqual(byId(mid, 'u1').cgrups, '{}', '零寫入(u1 未被改)')
+        //重新開框(基準取自含 u9 之 store)後再存: 成功, u9 保留
+        let dlgB = openDialog(store2, 'G1', 'users')
+        toggle(dlgB, 'u1', 'y', 'OR')
+        let resB = saveModel(dlgB, store2, 'G1', 'users')
+        assert.deepStrictEqual(await call(e, 'users', resB.rowsSend, resB.baseline), { ok: true, v: 'saveTabItemsSuccess' })
         let after = await storeOf(e, 'users')
         assert.ok(byId(after, 'u9'), 'u9 仍在庫內(修前被刪)')
         assert.strictEqual(byId(after, 'u9').cgrups, ON('G1'))
@@ -535,7 +542,7 @@ describe('unit-relDialogs-baseline (關聯對話框: 開框綁基準＋整表以
         assert.ok(!byId(await storeOf(e2, 'users'), 'u9'), '修前行為(無基準): u9 被刪(S4)')
     })
 
-    it('RB-SRV-003-開框後他人改了使用者「未碰」之列 u3: u3 以存檔當下 store 版本原樣帶回、不被草稿舊值改寫、存檔成功且 u3 保留他人之版本; 對照修前行為(以草稿值改寫)→ 伺服端 saveStale、或(無基準之舊客戶端)覆蓋他人變更  [spec P3／P5]', async function() {
+    it('RB-SRV-003-開框後他人改了使用者「未碰」之列 u3: u3 以存檔當下 store 版本原樣帶回、不被草稿舊值改寫; 但表級基準已過期 → 伺服端 saveStale、零寫入(run11 原則 7: 他人改別列亦拒; run07 版為成功); 重新開框後存檔成功且 u3 保留他人之版本; 對照修前行為(以草稿值改寫)→ 伺服端 saveStale、或(無基準之舊客戶端)覆蓋他人變更  [spec P3／P5／原則 7]', async function() {
         let e = createEnv()
         let store1 = await storeOf(e, 'users')
         let dlg = openDialog(store1, 'G1', 'users') //開框時 u3 未歸屬 G1(ARR_OFF 只有停用之 G7 與 G9)
@@ -546,8 +553,12 @@ describe('unit-relDialogs-baseline (關聯對話框: 開框綁基準＋整表以
         assert.deepStrictEqual(byId(res.rowsSend, 'u3'), byId(store2, 'u3'), 'u3 原樣帶回存檔當下 store 之版本')
         assert.strictEqual(byId(res.rowsSend, 'u3').cgrups, ON('G1', 'AND'))
         assert.ok(!(2 in res.kpNew), '未變更列不入新值表')
-        let r = await call(e, 'users', res.rowsSend, res.baseline)
-        assert.deepStrictEqual(r, { ok: true, v: 'saveTabItemsSuccess' }, 'u3 未被寫入, 不因開框後被他人改動而被拒(伺服端 same 列不檢查基準)')
+        assert.deepStrictEqual(await call(e, 'users', res.rowsSend, res.baseline), { ok: false, v: 'saveStale' }, '表內 u3 已異於開框時 → 表級過期(即使 u3 本次不寫入)')
+        assert.strictEqual(byId(await storeOf(e, 'users'), 'u1').cgrups, '{}', '零寫入')
+        let dlgB = openDialog(store2, 'G1', 'users') //重新開框: 基準取自含他人變更之 store
+        toggle(dlgB, 'u1', 'y', 'OR')
+        let resB = saveModel(dlgB, store2, 'G1', 'users')
+        assert.deepStrictEqual(await call(e, 'users', resB.rowsSend, resB.baseline), { ok: true, v: 'saveTabItemsSuccess' })
         let after = await storeOf(e, 'users')
         assert.strictEqual(byId(after, 'u3').cgrups, ON('G1', 'AND'), '保留他人之變更')
         assert.strictEqual(byId(after, 'u1').cgrups, ON('G1'))
@@ -654,9 +665,14 @@ describe('unit-relDialogs-baseline (關聯對話框: 開框綁基準＋整表以
         let store2 = await storeOf(e, 'users')
         toggle(dlg, 'u1', 'y', 'OR')
         let res = saveModel(dlg, store2, 'G1', 'users')
-        assert.ok(res.rowsSend, '未變更之有損列不拒')
+        assert.ok(res.rowsSend, '未變更之有損列不拒(前端不攔)')
         assert.strictEqual(byId(res.rowsSend, 'u3').cgrups, LOSSY, '逐字帶回')
-        assert.deepStrictEqual(await call(e, 'users', res.rowsSend, res.baseline), { ok: true, v: 'saveTabItemsSuccess' })
+        assert.deepStrictEqual(await call(e, 'users', res.rowsSend, res.baseline), { ok: false, v: 'saveStale' }, 'run11 表級: u3 於開框後被改 → 以開框基準被拒')
+        let dlgB = openDialog(store2, 'G1', 'users') //重新開框後再存: 有損列逐字帶回, 成功
+        toggle(dlgB, 'u1', 'y', 'OR')
+        let resB = saveModel(dlgB, store2, 'G1', 'users')
+        assert.strictEqual(byId(resB.rowsSend, 'u3').cgrups, LOSSY, '逐字帶回')
+        assert.deepStrictEqual(await call(e, 'users', resB.rowsSend, resB.baseline), { ok: true, v: 'saveTabItemsSuccess' })
         assert.strictEqual(byId(await storeOf(e, 'users'), 'u3').cgrups, LOSSY)
         //使用者勾選有損列 u3(開框時為未歸屬 → 歸屬)
         let dlg2 = openDialog(store2, 'G1', 'users')
@@ -695,7 +711,7 @@ describe('unit-relDialogs-baseline (關聯對話框: 開框綁基準＋整表以
         assert.strictEqual(e.woItems.users.cnt.del, 0)
     })
 
-    it('RB-SRV-101-權限所屬群組對話框(grups, 驗名稱): 勾選 g1 → 整表含 4 群組(含外部群組 gx); 開框後他人新增群組 g9 原樣帶回且不被刪; 成功  [spec P2／P3]', async function() {
+    it('RB-SRV-101-權限所屬群組對話框(grups, 驗名稱): 勾選 g1 → 整表含 4 群組(含外部群組 gx); 開框後他人新增群組 g9 原樣帶回且不被刪, 但表級基準已過期 → saveStale; 重新開框後成功  [spec P2／P3／原則 7]', async function() {
         let e = createEnv()
         let store1 = await storeOf(e, 'grups')
         let dlg = openDialog(store1, 'P1', 'grups')
@@ -708,7 +724,12 @@ describe('unit-relDialogs-baseline (關聯對話框: 開框綁基準＋整表以
         assert.deepStrictEqual(byId(res.rowsSend, 'g9'), byId(store2, 'g9'))
         assert.deepStrictEqual(byId(res.rowsSend, 'g2'), byId(store2, 'g2'))
         assert.strictEqual(byId(res.rowsSend, 'g2').cpemis, PRETTY)
-        assert.deepStrictEqual(await call(e, 'grups', res.rowsSend, res.baseline), { ok: true, v: 'saveTabItemsSuccess' })
+        assert.deepStrictEqual(await call(e, 'grups', res.rowsSend, res.baseline), { ok: false, v: 'saveStale' }, '開框後表內多了 g9 → 表級過期')
+        assert.strictEqual(byId(await storeOf(e, 'grups'), 'g1').cpemis, '{}', '零寫入')
+        let dlgB = openDialog(store2, 'P1', 'grups')
+        toggle(dlgB, 'g1', 'y', 'OR')
+        let resB = saveModel(dlgB, store2, 'P1', 'grups')
+        assert.deepStrictEqual(await call(e, 'grups', resB.rowsSend, resB.baseline), { ok: true, v: 'saveTabItemsSuccess' })
         let after = await storeOf(e, 'grups')
         assert.ok(byId(after, 'g9'), 'g9 仍在庫內')
         assert.strictEqual(byId(after, 'g1').cpemis, ON('P1'))
@@ -738,7 +759,7 @@ describe('unit-relDialogs-baseline (關聯對話框: 開框綁基準＋整表以
         assert.deepStrictEqual(res2, { rejected: 'relationRowsStale', names: ['G3'] })
     })
 
-    it('RB-SRV-103-開框後他人改了使用者未碰之群組 g3: g3 帶回存檔當下版本不被草稿改寫, 勾選 g1 成功且 g3 保留他人之變更; 有損群組(同名 OR+AND)未變更 → 不拒  [spec P3／P5]', async function() {
+    it('RB-SRV-103-開框後他人改了使用者未碰之群組 g3: g3 帶回存檔當下版本不被草稿改寫, 但表級基準已過期 → saveStale、零寫入; 重新開框後勾選 g1 成功且 g3 保留他人之變更; 有損群組(同名 OR+AND)未變更 → 前端不拒  [spec P3／P5／原則 7]', async function() {
         let e = createEnv()
         let store1 = await storeOf(e, 'grups')
         let dlg = openDialog(store1, 'P1', 'grups')
@@ -750,7 +771,12 @@ describe('unit-relDialogs-baseline (關聯對話框: 開框綁基準＋整表以
         assert.ok(res.rowsSend)
         assert.strictEqual(byId(res.rowsSend, 'g3').cpemis, LOSSY_P)
         assert.strictEqual(byId(res.rowsSend, 'g2').cpemis, ON('P1', 'AND'))
-        assert.deepStrictEqual(await call(e, 'grups', res.rowsSend, res.baseline), { ok: true, v: 'saveTabItemsSuccess' })
+        assert.deepStrictEqual(await call(e, 'grups', res.rowsSend, res.baseline), { ok: false, v: 'saveStale' }, '表內 g2／g3 已異於開框時 → 表級過期')
+        assert.strictEqual(byId(await storeOf(e, 'grups'), 'g1').cpemis, '{}', '零寫入')
+        let dlgB = openDialog(store2, 'P1', 'grups')
+        toggle(dlgB, 'g1', 'y', 'OR')
+        let resB = saveModel(dlgB, store2, 'P1', 'grups')
+        assert.deepStrictEqual(await call(e, 'grups', resB.rowsSend, resB.baseline), { ok: true, v: 'saveTabItemsSuccess' })
         let after = await storeOf(e, 'grups')
         assert.strictEqual(byId(after, 'g3').cpemis, LOSSY_P)
         assert.strictEqual(byId(after, 'g2').cpemis, ON('P1', 'AND'))

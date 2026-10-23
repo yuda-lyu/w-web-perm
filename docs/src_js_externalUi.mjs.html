@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    
+    <meta charset="utf-8">
+    <title>src/js/externalUi.mjs - Documentation</title>
+    
+    
+    <script src="scripts/prettify/prettify.js"></script>
+    <script src="scripts/prettify/lang-css.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc.css">
+    <script src="scripts/nav.js" defer></script>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+<input type="checkbox" id="nav-trigger" class="nav-trigger" />
+<label for="nav-trigger" class="navicon-button x">
+  <div class="navicon"></div>
+</label>
+
+<label for="nav-trigger" class="overlay"></label>
+
+<nav >
+    
+    
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="WWebPerm.html">WWebPerm</a></li></ul><h3>Global</h3><ul><li><a href="global.html#applyPurgePlan">applyPurgePlan</a></li><li><a href="global.html#auditFrom">auditFrom</a></li><li><a href="global.html#auditRefs">auditRefs</a></li><li><a href="global.html#buildReport">buildReport</a></li><li><a href="global.html#buildRowsSend">buildRowsSend</a></li><li><a href="global.html#buildSyncRowsNew">buildSyncRowsNew</a></li><li><a href="global.html#checkBaseline">checkBaseline</a></li><li><a href="global.html#checkCascadePlan">checkCascadePlan</a></li><li><a href="global.html#checkDbNotInUse">checkDbNotInUse</a></li><li><a href="global.html#checkExternalWrite">checkExternalWrite</a></li><li><a href="global.html#checkMapKeyBatch">checkMapKeyBatch</a></li><li><a href="global.html#checkUsersWrite">checkUsersWrite</a></li><li><a href="global.html#cleanOutOf">cleanOutOf</a></li><li><a href="global.html#compareBaseline">compareBaseline</a></li><li><a href="global.html#countAndRefs">countAndRefs</a></li><li><a href="global.html#countExternalRows">countExternalRows</a></li><li><a href="global.html#countIdRenumber">countIdRenumber</a></li><li><a href="global.html#createAuthorizeExec">createAuthorizeExec</a></li><li><a href="global.html#createLegendMeasurer">createLegendMeasurer</a></li><li><a href="global.html#createLockSave">createLockSave</a></li><li><a href="global.html#cvKpToArr">cvKpToArr</a></li><li><a href="global.html#cvKpToObj">cvKpToObj</a></li><li><a href="global.html#decideLegendType">decideLegendType</a></li><li><a href="global.html#describeUpstream">describeUpstream</a></li><li><a href="global.html#diffRefTargets">diffRefTargets</a></li><li><a href="global.html#dropServerOnlyDiff">dropServerOnlyDiff</a></li><li><a href="global.html#eachOwn">eachOwn</a></li><li><a href="global.html#fetchJson">fetchJson</a></li><li><a href="global.html#fillIdlessIds">fillIdlessIds</a></li><li><a href="global.html#findDupIndex">findDupIndex</a></li><li><a href="global.html#findKeyOtherFrom">findKeyOtherFrom</a></li><li><a href="global.html#findRefRows">findRefRows</a></li><li><a href="global.html#findTouchedDup">findTouchedDup</a></li><li><a href="global.html#fmtLossyMsg">fmtLossyMsg</a></li><li><a href="global.html#fmtVars">fmtVars</a></li><li><a href="global.html#fmtWarn">fmtWarn</a></li><li><a href="global.html#formatFixReport">formatFixReport</a></li><li><a href="global.html#formatFromAudit">formatFromAudit</a></li><li><a href="global.html#formatPurgeReport">formatPurgeReport</a></li><li><a href="global.html#genLegend">genLegend</a></li><li><a href="global.html#getAddConfirmText">getAddConfirmText</a></li><li><a href="global.html#getAddImpact">getAddImpact</a></li><li><a href="global.html#getBannerLines">getBannerLines</a></li><li><a href="global.html#getBaselineDigest">getBaselineDigest</a></li><li><a href="global.html#getCascadePreview">getCascadePreview</a></li><li><a href="global.html#getChangedIdx">getChangedIdx</a></li><li><a href="global.html#getDelConfirmText">getDelConfirmText</a></li><li><a href="global.html#getDelImpact">getDelImpact</a></li><li><a href="global.html#getDelRefCount">getDelRefCount</a></li><li><a href="global.html#getDigestFields">getDigestFields</a></li><li><a href="global.html#getDupRowsInconsistent">getDupRowsInconsistent</a></li><li><a href="global.html#getEffMode">getEffMode</a></li><li><a href="global.html#getExternalEdits">getExternalEdits</a></li><li><a href="global.html#getItemWarnText">getItemWarnText</a></li><li><a href="global.html#getKpLossy">getKpLossy</a></li><li><a href="global.html#getLockFields">getLockFields</a></li><li><a href="global.html#getNameErrs">getNameErrs</a></li><li><a href="global.html#getOwn">getOwn</a></li><li><a href="global.html#getPropKey">getPropKey</a></li><li><a href="global.html#getRawModeMap">getRawModeMap</a></li><li><a href="global.html#getRefRowsExtra">getRefRowsExtra</a></li><li><a href="global.html#getRefState">getRefState</a></li><li><a href="global.html#getRefWarnText">getRefWarnText</a></li><li><a href="global.html#getRefWarns">getRefWarns</a></li><li><a href="global.html#getRowIdxs">getRowIdxs</a></li><li><a href="global.html#getRowState">getRowState</a></li><li><a href="global.html#getRuleEnable">getRuleEnable</a></li><li><a href="global.html#getRuleWarnText">getRuleWarnText</a></li><li><a href="global.html#getRuleWarns">getRuleWarns</a></li><li><a href="global.html#getSavePreview">getSavePreview</a></li><li><a href="global.html#getSyncWarnLines">getSyncWarnLines</a></li><li><a href="global.html#hasDupKey">hasDupKey</a></li><li><a href="global.html#hasExternalDiff">hasExternalDiff</a></li><li><a href="global.html#isAuthMode">isAuthMode</a></li><li><a href="global.html#isBaselineStale">isBaselineStale</a></li><li><a href="global.html#isBaselineValid">isBaselineValid</a></li><li><a href="global.html#isDraftStale">isDraftStale</a></li><li><a href="global.html#isExternalRow">isExternalRow</a></li><li><a href="global.html#isJsonLossy">isJsonLossy</a></li><li><a href="global.html#isMain">isMain</a></li><li><a href="global.html#joinList">joinList</a></li><li><a href="global.html#joinNames">joinNames</a></li><li><a href="global.html#keepAssignByEntity">keepAssignByEntity</a></li><li><a href="global.html#keepAssignOnMissing">keepAssignOnMissing</a></li><li><a href="global.html#makeBaseline">makeBaseline</a></li><li><a href="global.html#makeRowStates">makeRowStates</a></li><li><a href="global.html#mapKeyOf">mapKeyOf</a></li><li><a href="global.html#mapNameKp">mapNameKp</a></li><li><a href="global.html#markDataReload">markDataReload</a></li><li><a href="global.html#markHasKey">markHasKey</a></li><li><a href="global.html#maskQuery">maskQuery</a></li><li><a href="global.html#maskTok">maskTok</a></li><li><a href="global.html#maskUrl">maskUrl</a></li><li><a href="global.html#mergePickKeysOnly">mergePickKeysOnly</a></li><li><a href="global.html#pairRowsToSnapshot">pairRowsToSnapshot</a></li><li><a href="global.html#pickUniqueUser">pickUniqueUser</a></li><li><a href="global.html#planDraftSync">planDraftSync</a></li><li><a href="global.html#planFixFromType">planFixFromType</a></li><li><a href="global.html#planPurgeChain">planPurgeChain</a></li><li><a href="global.html#planPurgeFrom">planPurgeFrom</a></li><li><a href="global.html#planRefChanges">planRefChanges</a></li><li><a href="global.html#putRefEntry">putRefEntry</a></li><li><a href="global.html#putRowsToKp">putRowsToKp</a></li><li><a href="global.html#refsChanged">refsChanged</a></li><li><a href="global.html#resolveShellWorker">resolveShellWorker</a></li><li><a href="global.html#restoreExternalOrder">restoreExternalOrder</a></li><li><a href="global.html#restoreServerFields">restoreServerFields</a></li><li><a href="global.html#reuseDeletedIds">reuseDeletedIds</a></li><li><a href="global.html#rewriteRefs">rewriteRefs</a></li><li><a href="global.html#rowDigest">rowDigest</a></li><li><a href="global.html#runAuditFrom">runAuditFrom</a></li><li><a href="global.html#runClean">runClean</a></li><li><a href="global.html#runFixFromType">runFixFromType</a></li><li><a href="global.html#runPurgeFrom">runPurgeFrom</a></li><li><a href="global.html#splitCheckedRows">splitCheckedRows</a></li><li><a href="global.html#submitGuard">submitGuard</a></li><li><a href="global.html#tabWriteKey">tabWriteKey</a></li><li><a href="global.html#validateRowsBeforeWrite">validateRowsBeforeWrite</a></li><li><a href="global.html#withTabLocks">withTabLocks</a></li><li><a href="global.html#wrapInjected">wrapInjected</a></li><li><a href="global.html#wrapOperOrm">wrapOperOrm</a></li><li><a href="global.html#writeWithCascade">writeWithCascade</a></li></ul>
+    
+</nav>
+
+<div id="main">
+    
+    <h1 class="page-title">src/js/externalUi.mjs</h1>
+    
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import { isExternalRow, getLockFields } from './externalRows.mjs'
+
+
+//清單頁(標的／權限／群組／使用者)之外部列(from 為非空字串者)前端輔助純函數(F-23; R-PRINCIPLE-00 原則 3、5; 規則帳本 R-EXT-OWN-01; ADR-037): 不依賴 Vue／DOM／語系檔,
+//判別外部列一律經 externalRows.isExternalRow(單一擁有者, 本檔不另寫判準); 伺服端為強制者, 本檔只供畫面提示與送出前擋下(不取代伺服端守門).
+
+
+let isStr = (v) => typeof v === 'string'
+let isObj = (v) => v !== null &amp;&amp; typeof v === 'object'
+
+
+//normV: 比對用正規化, 同 externalRows 之 checkExternalWrite(缺欄與 '' 視為同一; 其餘以 JSON 字串比對)
+let normV = (v) => JSON.stringify(v === undefined ? '' : v)
+
+
+/**
+ * 把範本之 {key} 代入(單趟掃描: 代入之值不再解析, 名稱可含 {n}、{from} 等字樣原樣顯示; 未給之佔位符原樣保留)
+ *
+ * 與 getAuthWarn.fmtWarn 同設計, 但佔位符不限定名單(如 {from}、{name}); 值一律轉字串, 不特殊處理 $ 字樣.
+ *
+ * @param {String} tpl 輸入範本
+ * @param {Object} [vars={}] 輸入 { 佔位符名: 值 }
+ * @returns {String} 回傳代入後之文字
+ * @example
+ *
+ * console.log(fmtVars('{from}: {n}', { from: 'teamA', n: 3 }))
+ * // => 'teamA: 3'
+ *
+ */
+function fmtVars(tpl, vars = {}) {
+    let kp = Object.create(null)
+    Object.keys(isObj(vars) ? vars : {}).forEach((k) => {
+        kp[k] = String(vars[k])
+    })
+    return String(tpl).replace(/\{(\w+)\}/g, (hit, k) => (k in kp ? kp[k] : hit))
+}
+
+
+/**
+ * 計算外部列(from 為非空字串者)之列數
+ *
+ * @param {Array} rows 輸入列陣列(非陣列視為空)
+ * @returns {Number} 回傳外部列數
+ */
+function countExternalRows(rows) {
+    if (!Array.isArray(rows)) {
+        return 0
+    }
+    return rows.filter((r) => isExternalRow(r)).length
+}
+
+
+/**
+ * 取出屬於某表之外部同步警示(getWebInfor().syncWarns: [{ keyTable, from, n, time }]; 外部同步疑似 id 重編)
+ *
+ * 只取 keyTable 與本頁表名相符、from 為非空字串、n 為正數者; 輸出為 { from, n }(次序同輸入); 非陣列或元素格式不符者略過.
+ *
+ * @param {Array} syncWarns 輸入 webInfor.syncWarns
+ * @param {String} keyTable 輸入本頁表名(targets／pemis／grups／users)
+ * @returns {Array} 回傳 [{ from, n }]
+ */
+function getSyncWarnLines(syncWarns, keyTable) {
+    let rs = []
+    if (!Array.isArray(syncWarns)) {
+        return rs
+    }
+    syncWarns.forEach((w) => {
+        if (isObj(w) &amp;&amp; w.keyTable === keyTable &amp;&amp; isStr(w.from) &amp;&amp; w.from !== '' &amp;&amp; typeof w.n === 'number' &amp;&amp; w.n > 0) {
+            rs.push({ from: w.from, n: w.n })
+        }
+    })
+    return rs
+}
+
+
+/**
+ * 產生清單上方橫幅之各行: 外部列提示(啟用外部列保護且外部列數 > 0 才有)＋本表之外部同步警示(每個來源一行); 皆無則回空陣列(頁面不渲染任何節點)
+ *
+ * 外部列提示用語系鍵 externalRowsNotice(群組／權限／使用者: 身分欄唯讀、不可刪除、指派可改)或 externalRowsNoticeTarget(標的無指派欄); 警示用 syncWarnIdRenumber({from}、{n}).
+ *
+ * @param {Object} p 輸入參數物件
+ * @param {String} p.keyTable 輸入本頁表名
+ * @param {String} p.kind 輸入頁面種類: 'Target'(標的頁)或其他
+ * @param {Array} p.rows 輸入本頁之基準列(store 之該表列, 已儲存者; 外部列只可能由外部同步寫入)
+ * @param {Boolean} p.lock 輸入是否啟用外部列保護(webInfor.lockExternalRows === 'y')
+ * @param {Array} p.syncWarns 輸入 webInfor.syncWarns
+ * @param {Function} p.$t 輸入語系函數(key → 文字)
+ * @returns {Array} 回傳 [{ kind: 'ext'|'warn', text }]
+ */
+function getBannerLines({ keyTable, kind, rows, lock, syncWarns, $t }) {
+    let rs = []
+    let n = lock === true ? countExternalRows(rows) : 0
+    if (n > 0) {
+        rs.push({ kind: 'ext', text: fmtVars($t(kind === 'Target' ? 'externalRowsNoticeTarget' : 'externalRowsNotice'), { n }) })
+    }
+    getSyncWarnLines(syncWarns, keyTable).forEach((w) => {
+        rs.push({ kind: 'warn', text: fmtVars($t('syncWarnIdRenumber'), { from: w.from, n: w.n }) })
+    })
+    return rs
+}
+
+
+/**
+ * 把勾選列依外部列保護切成「可處理」與「被擋下」: 啟用外部列保護時外部列不得刪除(伺服端 saveExternalRowChanged), 先於前端過濾並計數供提示
+ *
+ * @param {Array} items 輸入勾選之項目(清單頁 vo.itemsCheck, 每項之 data 為該列資料)
+ * @param {Boolean} lock 輸入是否啟用外部列保護
+ * @returns {Object} 回傳 { rows, nBlocked }: rows 為可處理之項目(未啟用保護時為全部), nBlocked 為被擋下之外部列數
+ */
+function splitCheckedRows(items, lock) {
+    let all = Array.isArray(items) ? items : []
+    if (lock !== true) {
+        return { rows: all, nBlocked: 0 }
+    }
+    let rows = all.filter((v) => !isExternalRow(isObj(v) ? v.data : undefined))
+    return { rows, nBlocked: all.length - rows.length }
+}
+
+
+/**
+ * 送出前檢查: 外部列(以基準列判定)是否被改動身分／結構欄、from 或被刪除(含改 id 致原 id 消失)——清單頁以逐列唯讀與刪除過濾擋下, 但貼上(Ctrl+V)等路徑可繞過逐列唯讀,
+ * 故送出前再比對一次(判準同 externalRows.checkExternalWrite: 鎖定欄位＝getLockFields, 另含 from; 指派欄與 order／伺服器管理欄不比對), 有違規即不送出並提示(伺服端同樣整次拒收)
+ *
+ * @param {Object} p 輸入參數物件
+ * @param {String} p.keyTable 輸入表名(targets／pemis／grups／users)
+ * @param {Array} p.keys 輸入該表 schema 欄位名陣列(ds[keyTable].keys)
+ * @param {Array} p.rowsNew 輸入欲送出之整表(清單目前之列)
+ * @param {Array} p.rowsOld 輸入基準列(store 之該表列)
+ * @returns {Object|null} 回傳 null 為無違規; 否則 { n, froms }: n 為違規之外部列數, froms 為涉及之來源(至多 5 個)
+ */
+function getExternalEdits({ keyTable, keys, rowsNew, rowsOld }) {
+    let fields = [...getLockFields(keyTable, keys), 'from']
+    let newById = new Map()
+    ;(Array.isArray(rowsNew) ? rowsNew : []).forEach((r) => {
+        if (isObj(r) &amp;&amp; (isStr(r.id) || (typeof r.id === 'number' &amp;&amp; Number.isFinite(r.id)))) {
+            newById.set(String(r.id), r)
+        }
+    })
+    let n = 0
+    let froms = []
+    ;(Array.isArray(rowsOld) ? rowsOld : []).forEach((o) => {
+        if (!isExternalRow(o) || !isStr(o.id)) {
+            return
+        }
+        let r = newById.get(o.id)
+        if (r === undefined || fields.some((f) => normV(r[f]) !== normV(o[f]))) {
+            n++
+            if (froms.indexOf(o.from) &lt; 0 &amp;&amp; froms.length &lt; 5) {
+                froms.push(o.from)
+            }
+        }
+    })
+    return n > 0 ? { n, froms } : null
+}
+
+
+export { fmtVars, countExternalRows, getSyncWarnLines, getBannerLines, splitCheckedRows, getExternalEdits }
+export default fmtVars
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+    
+    
+</div>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Fri Oct 23 2026 10:56:39 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+</footer>
+
+<script>prettyPrint();</script>
+<script src="scripts/polyfill.js"></script>
+<script src="scripts/linenumber.js"></script>
+
+
+
+</body>
+</html>

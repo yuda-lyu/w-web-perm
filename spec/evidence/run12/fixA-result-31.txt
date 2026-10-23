@@ -1,0 +1,11 @@
+start Fri Oct 23 2026 04:12:19 GMT+0800 (台北標準時間) grep=AF-037 probe=true file=test/e2e-array-form.test.mjs
+run 31: exit=0 passing=2 failing=0 pending=0 33s 
+run 32: exit=0 passing=2 failing=0 pending=0 32s 
+run 33: exit=0 passing=2 failing=0 pending=0 32s 
+run 34: exit=0 passing=2 failing=0 pending=0 32s 
+run 35: exit=0 passing=2 failing=0 pending=0 32s 
+run 36: exit=0 passing=2 failing=0 pending=0 33s 
+run 37: exit=0 passing=2 failing=0 pending=0 32s 
+run 38: exit=0 passing=2 failing=0 pending=0 32s 
+run 39: exit=0 passing=2 failing=0 pending=0 32s 
+run 40: exit=0 passing=2 failing=0 pending=0 32s 

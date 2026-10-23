@@ -1,6 +1,6 @@
 //外部列守門與過期快照基準之真後端 API 測試(run07; F-23／F-26; R-PRINCIPLE-00 原則 3、5; 規則帳本 R-EXT-OWN-01、R-BASELINE-01; ADR-037)。
 //
-//規格句(來源: tmp/run07/design-digest.md、CLAUDE_rulebook.md R-EXT-OWN-01／R-BASELINE-01、src/js/externalRows.mjs 與 rowDigest.mjs 檔頭):
+//規格句(來源: tmp/run07/design-digest.md、sgud/rule/rulebook.md R-EXT-OWN-01／R-BASELINE-01、src/js/externalRows.mjs 與 rowDigest.mjs 檔頭):
 //  S1 外部列＝from 為非空字串者(經 /syncAndReplaceTabs 灌入); from 為 ''、缺欄、非字串者為後台列。lockExternalRows 預設 'y'(經 getWebInfor 帶給前端), 'n' 回到舊行為(僅保留 from 須為字串)。
 //  S2 'y' 時後台整表寫入(updateUsers／updateGrups／updatePemis／updateTargets): 新增列 from 須為 ''(含複製繼承、手打、復活他來源之列); 外部列不得刪除、不得改 from、
 //     不得改身分／結構欄(schema 全部欄位扣除 id、from、order、指派欄、伺服器管理欄); 指派欄(users.cgrups／grups.cpemis／pemis.crules)後台可寫; 後台列不得改成非空 from;
@@ -52,7 +52,7 @@ import ds from '../src/schema/index.mjs'
 import { makeBaseline } from '../src/js/rowDigest.mjs'
 import procLang from '../server/procLang.mjs'
 import { assertPristineSeed } from './tools/baseSeed.mjs'
-import { startApi, TOKEN_ADMIN, TOKEN_APP, getWoItems, callRpc, urlSync, readSrLogSince, readTables, restoreTables, purgeExternalRows } from './tools/api-setup.mjs'
+import { startApi, TOKEN_ADMIN, TOKEN_APP, getWoItems, callRpc, urlSync, markSrLog, readSrLogSince, readTables, restoreTables, purgeExternalRows } from './tools/api-setup.mjs'
 import { restartBackend, genTempSettings } from './tools/e2e-setup.mjs'
 
 
@@ -170,15 +170,15 @@ let mustSync = async (kt, body) => {
     return r
 }
 
-//等待 srLog(pino 非同步落檔)出現符合 pred 之行, 回傳 time ≥ t0 之全部行
-let waitLines = async (t0, pred, label, ms = 30000) => {
+//等待 srLog(pino 非同步落檔)出現符合 pred 之行, 回傳標記(markSrLog, 動作之前取)之後新增之全部行(以檔案位置定位, 不比對測試與後端兩行程之時鐘; R-SRLOG-MARK-01)
+let waitLines = async (mark, pred, label, ms = 30000) => {
     let tEnd = Date.now() + ms
     let lines = []
     while (Date.now() < tEnd) {
-        lines = readSrLogSince(t0)
+        lines = readSrLogSince(mark)
         if (lines.some(pred)) {
             await sleep(800)
-            return readSrLogSince(t0)
+            return readSrLogSince(mark)
         }
         await sleep(300)
     }
@@ -188,9 +188,9 @@ let waitLines = async (t0, pred, label, ms = 30000) => {
 //expectStale: 應被拒 saveStale(S5b: 草稿過期先於外部列守門)、四表零寫入, 且 srLog 記 updateTabItems-stale-error 之原因屬 reasons、
 //  並無 updateTabItems-external-error(證明回 saveStale 是因為過期檢查先觸發, 而非守門與過期並存而碰巧回此鍵)
 let expectStale = async (label, kt, rows, reasons, opt) => {
-    let t0 = Date.now()
+    let mark = await markSrLog()
     await expectReject(label, kt, rows, 'saveStale', opt)
-    let lines = await waitLines(t0, (l) => l.event === 'updateTabItems-stale-error' && l.msg === 'saveStale', label)
+    let lines = await waitLines(mark, (l) => l.event === 'updateTabItems-stale-error' && l.msg === 'saveStale', label)
     let l = lines.filter((x) => x.event === 'updateTabItems-stale-error' && x.msg === 'saveStale').pop()
     A.equal(l.keyTable, kt, `${label} log 記表名`)
     A.ok(reasons.includes(l.reason), `${label} log 之原因應屬 ${reasons.join('／')}，實得 ${l.reason}`)
@@ -473,7 +473,7 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
 
         // ---------- 後台列 × 基準 ----------
 
-        it('EX-006b 改後台列(description) × 基準{不帶、正確、空陣列、格式不合、過期}: 不帶→成功(舊行為); 正確→成功; 空陣列／過期→saveStale; 格式不合→saveRowFieldInvalid', async function() {
+        it('EX-006b 改後台列(description) × 基準{不帶、正確、空陣列、格式不合、過期}: 不帶→成功(舊行為); 正確→成功; 空陣列／過期→saveStale; 格式不合→saveRowFieldInvalid; 過期＝表內任何列被他人改過(表級, 原則 7): 即使本次只改「未被他人改動」之別列亦 saveStale', async function() {
             for (let kt of KTS) {
                 await freshState()
                 let id = BO[kt]
@@ -498,13 +498,14 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 rows = await rowsOf(kt)
                 await expectReject(`${kt} 後台列空陣列基準`, kt, mk(rows, 'nb-3'), 'saveStale', { baseline: [] })
 
-                //過期: 他人(無基準之舊路徑)改了該列 → 持舊基準 → saveStale; 該列「未被本次改動」則不檢查(舊基準仍可存其他列)
+                //過期: 他人(無基準之舊路徑)改了該列 → 持舊基準 → saveStale; 表級(run11, 原則 7): 他人改的是別列(本次不寫入之列)亦 saveStale
                 let B1 = baselineOf(kt, rows)
                 await mustWrite(`${kt} 他人改同列`, kt, mk(rows, 'nb-by-other'))
                 await expectReject(`${kt} 後台列持過期基準`, kt, mk(await rowsOf(kt), 'nb-4'), 'saveStale', { baseline: B1 })
                 let rows3 = await rowsOf(kt)
                 let idOther = rows3.find((r) => r.id !== id && r.from === '').id //另一後台列(基準內、未被他人改動)
-                await mustWrite(`${kt} 舊基準存「未被他人改動」之別列`, kt, patch(rows3, idOther, { description: 'nb-other-row' }), { baseline: B1 })
+                await expectStale(`${kt} 舊基準存「未被他人改動」之別列(表內另有列已被他人改, 表級過期)`, kt, patch(rows3, idOther, { description: 'nb-other-row' }), ['rowChanged'], { baseline: B1 })
+                await mustWrite(`${kt} 重新載入(新基準)後存別列`, kt, patch(rows3, idOther, { description: 'nb-other-row' }), { baseline: baselineOf(kt, rows3) })
             }
         })
 
@@ -512,10 +513,10 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
         // ---------- 開框後他人新增／刪除之列 ----------
 
         for (let kt of KTS) {
-            it(`EX-007b 開框後他人新增／刪除之列 × 舊基準(${kt}): 新增之列原樣帶回→成功(c0); 草稿未含該新增列而存檔(＝刪除該列)→saveStale; 已被他人刪除之列(基準內)復活→saveStale`, async function() {
+            it(`EX-007b 開框後他人新增／刪除之列 × 舊基準(${kt}): 新增之列原樣帶回→saveStale(表級: 先動先贏, run07 版為成功); 重新載入(含新增列之新基準)後原樣帶回→成功(c0); 草稿未含該新增列而存檔(＝刪除該列)→saveStale; 已被他人刪除之列(基準內)復活→saveStale`, async function() {
                 let Y = BO[kt]
-                //c0: 開框後他人新增 X, 草稿(含 X 原樣帶回)編修別列 → 成功
-                //  此處 X 維持於陣列末端(其 order 於本次依位置重編後不變, 本無 diff); X 於其他位置帶回、order 因而異動者(C-1, S5b(i)), 見 EX-007d 與 EX-053
+                //c0: 開框後他人新增 X, 草稿(含 X 原樣帶回)編修別列 → 舊基準(無 X)表級過期 saveStale、零寫入; 以含 X 之新基準(重新載入)送出 → 成功
+                //  此處 X 維持於陣列末端(其 order 於本次依位置重編後不變, 本無 diff); X 於其他位置帶回、order 因而異動者(C-1)見 EX-007d 與 EX-053
                 await freshState()
                 let R0 = await rowsOf(kt)
                 let B0 = baselineOf(kt, R0)
@@ -523,7 +524,8 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 let cur = await rowsOf(kt)
                 let xDb = cur.find((r) => r.id === nid(kt, 'x1'))
                 A.ok(xDb, '前提: X 已新增')
-                await mustWrite(`${kt} c0: X 原樣帶回(維持末端位置)＋編修別列(舊基準)`, kt, [...patch(R0, Y, { description: 'c0-edit' }), xDb], { baseline: B0 })
+                await expectStale(`${kt} c0: X 原樣帶回＋編修別列(舊基準, 表級過期)`, kt, [...patch(R0, Y, { description: 'c0-edit' }), xDb], ['rowAdded'], { baseline: B0 })
+                await mustWrite(`${kt} c0: X 原樣帶回(維持末端位置)＋編修別列(重新載入之新基準)`, kt, [...patch(R0, Y, { description: 'c0-edit' }), xDb], { baseline: baselineOf(kt, cur) })
                 A.equal((await rowOf(kt, Y)).description, 'c0-edit', 'c0: 編修落地')
                 A.deepEqual(omit(await rowOf(kt, nid(kt, 'x1')), SERVER), omit(xDb, SERVER), 'c0: X 仍在且內容與 order 不變')
 
@@ -532,15 +534,15 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 R0 = await rowsOf(kt)
                 B0 = baselineOf(kt, R0)
                 await mustWrite(`${kt} 他人新增 X`, kt, [...R0, newRow(kt, 'x2')])
-                await expectReject(`${kt} 草稿未含他人新增之 X 即存檔`, kt, patch(R0, Y, { description: 'del-x-edit' }), 'saveStale', { baseline: B0 })
+                await expectStale(`${kt} 草稿未含他人新增之 X 即存檔`, kt, patch(R0, Y, { description: 'del-x-edit' }), ['rowAdded'], { baseline: B0 })
 
-                //復活: 基準內之後台列 Z 已被他人刪除, 草稿原樣帶回 Z → addExisted(saveStale)
+                //復活: 基準內之後台列 Z 已被他人刪除, 草稿原樣帶回 Z → rowRemoved(saveStale)
                 await freshState()
                 await mustWrite(`${kt} 預置 Z`, kt, [...await rowsOf(kt), newRow(kt, 'z1')])
                 R0 = await rowsOf(kt)
                 B0 = baselineOf(kt, R0)
                 await mustWrite(`${kt} 他人刪 Z`, kt, R0.filter((r) => r.id !== nid(kt, 'z1')))
-                await expectReject(`${kt} 草稿帶回已被他人刪除之 Z`, kt, patch(R0, Y, { description: 'revive-edit' }), 'saveStale', { baseline: B0 })
+                await expectStale(`${kt} 草稿帶回已被他人刪除之 Z`, kt, patch(R0, Y, { description: 'revive-edit' }), ['rowRemoved'], { baseline: B0 })
 
                 //無基準之舊客戶端: 同樣情境(刪 X／復活 Z)維持舊行為(成功)
                 await mustWrite(`${kt} 舊客戶端復活 Z(無基準)`, kt, patch(R0, Y, { description: 'old-client' }))
@@ -549,9 +551,8 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
         }
 
         for (let kt of KTS) {
-            it(`EX-007d 〔C-1 已修, S5b(i)〕開框後他人新增之列 X 於草稿依 order 排序帶回(${kt}; X 之 order 值大於其排序後之位置, 因外部列之 order 較大而位於其後): 成功(X 內容未變, order 因位置重編而異動不算過期), X 仍在且內容不變、編修落地、外部列逐位元不變`, async function() {
-                //規格句: S5b(i) 修改列之內容指紋與庫內相同(僅 order 不同)者不檢查基準、不算過期——送入之內容並未覆蓋他人版本
-                //(修前: X 之 order 因位置重編而異動成為 diff 列, 不在基準內而 saveStale, 本案原標 pending; 修後轉為正式案)
+            it(`EX-007d 〔C-1, run11 表級改寫〕開框後他人新增之列 X 於草稿依 order 排序帶回(${kt}; X 之 order 值大於其排序後之位置, 因外部列之 order 較大而位於其後): 舊基準(無 X)→saveStale/rowAdded、零寫入(run07 版為成功); 重新載入(含 X 之新基準)後 → 成功(X 內容未變, order 因位置重編而異動不算內容變更), X 仍在且內容不變、編修落地、外部列逐位元不變`, async function() {
+                //規格句: 原則 7(表級)——舊基準不含 X 即過期; 指紋排除 order——X 之 order 因位置重編而異動不算內容變更, 故以含 X 之新基準送出即成功
                 let Y = BO[kt]
                 await freshState()
                 let R0 = await rowsOf(kt)
@@ -563,7 +564,8 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 A.ok(xDb, '前提: X 已新增')
                 A.notEqual(xDb.order, iX + 1, `前提(${kt}): X 庫內 order(${xDb.order}) 須不等於其依 order 排序後之位置(${iX + 1}), 本次儲存才會使其 order 異動(C-1 情境)`)
                 let extBefore = await extOf(kt)
-                await mustWrite(`${kt} C-1: X 依 order 序帶回＋編修別列(舊基準)`, kt, patch(cur, Y, { description: 'c0b-edit' }), { baseline: B0 })
+                await expectStale(`${kt} C-1: X 依 order 序帶回＋編修別列(舊基準)`, kt, patch(cur, Y, { description: 'c0b-edit' }), ['rowAdded'], { baseline: B0 })
+                await mustWrite(`${kt} C-1: X 依 order 序帶回＋編修別列(重新載入之新基準)`, kt, patch(cur, Y, { description: 'c0b-edit' }), { baseline: baselineOf(kt, cur) })
                 A.equal((await rowOf(kt, Y)).description, 'c0b-edit', '編修落地')
                 let xAfter = await rowOf(kt, nid(kt, 'x1'))
                 A.ok(xAfter, 'X 仍在')
@@ -591,7 +593,7 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
         // ---------- 草稿過期先於外部列守門(S5b(ii))與基準新鮮時之守門 ----------
 
         for (let kt of KTS) {
-            it(`EX-050 開框後外部同步改了外部列內容, 使用者以正確舊基準只改後台列(${kt}): saveStale(log 原因 diffStale、無外部列守門之 error)、零寫入; 無基準之舊客戶端同樣送入則 saveExternalRowChanged; 重新載入(新基準)後存檔成功且不覆蓋外部之新內容`, async function() {
+            it(`EX-050 開框後外部同步改了外部列內容, 使用者以正確舊基準只改後台列(${kt}): saveStale(log 原因 rowChanged、無外部列守門之 error)、零寫入; 無基準之舊客戶端同樣送入則 saveExternalRowChanged; 重新載入(新基準)後存檔成功且不覆蓋外部之新內容`, async function() {
                 //規格句: S5b(ii)——草稿已過期(外部同步於開啟後改了外部列內容)而使用者只編修後台列時回 saveStale, 不回 saveExternalRowChanged
                 let Y = BO[kt]
                 let id = ext(kt, 0)
@@ -603,7 +605,7 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 let descNew = (await rowOf(kt, id)).description
                 A.notEqual(descNew, descOld, '前提: 外部同步已改外部列內容')
                 let draft = patch(R0, Y, { description: 'bo-edit-on-stale' })
-                await expectStale(`${kt} 持舊基準只改後台列`, kt, draft, ['diffStale'], { baseline: B0 })
+                await expectStale(`${kt} 持舊基準只改後台列`, kt, draft, ['rowChanged'], { baseline: B0 })
                 //無基準(舊客戶端): 外部列內容與庫內不同 → 視為改身分欄 → 守門拒收(此為既有行為, 非本次修訂之對象)
                 await expectReject(`${kt} 無基準之舊客戶端`, kt, draft, 'saveExternalRowChanged')
                 //重新載入: 以當前列與新基準存檔 → 成功; 外部列保持外部之新內容
@@ -629,15 +631,15 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 await mustSync(kt, { from: F, rows: clone(FX[kt]) }) //外部以帶鍵之 '{}' 重送 → 以外部為準(撤銷)
                 A.equal((await rowOf(kt, id))[af], '{}', '前提: 外部同步已撤銷指派')
                 let draft = patch(R1, Y, { description: 'bo-edit-old-assign' })
-                await expectStale(`${kt} 舊草稿只改後台列(外部列帶舊指派)`, kt, draft, ['diffStale'], { baseline: B1 })
+                await expectStale(`${kt} 舊草稿只改後台列(外部列帶舊指派)`, kt, draft, ['rowChanged'], { baseline: B1 })
                 A.equal((await rowOf(kt, id))[af], '{}', `${kt} 庫內外部列指派仍為撤銷後之值`)
                 await expectReject(`${kt} 無基準之舊客戶端(外部列指派與庫內不同)`, kt, draft, 'saveBaselineRequired')
             })
         }
 
         for (let kt of KTS) {
-            it(`EX-051 開框後外部同步移除了該外部列, 使用者以正確舊基準只改後台列(${kt}): 草稿仍帶該外部列→saveStale(log 原因 addExisted)、零寫入; 無基準或持新基準→saveFromNotAllowed; 草稿已不含該列(依當前列)→成功`, async function() {
-                //規格句: S5b(ii)——草稿已過期(外部同步移除該外部列)而使用者只編修後台列時回 saveStale; 新增列之主鍵在基準內＝復活(addExisted)
+            it(`EX-051 開框後外部同步移除了該外部列, 使用者以正確舊基準只改後台列(${kt}): 草稿仍帶該外部列→saveStale(log 原因 rowRemoved)、零寫入; 無基準或持新基準→saveFromNotAllowed; 草稿已不含該列(依當前列)但仍持舊基準→saveStale(表級), 持新基準→成功`, async function() {
+                //規格句: S5b(ii)——草稿已過期(外部同步移除該外部列)而使用者只編修後台列時回 saveStale(基準之列已不在庫內＝rowRemoved)
                 let Y = BO[kt]
                 await freshState()
                 let R0 = await rowsOf(kt)
@@ -645,12 +647,13 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 await mustSync(kt, { from: F, rows: [clone(FX[kt][0])] }) //移除第二筆外部列
                 A.equal(await rowOf(kt, ext(kt, 1)), undefined, '前提: 外部列已被同步移除')
                 let draft = patch(R0, Y, { description: 'bo-edit-removed-ext' }) //草稿仍含已移除之外部列(＝送入時成為新增、from 為外部來源)
-                await expectStale(`${kt} 持舊基準, 草稿仍帶已移除之外部列`, kt, draft, ['addExisted'], { baseline: B0 })
+                await expectStale(`${kt} 持舊基準, 草稿仍帶已移除之外部列`, kt, draft, ['rowRemoved'], { baseline: B0 })
                 await expectReject(`${kt} 無基準之舊客戶端`, kt, draft, 'saveFromNotAllowed')
                 await expectReject(`${kt} 持同步後之新基準, 草稿仍帶已移除之外部列`, kt, draft, 'saveFromNotAllowed', { baseline: baselineOf(kt, await rowsOf(kt)) })
-                //草稿已不含該列(如重新整理 store 後之列): 該列未被本次寫入, 舊基準對其無作用 → 成功
+                //草稿已不含該列(如重新整理 store 後之列)但仍持舊基準(表級): 基準之外部列已不在庫內 → 仍 saveStale; 持新基準(重新載入)→ 成功
                 let R1 = await rowsOf(kt)
-                await mustWrite(`${kt} 草稿不含已移除之外部列`, kt, patch(R1, Y, { description: 'bo-edit-reloaded' }), { baseline: B0 })
+                await expectStale(`${kt} 草稿不含已移除之外部列但持舊基準`, kt, patch(R1, Y, { description: 'bo-edit-reloaded' }), ['rowRemoved'], { baseline: B0 })
+                await mustWrite(`${kt} 草稿不含已移除之外部列(重新載入之新基準)`, kt, patch(R1, Y, { description: 'bo-edit-reloaded' }), { baseline: baselineOf(kt, R1) })
                 A.equal((await rowOf(kt, Y)).description, 'bo-edit-reloaded', `${kt} 編修落地`)
                 A.equal(await rowOf(kt, ext(kt, 1)), undefined, `${kt} 已移除之外部列不得被復活`)
             })
@@ -693,10 +696,10 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 let cur0 = R0.find((r) => r.id === id)
                 let f0 = T[kt].lock[0]
                 //舊草稿: 外部列 id 之內容為舊(與庫內不同), 再疊加各種違規
-                await expectStale(`${kt} 舊草稿＋改外部列身分欄`, kt, patch(R0, id, { [f0]: CHG[f0](cur0[f0]) }), ['diffStale'], { baseline: B0 })
-                await expectStale(`${kt} 舊草稿＋刪該外部列`, kt, R0.filter((r) => r.id !== id), ['delStale', 'diffStale'], { baseline: B0 })
-                await expectStale(`${kt} 舊草稿＋改該外部列 from`, kt, patch(R0, id, { from: '' }), ['diffStale'], { baseline: B0 })
-                await expectStale(`${kt} 舊草稿＋同批新增非空 from`, kt, [...R0, newRow(kt, 'p1', { from: F })], ['diffStale'], { baseline: B0 })
+                await expectStale(`${kt} 舊草稿＋改外部列身分欄`, kt, patch(R0, id, { [f0]: CHG[f0](cur0[f0]) }), ['rowChanged'], { baseline: B0 })
+                await expectStale(`${kt} 舊草稿＋刪該外部列`, kt, R0.filter((r) => r.id !== id), ['rowChanged'], { baseline: B0 })
+                await expectStale(`${kt} 舊草稿＋改該外部列 from`, kt, patch(R0, id, { from: '' }), ['rowChanged'], { baseline: B0 })
+                await expectStale(`${kt} 舊草稿＋同批新增非空 from`, kt, [...R0, newRow(kt, 'p1', { from: F })], ['rowChanged'], { baseline: B0 })
                 //對照: 持新基準(草稿所依據之列＝同步後之庫內列)之同一類動作 → 守門拒收(EX-052／EX-055 詳)
                 let R1 = await rowsOf(kt)
                 let B1 = baselineOf(kt, R1)
@@ -737,8 +740,8 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
         }
 
         for (let kt of KTS) {
-            it(`EX-053 開框後他人新增之列 X 以舊基準帶回(${kt}), store 順序與庫內 order 不同: X 置於最前／夾於後台列之間／多筆置換次序→成功(X 內容未變, order 依送入位置重編); 帶回時改了 X 之內容→saveStale; 他人另改了別列→saveStale`, async function() {
-                //規格句: S5b(i) 修改列之內容指紋與庫內相同者不檢查基準; 未覆蓋他人版本者不算過期, 但內容真有變者(X 不在基準內／別列已被他人改)仍 saveStale
+            it(`EX-053 開框後他人新增之列 X1、X2 (${kt}): 以舊基準(無 X)送出——不論 X 置於最前／夾於後台列之間／帶回時是否改其內容——一律 saveStale/rowAdded(表級: 先動先贏, 不部分變更; run07 版為成功／部分 saveStale)、零寫入; 重新載入(含 X 之新基準)後 X 置於最前／夾於後台列之間 → 成功(X 內容未變, order 依送入位置重編); 取得基準後他人再改別列 → saveStale/rowChanged`, async function() {
+                //規格句: 原則 7(表級)——基準涵蓋載入時整表, 庫內多了 X1、X2 即過期; 指紋排除 order, 故新基準下 X 因位置重編而異動 order 不算內容變更
                 let Y = BO[kt]
                 await freshState()
                 let R0 = await rowsOf(kt)
@@ -752,15 +755,19 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 let bos = cur.filter((r) => r.from !== F && r.id !== x1.id && r.id !== x2.id) //後台列(不含 X)
                 let exts = cur.filter((r) => r.from === F)
                 let extBefore = await extOf(kt)
-                //各小節各編修不同之後台列(一旦成功存檔, 該列於庫內之內容即與舊基準 B0 不同, 同一舊基準不得再用於改它): Y→(a)、Yb→(b)、Yc→(d)、Z→(d) 被他人改
+                //各小節各編修不同之後台列(一旦成功存檔, 該列於庫內之內容即與先前取得之基準不同, 同一基準不得再用於改它): Y→(a)、Yb→(b)、Yc→(d)、Z→(d) 被他人改
                 let others = bos.filter((r) => r.id !== Y).map((r) => r.id)
                 A.ok(others.length >= 3, `前提(${kt}): 另有 ≥3 筆後台列`)
                 let [Yb, Yc, Z] = others
 
-                //(a) X1 置於最前(庫內 order 為較後之位置): 成功; X1 之 order 依送入位置重編為 1
+                //(a0) 舊基準 B0(無 X) + X1 置於最前: saveStale/rowAdded、零寫入
                 let a = [x1, ...patch([...bos, x2, ...exts], Y, { description: 'c0-front' })]
                 A.notEqual(x1.order, 1, '前提: X1 庫內 order 不為 1')
-                await mustWrite(`${kt} X1 置於最前＋編修別列(舊基準)`, kt, a, { baseline: B0 })
+                await expectStale(`${kt} X1 置於最前＋編修別列(舊基準)`, kt, a, ['rowAdded'], { baseline: B0 })
+
+                //(a) 重新載入後(基準取自含 X1、X2 之現況): 成功; X1 之 order 依送入位置重編為 1
+                let B1 = baselineOf(kt, cur)
+                await mustWrite(`${kt} X1 置於最前＋編修別列(新基準)`, kt, a, { baseline: B1 })
                 A.equal((await rowOf(kt, Y)).description, 'c0-front', `${kt} (a) 編修落地`)
                 let got = Object.fromEntries((await selectAll(kt)).map((r) => [r.id, r]))
                 a.forEach((r, k) => {
@@ -772,12 +779,13 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 A.deepEqual(omit(got[x2.id], [...SERVER, 'order']), omit(x2, [...SERVER, 'order']), `${kt} (a) X2 內容不變`)
                 A.deepEqual(await extOf(kt), extBefore, `${kt} (a) 外部列逐位元不變`)
 
-                //(b) X2、X1 次序對調並夾於後台列之間: 成功
+                //(b) X2、X1 次序對調並夾於後台列之間: 取自(a)之後現況的新基準 → 成功; 沿用 B0 → saveStale
                 let cur2 = await rowsOf(kt)
                 let bos2 = cur2.filter((r) => r.from !== F && r.id !== x1.id && r.id !== x2.id)
                 let b = [bos2[0], x2, bos2[1], x1, ...bos2.slice(2), ...cur2.filter((r) => r.from === F)]
                 b = patch(b, Yb, { description: 'c0-between' })
-                await mustWrite(`${kt} X2、X1 夾於後台列之間＋編修別列(舊基準)`, kt, b, { baseline: B0 })
+                await expectStale(`${kt} X2、X1 夾於後台列之間(沿用舊基準 B0)`, kt, b, ['rowChanged', 'rowAdded'], { baseline: B0 })
+                await mustWrite(`${kt} X2、X1 夾於後台列之間＋編修別列(新基準)`, kt, b, { baseline: baselineOf(kt, cur2) })
                 A.equal((await rowOf(kt, Yb)).description, 'c0-between', `${kt} (b) 編修落地`)
                 let got2 = Object.fromEntries((await selectAll(kt)).map((r) => [r.id, r]))
                 b.forEach((r, k) => {
@@ -787,18 +795,18 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 })
                 A.ok(got2[x1.id] && got2[x2.id], `${kt} (b) X1、X2 仍在`)
 
-                //(c) 帶回時改了 X1 之內容(X1 不在基準內, 草稿不能證明自己看過它)→ saveStale、零寫入
+                //(c) 帶回時改了 X1 之內容, 持舊基準(X1 不在基準內)→ saveStale/rowAdded、零寫入
                 let cur3 = await rowsOf(kt)
-                await expectReject(`${kt} 帶回 X1 並改其內容(舊基準)`, kt, patch(cur3, x1.id, { description: 'x1-edited-by-draft' }), 'saveStale', { baseline: B0 })
+                await expectStale(`${kt} 帶回 X1 並改其內容(舊基準)`, kt, patch(cur3, x1.id, { description: 'x1-edited-by-draft' }), ['rowChanged', 'rowAdded'], { baseline: B0 })
 
-                //(d) 他人另改了基準內之別列 Z 的內容後, 草稿(X 位置異動)只改 Yc 但 Z 以舊內容帶回 → saveStale(Z 之內容真的不同, 不屬 order-only)
+                //(d) 草稿取得基準 B4 之後, 他人改了別列 Z 的內容 → 草稿(只改 Yc)持 B4 送出 → saveStale/rowChanged(Z 非本次寫入之列, 表級仍拒; run07 版 Z 以舊內容帶回才拒)
                 let cur4 = await rowsOf(kt)
-                let zOld = R0.find((r) => r.id === Z) //基準內之 Z(舊內容)
+                let B4 = baselineOf(kt, cur4)
                 await mustWrite(`${kt} 他人改 Z`, kt, patch(cur4, Z, { description: 'z-by-other' }))
-                A.notEqual((await rowOf(kt, Z)).description, zOld.description, '前提: Z 已被他人改內容')
+                A.equal((await rowOf(kt, Z)).description, 'z-by-other', '前提: Z 已被他人改內容')
                 let cur5 = await rowsOf(kt)
-                let stale = patch(patch(cur5, Z, { description: zOld.description }), Yc, { description: 'c0-stale-z' })
-                await expectStale(`${kt} 舊內容之 Z 帶回(舊基準)`, kt, stale, ['diffStale'], { baseline: B0 })
+                await expectStale(`${kt} 只改 Yc、Z 已被他人改(持 B4)`, kt, patch(cur5, Yc, { description: 'c0-stale-z' }), ['rowChanged'], { baseline: B4 })
+                await expectStale(`${kt} 只改 Yc、Z 以舊內容帶回(持 B4)`, kt, patch(patch(cur4, Z, { description: R0.find((r) => r.id === Z).description }), Yc, { description: 'c0-stale-z' }), ['rowChanged'], { baseline: B4 })
             })
         }
 
@@ -1036,15 +1044,15 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 { label: 'fromChanged', run: () => write('users', patch(rows, u1, { from: 'LOGSECRET-VALUE' })), ev: 'updateTabItems-external-error', reason: 'fromChanged', msg: 'saveExternalRowChanged', n: 1, froms: [F] },
                 { label: 'fromType', run: () => write('users', [...rows, newRow('users', 'lg2', { from: null, description: 'LOGSECRET-VALUE' })]), ev: 'updateTabItems-external-error', reason: 'fromType', msg: 'saveFromNotAllowed', n: 1, froms: [] },
                 { label: 'externalAssignNoBaseline', run: () => write('users', patch(rows, u1, { cgrups: AV.users[0] })), ev: 'updateTabItems-stale-error', reason: 'externalAssignNoBaseline', msg: 'saveBaselineRequired' },
-                { label: 'diffStale', run: () => write('users', patch(rows, u1, { cgrups: AV.users[0] }), { baseline: [] }), ev: 'updateTabItems-stale-error', reason: 'diffStale', msg: 'saveStale', n: 1 },
+                { label: 'rowAdded', run: () => write('users', patch(rows, u1, { cgrups: AV.users[0] }), { baseline: [] }), ev: 'updateTabItems-stale-error', reason: 'rowAdded', msg: 'saveStale', n: rows.length },
                 { label: 'baselineInvalid', run: () => write('users', patch(rows, u1, { cgrups: AV.users[0] }), { baseline: 'LOGSECRET-VALUE' }), ev: 'updateTabItems-validate-error', reason: 'baselineInvalid', msg: 'saveRowFieldInvalid' },
             ]
             for (let c of cases) {
-                let t0 = Date.now()
+                let mark = await markSrLog()
                 let r = await c.run()
                 A.equal(r.ok, false, `${c.label} 應被拒，實得: ${JSON.stringify(brief(r))}`)
                 A.equal(r.msg, c.msg, `${c.label} 回應鍵`)
-                let lines = await waitLines(t0, isEv(c.ev, c.reason), c.label)
+                let lines = await waitLines(mark, isEv(c.ev, c.reason), c.label)
                 let l = lines.find(isEv(c.ev, c.reason))
                 A.equal(l.level, 50, `${c.label} 應為 error 層級`)
                 A.equal(l.keyTable, 'users', `${c.label} 記表名`)
@@ -1077,7 +1085,7 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
             let othersBefore = JSON.stringify((await selectAll('users')).filter((r) => r.from !== F2).sort(byId))
 
             //(1) 再同步一次且不帶 cgrups 鍵(含改名)＋新使用者缺鍵 → 保留庫內值; 新使用者為 ''
-            let t0 = Date.now()
+            let mark = await markSrLog()
             await mustSync('users', { from: F2, rows: [u('id-kp-1', 'kp1-renamed'), u('id-kp-2', 'kp2'), u('id-kp-3', 'kp3')] })
             let got = Object.fromEntries((await extOf('users', F2)).map((r) => [r.id, r]))
             A.equal(got['id-kp-1'].cgrups, V[0], '(1) id-kp-1 缺鍵→保留 V0')
@@ -1085,7 +1093,7 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
             A.equal(got['id-kp-2'].cgrups, V[1], '(1) id-kp-2 缺鍵→保留 V1')
             A.equal(got['id-kp-3'].cgrups, '', '(1) 新使用者缺鍵→\'\'')
             A.equal(JSON.stringify((await selectAll('users')).filter((r) => r.from !== F2).sort(byId)), othersBefore, '(1) 他分區(後台列、F 外部列)逐位元不變')
-            let lines = await waitLines(t0, (l) => l.event === 'syncAndReplaceTabs-keepAssign', 'keepAssign log')
+            let lines = await waitLines(mark, (l) => l.event === 'syncAndReplaceTabs-keepAssign', 'keepAssign log')
             let ka = lines.find((l) => l.event === 'syncAndReplaceTabs-keepAssign')
             A.deepEqual({ keyTable: ka.keyTable, from: ka.from, field: ka.field, n: ka.n }, { keyTable: 'users', from: F2, field: 'cgrups', n: 2 }, `(1) keepAssign log 只記表名／來源／欄位／筆數(實得 ${ka._raw})`)
             A.ok(!ka._raw.includes('kp1') && !ka._raw.includes('@keep.example.com') && !ka._raw.includes(V[0]), '(1) keepAssign log 不得含使用者名稱／email／授權值')
@@ -1120,7 +1128,7 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 let idNew = `id-ex-keep-${kt}`
 
                 //(1) 缺鍵: 兩既有實體(第一列同批改描述)＋新實體 → 既有者保留、其他欄位以外部為準; 新實體為 ''
-                let t0 = Date.now()
+                let mark = await markSrLog()
                 await mustSync(kt, { from: F, rows: [noKey({ ...fx[0], description: 'ext-desc-changed' }), noKey(fx[1]), noKey({ id: idNew, order: 90, name: `exNew-${kt}`, description: 'new' })] })
                 let got = Object.fromEntries((await extOf(kt)).map((r) => [r.id, r]))
                 A.equal(got[ext(kt, 0)][af], AV[kt][0], `(1) ${kt} 缺 ${af} 鍵 → 保留後台指派 0`)
@@ -1128,7 +1136,7 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 A.equal(got[ext(kt, 1)][af], AV[kt][1], `(1) ${kt} 缺鍵 → 保留後台指派 1`)
                 A.equal(got[idNew][af], '', `(1) ${kt} 新實體缺鍵 → ''`)
                 A.equal(JSON.stringify((await selectAll(kt)).filter((r) => r.from !== F).sort(byId)), othersBefore, `(1) ${kt} 他分區(後台列)逐位元不變`)
-                let lines = await waitLines(t0, (l) => l.event === 'syncAndReplaceTabs-keepAssign' && l.keyTable === kt, `${kt} keepAssign log`)
+                let lines = await waitLines(mark, (l) => l.event === 'syncAndReplaceTabs-keepAssign' && l.keyTable === kt, `${kt} keepAssign log`)
                 let ka = lines.find((l) => l.event === 'syncAndReplaceTabs-keepAssign' && l.keyTable === kt)
                 A.deepEqual({ keyTable: ka.keyTable, from: ka.from, field: ka.field, n: ka.n }, { keyTable: kt, from: F, field: af, n: 2 }, `(1) ${kt} keepAssign log 只記表名／來源／欄位／筆數(實得 ${ka._raw})`)
                 noLeakLine(ka, [fx[0].id, fx[0].name, 'ext-desc-changed', AV[kt][0], AV[kt][1]], `(1) ${kt} keepAssign log(列主鍵／名稱／描述／授權值)`)
@@ -1175,13 +1183,13 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 let hrows = await rowsOf(h.kt)
                 await mustWrite(`${h.kt} 引用外部 ${kt}`, h.kt, patch(hrows, h.id, { [h.field]: JSON.stringify({ [oldName]: ON }) }), { baseline: baselineOf(h.kt, hrows) })
                 A.deepEqual(Object.keys(JSON.parse((await rowOf(h.kt, h.id))[h.field])), [oldName], `${kt} 前提: 引用端引用舊名`)
-                let t0 = Date.now()
+                let mark = await markSrLog()
                 await mustSync(kt, { from: F, rows: [omit({ ...FX[kt][0], name: `${oldName}-renamed` }, [af]), omit(FX[kt][1], [af])] })
                 let g = await rowOf(kt, ext(kt, 0))
                 A.equal(g.name, `${oldName}-renamed`, `${kt} 改名以外部為準`)
                 A.equal(g[af], AV[kt][0], `${kt} 同 id 改名缺鍵 → 保留後台指派`)
                 A.deepEqual(Object.keys(JSON.parse((await rowOf(h.kt, h.id))[h.field])), [`${oldName}-renamed`], `${kt} 引用端之引用已級聯改寫為新名(保留的指派與引用一起跟著走)`)
-                let lines = await waitLines(t0, (l) => l.event === 'syncAndReplaceTabs-keepAssign' && l.keyTable === kt, `${kt} keepAssign log`)
+                let lines = await waitLines(mark, (l) => l.event === 'syncAndReplaceTabs-keepAssign' && l.keyTable === kt, `${kt} keepAssign log`)
                 A.ok(!lines.some((l) => l.event === 'syncAndReplaceTabs-keepAssign-skip' && l.keyTable === kt), `${kt} 保留成功, 不得有 keepAssign-skip warn`)
             }
         })
@@ -1196,14 +1204,14 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
             A.deepEqual((await getInfor()).syncWarns, [], '前提: 首次同步(庫內無同名異 id)不登錄')
 
             //grups 發生 id 重編: 同名 rnA 換新 id、舊 id 不在本批
-            let t0 = Date.now()
+            let mark = await markSrLog()
             await mustSync('grups', { from: F3, rows: [mk('grups', 'id-rn-grups-3', 'rnA-grups'), mk('grups', 'id-rn-grups-2', 'rnB-grups')] })
             let warns = (await getInfor()).syncWarns
             A.equal(warns.length, 1, `grups 重編後應登錄 1 筆，實得 ${JSON.stringify(warns)}`)
             A.deepEqual({ keyTable: warns[0].keyTable, from: warns[0].from, n: warns[0].n }, { keyTable: 'grups', from: F3, n: 1 }, '登錄之表名／來源／筆數')
             A.ok(typeof warns[0].time === 'string' && !Number.isNaN(Date.parse(warns[0].time)), `登錄之 time 應為可解析之時間字串，實得 ${warns[0].time}`)
             A.deepEqual(Object.keys(warns[0]).sort(), ['from', 'keyTable', 'n', 'time'], '登錄只含表名、來源、筆數、時間(不含個資)')
-            let lines = await waitLines(t0, (l) => l.event === 'syncAndReplaceTabs-idRenumber', 'idRenumber log')
+            let lines = await waitLines(mark, (l) => l.event === 'syncAndReplaceTabs-idRenumber', 'idRenumber log')
             let w = lines.filter((l) => l.event === 'syncAndReplaceTabs-idRenumber')
             A.equal(w.length, 1, '應記 1 筆 warn')
             A.equal(w[0].level, 40, '事件層級應為 warn(40)')
@@ -1273,7 +1281,7 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
             await mustWrite('後台指派', 'users', patch(patch(patch(rows, 'id-ke-1', { cgrups: V[0] }), 'id-ke-2', { cgrups: V[1] }), 'id-ke-3', { cgrups: V[2] }), { baseline: baselineOf('users', rows) })
 
             //無 id、缺 cgrups 鍵: ke1(對到 1 筆→保留)、新 email(→'')、ke3(對到 2 筆→不保留); ke2 帶 id 依 id(保留)
-            let t0 = Date.now()
+            let mark = await markSrLog()
             await mustSync('users', { from: F2, rows: [
                 u({ name: 'ke1-new', email: 'ke1@keep.example.com' }),
                 u({ id: 'id-ke-2', name: 'ke2', email: 'ke2-changed@keep.example.com' }),
@@ -1288,7 +1296,7 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
             A.equal(by('ke3@keep.example.com').cgrups, '', '同 email 命中 2 筆(啟用＋停用)→不保留(須恰命中 1 筆)')
 
             //收嚴須附提示(run08 外審 sol #3): 對應鍵矛盾(ke2: id 指向之 email 已變)與命中多筆(ke3: 無從判定歸屬)各計 1, 合併記一筆 warn(只記表名／來源／欄位／筆數／原因, 不含 email)
-            let lines = await waitLines(t0, (l) => l.event === 'syncAndReplaceTabs-keepAssign-skip', 'keepAssign-skip log')
+            let lines = await waitLines(mark, (l) => l.event === 'syncAndReplaceTabs-keepAssign-skip', 'keepAssign-skip log')
             let w = lines.filter((l) => l.event === 'syncAndReplaceTabs-keepAssign-skip')
             A.equal(w.length, 1, '應記 1 筆 warn')
             A.deepEqual({ level: w[0].level, keyTable: w[0].keyTable, from: w[0].from, field: w[0].field, n: w[0].n, reason: w[0].reason }, { level: 40, keyTable: 'users', from: F2, field: 'cgrups', n: 2, reason: 'mapKeyConflict' }, `warn 之層級／表名／來源／欄位／筆數／原因(實得 ${w[0]._raw})`)
@@ -1485,14 +1493,14 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 let af = T[kt].assign
                 let rows = await rowsOf(kt)
                 await mustWrite(`${kt} 後台指派`, kt, patch(patch(rows, ext(kt, 0), { [af]: AV[kt][0] }), ext(kt, 1), { [af]: AV[kt][1] }), { baseline: baselineOf(kt, rows) })
-                let t0 = Date.now()
+                let mark = await markSrLog()
                 await mustSync(kt, { from: F, rows: [omit({ ...FX[kt][0], name: `${FX[kt][0].name}-renamed` }, [af]), omit(FX[kt][1], [af])] })
                 let g0 = await rowOf(kt, ext(kt, 0))
                 let g1 = await rowOf(kt, ext(kt, 1))
                 A.equal(g0.name, `${FX[kt][0].name}-renamed`, `${kt} 改名以外部為準(不連帶)`)
                 A.equal(g0[af], '', `${kt} 同 id 改名且引用不跟著改 → 不保留(收嚴)`)
                 A.equal(g1[af], AV[kt][1], `${kt} 名稱相同者 → 保留`)
-                let lines = await waitLines(t0, (l) => l.event === 'syncAndReplaceTabs-keepAssign-skip' && l.keyTable === kt, `${kt} keepAssign-skip log`)
+                let lines = await waitLines(mark, (l) => l.event === 'syncAndReplaceTabs-keepAssign-skip' && l.keyTable === kt, `${kt} keepAssign-skip log`)
                 let w = lines.filter((l) => l.event === 'syncAndReplaceTabs-keepAssign-skip' && l.keyTable === kt)
                 A.equal(w.length, 1, `${kt} 應記 1 筆 warn`)
                 A.equal(w[0].level, 40, `${kt} 事件層級應為 warn(40)`)

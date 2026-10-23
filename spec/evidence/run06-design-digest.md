@@ -39,6 +39,6 @@
 - **不用 `cd`**(用絕對路徑或指令自帶目錄參數);**不用 heredoc/cat/echo 寫檔**,一律用 Write/Edit 工具;搜內容用 Grep、找檔名用 Glob(專案資料目錄龐大,Bash `grep -r`/`find` 會逾時)。
 - 腳本用 `.mjs`;不用 PowerShell。
 - 長輸出之指令一律經 `node C:/opensrcOper/tools/quiet-run.mjs --name <短名> -- <指令>`;要看更多以 Grep 搜其 log。
-- 不得 git commit/push/tag/stash/checkout/reset;不得改 `CLAUDE.md`、`CLAUDE_settings.md`、`CLAUDE_rulebook.md`、`spec/`(除非任務明列);不得重產或改標準圖(`test/pics/**`);不得改其他套件 repo、`package.json` 版本。
+- 不得 git commit/push/tag/stash/checkout/reset;不得改 `CLAUDE.md`、`CLAUDE_settings.md`、`sgud/rule/rulebook.md`、`spec/`(除非任務明列);不得重產或改標準圖(`test/pics/**`);不得改其他套件 repo、`package.json` 版本。
 - **不跑瀏覽器 e2e**(除非任務明列)、不跑全套。單元/API 測試:`npx mocha <檔> --timeout 60000`(經 quiet-run)。
 - 完成後的最後回覆:列出新增/修改之檔(路徑)、執行之指令與結果(通過/失敗數)、未完成或有疑慮之處、需主責裁示之事項。

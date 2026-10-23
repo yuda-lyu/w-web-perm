@@ -8,25 +8,26 @@
 //  EXT-S1 外部列(from 為非空字串)之身分／結構欄後台不得改、不得刪、不得改 from; 指派欄(users.cgrups／grups.cpemis／pemis.crules)後台可寫; 後台新增列 from 須為 '';
 //         非字串 from 後台一律拒收(不論 lockExternalRows; 歷史 null 原樣送回不拒); 外部列 order 由外部擁有(後台儲存不重編; 後台列 order 仍 k+1).
 //         違規整次拒收(saveFromNotAllowed／saveExternalRowChanged)、四表零寫入、不靜默忽略.(設計摘要 §要解決什麼 1、2)
-//  EXT-S2 過期快照基準: 草稿開啟時之逐列內容指紋隨 RPC 第 3 參 { baseline } 帶入; 於表鎖內比對「本次將寫入之列」之庫內版本須與基準相同, 否則整次拒收 saveStale、零寫入;
+//  EXT-S2 過期快照基準(run11 改寫為表級; 使用者 2026-10-22 裁示 R-PRINCIPLE-00 原則 7「以表雜湊比對, 先動先贏」, run07 版「只比對本次將寫入之列」之案作廢或重寫): 草稿開啟時之整表逐列內容指紋隨 RPC 第 3 參 { baseline } 帶入;
+//         於表鎖內比對整表——庫內任何一列內容(排除 order 與伺服器管理欄)與基準不同、或有列增刪, 不論是否為本次將寫入之列, 一律整次拒收 saveStale(reason rowChanged／rowRemoved／rowAdded)、零寫入;
 //         未帶基準之舊客戶端: 後台列維持舊行為; 但修改外部列之指派欄無基準即拒收 saveBaselineRequired(外審 B.2); 基準格式不合 → saveRowFieldInvalid(零寫入).(設計摘要 §3)
 //  EXT-S3 外部列僅伺服器管理欄(建立者／建立時間／更新者／更新時間)不同之舊快照視為無變更, 不寫入、不把建立者與建立時間回退為舊值.
-//  EXT-S4 守門順序(run07 修訂, 依 U1 觀察 1 與 API 子代理 C-1 缺陷; 原為「外部列守門先於基準」, 帶舊語意之案已重寫): select → 還原外部列 order → 重複檢查 → ltdtDiffByKey → 外部列僅伺服器欄不同者移入 same →
-//         有基準者先 checkBaseline(saveStale) → 外部列守門(saveFromNotAllowed／saveExternalRowChanged) → 無基準且 lock 且有外部列 diff 才 saveBaselineRequired → 寫入前驗證 → 引用連帶 → 寫入;
+//  EXT-S4 守門順序(run11 修訂: 表級基準不需 diff 結果, 提前至 select 之後第一個檢查; run07: 依 U1 觀察 1 與 API 子代理 C-1 缺陷, 基準先於外部列守門): select → 有基準者 checkBaseline(saveStale) → 還原外部列 order → 重複檢查 →
+//         ltdtDiffByKey → 外部列僅伺服器欄不同者移入 same → 外部列守門(saveFromNotAllowed／saveExternalRowChanged) → 無基準且 lock 且有外部列 diff 才 saveBaselineRequired → 寫入前驗證 → 引用連帶 → 寫入;
 //         全在表鎖內; 比對於鎖內(鎖前之他人寫入須被看見). 有基準而草稿已過期(外部同步於開啟後改了外部列內容或移除之)而使用者只編修後台列 → 回 saveStale(而非誤導之外部列不可修改); 基準新鮮而仍違規 → 仍由守門拒收.
-//  EXT-S8 (run07 修訂) 修改列若內容(全部內容欄)與庫內相同(僅 order／伺服器管理欄不同; 如開框後他人新增之列因依列序重編 order 而成 diff 且不在基準內)不檢查基準、不算過期(rowDigest RD-S5);
-//         故他人新增 X 後, 草稿依 order 序原樣帶回 X 並只編修一個後台列、帶原基準 → 成功(X 內容不變); X 之內容被他人再改而草稿帶回舊版 → saveStale. 見 O 區段.
+//  EXT-S8 (run11 取代 run07 同編號「內容同庫內之 diff 不計」: 表級比對下不再有 diff 跳過規則) 他人在草稿之後新增 X, 草稿帶原基準(無 X)送出——即使原樣帶回 X、只編修一個後台列, 亦 saveStale/rowAdded(先動先贏, 不部分變更);
+//         重新載入(基準含 X)後重送則成功, X 內容不變、建立者沿用. 見 O 區段.
 //  EXT-S5 引用連帶(群組／權限改名與刪除)由伺服端發動, 引用端(含外部 users 列之 cgrups)改寫不受守門影響; 外部列之群組／權限／標的不可被後台改名或刪除(整次拒收, 引用端零寫入).
 //  EXT-S6 srLog: 事件 updateTabItems-external-error(含 keyTable、userId、msg、reason、n、froms)與 updateTabItems-stale-error(含 keyTable、userId、msg、reason[、n]);
 //         不含任何列 id、名稱、email 之值(只記鍵、原因、筆數、來源名稱).
 //  EXT-S7 用戶端 opt 只採納 baseline(updateTargets／Pemis／Grups 經 pickClientOpt; updateUsers 經 WWebPerm 之 kpFunExt 只組 { baseline } 與伺服端之 pickKeysOnly).
 //
 //輸入空間表(軸 × 案數; 案數為 mocha 實測, 共 307 案〔run07 U1b 修訂: 238 → 291, +A02b 4、+SITE-EX-003b 1、+O 區段 48; run07 U1c 修訂: 291 → 307, +J 區段 EXT-J03 重複 id 基準 12、+EXT-J03b 對照 4〕; 軸與格之展開見各 describe):
-//  A 守門拒收    22 項(A01 逐表×違規種類: 新增非空 from／複製繼承 from／非字串 from×3(null,123,true)／刪外部列／改外部 from×2(''、pz)／改鎖定欄 description／改身分欄 name|email／後台改成外部 pz, 共 11 種 × 表 4, targets 無身分欄故 43 案)＋ A02 復活(未帶基準 → 守門)4 ＋ A02b 復活(附基準 → saveStale/addExisted)4 ＋ A03 多違規 froms ＋ A04 整次拒收不靜默 ＋ A05 指派欄可寫 = 54; 每案斷言 key、四表逐位元不變且零寫入、集中 errLog、external-error 欄位(keyTable／userId／msg／reason／n／froms)
+//  A 守門拒收    22 項(A01 逐表×違規種類: 新增非空 from／複製繼承 from／非字串 from×3(null,123,true)／刪外部列／改外部 from×2(''、pz)／改鎖定欄 description／改身分欄 name|email／後台改成外部 pz, 共 11 種 × 表 4, targets 無身分欄故 43 案)＋ A02 復活(未帶基準 → 守門)4 ＋ A02b 復活(附基準 → saveStale/rowRemoved)4 ＋ A03 多違規 froms ＋ A04 整次拒收不靜默 ＋ A05 指派欄可寫 = 54; 每案斷言 key、四表逐位元不變且零寫入、集中 errLog、external-error 欄位(keyTable／userId／msg／reason／n／froms)
 //  B 指派欄      表 3(users／grups／pemis)× {有基準可寫, 無基準 saveBaselineRequired, 基準過期 saveStale, 後台列無基準舊行為} 12 ＋ targets 無指派欄 ＋ 外部指派與後台編修並行寫入 ＋ 無外部 diff 無須基準 = 15
-//  C B.1 過期    表 4 × {他人改同列, 他人新增列而草稿將其刪除, 草稿原樣帶回他人新增列(不拒), 復活他人已刪列, 同版與外部同步重寫伺服器欄／order(不作廢)} 20 ＋ 表 3 外部指派被他人改後送回舊值 3 ＋ 基準先於守門(C07 外部說明被同步改、C08 外部列被同步移除; 原為「守門先於基準」之舊語意, 已重寫)2 ＋ 表 4 空基準 [](≠未帶基準)4 = 29
+//  C B.1 過期    表 4 × {他人改同列, 他人新增列而草稿將其刪除, 草稿原樣帶回他人新增列(舊基準 → saveStale/rowAdded; 重新載入後成功), 復活他人已刪列, 同版與外部同步重寫伺服器欄／order(不作廢)} 20 ＋ 表 3 外部指派被他人改後送回舊值 3 ＋ 基準先於守門(C07 外部說明被同步改、C08 外部列被同步移除; 原為「守門先於基準」之舊語意, 已重寫)2 ＋ 表 4 空基準 [](≠未帶基準)4 = 29
 //  D B.2         無基準舊指派送回(整表／pickKeysOnly)2 ＋ 重新載入後可存 1 = 3
-//  E 僅伺服器欄  表 4 ×{有基準,無基準} 8 ＋ 無實質編修零寫入 1 = 9
+//  E 僅伺服器欄  表 4 ×{有基準,無基準} 8 ＋ 無實質編修零寫入 1 ＋ [run11 外審 sol 第 3 點] EXT-E03 外部列持舊管理欄改指派欄(users／grups／pemis)3 ＋ EXT-E04 後台列不受影響 1 = 13
 //  F order       表 4 ×{外部列移前不重編且不致成 diff, lockExternalRows:false 重編, 外部列居中} = 12
 //  G pickKeysOnly／opt  users × {基準通過且身分欄被忽略／缺列不刪／新增不採納, 無基準, 基準過期, 後台列與基準缺列項, 僅被忽略欄位之變更} 5 ＋ 表 3 用戶端 opt 只採 baseline 3 = 8
 //  H 舊行為迴歸  lockExternalRows:false × 表 4 × {改身分欄, 刪除, 新增非空 from, 改 from, 非字串 from 仍拒} 20 ＋ 無基準外部指派放行 ＋ 基準仍檢(過期／壞格式)＋ 不做僅伺服器欄不同之移除(舊快照照寫)= 23
@@ -35,8 +36,8 @@
 //  K 級聯×守門   後台群組改名／刪除連帶改寫外部 users 2 ＋ 外部群組改名／刪除被拒且引用端零寫入 2 ＋ 外部權限改名／刪除、外部標的刪除被拒 1 ＋ 級聯使舊基準失效 1 = 6
 //  L srLog       external／stale／級聯等路徑之鍵集合與無個資 4
 //  M 並行        同表兩操作者同基準(後台列、外部指派)2 ＋ 跨表 1 ＋ 鎖內比對(等待鎖期間他人已改／已納為外部列)2 = 5
-//  O 基準先於守門與內容同則跳過(run07 修訂)  表 4 ×{C-1 帶回 X 成功, X 被再改而帶舊版 saveStale, 基準含 X 舊版而庫內已變 saveStale, 草稿列已含最新 X 而基準舊 成功} 16 ＋ lockExternalRows:false 之 C-1 1 ＋
-//                表 4 ×{外部同步改外部列 → saveStale, 外部同步移除外部列 → saveStale/addExisted, 新鮮基準改外部身分欄／新增非空 from／刪外部列／帶回已移除外部列 → 守門, 過期且違規 → saveStale} 28 ＋ 無基準且違規 → 守門(users／grups／pemis)3 = 48
+//  O 基準先於守門(run07 修訂; run11 表級改寫: C-1 他人新增 X 後以舊基準送出即 saveStale/rowAdded, 重新載入後成功)  表 4 ×{C-1 舊基準 saveStale 後重新載入成功, X 被再改而帶舊版 saveStale/rowAdded, 基準含 X 舊版而庫內已變 saveStale/rowChanged, 列新基準舊 saveStale 後新基準成功} 16 ＋ lockExternalRows:false 之 C-1 1 ＋
+//                表 4 ×{外部同步改外部列 → saveStale, 外部同步移除外部列 → saveStale/rowRemoved, 新鮮基準改外部身分欄／新增非空 from／刪外部列／帶回已移除外部列 → 守門, 過期且違規 → saveStale} 28 ＋ 無基準且違規 → 守門(users／grups／pemis)3 = 48
 //  N 靜態站點    updateTabItems 之呼叫位置／次序(基準先於守門)／鎖內／單點／lock 守護 7 ＋ WWebPerm kpFunExt 簽名與 opt 採納 3 = 10; 另 EXT-999 區段存在核對 1
 //  刻意不測: 真後端端到端(api 層); 外部同步入口(api-syncAndReplaceTabs 與 unit-syncKeep); 前端唯讀／橫幅(e2e); 前端 baseline 之建立時機(UI1／UI2 之測試).
 //  未測: 無.
@@ -241,7 +242,7 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
         }
 
         //EXT-A02／A02b 為 run07 修訂: 原 A02 之期望(附基準而復活外部列 → saveFromNotAllowed「守門先於基準」)為舊語意; 新規格(EXT-S4)有基準者基準先於守門——
-        //草稿所依據之版本含該外部列而庫內已無(被外部同步移除)= 草稿已過期 → saveStale/addExisted; 無基準者無從證明過期, 由守門擋下 saveFromNotAllowed/addFrom
+        //草稿所依據之版本含該外部列而庫內已無(被外部同步移除)= 草稿已過期 → saveStale/rowRemoved; 無基準者無從證明過期, 由守門擋下 saveFromNotAllowed/addFrom
         for (let t of TABLE_KEYS) {
             it(`EXT-A02 ${t}: 復活外部同步已移除之外部列(庫內已無、草稿仍有且 from 為 pd), 未帶基準 → saveFromNotAllowed/addFrom(外部列守門), 零寫入`, async function() {
                 let env = createEnv()
@@ -256,7 +257,7 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
                 assert.strict.deepEqual(subset(lg, { msg: 1, reason: 1, froms: 1 }), { msg: 'saveFromNotAllowed', reason: 'addFrom', froms: ['pd'] })
             })
 
-            it(`EXT-A02b ${t}: 同上而附載入基準(草稿開啟時含該外部列)→ saveStale/addExisted(有基準者基準先於守門: 草稿已過期), 零寫入, 不得被復活`, async function() {
+            it(`EXT-A02b ${t}: 同上而附載入基準(草稿開啟時含該外部列)→ saveStale/rowRemoved(有基準者基準先於守門: 草稿已過期), 零寫入, 不得被復活`, async function() {
                 let env = createEnv()
                 let rows = await rowsOf(env.woItems, t)
                 await env.woItems[t].del([{ id: IDS[t].ext }])
@@ -265,7 +266,7 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
                 assert.strict.deepEqual(r, ERR('saveStale'))
                 assert.strict.equal(env.woItems[t].has(IDS[t].ext), false, '不得被復活')
                 assert.strict.equal(writesAll(env.woItems), 0)
-                assert.strict.equal(findLog(env.logs, 'updateTabItems-stale-error').reason, 'addExisted')
+                assert.strict.equal(findLog(env.logs, 'updateTabItems-stale-error').reason, 'rowRemoved')
                 assert.strict.equal(findLog(env.logs, 'updateTabItems-external-error'), undefined, '基準先拒收, 未走到外部列守門')
             })
         }
@@ -334,7 +335,7 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
                 assert.strict.deepEqual(subset(lg, { keyTable: 1, userId: 1, msg: 1, reason: 1 }), { keyTable: t, userId: 'id-admin', msg: 'saveBaselineRequired', reason: 'externalAssignNoBaseline' })
             })
 
-            it(`EXT-B03 ${t}: 外部列改指派欄 ${col}, 基準之該列為過期(庫內該列已被他人改過)→ saveStale/diffStale, 零寫入`, async function() {
+            it(`EXT-B03 ${t}: 外部列改指派欄 ${col}, 基準之該列為過期(庫內該列已被他人改過)→ saveStale/rowChanged, 零寫入`, async function() {
                 let env = createEnv()
                 let rows0 = await rowsOf(env.woItems, t)
                 let bl = blOf(t, rows0)
@@ -344,7 +345,7 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
                 let rows = edit(rows0, IDS[t].ext, { [col]: NEW_ASSIGN[t] })
                 await expectReject(env, t, rows, { baseline: bl }, 'saveStale', `${t} 基準過期`)
                 let lg = findLog(env.logs, 'updateTabItems-stale-error')
-                assert.strict.deepEqual(subset(lg, { msg: 1, reason: 1, n: 1 }), { msg: 'saveStale', reason: 'diffStale', n: 1 })
+                assert.strict.deepEqual(subset(lg, { msg: 1, reason: 1, n: 1 }), { msg: 'saveStale', reason: 'rowChanged', n: 1 })
             })
 
             it(`EXT-B04 ${t}: 後台列改指派欄 ${col}, 未帶基準 → 舊行為: 成功(最後寫入者勝, 不要求基準)`, async function() {
@@ -389,7 +390,7 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
         for (let t of TABLE_KEYS) {
             let ids = IDS[t]
 
-            it(`EXT-C01 ${t}: 草稿基準=舊版, 他人已改同一後台列; 以舊內容存檔 → saveStale/diffStale, 零寫入, 他人之改動仍在`, async function() {
+            it(`EXT-C01 ${t}: 草稿基準=舊版, 他人已改同一後台列; 以舊內容存檔 → saveStale/rowChanged, 零寫入, 他人之改動仍在`, async function() {
                 let env = createEnv()
                 let rows0 = await rowsOf(env.woItems, t)
                 let bl = blOf(t, rows0)
@@ -399,10 +400,10 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
                 await expectReject(env, t, rows, { baseline: bl }, 'saveStale', `${t} B.1`)
                 assert.strict.equal(env.woItems[t].get(ids.b1).description, 'by-other-admin')
                 let lg = findLog(env.logs, 'updateTabItems-stale-error')
-                assert.strict.deepEqual(subset(lg, { reason: 1, n: 1 }), { reason: 'diffStale', n: 1 })
+                assert.strict.deepEqual(subset(lg, { reason: 1, n: 1 }), { reason: 'rowChanged', n: 1 })
             })
 
-            it(`EXT-C02 ${t}: 另一端新增列後, 以舊基準(無該列)存檔而其整表不含該新列(將被刪除)→ saveStale/delStale, 該新列仍在`, async function() {
+            it(`EXT-C02 ${t}: 另一端新增列後, 以舊基準(無該列)存檔而其整表不含該新列(將被刪除)→ saveStale/rowAdded, 該新列仍在`, async function() {
                 let env = createEnv()
                 let rows0 = await rowsOf(env.woItems, t)
                 let bl = blOf(t, rows0)
@@ -415,10 +416,10 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
                 await expectReject(env, t, rows, { baseline: bl }, 'saveStale', `${t} 刪除他人新增之列`)
                 assert.strict.equal(env.woItems[t].has(n.id), true)
                 let lg = findLog(env.logs, 'updateTabItems-stale-error')
-                assert.strict.equal(lg.reason, 'delStale')
+                assert.strict.equal(lg.reason, 'rowAdded')
             })
 
-            it(`EXT-C03 ${t}: 他人在草稿之後新增之列, 草稿原樣帶回(未異動)→ 不使存檔作廢(same 不檢查), 成功且該列保留`, async function() {
+            it(`EXT-C03 ${t}: 他人在草稿之後新增之列, 草稿原樣帶回(未異動)→ 仍 saveStale/rowAdded(表級: 先動先贏, 不部分變更; run07 版為通過), 零寫入, 該列保留`, async function() {
                 let env = createEnv()
                 let rows0 = await rowsOf(env.woItems, t)
                 let bl = blOf(t, rows0)
@@ -426,14 +427,16 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
                 delete n._isNew
                 n.userId = 'rid-other'
                 await env.woItems[t].insert([{ ...n, order: rows0.length + 1 }]) //接在末尾(送入時依位置重給 order 後與庫內相同, 才是「原樣帶回」)
+                env.woItems[t].cnt.insert = 0 //他人之寫入不計入本次存檔之寫入數
                 let withN = [...rows0, (await rowsOf(env.woItems, t)).find((r) => r.id === n.id)]
                 let rows = edit(withN, ids.b1, { description: 'client-edit' })
-                assert.strict.deepEqual(await run(env.pc, t, rows, { baseline: bl }), OKR)
+                await expectReject(env, t, rows, { baseline: bl }, 'saveStale', `${t} 他人新增列(草稿原樣帶回)`)
+                assert.strict.equal(findLog(env.logs, 'updateTabItems-stale-error').reason, 'rowAdded')
                 assert.strict.equal(env.woItems[t].has(n.id), true)
-                assert.strict.equal(env.woItems[t].get(ids.b1).description, 'client-edit')
+                assert.strict.notEqual(env.woItems[t].get(ids.b1).description, 'client-edit', '草稿之編修未落地')
             })
 
-            it(`EXT-C04 ${t}: 復活他人已刪之後台列(草稿仍帶該列且基準有)→ saveStale/addExisted, 該列仍為已刪`, async function() {
+            it(`EXT-C04 ${t}: 復活他人已刪之後台列(草稿仍帶該列且基準有)→ saveStale/rowRemoved, 該列仍為已刪`, async function() {
                 let env = createEnv()
                 let rows0 = await rowsOf(env.woItems, t)
                 let bl = blOf(t, rows0)
@@ -442,7 +445,7 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
                 let rows = edit(rows0, ids.b1, { description: 'client-edit' }) //草稿仍含 b2(原樣)
                 await expectReject(env, t, rows, { baseline: bl }, 'saveStale', `${t} 復活`)
                 assert.strict.equal(env.woItems[t].has(ids.b2), false)
-                assert.strict.equal(findLog(env.logs, 'updateTabItems-stale-error').reason, 'addExisted')
+                assert.strict.equal(findLog(env.logs, 'updateTabItems-stale-error').reason, 'rowRemoved')
             })
 
             it(`EXT-C05 ${t}: 基準與庫內同版 → 編修成功; 外部同步重寫外部列之伺服器欄與 order(內容未變)不使草稿作廢`, async function() {
@@ -460,7 +463,7 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
 
         for (let t of ['users', 'grups', 'pemis']) {
             let col = ASSIGN[t]
-            it(`EXT-C06 ${t}: 草稿未動外部列、但庫內該外部列之 ${col} 已被他人改過; 草稿原樣送回(其舊值將覆寫新值)→ 視為將寫入之過期列 → saveStale/diffStale(不靜默還原授權)`, async function() {
+            it(`EXT-C06 ${t}: 草稿未動外部列、但庫內該外部列之 ${col} 已被他人改過; 草稿原樣送回(其舊值將覆寫新值)→ → 表級過期 saveStale/rowChanged(不靜默還原授權)`, async function() {
                 let env = createEnv()
                 let rows0 = await rowsOf(env.woItems, t)
                 let bl = blOf(t, rows0)
@@ -473,24 +476,28 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
         }
 
         for (let t of TABLE_KEYS) {
-            it(`EXT-C09 ${t}: 空基準 [](草稿開啟時無任何列; 與「未帶基準」不同)→ 編修既有列 saveStale/diffStale、刪除既有列 saveStale/delStale; 僅新增列則成功`, async function() {
+            it(`EXT-C09 ${t}: 空基準 [](草稿開啟時無任何列; 與「未帶基準」不同)→ 表內已有列, 故編修既有列、刪除既有列、僅新增列皆 saveStale/rowAdded(表級); 空表 × 空基準則通過`, async function() {
                 let env = createEnv()
                 let rows0 = await rowsOf(env.woItems, t)
                 await expectReject(env, t, edit(rows0, IDS[t].b1, { description: 'e' }), { baseline: [] }, 'saveStale', `${t} 空基準編修`)
-                assert.strict.equal(findLog(env.logs, 'updateTabItems-stale-error').reason, 'diffStale')
+                assert.strict.equal(findLog(env.logs, 'updateTabItems-stale-error').reason, 'rowAdded')
                 let env2 = createEnv()
                 await expectReject(env2, t, drop(await rowsOf(env2.woItems, t), IDS[t].b2), { baseline: [] }, 'saveStale', `${t} 空基準刪除`)
-                assert.strict.equal(findLog(env2.logs, 'updateTabItems-stale-error').reason, 'delStale')
+                assert.strict.equal(findLog(env2.logs, 'updateTabItems-stale-error').reason, 'rowAdded')
                 let env3 = createEnv()
                 let n = newRow(t)
-                assert.strict.deepEqual(await run(env3.pc, t, [...(await rowsOf(env3.woItems, t)), n], { baseline: [] }), OKR, '僅新增(id 不在基準)')
-                assert.strict.equal(env3.woItems[t].has(n.id), true)
+                await expectReject(env3, t, [...(await rowsOf(env3.woItems, t)), n], { baseline: [] }, 'saveStale', `${t} 空基準僅新增(表內已有列)`)
+                assert.strict.equal(env3.woItems[t].has(n.id), false)
+                let env4 = createEnv({ seed: (sd) => ({ ...sd, [t]: [] }) })
+                let n4 = newRow(t)
+                assert.strict.deepEqual(await run(env4.pc, t, [n4], { baseline: [] }), OKR, `${t} 空表 × 空基準`)
+                assert.strict.equal(env4.woItems[t].has(n4.id), true)
             })
         }
 
         //EXT-C07／C08 為 run07 修訂(U1 觀察 1; 原標題「守門先於基準」、原期望 saveExternalRowChanged／saveFromNotAllowed 為舊語意, 對使用者誤導):
         //草稿已過期(外部同步於開啟後改了外部列之內容, 或移除了該外部列)而使用者只編修後台列、基準正確 → 回 saveStale(資料已更新, 請重新載入), 零寫入
-        it('EXT-C07 基準先於守門: 外部同步已改外部列之說明, 草稿以舊說明送回(使用者只編修後台列、基準正確)→ 回 saveStale/diffStale(非 saveExternalRowChanged), 零寫入, 庫內保留同步之說明', async function() {
+        it('EXT-C07 基準先於守門: 外部同步已改外部列之說明, 草稿以舊說明送回(使用者只編修後台列、基準正確)→ 回 saveStale/rowChanged(非 saveExternalRowChanged), 零寫入, 庫內保留同步之說明', async function() {
             let env = createEnv()
             let rows0 = await rowsOf(env.woItems, 'grups')
             let bl = blOf('grups', rows0)
@@ -498,10 +505,10 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
             env.woItems.grups.cnt.save = 0
             await expectReject(env, 'grups', edit(rows0, 'rid-g1', { description: 'e' }), { baseline: bl }, 'saveStale', '外部列內容被同步改後之舊快照')
             assert.strict.equal(env.woItems.grups.get('rid-g2').description, 'changed-by-sync')
-            assert.strict.equal(findLog(env.logs, 'updateTabItems-stale-error').reason, 'diffStale')
+            assert.strict.equal(findLog(env.logs, 'updateTabItems-stale-error').reason, 'rowChanged')
         })
 
-        it('EXT-C08 基準先於守門: 草稿含已被外部同步移除之外部列(使用者只編修後台列、基準正確)→ saveStale/addExisted(非 saveFromNotAllowed), 零寫入, 該外部列不被復活', async function() {
+        it('EXT-C08 基準先於守門: 草稿含已被外部同步移除之外部列(使用者只編修後台列、基準正確)→ saveStale/rowRemoved(非 saveFromNotAllowed), 零寫入, 該外部列不被復活', async function() {
             let env = createEnv()
             let rows0 = await rowsOf(env.woItems, 'users')
             let bl = blOf('users', rows0)
@@ -509,7 +516,7 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
             env.woItems.users.cnt.del = 0
             await expectReject(env, 'users', edit(rows0, 'rid-u1', { description: 'e' }), { baseline: bl }, 'saveStale', '復活外部使用者')
             assert.strict.equal(env.woItems.users.has('rid-u3'), false)
-            assert.strict.equal(findLog(env.logs, 'updateTabItems-stale-error').reason, 'addExisted')
+            assert.strict.equal(findLog(env.logs, 'updateTabItems-stale-error').reason, 'rowRemoved')
         })
 
     })
@@ -590,6 +597,39 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
             let rows0 = await rewritten(env, 'users')
             assert.strict.deepEqual(await run(env.pc, 'users', rows0), OKR)
             assert.strict.equal(writes(env.woItems.users), 0)
+        })
+
+        //run11 外審 sol 第 3 點: 前端保留未存編輯(draftSync keep)期間外部同步重寫了該外部列(內容未變、建立者／時間較新), 草稿仍持舊伺服器管理欄;
+        //此時改外部列之指派欄存檔, 基準(排除伺服器管理欄)通過, 但原樣寫入會把較新之建立者／建立時間回退為舊值(同 S2). 修後: 改動之外部列改帶庫內之伺服器管理欄.
+        const NEW_ASSIGN_E = { users: J({ 'pii-G1': OR }), grups: J({ 'pii-P1': OR, 'pii-P3': OR }), pemis: J({ [T1]: 'y', [T3]: 'y' }) }
+        for (let t of ['users', 'grups', 'pemis']) {
+            let col = ASSIGN[t]
+            it(`EXT-E03 ${t}: 外部列內容未變被外部同步重寫(伺服器欄較新)後, 持舊草稿改其指派欄 ${col}(附基準)→ 成功; 指派欄為新值, 建立者／建立時間／更新者維持外部同步之新值(不回退), 更新者欄為操作者`, async function() {
+                let env = createEnv()
+                let rows0 = await rewritten(env, t)
+                let rows = edit(rows0, IDS[t].ext, { [col]: NEW_ASSIGN_E[t] }) //rows0 之外部列仍持舊 userId／timeCreate
+                assert.strict.notEqual(rows.find((r) => r.id === IDS[t].ext).userId, 'rid-sync', '前提: 草稿持舊建立者')
+                assert.strict.deepEqual(await run(env.pc, t, rows, { baseline: blOf(t, rows0) }), OKR)
+                let after = env.woItems[t].get(IDS[t].ext)
+                assert.strict.equal(after[col], NEW_ASSIGN_E[t])
+                assert.strict.equal(after.userId, 'rid-sync', '建立者不回退')
+                assert.strict.equal(after.timeCreate, '2026-02-02T00:00:00.000+08:00', '建立時間不回退')
+                assert.strict.equal(after.userIdUpdate, 'id-admin', '更新者為操作者(procOrm save 覆寫)')
+                assert.strict.equal(env.woItems[t].cnt.save, 1)
+            })
+        }
+
+        it('EXT-E04 後台列不受影響: 後台列持舊伺服器管理欄改內容 → 照舊寫入該列(restoreServerFields 只處理庫內為外部列者; 後台列寫入行為不變)', async function() {
+            let env = createEnv()
+            let rows0 = await rowsOf(env.woItems, 'grups')
+            let b1 = rows0.find((r) => r.id === IDS.grups.b1)
+            await env.woItems.grups.save([{ ...b1, userId: 'rid-other', timeCreate: '2026-03-03T00:00:00.000+08:00' }]) //後台列之建立者被他人改(模擬庫內較新)
+            env.woItems.grups.cnt.save = 0
+            let rows = edit(rows0, IDS.grups.b1, { description: 'client-edit' }) //草稿持舊 userId／timeCreate
+            assert.strict.deepEqual(await run(env.pc, 'grups', rows, { baseline: blOf('grups', rows0) }), OKR)
+            let after = env.woItems.grups.get(IDS.grups.b1)
+            assert.strict.equal(after.description, 'client-edit')
+            assert.strict.equal(after.userId, b1.userId, '後台列維持舊行為: 以送入之列為準(不介入)')
         })
 
     })
@@ -688,7 +728,7 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
             await expectReject(env, 'users', rows, { pickKeysOnly: ['cgrups'] }, 'saveBaselineRequired', 'G02')
         })
 
-        it('EXT-G03 pickKeysOnly + 過期基準(庫內該外部使用者已被改)→ saveStale/diffStale, 零寫入', async function() {
+        it('EXT-G03 pickKeysOnly + 過期基準(庫內該外部使用者已被改)→ saveStale/rowChanged, 零寫入', async function() {
             let env = createEnv()
             let rows0 = await rowsOf(env.woItems, 'users')
             let bl = blOf('users', rows0)
@@ -696,7 +736,7 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
             env.woItems.users.cnt.save = 0
             let rows = edit(rows0, 'rid-u2', { cgrups: J({ 'pii-G1': OR }) })
             await expectReject(env, 'users', rows, { pickKeysOnly: ['cgrups'], baseline: bl }, 'saveStale', 'G03')
-            assert.strict.equal(findLog(env.logs, 'updateTabItems-stale-error').reason, 'diffStale')
+            assert.strict.equal(findLog(env.logs, 'updateTabItems-stale-error').reason, 'rowChanged')
         })
 
         it('EXT-G04 pickKeysOnly: 後台使用者改 cgrups 無基準 → 成功(舊行為); 基準缺該列之項(基準由過濾後之清單產生)而該列有 diff → saveStale', async function() {
@@ -1190,12 +1230,15 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
         for (let t of TABLE_KEYS) {
             let bo2 = c1Id(t, 'bo2')
 
-            it(`EXT-O01 ${t}: C-1——X 依 order 序排在外部列之前, 草稿以原基準(無 X)原樣帶回 [bo1..bo4, X, ext1, ext2] 只編修 bo2 → 成功; X 與其餘列內容不變、X 建立者沿用、外部列逐位元不變, X 不被刪除重建`, async function() {
+            it(`EXT-O01 ${t}: C-1 情境(run11 表級改寫)——他人新增 X 後, 草稿以原基準(無 X)帶回 [bo1..bo4, X, ext1, ext2] 只編修 bo2 → saveStale/rowAdded, 零寫入(表內多了基準沒有的 X; 原則 7 先動先贏, run07 版為成功); 以重新載入之基準(含 X)重送則成功且 X 內容不變、X 建立者沿用、外部列逐位元不變、X 不被刪除重建`, async function() {
                 let { env, bl, x, afterOther } = await setupC1(t)
                 assert.strict.deepEqual(afterOther.map((r) => r.id), c1Ids(t, [...C1_BO]).concat([x.id], c1Ids(t, C1_EXT)), '前提: 依 order 序 X 在 ext1／ext2 之前')
                 let before = new Map(afterOther.map((r) => [r.id, cloneDeep(r)]))
+                await expectReject(env, t, edit(cloneDeep(afterOther), bo2, { description: 'bo2-edit' }), { baseline: bl }, 'saveStale', `${t} C-1 舊基準`)
+                assert.strict.equal(findLog(env.logs, 'updateTabItems-stale-error').reason, 'rowAdded')
+                //重新載入(基準取自含 X 之整表)後重送: 成功
                 let rows = edit(cloneDeep(afterOther), bo2, { description: 'bo2-edit' })
-                assert.strict.deepEqual(await run(env.pc, t, rows, { baseline: bl }, 'id-adminA'), OKR)
+                assert.strict.deepEqual(await run(env.pc, t, rows, { baseline: blOf(t, afterOther) }, 'id-adminA'), OKR)
                 let after = new Map((await rowsOf(env.woItems, t)).map((r) => [r.id, r]))
                 assert.strict.equal(after.size, 7, '列數不變')
                 assert.strict.equal(after.get(bo2).description, 'bo2-edit', '被編修之後台列落地')
@@ -1214,7 +1257,7 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
                 assert.strict.equal(after.get(c1Id(t, 'ext1')).order, 70, '外部列 order 維持庫內值')
             })
 
-            it(`EXT-O02 ${t}: C-1 但 X 於草稿取得之後又被他人改了內容(草稿帶回舊版 X)→ saveStale/diffStale n=1, 零寫入, 他人之改動仍在`, async function() {
+            it(`EXT-O02 ${t}: C-1 但 X 於草稿取得之後又被他人改了內容(草稿帶回舊版 X)→ saveStale/rowAdded n=1(X 不在基準), 零寫入, 他人之改動仍在`, async function() {
                 let { env, bl, x, afterOther } = await setupC1(t)
                 let Xold = afterOther.find((r) => r.id === x.id)
                 await env.woItems[t].save([{ ...Xold, description: 'X-changed-by-other' }])
@@ -1223,10 +1266,10 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
                 await expectReject(env, t, rows, { baseline: bl }, 'saveStale', `${t} 帶回舊版 X`)
                 assert.strict.equal(env.woItems[t].get(x.id).description, 'X-changed-by-other')
                 let lg = findLog(env.logs, 'updateTabItems-stale-error')
-                assert.strict.deepEqual(subset(lg, { msg: 1, reason: 1, n: 1 }), { msg: 'saveStale', reason: 'diffStale', n: 1 })
+                assert.strict.deepEqual(subset(lg, { msg: 1, reason: 1, n: 1 }), { msg: 'saveStale', reason: 'rowAdded', n: 1 })
             })
 
-            it(`EXT-O03 ${t}: 草稿開啟時已含 X(基準有 X 之舊版), 之後他人改了 X 之內容, 草稿帶回舊版 X → saveStale/diffStale n=1, 零寫入`, async function() {
+            it(`EXT-O03 ${t}: 草稿開啟時已含 X(基準有 X 之舊版), 之後他人改了 X 之內容, 草稿帶回舊版 X → saveStale/rowChanged n=1, 零寫入`, async function() {
                 let { env, x, afterOther } = await setupC1(t)
                 let blX = blOf(t, afterOther) //草稿開啟於「含 X」之版本
                 let Xold = afterOther.find((r) => r.id === x.id)
@@ -1234,27 +1277,32 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
                 resetCnt(env)
                 await expectReject(env, t, edit(cloneDeep(afterOther), bo2, { description: 'bo2-edit' }), { baseline: blX }, 'saveStale', `${t} 基準含 X 舊版`)
                 let lg = findLog(env.logs, 'updateTabItems-stale-error')
-                assert.strict.deepEqual(subset(lg, { reason: 1, n: 1 }), { reason: 'diffStale', n: 1 })
+                assert.strict.deepEqual(subset(lg, { reason: 1, n: 1 }), { reason: 'rowChanged', n: 1 })
             })
 
-            it(`EXT-O04 ${t}: 草稿之列已含他人最新之 X(內容=庫內; 他人改過 X 後草稿之列才更新)而基準為舊(無 X), 只編修 bo2 → 成功(送入之內容未覆蓋他人版本); X 維持他人之內容`, async function() {
+            it(`EXT-O04 ${t}: 草稿之列已含他人最新之 X(內容=庫內)而基準為舊(無 X)——列新、基準舊(client 自行混用, 例如存檔當下才取列)→ 仍 saveStale/rowAdded(表級只看基準對庫內整表), 零寫入; 基準與列皆取自最新 → 成功且 X 維持他人之內容`, async function() {
                 let { env, bl, x, afterOther } = await setupC1(t)
                 let Xold = afterOther.find((r) => r.id === x.id)
                 await env.woItems[t].save([{ ...Xold, description: 'X-changed-by-other' }])
                 resetCnt(env)
                 let latest = await rowsOf(env.woItems, t)
-                assert.strict.deepEqual(await run(env.pc, t, edit(cloneDeep(latest), bo2, { description: 'bo2-edit' }), { baseline: bl }, 'id-adminA'), OKR)
+                await expectReject(env, t, edit(cloneDeep(latest), bo2, { description: 'bo2-edit' }), { baseline: bl }, 'saveStale', `${t} 列新基準舊`)
+                assert.strict.equal(findLog(env.logs, 'updateTabItems-stale-error').reason, 'rowAdded')
+                assert.strict.deepEqual(await run(env.pc, t, edit(cloneDeep(latest), bo2, { description: 'bo2-edit' }), { baseline: blOf(t, latest) }, 'id-adminA'), OKR)
                 assert.strict.equal(env.woItems[t].get(x.id).description, 'X-changed-by-other')
                 assert.strict.equal(env.woItems[t].get(bo2).description, 'bo2-edit')
             })
         }
 
-        it('EXT-O05 users: lockExternalRows:false 時亦然(基準比對與外部列保護開關無關)——X 移至外部列之前原樣帶回、原基準 → 成功, 各列依位置重編 order 1～7, 內容不變', async function() {
+        it('EXT-O05 users: lockExternalRows:false 時亦然(基準比對與外部列保護開關無關)——X 移至外部列之前原樣帶回、以含 X 之基準 → 成功, 各列依位置重編 order 1～7, 內容不變; 以原基準(無 X)→ saveStale/rowAdded', async function() {
             let t = 'users'
-            let { env, bl, x, afterOther } = await setupC1(t, { proc: { lockExternalRows: false } })
+            let { env, bl: bl0, x, afterOther } = await setupC1(t, { proc: { lockExternalRows: false } })
+            let bl = blOf(t, afterOther)
             let before = new Map(afterOther.map((r) => [r.id, cloneDeep(r)]))
             let rows = [...afterOther.filter((r) => C1_BO.some((k) => r.id === c1Id(t, k))), afterOther.find((r) => r.id === x.id), ...afterOther.filter((r) => C1_EXT.some((k) => r.id === c1Id(t, k)))]
             rows = edit(cloneDeep(rows), c1Id(t, 'bo2'), { description: 'bo2-edit' })
+            await expectReject(env, t, rows, { baseline: bl0 }, 'saveStale', 'lock=false 原基準')
+            assert.strict.equal(findLog(env.logs, 'updateTabItems-stale-error').reason, 'rowAdded')
             assert.strict.deepEqual(await run(env.pc, t, rows, { baseline: bl }, 'id-adminA'), OKR)
             rows.forEach((r, k) => {
                 assert.strict.equal(env.woItems[t].get(r.id).order, k + 1, `${r.id} 舊行為依位置重編`)
@@ -1270,7 +1318,7 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
         for (let t of TABLE_KEYS) {
             let ids = IDS[t]
 
-            it(`EXT-O10 ${t}: 外部同步於草稿開啟後改了外部列之說明; 使用者只編修後台列、基準為開啟時之版本 → saveStale/diffStale n=1(非 saveExternalRowChanged), 零寫入, 庫內保留同步之說明`, async function() {
+            it(`EXT-O10 ${t}: 外部同步於草稿開啟後改了外部列之說明; 使用者只編修後台列、基準為開啟時之版本 → saveStale/rowChanged n=1(非 saveExternalRowChanged), 零寫入, 庫內保留同步之說明`, async function() {
                 let env = createEnv()
                 let rows0 = await rowsOf(env.woItems, t)
                 let bl = blOf(t, rows0)
@@ -1279,11 +1327,11 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
                 await expectReject(env, t, edit(rows0, ids.b1, { description: 'e' }), { baseline: bl }, 'saveStale', `${t} 外部列被同步改`)
                 assert.strict.equal(env.woItems[t].get(ids.ext).description, 'changed-by-sync')
                 let lg = findLog(env.logs, 'updateTabItems-stale-error')
-                assert.strict.deepEqual(subset(lg, { msg: 1, reason: 1, n: 1 }), { msg: 'saveStale', reason: 'diffStale', n: 1 })
+                assert.strict.deepEqual(subset(lg, { msg: 1, reason: 1, n: 1 }), { msg: 'saveStale', reason: 'rowChanged', n: 1 })
                 assert.strict.equal(findLog(env.logs, 'updateTabItems-external-error'), undefined, '基準先拒收, 未走到外部列守門')
             })
 
-            it(`EXT-O11 ${t}: 外部同步於草稿開啟後移除了外部列; 使用者只編修後台列、基準為開啟時之版本(仍含該外部列)→ saveStale/addExisted(非 saveFromNotAllowed), 零寫入, 該外部列不被復活`, async function() {
+            it(`EXT-O11 ${t}: 外部同步於草稿開啟後移除了外部列; 使用者只編修後台列、基準為開啟時之版本(仍含該外部列)→ saveStale/rowRemoved(非 saveFromNotAllowed), 零寫入, 該外部列不被復活`, async function() {
                 let env = createEnv()
                 let rows0 = await rowsOf(env.woItems, t)
                 let bl = blOf(t, rows0)
@@ -1291,7 +1339,7 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
                 env.woItems[t].cnt.del = 0
                 await expectReject(env, t, edit(rows0, ids.b1, { description: 'e' }), { baseline: bl }, 'saveStale', `${t} 外部列被同步移除`)
                 assert.strict.equal(env.woItems[t].has(ids.ext), false)
-                assert.strict.equal(findLog(env.logs, 'updateTabItems-stale-error').reason, 'addExisted')
+                assert.strict.equal(findLog(env.logs, 'updateTabItems-stale-error').reason, 'rowRemoved')
                 assert.strict.equal(findLog(env.logs, 'updateTabItems-external-error'), undefined)
             })
 
@@ -1384,20 +1432,21 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
                 assert.strict.equal(count(body, /\bisBaselineValid\(/g), 1)
             })
 
-            it('SITE-EX-002 checkExternalWrite／checkBaseline／hasExternalDiff／dropServerOnlyDiff 之呼叫位於 ltdtDiffByKey 之後、第一個 procOrm( 寫入之前', function() {
+            it('SITE-EX-002 checkExternalWrite／hasExternalDiff／dropServerOnlyDiff 之呼叫位於 ltdtDiffByKey 之後、第一個 procOrm( 寫入之前; checkBaseline(表級, run11)位於 select 之後、第一個 procOrm( 之前', function() {
                 let iDiff = at(/\bltdtDiffByKey\(/)
                 let iOrm = at(/\bprocOrm\(/)
                 assert.strict.ok(iDiff > 0 && iOrm > 0)
-                for (let name of ['dropServerOnlyDiff', 'checkExternalWrite', 'checkBaseline', 'hasExternalDiff']) {
+                assert.strict.ok(at(/\bcheckBaseline\(/) > 0 && at(/\bcheckBaseline\(/) < iDiff && at(/\bcheckBaseline\(/) < iOrm, 'checkBaseline 須在 ltdtDiffByKey 與 procOrm( 之前')
+                for (let name of ['dropServerOnlyDiff', 'checkExternalWrite', 'hasExternalDiff']) {
                     let i = at(new RegExp(`\\b${name}\\(`))
                     assert.strict.ok(i > iDiff, `${name} 須在 ltdtDiffByKey 之後`)
                     assert.strict.ok(i < iOrm, `${name} 須在第一個 procOrm( 寫入之前`)
                 }
             })
 
-            //SITE-EX-003 為 run07 修訂: 原次序 checkExternalWrite → checkBaseline(外部列守門先於基準)為舊語意; 新規格(EXT-S4): 基準先於守門, 無基準分支(hasExternalDiff)最後, 皆在寫入前驗證與第一個 procOrm( 之前
-            it('SITE-EX-003 次序: dropServerOnlyDiff → checkBaseline → checkExternalWrite → hasExternalDiff(無基準分支) → validateRowsBeforeWrite → 第一個 procOrm( (基準先於外部列守門, 兩者皆先於寫入前驗證)', function() {
-                let order = ['dropServerOnlyDiff', 'checkBaseline', 'checkExternalWrite', 'hasExternalDiff', 'validateRowsBeforeWrite', 'procOrm'].map((n) => at(new RegExp(`\\b${n}\\(`)))
+            //SITE-EX-003 為 run11 修訂(原 run07: dropServerOnlyDiff → checkBaseline → checkExternalWrite; 表級基準不需要 diff 結果 r, 提前至 select 之後): 基準最先(select 之後、還原 order 與 ltdtDiffByKey 之前), 其後守門、無基準分支, 皆在寫入前驗證與第一個 procOrm( 之前
+            it('SITE-EX-003 次序: checkBaseline → restoreExternalOrder → ltdtDiffByKey → dropServerOnlyDiff → checkExternalWrite → hasExternalDiff(無基準分支) → validateRowsBeforeWrite → 第一個 procOrm( (基準最先; 外部列守門其次, 兩者皆先於寫入前驗證)', function() {
+                let order = ['checkBaseline', 'restoreExternalOrder', 'ltdtDiffByKey', 'dropServerOnlyDiff', 'checkExternalWrite', 'hasExternalDiff', 'validateRowsBeforeWrite', 'procOrm'].map((n) => at(new RegExp(`\\b${n}\\(`)))
                 assert.strict.ok(order.every((i) => i > 0), JSON.stringify(order))
                 for (let k = 1; k < order.length; k++) {
                     assert.strict.ok(order[k] > order[k - 1], `次序錯: ${JSON.stringify(order)}`)
@@ -1409,6 +1458,14 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
                 assert.strict.ok(/if \(ex !== null\) \{[\s\S]*?Promise\.reject\(ex\.key\)/.test(body), 'checkExternalWrite 被拒須 reject ex.key')
             })
 
+            it('SITE-EX-005 restoreServerFields 緊接 dropServerOnlyDiff 之後、同受 if (lockExternalRows) 守護, 且在 checkExternalWrite 之前', function() {
+                let a = body.indexOf('r = dropServerOnlyDiff(')
+                let b = body.indexOf('r = restoreServerFields({ r, ltdtOld })')
+                let c = body.indexOf('checkExternalWrite({')
+                assert.strict.ok(a > 0 && b > a && c > b, 'restoreServerFields 須在 dropServerOnlyDiff 之後、checkExternalWrite 之前')
+                assert.strict.ok(/if \(lockExternalRows\) \{\s*r = dropServerOnlyDiff\([^\n]*\n\s*r = restoreServerFields\(/.test(body), '與 dropServerOnlyDiff 同受 lockExternalRows 守護')
+            })
+
             it('SITE-EX-004 restoreExternalOrder 位於 order=k+1 重給與 select 之後、ltdtDiffByKey 之前; 且與 dropServerOnlyDiff 皆受 if (lockExternalRows) 守護', function() {
                 let iOrder = at(/r\.order\s*=\s*k\s*\+\s*1/)
                 let iSel = at(/ltdtOld\s*=\s*await woItems\[keyTable\]\.select\(\)/)
@@ -1418,6 +1475,17 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
                 assert.strict.ok(iOrder < iRest && iSel < iRest && iRest < iDiff)
                 assert.strict.ok(/if \(lockExternalRows\) \{\s*rows = restoreExternalOrder\(/.test(body))
                 assert.strict.ok(/if \(lockExternalRows\) \{\s*r = dropServerOnlyDiff\(/.test(body))
+            })
+
+            //SITE-EX-007 (run11 新增): 表級基準比對是 select 之後的第一個檢查——先於 findTouchedDup(撞名)、checkUsersWrite(email／對應鍵)、saveNewRowExists(新增列已存在),
+            //使草稿過期時回「請重新載入」(saveStale), 而不是以過期畫面為前提的其他錯誤(R-PRINCIPLE-00 原則 7)
+            it('SITE-EX-007 checkBaseline 為 select 之後的第一個檢查: 先於 findTouchedDup、checkUsersWrite、saveNewRowExists、restoreExternalOrder、ltdtDiffByKey', function() {
+                let iSel = at(/ltdtOld\s*=\s*await woItems\[keyTable\]\.select\(\)/)
+                let order = [iSel, ...['checkBaseline', 'restoreExternalOrder', 'findTouchedDup', 'checkUsersWrite', 'saveNewRowExists', 'ltdtDiffByKey'].map((n) => at(new RegExp(`\\b${n}\\b`)))]
+                assert.strict.ok(order.every((i) => i > 0), JSON.stringify(order))
+                for (let k = 1; k < order.length; k++) {
+                    assert.strict.ok(order[k] > order[k - 1], `次序錯: ${JSON.stringify(order)}`)
+                }
             })
 
             it('SITE-EX-005 守門與基準比對皆在表鎖內(withTabLocks(kmx, [keyTable] 之後); 基準格式驗證在取鎖與任何讀寫之前(lockSave( 之前)', function() {

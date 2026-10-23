@@ -1,0 +1,13 @@
+start Fri Oct 23 2026 07:22:56 GMT+0800 (台北標準時間)
+sha-before 0882754a13d6714cabdf96e34ae395374ef3cf98
+fixed-027-1: exit=0 passing=2 failing=0 pending=0 67s 
+mutation mutA-legacy-guard applied
+mutA-027-1: exit=2 passing=0 failing=2 pending=0 32s 1) E2E-027-users-own-save-late-double-push || 2) E2E-027-users-own-save-late-double-push || 1) e2e-external-rows (eng) || 2) e2e-external-rows (cht)
+mutA-027-2: exit=2 passing=0 failing=2 pending=0 32s 1) E2E-027-users-own-save-late-double-push || 2) E2E-027-users-own-save-late-double-push || 1) e2e-external-rows (eng) || 2) e2e-external-rows (cht)
+mutation restored sha=OK
+FILE-e2e-ref-cascade: exit=0 passing=16 failing=0 pending=0 238s 
+FILE-e2e-rela-user-grup: exit=0 passing=20 failing=0 pending=0 619s 
+af037-1: exit=0 passing=2 failing=0 pending=0 32s 
+af037-2: exit=0 passing=2 failing=0 pending=0 32s 
+af037-3: exit=0 passing=2 failing=0 pending=0 32s 
+af037-4: exit=0 passing=2 failing=0 pending=0 32s 

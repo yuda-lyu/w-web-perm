@@ -52,7 +52,12 @@ export function assertPristineSeed(key, seed) {
     let lack = got ? want.filter((id) => !got.includes(id)) : []
     if (!got || got.length !== n || extra.length > 0 || lack.length > 0) {
         let names = Array.isArray(seed) ? seed.map((v) => (v && (v.name || v.id)) || '?').join(', ') : String(seed)
-        throw new Error(`captureBaseSeedOnce(${key}): 擷取到的資料不是 pristine base seed(實得 ${got ? got.length : '非陣列'} 筆, 應為 ${n} 筆; 多出主鍵 [${extra.join(', ')}]、缺少主鍵 [${lack.join(', ')}]): [${names}]。` +
+        //多出之列若為外部列(from 為非空字串), 在主鍵後註記其 from 分區: 各測試檔之夾具各用專屬 from(如 e2e-init E2E-006 之 appE2eInit006), 據此可指向是哪個檔遺留(2026-10-22 run09)
+        let fromOf = (id) => {
+            let r = Array.isArray(seed) ? seed.find((v) => v && v.id !== undefined && String(v.id) === id) : null
+            return (r && typeof r.from === 'string' && r.from !== '') ? `${id}(from=${r.from})` : id
+        }
+        throw new Error(`captureBaseSeedOnce(${key}): 擷取到的資料不是 pristine base seed(實得 ${got ? got.length : '非陣列'} 筆, 應為 ${n} 筆; 多出主鍵 [${extra.map(fromOf).join(', ')}]、缺少主鍵 [${lack.join(', ')}]): [${names}]。` +
             '常見成因: 單一 mocha 行程內前一個 e2e 檔遺留改動(其收尾未還原本表)或前置測試污染了庫; 逐檔隔離執行不會遇到(每檔重種)。')
     }
     return seed

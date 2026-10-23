@@ -1,17 +1,16 @@
 //列內容指紋與載入基準純函數單元測試(F-26 過期快照保護; R-PRINCIPLE-00 原則 3「遇衝突或歧義:收嚴＋提示」; 規則帳本 R-BASELINE-01; ADR-037; run07 U1)
 //
-//受測: src/js/rowDigest.mjs(純函數, 前後端共用): cyrb53／getDigestFields／rowDigest／makeBaseline／isBaselineValid／getBaselineDigest／checkBaseline.
+//受測: src/js/rowDigest.mjs(純函數, 前後端共用): cyrb53／getDigestFields／rowDigest／makeBaseline／isBaselineValid／getBaselineDigest／compareBaseline／isBaselineStale／checkBaseline.
 //
 //規格來源(期望由下列規則推導, 不抄實作; 規格常數見 test/tools/unitExt.mjs):
 //  RD-S1 指紋只含內容欄位: schema 全部欄位扣除 order 與伺服器管理欄(userId／timeCreate／userIdUpdate／timeUpdate); 外部同步整來源重寫使每列之建立／更新時間皆變, 內容未變者不應使草稿作廢; order 由儲存時依列序重給.
 //  RD-S2 每個內容欄位(含 id、from)之變動皆改變指紋; 缺欄視同 null; 物件鍵序、非 schema 之暫態欄位(如 _isNew)不影響; 同內容同指紋(與是哪一個物件無關).
 //  RD-S3 載入基準 = 草稿所依據之那版列之 [[id, digest], ...](只含字串 id 之列, 次序同輸入); 格式合法 = 陣列且每項為 [字串, 字串].
-//  RD-S4 比對(表鎖內, 於寫入之前): 本次「將寫入」之列——修改列與刪除列之庫內版本須與基準相同(基準無該列 = 草稿之後才新增, 亦視為過期);
-//        新增列之 id 若在基準內 = 草稿所依據之版本有、現已不在(被刪或被同步移除), 復活會使已撤銷之列回來, 視為過期; 未異動之列(same)不檢查.
-//        違規整次拒收 saveStale; reason 為 diffStale／delStale／addExisted, 以「修改 → 刪除 → 新增」之第一個違規為準, n 為違規列總數.
-//  RD-S5 (run07 修訂, 依 API 子代理 C-1 缺陷與 U1 觀察 1; 本檔 RC-050～RC-063 為其翻譯; 原 RC-002 diff 格之期望為舊語意) 修改列(diff)若其內容指紋與庫內該列相同(僅 order／伺服器管理欄不同,
-//        如開框後他人新增之列因依列序重編 order 而成為 diff 且不在基準內), 不檢查基準、不算過期——送入之內容並未覆蓋他人版本; 與基準是否有該列、基準版本是否仍等於庫內版本皆無關.
-//        刪除列與新增列之檢查不變; 修改列只要任一內容欄(含缺欄與 null 之差異外之任何差異)與庫內不同, 仍依 RD-S4 檢查基準.
+//  RD-S4 (run11 改寫為表級; 使用者 2026-10-22 裁示 R-PRINCIPLE-00 原則 7「多人同時編輯以表雜湊比對, 先動先贏」; run07 版「只檢查本次將寫入之列」之期望作廢)
+//        比對(表鎖內, 於寫入之前): 草稿載入時之整表(基準)與目前庫內整表逐列比內容指紋與列集合——表內任何一列之內容不同、或有列被增刪, 即過期, 不論該列是否為本次將寫入者(不部分變更、不上鎖).
+//        整次拒收 saveStale; reason 為 rowChanged(有列內容不同)／rowRemoved(基準之列已不在)／rowAdded(多出基準沒有之列), 依序取第一個成立者, n 為差異列總數.
+//  RD-S5 (run11 取代 run07 同編號: 原為「diff 列內容同庫內不計」之跳過規則, 表級比對不再有 r 參數而作廢) 指紋口徑不變(RD-S1): 排除 order 與伺服器管理欄——外部同步整批重寫但內容未變(時間／建立者／order 皆變)、
+//        儲存依列序重給 order、純列序重排, 皆不使表雜湊改變, 管理員不被誤擋; 外部同步真有改變內容 → 雜湊變 → 管理員以舊資料存檔被擋(以外部為主, 原則 5).
 //  RD-S6 (run07 外審 sol R8 修訂; 原檔頭「同 id 重複之基準項(Map 取後者, 非規格)不測」之敘述作廢) 基準中同一 id 不得出現兩次(不論兩項指紋是否相同、次序如何): 同 id 帶不同版本為矛盾之基準,
 //        由列序決定採哪版屬靜默擇一(R-PRINCIPLE-00 原則 3「遇衝突或歧義:收嚴＋提示」), 格式驗證(isBaselineValid)即拒收 → 伺服端回 saveRowFieldInvalid(reason baselineInvalid)零寫入(procCore 層見 unit-procCore-external EXT-J03).
 //        id 之比對為嚴格字串相等(大小寫相異、原型鍵名皆為一般字串).
@@ -23,19 +22,17 @@
 //  RB  makeBaseline     id 型別 7 種(含缺 id)＋ 非物件元素 3 種 = 10; 次序／digest 一致／非陣列／空／order 與伺服器欄不同基準同／不改輸入 5; 四表 4 = 19
 //  RV  isBaselineValid  壞形狀 26 種 ＋ 合法形狀 5 種 = 31; [run07 R8] 同 id 重複之壞形狀 7 種(同指紋／異指紋／交換次序／不相鄰／三次／原型鍵名／空字串) ＋ 真指紋交換次序 2 ＋ 合法(id 異而指紋同／原型鍵名不重複／大小寫相異) 3 = 12; 共 43, 全測
 //  GD  getBaselineDigest  [run07 R8] 有／無／壞基準與壞元素／原型鍵名／與 makeBaseline 一致／id 型別 6 案, 全測
-//  RC  checkBaseline    {diff,del,add} × {基準有且同版,基準有但庫內已變,基準無} 9 格 × 表 4 = 36; 內容欄逐欄改變(users 7、grups 4、pemis 4、targets 2 欄 = 17 欄)× {diff,del} = 34;
-//                       order／伺服器欄變動不使過期 4(四表) ＋ same 不檢查 ＋ 只檢查將寫入之列 = 6; 混合之 reason／n 優先序 6; 缺 id／非物件／庫內已無／雜訊／不改輸入 6; 空基準 3; 隨機語意對照 400;
-//                       [RD-S5 內容同庫內之 diff 不計] 基準無該列 4(四表)＋基準在但庫內已變 4＋order 與四伺服器欄皆異 4＋任一內容欄不同仍檢查 17 欄＋缺欄≡null 與 ''≠null 2＋混合計數 4＋C-1 函數層情境 2＋庫內無該列 1＋空基準 1 = 39;
-//                       RC-002 diff 格(17)改為「client 列為草稿所依據之舊版另編修一欄」, RC-040 隨機情境加入「僅 order 不同之 diff」(預言依內容語意)
+//  RC  checkBaseline 表級(run11): 整表情境 11 種 × 表 4 = 44; 內容欄逐欄被他人改(users 7、grups 4、pemis 4、targets 2 欄 = 17 欄)= 17; order／伺服器欄變動與純重排不使過期 4 表 × 2 ＋ 外部同步整批重寫 ＋ 他列被改仍拒 = 10;
+//                       reason／n 優先序與形狀 5; 雜訊列／重複 id／不改輸入／非陣列／keys 非陣列 5; 空基準／空表 3; 隨機語意對照 400(預言逐 id 比內容, 不經指紋); isBaselineStale／前後端同判準／compareBaseline 形狀 3
 //  刻意不測: 稀疏陣列之基準(JSON 不會產生); 指紋之具體字串值(不凍結雜湊演算法, 只驗性質); 同 id 重複之基準送入 checkBaseline 之行為(RD-S6 已於格式驗證拒收, 呼叫端須先 isBaselineValid; procCore 即如此).
 //  未測: 無.
 //跑法: npx mocha test/unit-rowDigest.test.mjs --reporter list --timeout 60000
 import assert from 'assert'
-import { cyrb53, getDigestFields, rowDigest, makeBaseline, isBaselineValid, getBaselineDigest, checkBaseline } from '../src/js/rowDigest.mjs'
+import { cyrb53, getDigestFields, rowDigest, makeBaseline, isBaselineValid, getBaselineDigest, compareBaseline, isBaselineStale, checkBaseline } from '../src/js/rowDigest.mjs'
 import { TABLES, KEYS, SPEC_SERVER, SPEC_DIGEST, MISSING, mkRow, rowWith, deepFreeze, mulberry32 } from './tools/unitExt.mjs'
 
 
-const cells = { RD: 0, RG: 0, RB: 0, RV: 0, GD: 0, RC_matrix: 0, RC_field: 0, RC_inv: 0, RC_mixed: 0, RC_robust: 0, RC_empty: 0, RC_random: 0, RC_skip: 0 }
+const cells = { RD: 0, RG: 0, RB: 0, RV: 0, GD: 0, RC_matrix: 0, RC_field: 0, RC_inv: 0, RC_mixed: 0, RC_robust: 0, RC_empty: 0, RC_random: 0, RC_misc: 0 }
 let sortCopy = (a) => [...a].sort()
 let dg = (t, o = {}) => rowDigest(mkRow(t, o), KEYS[t])
 //contentOf: 「內容是否相同」之獨立預言(不經指紋): 內容欄位依 SPEC_DIGEST 逐表手列, 缺欄視為 null
@@ -446,244 +443,191 @@ describe('unit-rowDigest (列內容指紋與載入基準, F-26, R-BASELINE-01)',
 
 
     // =====================================================================
-    // checkBaseline
+    // compareBaseline／isBaselineStale／checkBaseline(表級, run11)
     // =====================================================================
-    describe('checkBaseline(RD-S4)', function() {
+    describe('checkBaseline 表級(RD-S4)', function() {
 
-        //庫內三列(目前版本); 基準狀態: 'same' 基準指紋 = 庫內目前版本; 'changed' 基準為較舊之內容(庫內已變); 'absent' 基準無該 id
+        //庫內三列(目前版本); 基準 = 草稿載入時之整表(makeBaseline)
         let dbRows = (t) => [mkRow(t, { id: 'r1', order: 1 }), mkRow(t, { id: 'r2', order: 2 }), mkRow(t, { id: 'r3', order: 3 })]
-        let oldVersion = (t, row) => rowWith(row, { description: 'older-description' }) //較舊版: 內容(description 為四表共有之內容欄)不同
-        let blOf = (t, db, states) => {
-            let bl = []
-            db.forEach((row) => {
-                let st = states[row.id]
-                if (st === 'same') {
-                    bl.push([row.id, rowDigest(row, KEYS[t])])
-                }
-                else if (st === 'changed') {
-                    bl.push([row.id, rowDigest(oldVersion(t, row), KEYS[t])])
-                }
-            })
-            return bl
-        }
+        let chk = (t, db, bl) => checkBaseline({ keys: KEYS[t], ltdtOld: deepFreeze(db), baseline: deepFreeze(bl) })
+        let stale = (reason, n) => ({ key: 'saveStale', reason, n })
 
-        //9 格: 操作 × 基準狀態. diff／del 之目標列 r2; add 之目標列為庫內不存在之 id
-        //add 之「基準有」: 基準內有該 id(草稿所依據之版本有、現已不在庫內), 不論基準指紋為何皆為 addExisted; 「基準無」: 草稿之後才新增之新 id
+        //載入時整表 vs 目前整表: 每格 = [情境, 目前整表產生器, 期望]; 「他人改別列」「他人增刪列」即使與使用者將寫入之列無關, 亦整次拒收(原則 7: 表級, 不部分變更)
         for (let t of TABLES) {
             let MATRIX = [
-                ['diff', 'same', null],
-                ['diff', 'changed', 'diffStale'],
-                ['diff', 'absent', 'diffStale'],
-                ['del', 'same', null],
-                ['del', 'changed', 'delStale'],
-                ['del', 'absent', 'delStale'],
-                ['add', 'same', 'addExisted'],
-                ['add', 'changed', 'addExisted'],
-                ['add', 'absent', null],
+                ['整表一致', (db) => db, null],
+                ['他人改了一列內容(別列)', (db) => [db[0], rowWith(db[1], { description: 'by-other' }), db[2]], stale('rowChanged', 1)],
+                ['他人改了全部三列內容', (db) => db.map((r) => rowWith(r, { description: `by-other-${r.id}` })), stale('rowChanged', 3)],
+                ['他人刪了一列', (db) => [db[0], db[2]], stale('rowRemoved', 1)],
+                ['他人新增一列', (db) => [...db, mkRow(t, { id: 'rN', order: 4 })], stale('rowAdded', 1)],
+                ['他人新增三列', (db) => [...db, mkRow(t, { id: 'rN1' }), mkRow(t, { id: 'rN2' }), mkRow(t, { id: 'rN3' })], stale('rowAdded', 3)],
+                ['改一列＋刪一列＋增一列', (db) => [rowWith(db[0], { description: 'by-other' }), db[2], mkRow(t, { id: 'rN' })], stale('rowChanged', 3)],
+                ['刪一列＋增一列(無內容改變)', (db) => [db[0], db[2], mkRow(t, { id: 'rN' })], stale('rowRemoved', 2)],
+                ['刪後以同 id 重新新增且內容不同(同 id 異內容)', (db) => [db[0], mkRow(t, { id: 'r2', description: 'recreated' }), db[2]], stale('rowChanged', 1)],
+                ['刪後以同 id 重新新增且內容相同(整表內容未變)', (db) => [db[0], mkRow(t, { id: 'r2', order: 2 }), db[2]], null],
+                ['整表清空', () => [], stale('rowRemoved', 3)],
             ]
-            for (let [op, st, exp] of MATRIX) {
-                it(`RC-001 ${t} ${op} × 基準${st === 'same' ? '有且同版' : (st === 'changed' ? '有但庫內已變' : '無')} → ${exp === null ? '通過' : `saveStale/${exp}`}`, function() {
+            for (let [title, gen, exp] of MATRIX) {
+                it(`RC-001 ${t}: ${title} → ${exp === null ? '通過' : `saveStale/${exp.reason}(n=${exp.n})`}`, function() {
                     cells.RC_matrix++
-                    let db = dbRows(t)
-                    let r = { add: [], del: [], diff: [], same: [] }
-                    let states = { r1: 'same', r2: 'same', r3: 'same' }
-                    if (op === 'add') {
-                        //新增列之 id 不在庫內: 'same'／'changed' 時基準內放該 id(以較舊內容之指紋), 'absent' 時基準無
-                        let nr = mkRow(t, { id: 'rN', order: 4 })
-                        r.add = [nr]
-                        let bl = blOf(t, db, states)
-                        if (st !== 'absent') {
-                            bl.push(['rN', rowDigest(st === 'same' ? nr : oldVersion(t, nr), KEYS[t])])
-                        }
-                        let res = checkBaseline({ keys: KEYS[t], r: deepFreeze(r), ltdtOld: deepFreeze(db), baseline: deepFreeze(bl) })
-                        assert.strict.deepEqual(res, exp === null ? null : { key: 'saveStale', reason: exp, n: 1 })
-                        return
-                    }
-                    states.r2 = st
-                    let row = { ...db[1], description: 'client-edit' }
-                    if (op === 'diff') {
-                        r.diff = [row]
-                        r.same = [db[0], db[2]]
-                    }
-                    else {
-                        r.del = [db[1]]
-                        r.same = [db[0], db[2]]
-                    }
-                    let res = checkBaseline({ keys: KEYS[t], r: deepFreeze(r), ltdtOld: deepFreeze(db), baseline: deepFreeze(blOf(t, db, states)) })
-                    assert.strict.deepEqual(res, exp === null ? null : { key: 'saveStale', reason: exp, n: 1 })
+                    let db0 = dbRows(t)
+                    let bl = makeBaseline(db0, KEYS[t])
+                    assert.strict.deepEqual(chk(t, gen(db0), bl), exp)
                 })
             }
         }
 
-        //內容欄逐欄: 庫內該欄已與基準不同 → diff 與 del 皆過期(基準 = 較舊內容); 欄位為 schema 全部內容欄(含 id 以外之 from 等)
-        //diff 格之 client 列(run07 U1b 依 RD-S5 重寫; 原期望為舊語意: 原送入「內容=庫內、僅 order 不同」之列亦判 diffStale, 新語意下該形狀屬「不計」, 見 RC-050): 草稿開啟於舊版(欄 f 為較舊值),
-        //使用者另編修一個內容欄 g(≠f, ≠id)→ 送入列之內容既異於庫內(f 為舊值、g 已編修)、基準亦不等於庫內 → 仍為 diffStale
+        //內容欄逐欄: 他人改了任一內容欄 → 過期(欄位為 schema 全部內容欄, 含 from; id 改變 = 該列被刪＋新列新增, 見 RC-001)
         for (let t of TABLES) {
             for (let f of SPEC_DIGEST[t].filter((k) => k !== 'id')) {
-                for (let op of ['diff', 'del']) {
-                    it(`RC-002 ${t}: 庫內 ${f} 已異於基準 → ${op} 過期(${op === 'diff' ? 'diffStale' : 'delStale'})`, function() {
-                        cells.RC_field++
-                        let dbRow = mkRow(t, { id: 'r1' })
-                        let stale = rowWith(dbRow, { [f]: `older-${f}` }) //基準依據之較舊版
-                        let bl = [['r1', rowDigest(stale, KEYS[t])]]
-                        let g = SPEC_DIGEST[t].find((k) => k !== 'id' && k !== f) //使用者於舊版上另編修之欄
-                        let client = rowWith(stale, { [g]: `client-edit-${g}`, order: 2 })
-                        let r = op === 'diff' ? { add: [], del: [], diff: [client], same: [] } : { add: [], del: [dbRow], diff: [], same: [] }
-                        if (op === 'diff') {
-                            assert.strict.notEqual(contentOf(t, client), contentOf(t, dbRow), '前提: 送入列之內容異於庫內(否則屬 RD-S5 不計之形狀)')
-                        }
-                        let res = checkBaseline({ keys: KEYS[t], r, ltdtOld: [dbRow], baseline: bl })
-                        assert.strict.deepEqual(res, { key: 'saveStale', reason: op === 'diff' ? 'diffStale' : 'delStale', n: 1 })
-                    })
-                }
+                it(`RC-002 ${t}: 庫內 ${f} 已異於載入時 → saveStale/rowChanged(n=1)`, function() {
+                    cells.RC_field++
+                    let db0 = dbRows(t)
+                    let bl = makeBaseline(db0, KEYS[t])
+                    let db = [db0[0], rowWith(db0[1], { [f]: `by-other-${f}` }), db0[2]]
+                    assert.strict.notEqual(contentOf(t, db[1]), contentOf(t, db0[1]), '前提: 內容確實不同')
+                    assert.strict.deepEqual(chk(t, db, bl), stale('rowChanged', 1))
+                })
             }
         }
 
-        //order／伺服器管理欄: 外部同步整來源重寫使其變動, 內容未變 → 基準仍同版, 不過期
+        //order／伺服器管理欄: 外部同步整來源重寫、儲存依列序重給 order——內容未變 → 不過期(使用者 2026-10-22: 以內容計算, 排除系統自動變更之欄位)
         for (let t of TABLES) {
-            it(`RC-003 ${t}: 庫內僅 order 與伺服器管理欄較基準新(內容未變)→ diff／del 皆通過(不使草稿作廢)`, function() {
+            it(`RC-003 ${t}: 全部列之 order 與四個伺服器管理欄皆已改變(內容未變)→ 通過(不使草稿作廢)`, function() {
                 cells.RC_inv++
-                let atOpen = mkRow(t, { id: 'r1' })
-                let dbNow = rowWith(atOpen, { order: 50, userId: 'sync', timeCreate: 'tc', userIdUpdate: 'sync', timeUpdate: 'tu' })
-                let bl = makeBaseline([atOpen], KEYS[t])
-                assert.strict.equal(checkBaseline({ keys: KEYS[t], r: { add: [], del: [], diff: [{ ...dbNow, description: 'edit' }], same: [] }, ltdtOld: [dbNow], baseline: bl }), null)
-                assert.strict.equal(checkBaseline({ keys: KEYS[t], r: { add: [], del: [dbNow], diff: [], same: [] }, ltdtOld: [dbNow], baseline: bl }), null)
+                let db0 = dbRows(t)
+                let bl = makeBaseline(db0, KEYS[t])
+                let db = db0.map((r, k) => rowWith(r, { order: 50 + k, userId: 'sync', timeCreate: 'tc2', userIdUpdate: 'sync', timeUpdate: 'tu2' }))
+                assert.strict.equal(chk(t, db, bl), null)
+            })
+            it(`RC-004 ${t}: 純列序重排(order 反向、列在陣列中的位置也反向; 內容未變)→ 通過`, function() {
+                cells.RC_inv++
+                let db0 = dbRows(t)
+                let bl = makeBaseline(db0, KEYS[t])
+                let db = db0.map((r, k) => rowWith(r, { order: 3 - k })).reverse()
+                assert.strict.equal(chk(t, db, bl), null)
             })
         }
-
-        it('RC-004 same 列不檢查: 庫內已變／基準無之列若列於 same → 通過(他人在草稿之後新增而草稿原樣帶回、內容未變之列不使存檔作廢)', function() {
+        it('RC-005 外部同步整批重寫內容未變(users: 同一來源 3 列 teamX, 重寫後時間／建立者／order 全變)→ 通過; 其中一列內容真有改變 → rowChanged(n=1)', function() {
             cells.RC_inv++
-            let db = dbRows('grups')
-            let bl = blOf('grups', db, { r1: 'changed', r2: 'absent', r3: 'same' })
-            let r = { add: [], del: [], diff: [], same: [db[0], db[1], db[2]] }
-            assert.strict.equal(checkBaseline({ keys: KEYS.grups, r, ltdtOld: db, baseline: bl }), null)
+            let ext = (id, o = {}) => mkRow('users', { id, from: 'teamX', description: `desc-${id}`, ...o })
+            let db0 = [mkRow('users', { id: 'bo1', order: 1 }), ext('e1', { order: 100 }), ext('e2', { order: 101 }), ext('e3', { order: 102 })]
+            let bl = makeBaseline(db0, KEYS.users)
+            let rewritten = db0.map((r) => (r.from === 'teamX' ? rowWith(r, { userId: 'syncer', timeCreate: 'T2', userIdUpdate: 'syncer', timeUpdate: 'T2', order: r.order + 7 }) : r))
+            assert.strict.equal(chk('users', rewritten, bl), null)
+            let changed = rewritten.map((r) => (r.id === 'e2' ? rowWith(r, { description: 'external-changed' }) : r))
+            assert.strict.deepEqual(chk('users', changed, bl), stale('rowChanged', 1))
         })
 
-        it('RC-005 只檢查「本次將寫入」之列: 他列之庫內版本已與基準不同, 不影響只寫其餘列之存檔', function() {
+        //原則 7 之核心對照: 與「使用者將寫入之列」無關的列被改, 亦拒(run07 版對此通過)
+        it('RC-006 使用者只想改 r1, 他人改了 r3(與 r1 無關)→ 仍 saveStale(表級, 先動先贏; 不部分變更)', function() {
             cells.RC_inv++
-            let db = dbRows('grups')
-            let bl = blOf('grups', db, { r1: 'changed', r2: 'same', r3: 'same' }) //r1 已被他人改過, 但本次不寫 r1
-            let r = { add: [], del: [], diff: [{ ...db[1], description: 'edit' }], same: [db[0], db[2]] }
-            assert.strict.equal(checkBaseline({ keys: KEYS.grups, r, ltdtOld: db, baseline: bl }), null)
+            let db0 = dbRows('grups')
+            let bl = makeBaseline(db0, KEYS.grups)
+            let db = [db0[0], db0[1], rowWith(db0[2], { description: 'by-other' })]
+            assert.strict.deepEqual(chk('grups', db, bl), stale('rowChanged', 1))
         })
 
-        //混合: reason 為「修改 → 刪除 → 新增」之第一個違規; n 為違規列總數
-        let mixedSetup = () => {
-            let db = dbRows('grups')
-            let bl = blOf('grups', db, { r1: 'changed', r2: 'absent', r3: 'same' })
-            bl.push(['rGone', 'x']) //基準有、庫內已無之列
-            return { db, bl }
-        }
-        it('RC-010 修改過期＋刪除過期＋新增復活 → reason=diffStale, n=3', function() {
+        //reason 優先序: rowChanged → rowRemoved → rowAdded, n 為三者總和
+        it('RC-010 reason 優先序與 n: 僅刪＋增 → rowRemoved; 僅增 → rowAdded; 三者並存 → rowChanged, n 為總和', function() {
             cells.RC_mixed++
-            let { db, bl } = mixedSetup()
-            let r = { add: [mkRow('grups', { id: 'rGone' })], del: [db[1]], diff: [{ ...db[0], description: 'e' }], same: [db[2]] }
-            assert.strict.deepEqual(checkBaseline({ keys: KEYS.grups, r, ltdtOld: db, baseline: bl }), { key: 'saveStale', reason: 'diffStale', n: 3 })
+            let db0 = dbRows('users')
+            let bl = makeBaseline(db0, KEYS.users)
+            assert.strict.deepEqual(chk('users', [db0[0], mkRow('users', { id: 'x' }), mkRow('users', { id: 'y' })], bl), stale('rowRemoved', 4))
+            assert.strict.deepEqual(chk('users', [...db0, mkRow('users', { id: 'x' })], bl), stale('rowAdded', 1))
+            assert.strict.deepEqual(chk('users', [rowWith(db0[0], { name: 'z' }), mkRow('users', { id: 'x' })], bl), stale('rowChanged', 4))
         })
-        it('RC-011 刪除過期＋新增復活(無修改違規)→ reason=delStale, n=2', function() {
+        it('RC-011 回傳形狀恆為 { key: "saveStale", reason, n }(無其他鍵); 通過回 null', function() {
             cells.RC_mixed++
-            let { db, bl } = mixedSetup()
-            let r = { add: [mkRow('grups', { id: 'rGone' })], del: [db[1]], diff: [{ ...db[2], description: 'e' }], same: [db[0]] }
-            assert.strict.deepEqual(checkBaseline({ keys: KEYS.grups, r, ltdtOld: db, baseline: bl }), { key: 'saveStale', reason: 'delStale', n: 2 })
-        })
-        it('RC-012 僅新增復活 → reason=addExisted, n=1', function() {
-            cells.RC_mixed++
-            let { db, bl } = mixedSetup()
-            let r = { add: [mkRow('grups', { id: 'rGone' })], del: [], diff: [], same: db }
-            assert.strict.deepEqual(checkBaseline({ keys: KEYS.grups, r, ltdtOld: db, baseline: bl }), { key: 'saveStale', reason: 'addExisted', n: 1 })
-        })
-        it('RC-013 同類多列各計一次: 3 列修改過期 → n=3', function() {
-            cells.RC_mixed++
-            let db = dbRows('grups')
-            let bl = blOf('grups', db, { r1: 'changed', r2: 'changed', r3: 'absent' })
-            let r = { add: [], del: [], diff: db.map((x) => ({ ...x, description: 'e' })), same: [] }
-            assert.strict.deepEqual(checkBaseline({ keys: KEYS.grups, r, ltdtOld: db, baseline: bl }), { key: 'saveStale', reason: 'diffStale', n: 3 })
-        })
-        it('RC-014 多列新增皆復活 → n 為復活列數; 其中僅一個復活 → n=1', function() {
-            cells.RC_mixed++
-            let db = dbRows('grups')
-            let bl = [['a', 'x'], ['b', 'y']]
-            let two = checkBaseline({ keys: KEYS.grups, r: { add: [mkRow('grups', { id: 'a' }), mkRow('grups', { id: 'b' }), mkRow('grups', { id: 'new' })], del: [], diff: [], same: db }, ltdtOld: db, baseline: bl })
-            assert.strict.deepEqual(two, { key: 'saveStale', reason: 'addExisted', n: 2 })
-            let one = checkBaseline({ keys: KEYS.grups, r: { add: [mkRow('grups', { id: 'a' }), mkRow('grups', { id: 'new' })], del: [], diff: [], same: db }, ltdtOld: db, baseline: bl })
-            assert.strict.deepEqual(one, { key: 'saveStale', reason: 'addExisted', n: 1 })
-        })
-        it('RC-015 回傳形狀恆為 { key: "saveStale", reason, n }(無其他鍵)', function() {
-            cells.RC_mixed++
-            let { db, bl } = mixedSetup()
-            let res = checkBaseline({ keys: KEYS.grups, r: { add: [], del: [db[1]], diff: [], same: [] }, ltdtOld: db, baseline: bl })
+            let db0 = dbRows('pemis')
+            let bl = makeBaseline(db0, KEYS.pemis)
+            let res = chk('pemis', [db0[0]], bl)
             assert.strict.deepEqual(Object.keys(res).sort(), ['key', 'n', 'reason'])
-            assert.strict.equal(res.key, 'saveStale')
+            assert.strict.equal(chk('pemis', db0, bl), null)
         })
-
-        //缺 id／非物件／庫內已無: 不拋例外, 依「無從證明版本相同」收嚴
-        it('RC-020 diff 列缺 id 或非物件 → diffStale(無從對應基準); 不拋例外', function() {
-            cells.RC_robust++
-            let db = dbRows('grups')
-            let bl = blOf('grups', db, { r1: 'same', r2: 'same', r3: 'same' })
-            for (let row of [rowWith(db[0], { id: MISSING }), null, 'x', 5]) {
-                let res = checkBaseline({ keys: KEYS.grups, r: { add: [], del: [], diff: [row], same: [] }, ltdtOld: db, baseline: bl })
-                assert.strict.deepEqual(res, { key: 'saveStale', reason: 'diffStale', n: 1 }, `diff 列 ${JSON.stringify(row)}`)
+        it('RC-012 reason 只可能是 rowChanged／rowRemoved／rowAdded(舊 diffStale／delStale／addExisted 已不存在)', function() {
+            cells.RC_mixed++
+            let seen = new Set()
+            for (let t of TABLES) {
+                let db0 = dbRows(t)
+                let bl = makeBaseline(db0, KEYS[t])
+                seen.add(chk(t, [rowWith(db0[0], { description: 'x' }), db0[1], db0[2]], bl).reason)
+                seen.add(chk(t, [db0[0]], bl).reason)
+                seen.add(chk(t, [...db0, mkRow(t, { id: 'n' })], bl).reason)
             }
+            assert.strict.deepEqual(sortCopy([...seen]), ['rowAdded', 'rowChanged', 'rowRemoved'])
         })
-        it('RC-021 del 列缺 id 或非物件 → delStale; 不拋例外', function() {
-            cells.RC_robust++
-            let db = dbRows('grups')
-            let bl = blOf('grups', db, { r1: 'same', r2: 'same', r3: 'same' })
-            for (let row of [rowWith(db[0], { id: MISSING }), null, 'x', 5]) {
-                let res = checkBaseline({ keys: KEYS.grups, r: { add: [], del: [row], diff: [], same: [] }, ltdtOld: db, baseline: bl })
-                assert.strict.deepEqual(res, { key: 'saveStale', reason: 'delStale', n: 1 }, `del 列 ${JSON.stringify(row)}`)
-            }
+        it('RC-013 同類多列各計一次: 5 列皆被改 → n=5; 2 列被刪 → n=2; 4 列新增 → n=4', function() {
+            cells.RC_mixed++
+            let db0 = [1, 2, 3, 4, 5].map((k) => mkRow('targets', { id: `t${k}`, order: k }))
+            let bl = makeBaseline(db0, KEYS.targets)
+            assert.strict.deepEqual(chk('targets', db0.map((r) => rowWith(r, { description: `o-${r.id}` })), bl), stale('rowChanged', 5))
+            assert.strict.deepEqual(chk('targets', db0.slice(2), bl), stale('rowRemoved', 2))
+            assert.strict.deepEqual(chk('targets', [...db0, ...[1, 2, 3, 4].map((k) => mkRow('targets', { id: `n${k}` }))], bl), stale('rowAdded', 4))
         })
-        it('RC-022 add 列缺 id、id 非字串或非物件 → 無從在基準內 → 不計(通過); 不拋例外', function() {
-            cells.RC_robust++
-            let db = dbRows('grups')
-            let bl = blOf('grups', db, { r1: 'same', r2: 'same', r3: 'same' })
-            let adds = [rowWith(mkRow('grups'), { id: MISSING }), mkRow('grups', { id: 5 }), mkRow('grups', { id: null }), null, 'x']
-            assert.strict.equal(checkBaseline({ keys: KEYS.grups, r: { add: adds, del: [], diff: [], same: db }, ltdtOld: db, baseline: bl }), null)
-        })
-        it('RC-023 diff 列之 id 在基準內但庫內已無該列(被他人刪除) → diffStale', function() {
-            cells.RC_robust++
-            let db = dbRows('grups')
-            let bl = [...blOf('grups', db, { r1: 'same', r2: 'same', r3: 'same' }), ['rX', 'x']]
-            let res = checkBaseline({ keys: KEYS.grups, r: { add: [], del: [], diff: [mkRow('grups', { id: 'rX' })], same: [] }, ltdtOld: db, baseline: bl })
-            assert.strict.deepEqual(res, { key: 'saveStale', reason: 'diffStale', n: 1 })
-        })
-        it('RC-024 庫內列含非物件或無字串 id 者 → 忽略, 不影響他列比對', function() {
-            cells.RC_robust++
-            let db = dbRows('grups')
-            let bl = blOf('grups', db, { r1: 'same', r2: 'same', r3: 'same' })
-            let noisy = [null, 'x', 5, mkRow('grups', { id: 77 }), ...db]
-            let res = checkBaseline({ keys: KEYS.grups, r: { add: [], del: [], diff: [{ ...db[0], description: 'e' }], same: [] }, ltdtOld: noisy, baseline: bl })
-            assert.strict.equal(res, null)
-        })
-        it('RC-025 不改輸入(凍結之 r／ltdtOld／baseline)', function() {
-            cells.RC_robust++
-            let db = dbRows('grups')
-            let bl = blOf('grups', db, { r1: 'changed', r2: 'same', r3: 'same' })
-            let r = { add: [mkRow('grups', { id: 'n' })], del: [db[2]], diff: [{ ...db[0], description: 'e' }], same: [db[1]] }
-            checkBaseline({ keys: KEYS.grups, r: deepFreeze(r), ltdtOld: deepFreeze(db), baseline: deepFreeze(bl) })
+        it('RC-014 內容同、僅 id 大小寫不同 → 視為刪一列＋增一列(id 為嚴格字串相等)', function() {
+            cells.RC_mixed++
+            let db0 = dbRows('grups')
+            let bl = makeBaseline(db0, KEYS.grups)
+            let db = [db0[0], rowWith(db0[1], { id: 'R2' }), db0[2]]
+            assert.strict.deepEqual(chk('grups', db, bl), stale('rowRemoved', 2))
         })
 
-        it('RC-030 空基準: 無任何寫入 → 通過; 僅新增(id 不在基準) → 通過', function() {
-            cells.RC_empty++
-            let db = dbRows('grups')
-            assert.strict.equal(checkBaseline({ keys: KEYS.grups, r: { add: [], del: [], diff: [], same: db }, ltdtOld: db, baseline: [] }), null)
-            assert.strict.equal(checkBaseline({ keys: KEYS.grups, r: { add: [mkRow('grups', { id: 'brandnew' })], del: [], diff: [], same: db }, ltdtOld: db, baseline: [] }), null)
+        //穩健: 庫內異常列、重複 id、不改輸入
+        it('RC-020 庫內列含非物件或無字串 id 者 → 忽略, 不影響其餘列之比對(兩側一致: makeBaseline 亦只含字串 id 之列)', function() {
+            cells.RC_robust++
+            let db0 = dbRows('users')
+            let bl = makeBaseline(db0, KEYS.users)
+            let noise = [null, undefined, 'str', 5, [], { name: 'no-id' }, { id: 7 }, { id: null }, { id: ['r9'] }]
+            assert.strict.equal(chk('users', [...noise, ...db0], bl), null)
+            assert.strict.deepEqual(chk('users', [...noise, db0[0]], bl), stale('rowRemoved', 2))
         })
-        it('RC-031 空基準: 有修改 → diffStale(基準無該列 = 草稿之後才新增)', function() {
-            cells.RC_empty++
-            let db = dbRows('grups')
-            assert.strict.deepEqual(checkBaseline({ keys: KEYS.grups, r: { add: [], del: [], diff: [{ ...db[0], description: 'e' }], same: [db[1], db[2]] }, ltdtOld: db, baseline: [] }), { key: 'saveStale', reason: 'diffStale', n: 1 })
+        it('RC-021 庫內同 id 出現兩次(ORM 主鍵唯一, 不應發生)→ 只計一次(取第一個), 不重複計 n', function() {
+            cells.RC_robust++
+            let db0 = dbRows('pemis')
+            let bl = makeBaseline(db0, KEYS.pemis)
+            let dup = [db0[0], rowWith(db0[0], { description: 'dup' }), db0[1], db0[2]]
+            assert.strict.equal(chk('pemis', dup, bl), null)
         })
-        it('RC-032 空基準: 有刪除 → delStale(草稿不知有此列, 不得刪除)', function() {
-            cells.RC_empty++
-            let db = dbRows('grups')
-            assert.strict.deepEqual(checkBaseline({ keys: KEYS.grups, r: { add: [], del: [db[2]], diff: [], same: [db[0], db[1]] }, ltdtOld: db, baseline: [] }), { key: 'saveStale', reason: 'delStale', n: 1 })
+        it('RC-022 不改輸入(凍結之 ltdtOld／baseline)', function() {
+            cells.RC_robust++
+            let db0 = dbRows('grups')
+            let bl = makeBaseline(db0, KEYS.grups)
+            let db = deepFreeze([db0[0], rowWith(db0[1], { description: 'x' })])
+            let before = JSON.stringify([db, bl])
+            checkBaseline({ keys: KEYS.grups, ltdtOld: db, baseline: deepFreeze(bl) })
+            assert.strict.equal(JSON.stringify([db, bl]), before)
+        })
+        it('RC-023 ltdtOld 非陣列／baseline 非陣列 → 不拋例外, 視為空(compareBaseline)', function() {
+            cells.RC_robust++
+            assert.strict.deepEqual(compareBaseline({ keys: KEYS.users, rows: null, baseline: null }), { nChanged: 0, nRemoved: 0, nAdded: 0 })
+            assert.strict.deepEqual(compareBaseline({ keys: KEYS.users, rows: undefined, baseline: 'x' }), { nChanged: 0, nRemoved: 0, nAdded: 0 })
+            assert.strict.deepEqual(compareBaseline({ keys: KEYS.users, rows: dbRows('users'), baseline: {} }), { nChanged: 0, nRemoved: 0, nAdded: 3 })
+        })
+        it('RC-024 keys 非陣列(無內容欄)→ 不拋例外; 此時任何列同指紋, 僅列集合之增刪被偵測', function() {
+            cells.RC_robust++
+            let db0 = dbRows('users')
+            let bl = makeBaseline(db0, KEYS.users)
+            assert.strict.deepEqual(compareBaseline({ keys: null, rows: db0, baseline: bl.map(([id]) => [id, rowDigest({}, null)]) }), { nChanged: 0, nRemoved: 0, nAdded: 0 })
         })
 
-        //隨機語意對照: 以「內容是否相同」之獨立預言(不經指紋)比對 checkBaseline
-        it('RC-040 隨機 400 情境: checkBaseline 與內容語意預言一致(表隨機、庫內被他人改／刪／增、草稿改／刪／增)', function() {
+        //空基準／空表
+        it('RC-030 空基準 × 空表 → 通過(兩側皆無列)', function() {
+            cells.RC_empty++
+            assert.strict.equal(chk('users', [], []), null)
+        })
+        it('RC-031 空基準 × 庫內有 3 列(草稿載入時表是空的, 之後他人新增)→ rowAdded, n=3', function() {
+            cells.RC_empty++
+            assert.strict.deepEqual(chk('users', dbRows('users'), []), stale('rowAdded', 3))
+        })
+        it('RC-032 基準有 3 列 × 庫內已清空(外部同步或他人刪光)→ rowRemoved, n=3', function() {
+            cells.RC_empty++
+            let db0 = dbRows('users')
+            assert.strict.deepEqual(chk('users', [], makeBaseline(db0, KEYS.users)), stale('rowRemoved', 3))
+        })
+
+        //隨機語意對照: 以「整表內容是否相同」之獨立預言(不經指紋)比對 checkBaseline／compareBaseline／isBaselineStale
+        it('RC-040 隨機 400 情境: checkBaseline／compareBaseline／isBaselineStale 與整表內容語意預言一致(表隨機; 庫內被他人改內容／僅改 order 與伺服器欄／刪／增)', function() {
             let rand = mulberry32(777)
             let pick = (arr) => arr[Math.floor(rand() * arr.length)]
             let alpha = ['a', 'b', '', 'c d']
@@ -699,222 +643,90 @@ describe('unit-rowDigest (列內容指紋與載入基準, F-26, R-BASELINE-01)',
                     }
                     return o
                 }
-                //草稿開啟時之列 rows0; 之後庫內變為 db(每列: 不變 60%／內容被改 15%／被刪 15%, 並可能新增列)
                 let rows0 = []
-                for (let k = 0; k < 1 + Math.floor(rand() * 5); k++) {
+                for (let k = 0; k < Math.floor(rand() * 6); k++) {
                     rows0.push(randRow(`r${k}`))
                 }
+                //之後庫內變為 db(每列: 僅 order／伺服器欄變 50%／內容被改 20%／被刪 20%／不變 10%, 並可能新增列)
                 let db = []
                 rows0.forEach((row) => {
                     let x = rand()
-                    if (x < 0.6) {
-                        db.push({ ...row, order: row.order + 1, timeUpdate: 'sync-time' }) //僅 order／伺服器欄變
+                    if (x < 0.5) {
+                        db.push({ ...row, order: row.order + 1, timeUpdate: 'sync-time', userId: 'syncer' })
                     }
-                    else if (x < 0.75) {
+                    else if (x < 0.7) {
                         db.push(randRow(row.id)) //內容可能被改(亦可能碰巧相同, 由預言判定)
+                    }
+                    else if (x < 0.8) {
+                        //被刪
+                    }
+                    else {
+                        db.push({ ...row })
                     }
                 })
                 for (let k = 0; k < Math.floor(rand() * 3); k++) {
                     db.push(randRow(`new${k}`))
                 }
                 let bl = makeBaseline(rows0, KEYS[t])
+                //預言: 逐 id 比內容(不經指紋)
                 let c0 = new Map(rows0.map((row) => [row.id, contentOf(t, row)]))
-                //草稿之寫入: 對庫內現有列隨機選 diff／del／same; 另隨機新增(id 取基準內已被刪者或全新)
-                let r = { add: [], del: [], diff: [], same: [] }
-                db.forEach((row) => {
-                    let x = rand()
-                    if (x < 0.25) {
-                        r.diff.push({ ...row, description: 'client-edit' })
+                let c1 = new Map(db.map((row) => [row.id, contentOf(t, row)]))
+                let nChanged = 0
+                let nRemoved = 0
+                let nAdded = 0
+                c0.forEach((v, id) => {
+                    if (!c1.has(id)) {
+                        nRemoved++
                     }
-                    else if (x < 0.4) {
-                        r.diff.push({ ...row, order: row.order + 5, timeUpdate: 'client-time' }) //僅 order／伺服器欄不同之 diff(如他人新增之列因列序被重編 order; RD-S5)
-                    }
-                    else if (x < 0.55) {
-                        r.del.push(row)
-                    }
-                    else {
-                        r.same.push(row)
+                    else if (c1.get(id) !== v) {
+                        nChanged++
                     }
                 })
-                let dbIds = new Set(db.map((row) => row.id))
-                for (let k = 0; k < Math.floor(rand() * 3); k++) {
-                    let gone = rows0.filter((row) => !dbIds.has(row.id))
-                    r.add.push(randRow(gone.length > 0 && rand() < 0.6 ? pick(gone).id : `fresh${k}`))
+                c1.forEach((v, id) => {
+                    if (!c0.has(id)) {
+                        nAdded++
+                    }
+                })
+                let nAll = nChanged + nRemoved + nAdded
+                let exp = nAll === 0 ? null : stale(nChanged > 0 ? 'rowChanged' : (nRemoved > 0 ? 'rowRemoved' : 'rowAdded'), nAll)
+                assert.strict.deepEqual(chk(t, db, bl), exp, `情境 ${n}(${t}) checkBaseline`)
+                assert.strict.deepEqual(compareBaseline({ keys: KEYS[t], rows: db, baseline: bl }), { nChanged, nRemoved, nAdded }, `情境 ${n}(${t}) compareBaseline`)
+                assert.strict.equal(isBaselineStale({ keys: KEYS[t], rows: db, baseline: bl }), nAll > 0, `情境 ${n}(${t}) isBaselineStale`)
+            }
+        })
+
+        //isBaselineStale: 前端提示用布林版, 與 compareBaseline 總和一致
+        it('RC-050 isBaselineStale: 一致 → false; 改一列／刪一列／增一列 → true; 僅 order／伺服器欄不同 → false', function() {
+            cells.RC_misc++
+            let db0 = dbRows('users')
+            let bl = makeBaseline(db0, KEYS.users)
+            let st = (rows) => isBaselineStale({ keys: KEYS.users, rows, baseline: bl })
+            assert.strict.equal(st(db0), false)
+            assert.strict.equal(st([db0[0], rowWith(db0[1], { email: 'o@x' }), db0[2]]), true)
+            assert.strict.equal(st([db0[0], db0[1]]), true)
+            assert.strict.equal(st([...db0, mkRow('users', { id: 'n' })]), true)
+            assert.strict.equal(st(db0.map((r) => rowWith(r, { order: 99, timeUpdate: 'z', userIdUpdate: 'z' }))), false)
+        })
+        it('RC-051 前端 store 之列與伺服端庫內列為同一組資料時, 前後端共用同一判準(同輸入 → 同結果): 前端取 isBaselineStale、伺服端取 checkBaseline 之 null／非 null', function() {
+            cells.RC_misc++
+            let rand = mulberry32(4242)
+            for (let n = 0; n < 50; n++) {
+                let t = TABLES[n % TABLES.length]
+                let rows0 = [0, 1, 2, 3].map((k) => mkRow(t, { id: `r${k}`, order: k + 1 }))
+                let rows1 = rows0.filter(() => rand() < 0.85).map((r) => (rand() < 0.3 ? rowWith(r, { description: `x${n}` }) : r))
+                if (rand() < 0.3) {
+                    rows1.push(mkRow(t, { id: `z${n}` }))
                 }
-                //預言
-                let dbBy = new Map(db.map((row) => [row.id, row]))
-                let reasons = []
-                r.diff.forEach((row) => {
-                    if (contentOf(t, row) === contentOf(t, dbBy.get(row.id))) {
-                        return //RD-S5: 送入之內容與庫內相同(僅 order／伺服器欄不同)→ 不計
-                    }
-                    if (!c0.has(row.id) || c0.get(row.id) !== contentOf(t, dbBy.get(row.id))) {
-                        reasons.push('diffStale')
-                    }
-                })
-                r.del.forEach((row) => {
-                    if (!c0.has(row.id) || c0.get(row.id) !== contentOf(t, row)) {
-                        reasons.push('delStale')
-                    }
-                })
-                r.add.forEach((row) => {
-                    if (c0.has(row.id)) {
-                        reasons.push('addExisted')
-                    }
-                })
-                let exp = reasons.length === 0 ? null : { key: 'saveStale', reason: reasons[0], n: reasons.length }
-                assert.strict.deepEqual(checkBaseline({ keys: KEYS[t], r, ltdtOld: db, baseline: bl }), exp, `情境 ${n}(${t})`)
+                let bl = makeBaseline(rows0, KEYS[t])
+                assert.strict.equal(isBaselineStale({ keys: KEYS[t], rows: rows1, baseline: bl }), checkBaseline({ keys: KEYS[t], ltdtOld: rows1, baseline: bl }) !== null)
             }
         })
-
-
-        // ---------------------------------------------------------------
-        // RD-S5: 修改列之內容與庫內相同(僅 order／伺服器管理欄不同)→ 不檢查基準、不算過期(run07 U1b; 新增格, 無舊語意對應)
-        // 各格皆附「對照」: 同一情境把送入列改成內容異於庫內, 須回 diffStale——證明該格之基準狀態本來會判過期, 通過確由 RD-S5 之跳過而來
-        // ---------------------------------------------------------------
-        for (let t of TABLES) {
-            it(`RC-050 ${t}: diff 列內容=庫內、僅 order 不同, 基準無該列(開框後他人新增、依列序重編 order)→ 不計(通過); 對照: 內容異於庫內則 diffStale`, function() {
-                cells.RC_skip++
-                let db = dbRows(t)
-                let bl = blOf(t, db, { r1: 'same', r2: 'same', r3: 'absent' }) //r3 為草稿開啟之後才由他人新增
-                let r = { add: [], del: [], diff: [{ ...db[2], order: 2 }], same: [db[0], db[1]] }
-                assert.strict.equal(checkBaseline({ keys: KEYS[t], r: deepFreeze(r), ltdtOld: deepFreeze(db), baseline: deepFreeze(bl) }), null)
-                let ctl = { add: [], del: [], diff: [{ ...db[2], order: 2, description: 'client-edit' }], same: [db[0], db[1]] }
-                assert.strict.deepEqual(checkBaseline({ keys: KEYS[t], r: ctl, ltdtOld: db, baseline: bl }), { key: 'saveStale', reason: 'diffStale', n: 1 })
-            })
-
-            it(`RC-051 ${t}: diff 列內容=庫內、僅 order 不同, 基準有該列但庫內已較基準新(基準版本≠庫內版本)→ 不計(通過); 對照: 內容異於庫內則 diffStale`, function() {
-                cells.RC_skip++
-                let db = dbRows(t)
-                let bl = blOf(t, db, { r1: 'same', r2: 'changed', r3: 'same' })
-                let r = { add: [], del: [], diff: [{ ...db[1], order: 5 }], same: [db[0], db[2]] }
-                assert.strict.equal(checkBaseline({ keys: KEYS[t], r: deepFreeze(r), ltdtOld: deepFreeze(db), baseline: deepFreeze(bl) }), null)
-                let ctl = { add: [], del: [], diff: [{ ...db[1], order: 5, description: 'client-edit' }], same: [db[0], db[2]] }
-                assert.strict.deepEqual(checkBaseline({ keys: KEYS[t], r: ctl, ltdtOld: db, baseline: bl }), { key: 'saveStale', reason: 'diffStale', n: 1 })
-            })
-
-            it(`RC-052 ${t}: diff 列之 order 與四個伺服器管理欄皆不同、內容=庫內 → 不計(通過; 基準無該列)`, function() {
-                cells.RC_skip++
-                let db = dbRows(t)
-                let bl = blOf(t, db, { r1: 'same', r2: 'absent', r3: 'same' })
-                let row = { ...db[1], order: 9, userId: 'other', timeCreate: 'tc', userIdUpdate: 'other', timeUpdate: 'tu' }
-                let r = { add: [], del: [], diff: [row], same: [db[0], db[2]] }
-                assert.strict.equal(checkBaseline({ keys: KEYS[t], r, ltdtOld: db, baseline: bl }), null)
-            })
-
-            //跳過只在「全部內容欄皆相同」時成立: 任一內容欄不同(其餘皆同)且基準無該列 → 仍 diffStale(使「只比部分欄位」之實作變紅)
-            for (let f of SPEC_DIGEST[t].filter((k) => k !== 'id')) {
-                it(`RC-053 ${t}: diff 列僅 ${f} 異於庫內(其餘內容欄與 order 之外皆同), 基準無該列 → diffStale(跳過只在全部內容欄相同時成立)`, function() {
-                    cells.RC_skip++
-                    let db = dbRows(t)
-                    let bl = blOf(t, db, { r1: 'same', r2: 'absent', r3: 'same' })
-                    let row = { ...db[1], [f]: `client-${f}`, order: 2 }
-                    assert.strict.notEqual(contentOf(t, row), contentOf(t, db[1]), '前提: 內容確實異於庫內')
-                    let r = { add: [], del: [], diff: [row], same: [db[0], db[2]] }
-                    assert.strict.deepEqual(checkBaseline({ keys: KEYS[t], r, ltdtOld: db, baseline: bl }), { key: 'saveStale', reason: 'diffStale', n: 1 })
-                })
-            }
-        }
-
-        it('RC-054 內容相同之判定同 rowDigest(RD-S2): 庫內 description 為 null, 送入列缺 description 欄(缺欄≡null)→ 內容相同, 不計(通過)', function() {
-            cells.RC_skip++
-            let db = [mkRow('grups', { id: 'r1', order: 1, description: null }), mkRow('grups', { id: 'r2', order: 2 })]
-            let bl = [['r2', rowDigest(db[1], KEYS.grups)]] //r1 不在基準(草稿開啟後新增)
-            let row = rowWith(db[0], { order: 2, description: MISSING })
-            assert.strict.equal(checkBaseline({ keys: KEYS.grups, r: { add: [], del: [], diff: [row], same: [db[1]] }, ltdtOld: db, baseline: bl }), null)
-        })
-
-        it('RC-055 內容相同之判定同 rowDigest(RD-S2): 庫內 description 為 null, 送入列為 \'\'(≠ null)→ 內容不同, 基準無該列 → diffStale', function() {
-            cells.RC_skip++
-            let db = [mkRow('grups', { id: 'r1', order: 1, description: null }), mkRow('grups', { id: 'r2', order: 2 })]
-            let bl = [['r2', rowDigest(db[1], KEYS.grups)]]
-            let row = rowWith(db[0], { order: 2, description: '' })
-            assert.strict.deepEqual(checkBaseline({ keys: KEYS.grups, r: { add: [], del: [], diff: [row], same: [db[1]] }, ltdtOld: db, baseline: bl }), { key: 'saveStale', reason: 'diffStale', n: 1 })
-        })
-
-        //混合: 被跳過之 diff 不計入 n、不影響其餘列之 reason
-        describe('跳過之 diff 與其餘寫入列並存(RD-S5)', function() {
-
-            let dbG = () => dbRows('grups')
-
-            it('RC-056 兩個「僅 order 不同」之 diff(r1 基準無、r2 基準已變)＋合法編修 r3 → 通過; 改為再加一個基準已變之真編修 r4 → reason=diffStale, n=1(只計真過期者)', function() {
-                cells.RC_skip++
-                let db = [...dbG(), mkRow('grups', { id: 'r4', order: 4 })]
-                let bl = blOf('grups', db, { r1: 'absent', r2: 'changed', r3: 'same', r4: 'changed' })
-                let skipped = [{ ...db[0], order: 7 }, { ...db[1], order: 8 }]
-                let ok = { add: [], del: [], diff: [...skipped, { ...db[2], description: 'valid-edit' }], same: [db[3]] }
-                assert.strict.equal(checkBaseline({ keys: KEYS.grups, r: ok, ltdtOld: db, baseline: bl }), null)
-                let bad = { add: [], del: [], diff: [...skipped, { ...db[2], description: 'valid-edit' }, { ...db[3], description: 'stale-edit' }], same: [] }
-                assert.strict.deepEqual(checkBaseline({ keys: KEYS.grups, r: bad, ltdtOld: db, baseline: bl }), { key: 'saveStale', reason: 'diffStale', n: 1 })
-            })
-
-            it('RC-057 僅有「僅 order 不同」之 diff(任意多個, 基準狀態各異)→ 通過', function() {
-                cells.RC_skip++
-                let db = dbG()
-                let bl = blOf('grups', db, { r1: 'absent', r2: 'changed', r3: 'same' })
-                let r = { add: [], del: [], diff: db.map((x, k) => ({ ...x, order: 10 + k })), same: [] }
-                assert.strict.equal(checkBaseline({ keys: KEYS.grups, r, ltdtOld: db, baseline: bl }), null)
-            })
-
-            it('RC-058 「僅 order 不同」之 diff＋過期之 del → reason=delStale, n=1(跳過只及 diff, 不及 del)', function() {
-                cells.RC_skip++
-                let db = dbG()
-                let bl = blOf('grups', db, { r1: 'absent', r2: 'changed', r3: 'same' })
-                let r = { add: [], del: [db[1]], diff: [{ ...db[0], order: 7 }], same: [db[2]] }
-                assert.strict.deepEqual(checkBaseline({ keys: KEYS.grups, r, ltdtOld: db, baseline: bl }), { key: 'saveStale', reason: 'delStale', n: 1 })
-            })
-
-            it('RC-059 「僅 order 不同」之 diff＋基準內已存在 id 之 add(復活) → reason=addExisted, n=1(跳過只及 diff, 不及 add)', function() {
-                cells.RC_skip++
-                let db = dbG()
-                let bl = [...blOf('grups', db, { r1: 'absent', r2: 'same', r3: 'same' }), ['rGone', 'x']]
-                let r = { add: [mkRow('grups', { id: 'rGone' })], del: [], diff: [{ ...db[0], order: 7 }], same: [db[1], db[2]] }
-                assert.strict.deepEqual(checkBaseline({ keys: KEYS.grups, r, ltdtOld: db, baseline: bl }), { key: 'saveStale', reason: 'addExisted', n: 1 })
-            })
-
-        })
-
-        //C-1 情境之函數層(API 子代理 C-1 缺陷; 整合層見 unit-procCore-external 之 EXT-O01～O03): users 後台 4 列(order 1～4)＋外部 2 列(order 70／80); 草稿基準取自 R0(無 X);
-        //他人新增 X 時 X 之 order 為 7(接在 R0 之後), 草稿依 order 序帶回 [bo1..bo4, X, ext1, ext2] → 伺服端以位置重給後台列 order, X 變 5、外部列還原為庫內 order → 只有 X(僅 order)與被編修之後台列成為 diff
-        describe('C-1 情境(users: 後台 4 列＋外部 2 列, 他人新增列 X 使 order 重編)', function() {
-
-            let setup = () => {
-                let u = (id, order, from) => mkRow('users', { id, order, from, name: `n-${id}`, email: `${id}@example.com` })
-                let R0 = [u('bo1', 1, ''), u('bo2', 2, ''), u('bo3', 3, ''), u('bo4', 4, ''), u('ext1', 70, 'pd'), u('ext2', 80, 'pe')]
-                let X = u('X', 7, '')
-                return { R0, X, db: [...R0, X], bl: makeBaseline(R0, KEYS.users) }
-            }
-
-            it('RC-060 X 依 order 序原樣帶回(order 7→5, 內容不變)並只編修 bo2, 原基準 → 通過', function() {
-                cells.RC_skip++
-                let { R0, X, db, bl } = setup()
-                let r = { add: [], del: [], diff: [{ ...X, order: 5 }, { ...R0[1], description: 'bo2-edit' }], same: [R0[0], R0[2], R0[3], R0[4], R0[5]] }
-                assert.strict.equal(checkBaseline({ keys: KEYS.users, r: deepFreeze(r), ltdtOld: deepFreeze(db), baseline: deepFreeze(bl) }), null)
-            })
-
-            it('RC-061 同情境但 X 之內容於庫內已被他人再改(草稿帶回舊版 X)→ diffStale, n=1', function() {
-                cells.RC_skip++
-                let { R0, X, db, bl } = setup()
-                let dbNow = db.map((x) => (x.id === 'X' ? { ...x, description: 'X-changed-by-other' } : x))
-                let r = { add: [], del: [], diff: [{ ...X, order: 5 }, { ...R0[1], description: 'bo2-edit' }], same: [R0[0], R0[2], R0[3], R0[4], R0[5]] }
-                assert.strict.deepEqual(checkBaseline({ keys: KEYS.users, r, ltdtOld: dbNow, baseline: bl }), { key: 'saveStale', reason: 'diffStale', n: 1 })
-            })
-
-        })
-
-        //跳過只及「庫內存在之列」: diff 列之 id 不在庫內(庫內已無該列, 草稿仍帶回並改動)→ 依 RD-S4 檢查, 不因無從比對內容而放行
-        it('RC-062 diff 列之 id 不在庫內且不在基準 → diffStale(無庫內列可比, 不跳過)', function() {
-            cells.RC_skip++
-            let db = dbRows('grups')
-            let bl = blOf('grups', db, { r1: 'same', r2: 'same', r3: 'same' })
-            let ghost = mkRow('grups', { id: 'ghost', order: 9 })
-            assert.strict.deepEqual(checkBaseline({ keys: KEYS.grups, r: { add: [], del: [], diff: [ghost], same: db }, ltdtOld: db, baseline: bl }), { key: 'saveStale', reason: 'diffStale', n: 1 })
-        })
-
-        it('RC-063 空基準 [] ＋「僅 order 不同」之 diff → 通過(跳過與基準內容無關; 對照 RC-031: 有內容修改則 diffStale)', function() {
-            cells.RC_skip++
-            let db = dbRows('grups')
-            assert.strict.equal(checkBaseline({ keys: KEYS.grups, r: { add: [], del: [], diff: [{ ...db[0], order: 5 }], same: [db[1], db[2]] }, ltdtOld: db, baseline: [] }), null)
+        it('RC-052 compareBaseline 回傳形狀恆為 { nChanged, nRemoved, nAdded }(三個非負整數)', function() {
+            cells.RC_misc++
+            let db0 = dbRows('grups')
+            let c = compareBaseline({ keys: KEYS.grups, rows: [db0[0], rowWith(db0[1], { description: 'q' }), mkRow('grups', { id: 'n' })], baseline: makeBaseline(db0, KEYS.grups) })
+            assert.strict.deepEqual(Object.keys(c).sort(), ['nAdded', 'nChanged', 'nRemoved'])
+            assert.strict.deepEqual(c, { nChanged: 1, nRemoved: 1, nAdded: 1 })
         })
 
     })
@@ -933,14 +745,14 @@ describe('unit-rowDigest (列內容指紋與載入基準, F-26, R-BASELINE-01)',
                 RB: 19,
                 RV: 43,
                 GD: 6,
-                RC_matrix: 36,
-                RC_field: 34,
-                RC_inv: 6,
-                RC_mixed: 6,
-                RC_robust: 6,
+                RC_matrix: 44,
+                RC_field: 17,
+                RC_inv: 10,
+                RC_mixed: 5,
+                RC_robust: 5,
                 RC_empty: 3,
                 RC_random: 400,
-                RC_skip: 39,
+                RC_misc: 3,
             })
         })
 

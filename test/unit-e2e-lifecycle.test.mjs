@@ -170,6 +170,71 @@ describe('unit-e2e-lifecycle (e2e 檔 DB 收尾對稱, R-E2E-ISO-01)', function(
         assert.strict.ok(/assertPristineSeed\(key,/.test(m[0]), 'captureBaseSeedOnce 須以 assertPristineSeed 守門')
     })
 
+    //LC-004～005: 外部列夾具之收尾(規則帳本 R-TEST-EXT-CLEAN-01; run09)——2026-10-22 全套: e2e-init E2E-006 以管理者寫入移除外部列 id-mk-dup → saveExternalRowChanged, 夾具殘留致其後 12 案失敗
+    let testCode = (fn) => sourceLines(path.join(fdTest, fn), 'code').map((l) => l.text).join('\n')
+    let testFilesApiE2e = () => fs.readdirSync(fdTest).filter((f) => /^(api|e2e)-.*\.test\.mjs$/.test(f)).sort()
+    //直接以 delAll({ from … }) 刪外部分區(各檔自寫收尾); 收尾一律經 test/tools/api-setup.mjs 之 cleanExternalFixtures／purgeExternalRows
+    let RE_INLINE_DEL = /\.delAll\(\s*\{\s*from\b/
+    //建立外部列夾具之入口(外部同步端點／同步夾具函式)
+    let RE_MAKES_EXT = /\burlSync\b|\bsyncRows\(|\bpostSync\(|\/syncAndReplaceTabs/
+    //外部列夾具之合規收尾(單一入口 cleanExternalFixtures; restoreTables／purgeExternalRows 為其同系底層; createIsolation 內含 restoreTables)
+    let RE_CLEANS_EXT = /\b(cleanExternalFixtures|restoreTables|purgeExternalRows|createIsolation)\(/
+
+    //呼叫了收尾輔助就必須 import 它(2026-10-22 run09 首輪修正漏了 api-tokenSafety 之 import: 以 node --check 查不出, 執行到 after-hook 才 ReferenceError, 夾具未清而被後檔掩蓋)
+    let HELPERS = ['cleanExternalFixtures', 'purgeExternalRows', 'restoreTables']
+    let importsName = (code, name) => new RegExp(`import\\s*\\{[^}]*\\b${name}\\b[^}]*\\}\\s*from`).test(code)
+    let callsName = (code, name) => new RegExp(`\\b${name}\\(`).test(code)
+
+    it('LC-004 站點不變式: api-／e2e- 測試檔不自寫 delAll({ from … }) 收尾; 凡經同步端點建立外部列夾具者, 必有 cleanExternalFixtures／restoreTables／purgeExternalRows／createIsolation 之收尾; 呼叫收尾輔助者必已 import', function() {
+        let bad = []
+        let makers = []
+        for (let fn of testFilesApiE2e()) {
+            let code = testCode(fn)
+            if (RE_INLINE_DEL.test(code)) {
+                bad.push(`${fn}: 自寫 delAll({ from … }) 收尾(外部列夾具請用 cleanExternalFixtures)`)
+            }
+            for (let name of HELPERS) {
+                if (callsName(code, name) && !importsName(code, name)) {
+                    bad.push(`${fn}: 呼叫 ${name}( 但未自 ./tools/api-setup.mjs import(執行到才 ReferenceError)`)
+                }
+            }
+            if (RE_MAKES_EXT.test(code)) {
+                makers.push(fn)
+                if (!RE_CLEANS_EXT.test(code)) {
+                    bad.push(`${fn}: 建立外部列夾具(經同步端點)但無 cleanExternalFixtures／restoreTables／purgeExternalRows／createIsolation 收尾`)
+                }
+            }
+        }
+        assert.strict.deepEqual(bad, [], bad.join('\n'))
+        //站點全集(2026-10-22 run09 盤點): 新增建立外部列夾具之檔須同步更新此清單與規則帳本 R-TEST-EXT-CLEAN-01 站點表
+        assert.strict.deepEqual(makers, ['api-authMerge.test.mjs', 'api-cleanExternal.test.mjs', 'api-externalRows.test.mjs', 'api-getPermUserInfor.test.mjs', 'api-keyProp.test.mjs', 'api-mapKey.test.mjs', 'api-refCascade.test.mjs', 'api-syncAndReplaceTabs.test.mjs', 'api-tokenSafety.test.mjs', 'api-updateTabs.test.mjs', 'e2e-array-form.test.mjs', 'e2e-external-rows.test.mjs', 'e2e-init.test.mjs', 'e2e-ref-cascade.test.mjs'])
+    })
+
+    it('LC-004b LC-004 的判定器本身: 自寫 delAll({ from }) 被抓、以 id 刪後台列不算; 同步入口與收尾入口各自辨識', function() {
+        assert.strict.equal(RE_INLINE_DEL.test('await woItems[kt].delAll({ from: F })'), true)
+        assert.strict.equal(RE_INLINE_DEL.test('await woItems.users.delAll({ from })'), true)
+        assert.strict.equal(RE_INLINE_DEL.test('await woItems.users.delAll({ id: { $in: ids } })'), false, '以 id 刪(後台列)不是外部分區收尾')
+        assert.strict.equal(RE_INLINE_DEL.test('[\'targets.delAll\', { from: \'__none__\' }]'), false, '資料通道直呼字串不是呼叫')
+        assert.strict.equal(RE_MAKES_EXT.test('const url = urlSync.replace(\'{keyTable}\', kt)'), true)
+        assert.strict.equal(RE_MAKES_EXT.test('await syncRows(\'users\', rows, F)'), true)
+        assert.strict.equal(RE_MAKES_EXT.test('await callRpc(\'updateUsers\', [rows], TOKEN_ADMIN)'), false)
+        assert.strict.equal(RE_CLEANS_EXT.test('await cleanExternalFixtures({ froms: [F] })'), true)
+        assert.strict.equal(RE_CLEANS_EXT.test('await callRpc(\'updateUsers\', [rowsBase], TOKEN_ADMIN)'), false, '管理者寫入不是外部列收尾')
+        //import 偵測: 單行與多行之具名 import 皆算; 只在註解／字串以外之 import 清單中出現才算(此處以 code 模式文字測)
+        let imp1 = 'import { startApi, cleanExternalFixtures } from \'./tools/api-setup.mjs\'\nawait cleanExternalFixtures({})'
+        let imp2 = 'import {\n    startApi,\n    cleanExternalFixtures,\n} from \'./tools/api-setup.mjs\'\nawait cleanExternalFixtures({})'
+        let noImp = 'import { startApi, getWoItems } from \'./tools/api-setup.mjs\'\nawait cleanExternalFixtures({})'
+        assert.strict.equal(importsName(imp1, 'cleanExternalFixtures') && callsName(imp1, 'cleanExternalFixtures'), true)
+        assert.strict.equal(importsName(imp2, 'cleanExternalFixtures') && callsName(imp2, 'cleanExternalFixtures'), true)
+        assert.strict.equal(callsName(noImp, 'cleanExternalFixtures') && !importsName(noImp, 'cleanExternalFixtures'), true, '呼叫而未 import 須被抓到')
+    })
+
+    it('LC-005 站點不變式: e2e-init E2E-006 之 finally 以 cleanExternalFixtures 移除本案外部分區(froms: [FROM_006])並回驗 pristine, 不以管理者寫入 updateUsers 移除', function() {
+        let code = testCode('e2e-init.test.mjs')
+        assert.strict.ok(/await cleanExternalFixtures\(\{ kts: \['users'\], froms: \[FROM_006\], pristine: true \}\)/.test(code), 'E2E-006 收尾須呼叫 cleanExternalFixtures({ kts: [\'users\'], froms: [FROM_006], pristine: true })')
+        assert.strict.ok(!/['"`]updateUsers['"`]/.test(code), 'e2e-init 不得以管理者寫入(updateUsers)做收尾: 外部列後台不得刪(Lv1 saveExternalRowChanged)')
+    })
+
     //以真種子 id 組出 seed(列只需 id／name)
     let mkSeed = (key) => getSeedIds(key).map((id) => ({ id, name: id.replace(/^id-for-/, '') }))
 
@@ -190,6 +255,19 @@ describe('unit-e2e-lifecycle (e2e 檔 DB 收尾對稱, R-E2E-ISO-01)', function(
             assert.strict.ok(/實得 5 筆/.test(err.message) && /應為 4 筆/.test(err.message), err.message)
             assert.strict.ok(/多出主鍵 \[id-for-mary-dup\]/.test(err.message), err.message)
             assert.strict.ok(/缺少主鍵 \[\]/.test(err.message), err.message)
+            return true
+        })
+    })
+
+    it('BS-002b 多出之列為外部列(from 非空)時, 多出主鍵後註記其 from 分區(指向遺留之測試檔: 夾具各用專屬 from); 後台多餘列(from 空字串)不註記', function() {
+        let seed = [...mkSeed('users'), { id: 'id-mk-dup', name: 'dup-admin', from: 'appE2eInit006' }]
+        assert.strict.throws(() => assertPristineSeed('users', seed), (err) => {
+            assert.strict.ok(/多出主鍵 \[id-mk-dup\(from=appE2eInit006\)\]/.test(err.message), err.message)
+            return true
+        })
+        let seed2 = [...mkSeed('users'), { id: 'id-bo', name: 'bo', from: '' }, { id: 'id-nf', name: 'nf' }]
+        assert.strict.throws(() => assertPristineSeed('users', seed2), (err) => {
+            assert.strict.ok(/多出主鍵 \[id-bo, id-nf\]/.test(err.message), err.message)
             return true
         })
     })

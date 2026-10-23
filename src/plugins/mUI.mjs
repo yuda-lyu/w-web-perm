@@ -8,6 +8,7 @@ import isfun from 'wsemi/src/isfun.mjs'
 import waitFun from 'wsemi/src/waitFun.mjs'
 // import WUiDwload from 'w-ui-dwload/src/WUiDwload.mjs'
 import submitGuard from './submitGuard.mjs'
+import { markDataReload } from './dataReloadGuard.mjs'
 
 
 let vo = Vue.prototype
@@ -264,14 +265,8 @@ function getIcon(icon) {
 //(儲存成功後伺服器推播更新列 → changeParams 重算 → genOpt 重建 opt → rowsChange 再把 isModified 設回 true, 儲存鈕殘留即為此例),
 //故須於寫入資料當下標記, 待渲染完成後解除. 對齊 w-web-sso LayoutContentUsers.vue 之 markDataReload.
 //用法: 元件 data() 宣告 systemProcing:false; genOpt 內於 vo.opt = opt 前呼叫 vo.$ui.markDataReload(vo); rowsChange 守門加 vo.systemProcing.
-function markDataReload(vm) {
-    vm.systemProcing = true
-    vm.$nextTick(() => {
-        setTimeout(() => {
-            vm.systemProcing = false
-        }, 1)
-    })
-}
+//實作移至 dataReloadGuard.mjs(純邏輯, 可單元測試; 規則帳本 R-RELOAD-GUARD-01): 重疊之重載(一次儲存使兩張表先後推播而重建兩次)只由最後一次之計時器解除旗標,
+//修正前每次呼叫各排一個無條件解除之計時器, 第 1 次之計時器會在第 2 次重建之 rowsChange 之前把旗標解除, 使儲存成功後 isModified 被誤設為真(run12, AF-037).
 
 
 let mUI = {

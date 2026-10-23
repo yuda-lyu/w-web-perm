@@ -617,12 +617,13 @@ describe('unit-getAddImpact (新增撞懸空名之影響與確認框, 設計原�
 
         let code = (rel) => sourceLines(path.join(projRoot, rel), 'code').map((l) => l.text).join('\n')
         let PAGES = [
-            ['LayoutContentGrups', 'grups', 'vo.grups', 'rows', 'vo.users', 'Grup', 'updateGrups(rows, { baseline })'],
-            ['LayoutContentPemis', 'pemis', 'vo.pemis', 'rows', 'vo.grups', 'Pemi', 'updatePemis(rows, { baseline })'],
-            ['LayoutContentTargets', 'targets', 'vo.targets', 'rowsSend', 'vo.pemis', 'Target', 'updateTargets(rowsSend, { baseline })'],
+            //run11: 「舊」列為草稿所依據之那份 store 列(vo.baseRows, 與載入基準同時產生; 有未存編輯時 store 可能已被推播更新, 不用 vo.<表>), 見 unit-draftSync DS-4f
+            ['LayoutContentGrups', 'grups', 'vo.baseRows', 'rows', 'vo.users', 'Grup', 'updateGrups(rows, { baseline })'],
+            ['LayoutContentPemis', 'pemis', 'vo.baseRows', 'rows', 'vo.grups', 'Pemi', 'updatePemis(rows, { baseline })'],
+            ['LayoutContentTargets', 'targets', 'vo.baseRows', 'rowsSend', 'vo.pemis', 'Target', 'updateTargets(rowsSend, { baseline })'],
         ]
 
-        it('SITE-AI-001 三頁: 以 store 為基準於開 loading 前同步計算 addText; 與改名／刪除預覽之確認框依序(預覽 < 預覽確認框 < 新增確認框 < 開 loading < 打 API); 新增確認框: unlockBtn → showCheckYesNo → 選否 return; 無影響不彈框', function() {
+        it('SITE-AI-001 三頁: 以草稿所依據之 store 列(baseRows)為基準於開 loading 前同步計算 addText; 與改名／刪除預覽之確認框依序(預覽 < 預覽確認框 < 新增確認框 < 開 loading < 打 API); 新增確認框: unlockBtn → showCheckYesNo → 選否 return; 無影響不彈框', function() {
             for (let [fn, table, base, rowsVar, holders, kind] of PAGES) {
                 let c = code(`src/components/${fn}.vue`)
                 assert.strict.ok(c.includes(`import { getAddImpact, getAddConfirmText } from '../js/getAddImpact.mjs'`), `${fn} import`)

@@ -764,13 +764,13 @@ describe('unit-getNameErrs (清單頁名稱／email 擋存與歷史警告判準,
             for (let fn of pages) {
                 let c = code(`src/components/${fn}.vue`)
                 assert.strict.ok(/import \{ getNameErrs, mapNameKp \} from '\.\.\/js\/getNameErrs\.mjs'/.test(c), `${fn} 應 import getNameErrs`)
-                assert.strict.ok(/getNameErrs\(get\(vo, 'opt\.rows', \[\]\), vo\.(grups|pemis|users), 'name'/.test(c), `${fn} 應以 store 之原始列為基準呼叫 getNameErrs`)
+                assert.strict.ok(/getNameErrs\(get\(vo, 'opt\.rows', \[\]\), vo\.baseRows, 'name'/.test(c), `${fn} 應以草稿所依據之列(baseRows; run11 外審 sol 第 6 點, 不用可能已被推播更新之 store)為基準呼叫 getNameErrs`)
                 assert.strict.ok(!/\bhaskey\(kp(Name|Email)\b/.test(c), `${fn} 不應再有逐列 haskey(kpName／kpEmail) 計重複`)
                 assert.strict.ok(/iseobj\(vo\.errItemsByName\)/.test(c), `${fn} isError 仍只由擋存者(errItemsByName)決定`)
                 assert.strict.ok(!/iseobj\(vo\.warnItemsBy/.test(c), `${fn} 歷史警告不得使 isError 為真`)
             }
             let u = code('src/components/LayoutContentUsers.vue')
-            assert.strict.ok(/getNameErrs\(get\(vo, 'opt\.rows', \[\]\), vo\.users, 'email', \{ badScope: 'touched', isValid: isEmail \}\)/.test(u), 'Users 之 email 應 badScope touched 並檢查 isEmail')
+            assert.strict.ok(/getNameErrs\(get\(vo, 'opt\.rows', \[\]\), vo\.baseRows, 'email', \{ badScope: 'touched', isValid: isEmail \}\)/.test(u), 'Users 之 email 應 badScope touched 並檢查 isEmail')
             assert.strict.ok(/iseobj\(vo\.errItemsByEmail\)/.test(u))
         })
 
@@ -833,7 +833,7 @@ describe('unit-getNameErrs (清單頁名稱／email 擋存與歷史警告判準,
         })
 
         it('SITE-GN-004 刪除確認: 群組頁／權限頁經 getDelImpact＋getDelConfirmText＋showCheckYesNo(單一框, 多種影響併入同一框), 無影響時不彈框; 不用原生 confirm／alert(儲存前之引用連帶預覽另一個確認框見 unit-getCascadePreview SITE-GCP-001; 新增撞懸空名之確認框見 unit-getAddImpact SITE-AI)', function() {
-            for (let [fn, kind, arg] of [['LayoutContentGrups', 'Grup', `vo.grups, vo.users, 'Grup'`], ['LayoutContentPemis', 'Pemi', `vo.pemis, vo.grups, 'Pemi'`]]) {
+            for (let [fn, kind, arg] of [['LayoutContentGrups', 'Grup', `vo.baseRows, vo.users, 'Grup'`], ['LayoutContentPemis', 'Pemi', `vo.baseRows, vo.grups, 'Pemi'`]]) {
                 let c = code(`src/components/${fn}.vue`)
                 assert.strict.ok(c.includes(`let impact = getDelImpact(delIds, ${arg}, getRowsRemain())`), `${fn} 影響人數`)
                 assert.strict.ok(c.includes(`let confirmText = getDelConfirmText(impact, (k) => vo.$t(k), '${kind}')`), `${fn} 確認框文字`)

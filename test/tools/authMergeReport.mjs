@@ -8,7 +8,7 @@
 //                                                                                     相對 run04(未發布, 僅開發內)因 c／d／e 額外收回者(lostByCde)與其原因、觸發之引用(只列名稱, 不列 email)、
 //                                                                                     1.1.12 下結果取決於儲存順序者(legacyOrderSensitive)、同名表列; --json 改輸出 JSON
 //
-//規格見 CLAUDE_rulebook.md 之 R-AUTH-MERGE-00／R-PRINCIPLE-00 與 spec/設計要點與取捨.md 之 ADR-033; 舊語意(run04、1.1.12)只存在於 authMerge.mjs 之完整模型 evalFull(比較用, 不入 src/).
+//規格見 sgud/rule/rulebook.md 之 R-AUTH-MERGE-00／R-PRINCIPLE-00 與 spec/設計要點與取捨.md 之 ADR-033; 舊語意(run04、1.1.12)只存在於 authMerge.mjs 之完整模型 evalFull(比較用, 不入 src/).
 
 import fs from 'fs'
 import { evalSpec, specP, itemVariants, rulesetsAll, auditUsers, findNameConflicts, findEmptyNames, ySet } from './authMerge.mjs'

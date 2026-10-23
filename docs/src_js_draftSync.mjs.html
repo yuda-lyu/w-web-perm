@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    
+    <meta charset="utf-8">
+    <title>src/js/draftSync.mjs - Documentation</title>
+    
+    
+    <script src="scripts/prettify/prettify.js"></script>
+    <script src="scripts/prettify/lang-css.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc.css">
+    <script src="scripts/nav.js" defer></script>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+<input type="checkbox" id="nav-trigger" class="nav-trigger" />
+<label for="nav-trigger" class="navicon-button x">
+  <div class="navicon"></div>
+</label>
+
+<label for="nav-trigger" class="overlay"></label>
+
+<nav >
+    
+    
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="WWebPerm.html">WWebPerm</a></li></ul><h3>Global</h3><ul><li><a href="global.html#applyPurgePlan">applyPurgePlan</a></li><li><a href="global.html#auditFrom">auditFrom</a></li><li><a href="global.html#auditRefs">auditRefs</a></li><li><a href="global.html#buildReport">buildReport</a></li><li><a href="global.html#buildRowsSend">buildRowsSend</a></li><li><a href="global.html#buildSyncRowsNew">buildSyncRowsNew</a></li><li><a href="global.html#checkBaseline">checkBaseline</a></li><li><a href="global.html#checkCascadePlan">checkCascadePlan</a></li><li><a href="global.html#checkDbNotInUse">checkDbNotInUse</a></li><li><a href="global.html#checkExternalWrite">checkExternalWrite</a></li><li><a href="global.html#checkMapKeyBatch">checkMapKeyBatch</a></li><li><a href="global.html#checkUsersWrite">checkUsersWrite</a></li><li><a href="global.html#cleanOutOf">cleanOutOf</a></li><li><a href="global.html#compareBaseline">compareBaseline</a></li><li><a href="global.html#countAndRefs">countAndRefs</a></li><li><a href="global.html#countExternalRows">countExternalRows</a></li><li><a href="global.html#countIdRenumber">countIdRenumber</a></li><li><a href="global.html#createAuthorizeExec">createAuthorizeExec</a></li><li><a href="global.html#createLegendMeasurer">createLegendMeasurer</a></li><li><a href="global.html#createLockSave">createLockSave</a></li><li><a href="global.html#cvKpToArr">cvKpToArr</a></li><li><a href="global.html#cvKpToObj">cvKpToObj</a></li><li><a href="global.html#decideLegendType">decideLegendType</a></li><li><a href="global.html#describeUpstream">describeUpstream</a></li><li><a href="global.html#diffRefTargets">diffRefTargets</a></li><li><a href="global.html#dropServerOnlyDiff">dropServerOnlyDiff</a></li><li><a href="global.html#eachOwn">eachOwn</a></li><li><a href="global.html#fetchJson">fetchJson</a></li><li><a href="global.html#fillIdlessIds">fillIdlessIds</a></li><li><a href="global.html#findDupIndex">findDupIndex</a></li><li><a href="global.html#findKeyOtherFrom">findKeyOtherFrom</a></li><li><a href="global.html#findRefRows">findRefRows</a></li><li><a href="global.html#findTouchedDup">findTouchedDup</a></li><li><a href="global.html#fmtLossyMsg">fmtLossyMsg</a></li><li><a href="global.html#fmtVars">fmtVars</a></li><li><a href="global.html#fmtWarn">fmtWarn</a></li><li><a href="global.html#formatFixReport">formatFixReport</a></li><li><a href="global.html#formatFromAudit">formatFromAudit</a></li><li><a href="global.html#formatPurgeReport">formatPurgeReport</a></li><li><a href="global.html#genLegend">genLegend</a></li><li><a href="global.html#getAddConfirmText">getAddConfirmText</a></li><li><a href="global.html#getAddImpact">getAddImpact</a></li><li><a href="global.html#getBannerLines">getBannerLines</a></li><li><a href="global.html#getBaselineDigest">getBaselineDigest</a></li><li><a href="global.html#getCascadePreview">getCascadePreview</a></li><li><a href="global.html#getChangedIdx">getChangedIdx</a></li><li><a href="global.html#getDelConfirmText">getDelConfirmText</a></li><li><a href="global.html#getDelImpact">getDelImpact</a></li><li><a href="global.html#getDelRefCount">getDelRefCount</a></li><li><a href="global.html#getDigestFields">getDigestFields</a></li><li><a href="global.html#getDupRowsInconsistent">getDupRowsInconsistent</a></li><li><a href="global.html#getEffMode">getEffMode</a></li><li><a href="global.html#getExternalEdits">getExternalEdits</a></li><li><a href="global.html#getItemWarnText">getItemWarnText</a></li><li><a href="global.html#getKpLossy">getKpLossy</a></li><li><a href="global.html#getLockFields">getLockFields</a></li><li><a href="global.html#getNameErrs">getNameErrs</a></li><li><a href="global.html#getOwn">getOwn</a></li><li><a href="global.html#getPropKey">getPropKey</a></li><li><a href="global.html#getRawModeMap">getRawModeMap</a></li><li><a href="global.html#getRefRowsExtra">getRefRowsExtra</a></li><li><a href="global.html#getRefState">getRefState</a></li><li><a href="global.html#getRefWarnText">getRefWarnText</a></li><li><a href="global.html#getRefWarns">getRefWarns</a></li><li><a href="global.html#getRowIdxs">getRowIdxs</a></li><li><a href="global.html#getRowState">getRowState</a></li><li><a href="global.html#getRuleEnable">getRuleEnable</a></li><li><a href="global.html#getRuleWarnText">getRuleWarnText</a></li><li><a href="global.html#getRuleWarns">getRuleWarns</a></li><li><a href="global.html#getSavePreview">getSavePreview</a></li><li><a href="global.html#getSyncWarnLines">getSyncWarnLines</a></li><li><a href="global.html#hasDupKey">hasDupKey</a></li><li><a href="global.html#hasExternalDiff">hasExternalDiff</a></li><li><a href="global.html#isAuthMode">isAuthMode</a></li><li><a href="global.html#isBaselineStale">isBaselineStale</a></li><li><a href="global.html#isBaselineValid">isBaselineValid</a></li><li><a href="global.html#isDraftStale">isDraftStale</a></li><li><a href="global.html#isExternalRow">isExternalRow</a></li><li><a href="global.html#isJsonLossy">isJsonLossy</a></li><li><a href="global.html#isMain">isMain</a></li><li><a href="global.html#joinList">joinList</a></li><li><a href="global.html#joinNames">joinNames</a></li><li><a href="global.html#keepAssignByEntity">keepAssignByEntity</a></li><li><a href="global.html#keepAssignOnMissing">keepAssignOnMissing</a></li><li><a href="global.html#makeBaseline">makeBaseline</a></li><li><a href="global.html#makeRowStates">makeRowStates</a></li><li><a href="global.html#mapKeyOf">mapKeyOf</a></li><li><a href="global.html#mapNameKp">mapNameKp</a></li><li><a href="global.html#markDataReload">markDataReload</a></li><li><a href="global.html#markHasKey">markHasKey</a></li><li><a href="global.html#maskQuery">maskQuery</a></li><li><a href="global.html#maskTok">maskTok</a></li><li><a href="global.html#maskUrl">maskUrl</a></li><li><a href="global.html#mergePickKeysOnly">mergePickKeysOnly</a></li><li><a href="global.html#pairRowsToSnapshot">pairRowsToSnapshot</a></li><li><a href="global.html#pickUniqueUser">pickUniqueUser</a></li><li><a href="global.html#planDraftSync">planDraftSync</a></li><li><a href="global.html#planFixFromType">planFixFromType</a></li><li><a href="global.html#planPurgeChain">planPurgeChain</a></li><li><a href="global.html#planPurgeFrom">planPurgeFrom</a></li><li><a href="global.html#planRefChanges">planRefChanges</a></li><li><a href="global.html#putRefEntry">putRefEntry</a></li><li><a href="global.html#putRowsToKp">putRowsToKp</a></li><li><a href="global.html#refsChanged">refsChanged</a></li><li><a href="global.html#resolveShellWorker">resolveShellWorker</a></li><li><a href="global.html#restoreExternalOrder">restoreExternalOrder</a></li><li><a href="global.html#restoreServerFields">restoreServerFields</a></li><li><a href="global.html#reuseDeletedIds">reuseDeletedIds</a></li><li><a href="global.html#rewriteRefs">rewriteRefs</a></li><li><a href="global.html#rowDigest">rowDigest</a></li><li><a href="global.html#runAuditFrom">runAuditFrom</a></li><li><a href="global.html#runClean">runClean</a></li><li><a href="global.html#runFixFromType">runFixFromType</a></li><li><a href="global.html#runPurgeFrom">runPurgeFrom</a></li><li><a href="global.html#splitCheckedRows">splitCheckedRows</a></li><li><a href="global.html#submitGuard">submitGuard</a></li><li><a href="global.html#tabWriteKey">tabWriteKey</a></li><li><a href="global.html#validateRowsBeforeWrite">validateRowsBeforeWrite</a></li><li><a href="global.html#withTabLocks">withTabLocks</a></li><li><a href="global.html#wrapInjected">wrapInjected</a></li><li><a href="global.html#wrapOperOrm">wrapOperOrm</a></li><li><a href="global.html#writeWithCascade">writeWithCascade</a></li></ul>
+    
+</nav>
+
+<div id="main">
+    
+    <h1 class="page-title">src/js/draftSync.mjs</h1>
+    
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>//清單頁「草稿」對 store 推播之處置(R-PRINCIPLE-00 原則 7, 使用者 2026-10-22 裁示; 規則帳本 R-BASELINE-01、R-DRAFT-KEEP-01; ADR-037 Update(run11)): 純函數(不依賴 Vue／DOM), 四個清單頁共用.
+//
+//背景: 清單頁以 computed(changeParams)監看 store, 資料推播(伺服器約 2 秒輪詢, 他人或外部同步改了表)使 store 變新時, 修改前一律重建 items 與基準, 使管理員尚未儲存之編輯被靜默丟棄,
+//再存回「儲存成功」(verify01 情境 5 實證). 原則 7 要求: 有未存之編輯時收到推播, 保留草稿與其載入時之基準、提示「資料已被更新」, 存檔即被伺服端依表雜湊拒收並提示重新載入; 無未存編輯時照舊重建.
+//
+//changeParams 之重算另有其他觸發(genOpt 內讀取之反應式來源, 如語系切換使表頭文字重算): 那些觸發維持修改前之行為(重建), 只有「store 變新且有未存編輯」才保留草稿.
+
+import { isBaselineStale } from './rowDigest.mjs'
+
+
+/**
+ * 判斷來源 store 資料(任一依賴表之列陣列)是否已更新: 逐一比對參照(Vuex 每次推播以新陣列取代整表, 同參照即未更新)
+ *
+ * @param {Array|null} prev 輸入上次建立草稿時之各表參照陣列(null 為尚未建立過)
+ * @param {Array} now 輸入目前各表參照陣列
+ * @returns {Boolean} 回傳是否有任一表參照改變(prev 為 null 或長度不同視為已更新)
+ */
+function refsChanged(prev, now) {
+    if (!Array.isArray(prev) || !Array.isArray(now) || prev.length !== now.length) {
+        return true
+    }
+    return now.some((r, k) => r !== prev[k])
+}
+
+
+/**
+ * 決定清單頁對這次 changeParams 重算之處置
+ *
+ * - 'keep': 來源 store 變新(推播)而有未存編輯 → 保留草稿與其載入時之基準, 不重建(基準是否已過期由呼叫端以 isDraftStale 判定並提示)
+ * - 'keepQuiet': 同 'keep'(保留草稿與基準, 不重建), 但此推播是「自己之存檔請求進行中」所致(伺服端已寫入、回應尚未抵達; run12)——不是他人更新, 呼叫端不得據以顯示過期提示:
+ *   存檔成功即重建(草稿被捨棄、提示歸零), 存檔失敗由存檔流程依目前 store 重算提示
+ * - 'rebuild': 其餘一律重建 items 與基準(同修改前)——首次載入; 使用者切換編輯模式(使用者自己的動作, 草稿隨之放棄); store 變新且無未存編輯; 其他反應式依賴觸發之重算(如語系切換)
+ *
+ * hasDraft、saving 以函數傳入、惰性求值: hasDraft 僅於 store 變新時才呼叫(非首次、編輯模式未變), saving 僅於確定要保留草稿時才呼叫。
+ *
+ * @param {Object} p 輸入參數物件
+ * @param {Boolean} p.first 輸入是否尚未建立過草稿(首次)
+ * @param {Boolean} p.editChanged 輸入編輯模式是否被切換
+ * @param {Boolean} p.storeChanged 輸入來源 store 是否變新(見 refsChanged)
+ * @param {Function} p.hasDraft 輸入回傳「是否有未存編輯」之函數
+ * @param {Function} [p.saving] 輸入回傳「自己之存檔請求是否進行中」之函數(未給視為否)
+ * @returns {String} 回傳 'rebuild'｜'keep'｜'keepQuiet'
+ */
+function planDraftSync({ first, editChanged, storeChanged, hasDraft, saving }) {
+    if (first === true || editChanged === true || storeChanged !== true) {
+        return 'rebuild'
+    }
+    if (!(typeof hasDraft === 'function' &amp;&amp; hasDraft() === true)) {
+        return 'rebuild'
+    }
+    return (typeof saving === 'function' &amp;&amp; saving() === true) ? 'keepQuiet' : 'keep'
+}
+
+
+/**
+ * 草稿所依據之基準相對於目前 store 整表是否已過期(供顯示「資料已被更新」提示; 判準同伺服端 checkBaseline, 單一擁有者 rowDigest.compareBaseline)
+ *
+ * @param {Object} p 輸入參數物件
+ * @param {Array} p.keys 輸入該表 schema 欄位名陣列
+ * @param {Array} p.rows 輸入目前 store 之該表列
+ * @param {Array} p.baseline 輸入草稿載入時之基準
+ * @returns {Boolean} 回傳是否過期(有任一列內容不同或列被增刪; 僅 order／伺服器管理欄不同不算)
+ */
+function isDraftStale({ keys, rows, baseline }) {
+    return isBaselineStale({ keys, rows, baseline })
+}
+
+
+export { refsChanged, planDraftSync, isDraftStale }
+export default planDraftSync
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+    
+    
+</div>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Fri Oct 23 2026 10:56:39 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+</footer>
+
+<script>prettyPrint();</script>
+<script src="scripts/polyfill.js"></script>
+<script src="scripts/linenumber.js"></script>
+
+
+
+</body>
+</html>

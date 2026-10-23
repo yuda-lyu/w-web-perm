@@ -1,4 +1,4 @@
-//外部列保護(F-23)與過期快照(F-26)e2e(run07; 使用者 2026-10-21 裁示「開了外部同步就以外部為主」)。對應 spec/流程_外部列保護與過期快照.md(E2E-001～015; 案號與本檔 CASES 之 E2E-NNN 一一對應)。
+//外部列保護(F-23)與過期快照(F-26)e2e(run07; 使用者 2026-10-21 裁示「開了外部同步就以外部為主」)。對應 spec/流程_外部列保護與過期快照.md(E2E-001～026; 案號與本檔 CASES 之 E2E-NNN 一一對應; run11 改寫 E2E-012、新增 E2E-016～026)。
 //雙模式：
 //  - 產 baseline：node test/e2e-external-rows.test.mjs --baseline （寫 test/pics/external-rows/; 2026-10-22 run07 N2 已產製 6 案 × 2 語系 × 11 張並逐張目視審畢; 產製端單案失敗不中斷整批, 結尾彙整失敗案例並以非 0 結束）
 //  - 驗證（mocha）：npx mocha test/e2e-external-rows.test.mjs --reporter list --timeout 300000
@@ -13,11 +13,12 @@
 //  軸 B 外部列保護之使用者可觀察面(10 格): 鎖頭＋tooltip(001、007)、橫幅(001、007)、name／email／description 不可編(002、007)、isAdmin／isActive 核選方塊 disabled(002)、from 欄不可編(003)、
 //        勾選含外部列之刪除過濾提示(004、009)、全為外部列之刪除(005)、複製外部列之 from 重置(006)、指派欄可改(008、013)、與外部來源撞名之提示(015) → 10 格全測
 //  軸 C 同步警示橫幅(3 格): 有警示(010)、重新同步後消失(010)、無警示時不渲染(001、007 之 warn 橫幅為 0) → 全測
-//  軸 D 過期快照(F-26)對話框路徑(5 格): 後台列被他人改而拒存(011)、外部列被同步改而拒存(013)、拒存後保留對話框且可再按(011)、重開框以新基準可存(013)、開框後新增之外部列／後台列存檔後仍在(012) → 全測;
-//        清單頁(非對話框)之過期快照路徑未測(判定性在 api-externalRows／unit-procCore-external; 本輪派工限對話框)
+//  軸 D 過期快照(F-26)對話框路徑(5 格): 後台列被他人改而拒存(011)、外部列被同步改而拒存(013)、拒存後保留對話框且可再按(011)、重開框以新基準可存(013)、開框後新增之外部列／後台列使存檔被拒、重開框後存檔仍在(012) → 全測;
+//        清單頁(非對話框)之過期快照路徑由軸 G(run11)涵蓋
 //  軸 E 設定 lockExternalRows(2 格): 'y' 預設(001～013、015)、'n'(014) → 全測
 //  軸 F 語系(2 格): eng、cht → 全測(每案兩語系)
-//  已測案例 15 × 語系 2 = 30 個 it。
+//  軸 G 多人同時編輯(R-PRINCIPLE-00 原則 7; run11 新增, 9 格): 四清單頁各一(016 users 同列／017 grups 他列／018 pemis 他人新增列／019 targets 他人刪除列)、兩反向對話框各一(020、021)、外部同步內容未變不擋(022)、無草稿照舊重建(023)、語系切換後表頭仍更新(024); 全測。
+//  已測案例 26 × 語系 2 = 52 個 it(標準圖 8 案: run07 6 案 ＋ run11 E2E-016、020 各 1 張／語系)。
 //
 //夾具(皆以外部來源 from 為界之真同步端點建立; 外部列 id／名稱前綴 xr／ext-, 不撞他檔夾具): 使用者 ext-u1(cgrups 引用 權限群組M2)、ext-u2、ext-u3(引用 ext-g1); 群組 ext-g1(cpemis 含 權限P1)、ext-g2;
 //  後台列夾具由管理者寫入 RPC(editTableRows)先於外部列建立。收尾 restoreTables(purgeExternalRows 直刪外部列夾具 → 整表寫回快照)並回驗筆數與無外部列殘留(R-E2E-ISO-01)。
@@ -29,7 +30,7 @@ import assert from 'assert'
 import JSON5 from 'json5'
 import {
     startServersOnce, cleanup, openApp, setLang, captureStableWithBox, rowBoxSel, waitUntilExist, getResolvedActiveTargets, typeIntoCell,
-    MDI, iconBtn, gotoGrups, checkRow, clickAdd, saveAndWaitModal, assertModalMsg, dismissResultModal, clickModalBtn, waitModalGone, topModalLines,
+    MDI, iconBtn, gotoGrups, gotoPemis, checkRow, clickAdd, clickSave, saveAndWaitModal, assertModalMsg, dismissResultModal, clickModalBtn, waitModalGone, topModalLines,
     expectResultBox, rowIndexByCell, pageSaveShown, openBelongDialog, toggleDialogEnable, clickDialogSave, clickDialogClose, waitDialogClosed, waitDialogGrid, DLG_MDI, dlgBtn,
 } from './tools/e2e-setup.mjs'
 import { editTableRows, selectAllRows } from './tools/api-setup.mjs'
@@ -37,7 +38,7 @@ import { createBaselineGate, itemsUnionBox } from './tools/e2eLib.mjs'
 import {
     TREE, ON, mkU, mkG, pickRow, PICK_U, PICK_G, fmtT, tOf, syncRows, clearSyncWarn, snapTables, rowOf, hasRow, createIsolation, makeRunner,
     waitStoreCount, waitStoreField, bannerTexts, lockTitles, lockCount, cellText, checkboxState, dblclickEditorCount, assertEditableControl, cellWarnTitle, topModalBox, showFromColumn, expectResultBoxAbove,
-    hasName, waitNameGone, enterPage,
+    hasName, waitNameGone, enterPage, gotoTargets, T,
 } from './tools/e2eExt.mjs'
 
 const FLOW = 'external-rows'
@@ -72,6 +73,8 @@ const LIT = {
         warn: (from, n) => `The external source "${from}" appears to have renumbered ids (${n} item(s)`,
         usedBy: (name, from) => `External source "${from}" already uses the name "${name}"`,
         stale: 'Not saved: the data changed',
+        staleDraft: 'The data was updated by someone else or by an external synchronization after you started editing',
+        staleDialog: 'The data was updated by someone else or by an external synchronization after this window was opened',
     },
     cht: {
         notice: (n) => `有 ${n} 筆資料由外部來源同步`,
@@ -80,11 +83,75 @@ const LIT = {
         warn: (from, n) => `外部來源「${from}」疑似重編 id（有 ${n} 筆項目`,
         usedBy: (name, from) => `外部來源「${from}」已使用此名稱「${name}」`,
         stale: '未儲存：載入此頁面後資料已被他人或外部同步更新',
+        staleDraft: '資料已被他人或外部同步更新。您尚未儲存的編輯仍保留於此',
+        staleDialog: '資料已被他人或外部同步更新，本視窗內的資料已過期',
     },
 }
 
 //進入清單頁並等 store 載入夾具後之筆數: 本檔簡稱 enter(同 e2eExt.enterPage)
 const enter = enterPage
+
+//—— run11(R-PRINCIPLE-00 原則 7): 「資料已被更新」提示 ——
+//清單頁橫幅 data-fmid="<表>-banner-stale"(附 "<表>-banner-stale-reload" 鈕); 反向關聯對話框提示 data-fmid="grup-blng-users-banner-stale"／"pemi-blng-grups-banner-stale"
+const waitStale = (page, fmid) => waitUntilExist(page, `提示 ${fmid} 出現`, (id) => !!document.querySelector(`[data-fmid="${id}"]`), { arg: fmid, timeout: 20000 })
+const waitStaleGone = (page, fmid) => waitUntilExist(page, `提示 ${fmid} 消失`, (id) => !document.querySelector(`[data-fmid="${id}"]`), { arg: fmid, timeout: 20000 })
+const staleTexts = (page, fmid) => page.evaluate((id) => [...document.querySelectorAll(`[data-fmid="${id}"]`)].map((e) => ((e.querySelector('span') || e).textContent || '').trim()), fmid)
+const staleCount = (page, fmid) => page.evaluate((id) => document.querySelectorAll(`[data-fmid="${id}"]`).length, fmid)
+//store 某表陣列之參照(推播以新陣列取代整表): 先記下、再等參照改變——用於「外部同步內容未變之整批重寫」(無欄位值可等)
+const markStoreRef = (page, kt) => page.evaluate((k) => { window.__xrRef = window.$vo.$store.state[k] }, kt)
+const waitStoreRefChanged = (page, kt) => waitUntilExist(page, `store ${kt} 已被推播更新(參照改變)`, (k) => window.$vo.$store.state[k] !== window.__xrRef, { arg: kt, timeout: 30000 })
+
+//—— run12(自己儲存引起之推播; 規則帳本 R-RELOAD-GUARD-01、R-DRAFT-KEEP-01): 人為固定推播與儲存回應抵達之時刻 ——
+//以下為 setup 手段(模擬網路時序, 不是使用者動作): 推播本身是真實的(伺服端寫入後約 2 秒輪詢送來之整表), 只是攔住或延後套用, 使「窗口」必然命中而不靠碰運氣。
+//holdPushes: 攔住 store 之資料推播(整表以新陣列取代)而不套用, 緩存於 window.__heldPushes
+const holdPushes = (page) => page.evaluate(() => {
+    const st = window.$vo.$store
+    window.__heldPushes = []
+    window.__pairDone = false
+    window.__origCommit = st.commit
+    st.commit = function(type, payload, ...rest) {
+        if (payload && typeof payload.tableName === 'string' && Array.isArray(payload.data)) {
+            window.__heldPushes.push({ type, payload })
+            return undefined
+        }
+        return window.__origCommit.call(st, type, payload, ...rest)
+    }
+})
+//releasePushes: 停止攔截並放行: 先依序套用全部被攔住之推播, 再套用一筆「內容相同、陣列為新參照」之 kt 表推播——兩次重建相隔不到 20ms(實測 AF-037 之失敗時序:
+//權限改名連帶更新群組引用端, grups 與 pemis 兩張表先後推播相隔約 17ms)。第二筆之時刻要點(對應實測時序: ag-grid 對第一次重建之 rowDataUpdated 事件已派發、第一次重建的 1ms 解除計時器尚未觸發):
+//先 Promise.resolve().then(…) 讓第一次重建之 Vue 更新(微任務)跑完, 再於其中登記 setTimeout(0)——該計時器的到期早於「第一次重建之 nextTick 回呼所登記的 1ms 計時器」(後者於微任務末段才登記、再 +1ms),
+//且晚於 ag-grid 在更新中登記的事件派發計時器; 第二次重建之渲染耗時遠大於 1ms, 故舊實作之第 1 次計時器必於第二次重建之事件之前觸發而提早解除旗標
+const releasePushes = (page, kt) => page.evaluate((k) => {
+    const st = window.$vo.$store
+    st.commit = window.__origCommit
+    const held = window.__heldPushes
+    window.__heldPushes = []
+    for (const h of held) {
+        st.commit(h.type, h.payload)
+    }
+    const last = held.filter((h) => h.payload.tableName === k).pop()
+    Promise.resolve().then(() => {
+        setTimeout(() => {
+            st.commit(last.type, { ...last.payload, data: last.payload.data.slice() })
+            window.__pairDone = true
+        }, 0)
+    })
+}, kt)
+//holdSaveResponse: 包裝 $fapi.<fn>(如 updateUsers): 請求照常送出、伺服端照常寫入, 但把回應扣住直到 releaseSaveResponse(模擬回應較慢; 其間輪詢推播必然抵達)
+const holdSaveResponse = (page, fn) => page.evaluate((f) => {
+    const api = window.$vo.$fapi
+    const orig = api[f]
+    window.__saveHold = { written: false, release: null }
+    api[f] = function(...a) {
+        return orig.apply(this, a).then((r) => new Promise((resolve) => {
+            window.__saveHold.written = true
+            window.__saveHold.release = () => resolve(r)
+        }))
+    }
+}, fn)
+const waitSaveWritten = (page) => waitUntilExist(page, '儲存請求已由伺服端寫入(回應被扣住)', () => !!window.__saveHold && window.__saveHold.written === true, { timeout: 30000 })
+const releaseSaveResponse = (page) => page.evaluate(() => window.__saveHold.release())
+const BELONG_GRUPS = { colId: 'belongGrups', titleKey: 'pemiBlngEditGrups', label: 'VePemiBlngGrups 對話框標題' } //權限頁開「所屬群組」對話框(同 e2e-rela-grup-pemi 之 BELONG_DIALOG_OPT)
 
 //case 定義（順序＝產製順序＝mocha it 順序）：stages 為該案產出之全部圖鍵（空陣列＝純語意案例）；fixture 於開瀏覽器前建夾具；settings 為該案需之後端設定覆寫；
 //run(page,lang) 走流程並回傳截圖（可含流程中語意斷言）；semantic(page,lang) 為結尾語意斷言，產製端與比對端皆於寫檔／比對之前執行
@@ -520,17 +587,30 @@ const CASES = [
         },
     },
     {
-        //E2E-012(F-26, S4): 開「所屬使用者」對話框後, 他人新增一位後台使用者(late-b)、外部來源同步進一位外部使用者(late-x) → 於對話框勾選 john 並存檔成功 → 兩位新增之使用者存檔後仍在(未被整表 diff 刪除)。純語意。
-        //6 步 user path: ①群組頁開 M1 對話框 ②(他人新增後台使用者、外部同步新增外部使用者) ③勾選 john ④按對話框儲存 ⑤看到成功訊息, 對話框關閉 ⑥庫內 john 已屬 M1, late-b 與 late-x 仍在且不變
-        name: 'E2E-012-dialog-keep-new-rows',
+        //E2E-012(F-26, S4; run11 改寫為表級: R-PRINCIPLE-00 原則 7「先動先贏」): 開「所屬使用者」對話框後, 他人新增一位後台使用者(late-b)、外部來源同步進一位外部使用者(late-x) → 於對話框勾選 john 並存檔 → 被拒(saveStale, 表內多了開框時沒有的兩列;
+        //run07 版為成功), 庫內零寫入、兩位新增之使用者仍在; 關閉對話框重新開啟(載入含兩位新增者之新基準)後再勾選 john 存檔 → 成功, 兩位新增之使用者存檔後仍在(未被整表 diff 刪除)。純語意。
+        //6 步 user path: ①群組頁開 M1 對話框 ②(他人新增後台使用者、外部同步新增外部使用者) ③勾選 john ④按對話框儲存, 看到未儲存訊息框 ⑤關閉對話框、重新開啟、勾選 john、按儲存, 看到成功訊息, 對話框關閉 ⑥庫內 john 已屬 M1, late-b 與 late-x 仍在且不變
+        name: 'E2E-012-dialog-new-rows-stale-reload',
         stages: [],
-        run: async (page) => {
+        run: async (page, lang) => {
             await gotoGrups(page)
             await openBelongDialog(page, 0, BELONG_USERS) //開框時 users 為 base 4 筆
             await editTableRows('users', (rows) => [...rows, mkU('id-xr-lb', 'late-b', {}, { description: '開框後他人新增之後台列', from: '', order: 0 })]) //後台列先建
             await syncRows('users', [mkU('id-xr-lx', 'late-x', {}, { description: '開框後外部同步新增之外部列', order: 120 })], F_LATE)
             await waitStoreCount(page, 'users', 6)
             await toggleDialogEnable(page, 2) //勾選 john(row2; 原不屬 M1)
+            const dbBefore = await snapTables(['users'])
+            await clickDialogSave(page)
+            const t = { fail: await tOf(page, 'userSaveUsersFail'), stale: await tOf(page, 'saveStale') }
+            await expectResultBoxAbove(page, 'saveStale 訊息框', `${t.fail}: ${t.stale}`)
+            assert.ok(t.stale.includes(LIT[lang].stale), `saveStale 文字應含字面片段「${LIT[lang].stale}」(實得 ${t.stale})`)
+            assert.deepEqual(await snapTables(['users']), dbBefore, '被拒: users 零寫入(兩位新增之使用者仍在、john 未歸屬)')
+            await dismissResultModal(page)
+            //關閉對話框、重新開啟(show() 以最新 store 重算基準), 再勾選存檔 → 成功
+            await clickDialogClose(page)
+            await waitDialogClosed(page, 'grupBlngEditUsers')
+            await openBelongDialog(page, 0, BELONG_USERS) //列: row0=peter, row1=mary, row2=john, row3=admin, row4=late-b(後台列 order 於整表寫入重給)…
+            await toggleDialogEnable(page, 2)
             await clickDialogSave(page)
             await expectResultBoxAbove(page, '成功彈窗', await tOf(page, 'userSaveUsersSuccess'))
             await dismissResultModal(page)
@@ -539,7 +619,7 @@ const CASES = [
         },
         semantic: async () => {
             const us = await selectAllRows('users')
-            //spec E2E-012 驗證: 開框後新增之兩列(後台列、外部列)存檔後仍在、內容不變; john 之授權設定已含 M1
+            //spec E2E-012 驗證: 開框後新增之兩列(後台列、外部列)重新開框存檔後仍在、內容不變; john 之授權設定已含 M1
             assert.ok(hasRow(us, 'id-xr-lb') && hasRow(us, 'id-xr-lx'), '開框後新增之後台列與外部列存檔後須仍在')
             assert.equal(rowOf(us, 'id-xr-lb').from, '', 'late-b 仍為後台列')
             assert.equal(rowOf(us, 'id-xr-lx').from, F_LATE, 'late-x 仍為外部列, 來源不變')
@@ -648,6 +728,516 @@ const CASES = [
             const gs = await selectAllRows('grups')
             assert.equal(gs.length, 6, '被擋: 庫內筆數不變(base 4 + 外部 2)')
             assert.equal(gs.filter((g) => g.name === 'ext-g1').length, 1, '庫內仍只有一個 ext-g1')
+        },
+    },
+    {
+        //E2E-016(R-PRINCIPLE-00 原則 7, 使用者 2026-10-22「前端有未存編輯時收到推播不得靜默丟棄草稿」; verify01 情境 5 之 FAIL): 使用者頁有未存編輯(mary 之說明)時, 他人改了同一列(mary 之 email),
+        //約 2 秒後推播抵達 → 草稿(說明欄之編輯、儲存鈕)保留、清單上方出現「資料已被更新」橫幅(附「重新載入」鈕) → 按儲存被拒(saveStale 訊息框; 庫內零寫入, mary 仍為他人版本) →
+        //按「重新載入」→ 橫幅消失、草稿放棄、清單回到最新資料(email 為他人版本)、儲存鈕消失 → 重新編輯後存檔成功。
+        //6 步 user path: ①使用者頁 ②雙擊 mary 之說明欄輸入新說明(未存) ③(他人改了 mary 之 email) ④看到橫幅、草稿與儲存鈕仍在 ⑤按儲存, 看到未儲存訊息框 ⑥按「重新載入」, 清單回到最新資料; 再編輯、儲存, 看到成功訊息
+        //圖: 觀察步驟(推播抵達後之反應, 無點擊前圖): 框住橫幅整條(含文字與「重新載入」鈕)
+        name: 'E2E-016-users-stale-draft-kept',
+        stages: ['E2E-016-1-stale-banner'],
+        run: async (page, lang) => {
+            await enter(page, 'users', 4)
+            const k = await rowIndexByCell(page, 'name', 'mary')
+            const emailOld = await cellText(page, k, 'email')
+            const descOld = await cellText(page, k, 'description')
+            const DRAFT = 'A管理員未儲存之說明'
+            await typeIntoCell(page, k, 'description', DRAFT)
+            assert.equal(await pageSaveShown(page), true, '前提: 有未存編輯, 儲存鈕現身')
+            assert.equal(await staleCount(page, 'users-banner-stale'), 0, '前提: 尚無過期提示')
+            //他人改了 mary 之 email(同一列; 經管理者寫入 RPC); 前端 store 隨推播更新
+            const OTHER = 'mary-by-other@example.com'
+            await editTableRows('users', (rows) => {
+                rows.find((r) => r.id === 'id-for-mary').email = OTHER
+                return rows
+            })
+            await waitStoreField(page, 'users', 'id-for-mary', 'email', OTHER)
+            await waitStale(page, 'users-banner-stale')
+            //spec E2E-016 驗證1: 橫幅文字＝staleDraftNotice(單一橫幅); 草稿保留(說明欄仍為 A 之編輯、email 欄仍為載入時之版本——不被推播覆蓋)、儲存鈕仍在
+            assert.deepEqual(await staleTexts(page, 'users-banner-stale'), [await tOf(page, 'staleDraftNotice')], '應有一條過期橫幅, 文字為 staleDraftNotice')
+            assert.ok((await staleTexts(page, 'users-banner-stale'))[0].includes(LIT[lang].staleDraft), `橫幅應含字面片段「${LIT[lang].staleDraft}」`)
+            assert.equal(await cellText(page, k, 'description'), DRAFT, '草稿未被丟棄: 說明欄仍為 A 之編輯')
+            assert.equal(await cellText(page, k, 'email'), emailOld, '草稿未被重建: email 欄仍為載入時之版本(他人之新值不蓋掉草稿)')
+            assert.equal(await pageSaveShown(page), true, '儲存鈕仍在')
+            const s1 = await captureStableWithBox(page, itemsUnionBox('[data-fmid="users-banner-stale"]', { fit: true })) //結果: 清單上方出現過期橫幅(框住橫幅整條)
+            //spec E2E-016 驗證2: 按儲存 → 伺服端以表雜湊拒收(saveStale 訊息框), 庫內零寫入(仍為他人版本)
+            const dbBefore = await snapTables(['users'])
+            await clickSave(page)
+            await expectResultBox(page, 'saveStale 訊息框', `${await tOf(page, 'userSaveUsersFail')}: ${await tOf(page, 'saveStale')}`)
+            await dismissResultModal(page)
+            assert.deepEqual(await snapTables(['users']), dbBefore, '被拒: users 零寫入')
+            assert.equal(await staleCount(page, 'users-banner-stale'), 1, '被拒後橫幅與草稿仍在')
+            assert.equal(await cellText(page, k, 'description'), DRAFT, '被拒後草稿仍在')
+            //spec E2E-016 驗證3: 按「重新載入」→ 橫幅消失、草稿放棄、清單回到最新資料、儲存鈕消失
+            await page.locator('[data-fmid="users-banner-stale-reload"]').first().click()
+            await waitStaleGone(page, 'users-banner-stale')
+            await page.waitForTimeout(800) //清單重建 settle
+            assert.equal(await cellText(page, k, 'description'), descOld, '重新載入: 說明欄回到最新資料(草稿已放棄)')
+            assert.equal(await cellText(page, k, 'email'), OTHER, '重新載入: email 欄為他人之版本')
+            assert.equal(await pageSaveShown(page), false, '重新載入: 無未存編輯, 儲存鈕消失')
+            //spec E2E-016 驗證4: 重新載入後(新基準)再編輯、存檔 → 成功
+            const AFTER = 'A管理員重新載入後之說明'
+            await typeIntoCell(page, k, 'description', AFTER)
+            await saveAndWaitModal(page)
+            await assertModalMsg(page, 'userSaveUsersSuccess')
+            await dismissResultModal(page)
+            return [{ name: 'E2E-016-1-stale-banner', buf: s1 }]
+        },
+        semantic: async () => {
+            const mary = rowOf(await selectAllRows('users'), 'id-for-mary')
+            assert.equal(mary.email, 'mary-by-other@example.com', '他人之 email 版本保留(被拒之儲存未覆蓋)')
+            assert.equal(mary.description, 'A管理員重新載入後之說明', '重新載入後之編輯已存')
+        },
+    },
+    {
+        //E2E-017(原則 7): 群組頁有未存編輯(M1 之說明)時, 外部來源同步改了「同表另一列」(外部群組 ext-g2 之說明)——與 A 編輯之列無關——→ 草稿保留、出現過期橫幅 → 按儲存被拒(表級: 先動先贏, 不部分變更), 庫內零寫入。純語意。
+        //6 步 user path: ①群組頁 ②雙擊 M1 之說明欄輸入新說明(未存) ③(外部同步改了 ext-g2 之說明) ④看到橫幅、草稿與儲存鈕仍在 ⑤按儲存, 看到未儲存訊息框 ⑥庫內 M1 未被改、ext-g2 為外部新值
+        name: 'E2E-017-grups-stale-other-row',
+        stages: [],
+        fixture: fxGrups,
+        run: async (page, lang) => {
+            await enter(page, 'grups', 6)
+            const k = await rowIndexByCell(page, 'name', '權限群組M1')
+            const DRAFT = 'A管理員未儲存之群組說明'
+            await typeIntoCell(page, k, 'description', DRAFT)
+            assert.equal(await pageSaveShown(page), true, '前提: 有未存編輯')
+            const NEW = '外部來源改過之說明(別列)'
+            await syncRows('grups', [X_G1, { ...X_G2, description: NEW }], F_G)
+            await waitStoreField(page, 'grups', 'id-xr-g2', 'description', NEW)
+            await waitStale(page, 'grups-banner-stale')
+            assert.deepEqual(await staleTexts(page, 'grups-banner-stale'), [await tOf(page, 'staleDraftNotice')])
+            assert.ok((await staleTexts(page, 'grups-banner-stale'))[0].includes(LIT[lang].staleDraft), `橫幅應含字面片段「${LIT[lang].staleDraft}」`)
+            assert.equal(await cellText(page, k, 'description'), DRAFT, '草稿未被丟棄')
+            assert.equal(await pageSaveShown(page), true, '儲存鈕仍在')
+            const dbBefore = await snapTables(['grups'])
+            await clickSave(page)
+            await expectResultBox(page, 'saveStale 訊息框', `${await tOf(page, 'grupSaveGrupsFail')}: ${await tOf(page, 'saveStale')}`)
+            await dismissResultModal(page)
+            assert.deepEqual(await snapTables(['grups']), dbBefore, '被拒: grups 零寫入(A 編輯之列與外部另一列皆不變)')
+            return null
+        },
+        semantic: async () => {
+            const gs = await selectAllRows('grups')
+            assert.notEqual(rowOf(gs, 'id-for-權限群組M1').description, 'A管理員未儲存之群組說明', 'M1 之說明未被被拒之儲存寫入')
+            assert.equal(rowOf(gs, 'id-xr-g2').description, '外部來源改過之說明(別列)', 'ext-g2 維持外部新值')
+        },
+    },
+    {
+        //E2E-018(原則 7): 權限頁有未存編輯(P1 之說明)時, 他人新增了一個權限(表內多一列)→ 草稿保留、出現過期橫幅 → 按儲存被拒(列增減亦使表雜湊改變), 庫內零寫入、他人新增之權限仍在。純語意。
+        //6 步 user path: ①權限頁 ②雙擊 P1 之說明欄輸入新說明(未存) ③(他人新增權限) ④看到橫幅、草稿與儲存鈕仍在 ⑤按儲存, 看到未儲存訊息框 ⑥庫內 P1 未被改、他人新增之權限仍在
+        name: 'E2E-018-pemis-stale-other-added',
+        stages: [],
+        run: async (page, lang) => {
+            await enter(page, 'pemis', 4)
+            const k = await rowIndexByCell(page, 'name', '權限P1')
+            const DRAFT = 'A管理員未儲存之權限說明'
+            await typeIntoCell(page, k, 'description', DRAFT)
+            assert.equal(await pageSaveShown(page), true, '前提: 有未存編輯')
+            await editTableRows('pemis', (rows) => [...rows, { id: 'id-xr-p9', order: 99, name: 'xr-late-pemi', description: '他人新增之權限', from: '', crules: '{}' }])
+            await waitStoreCount(page, 'pemis', 5)
+            await waitStale(page, 'pemis-banner-stale')
+            assert.deepEqual(await staleTexts(page, 'pemis-banner-stale'), [await tOf(page, 'staleDraftNotice')])
+            assert.ok((await staleTexts(page, 'pemis-banner-stale'))[0].includes(LIT[lang].staleDraft), `橫幅應含字面片段「${LIT[lang].staleDraft}」`)
+            assert.equal(await cellText(page, k, 'description'), DRAFT, '草稿未被丟棄')
+            assert.equal(await hasName(page, 'xr-late-pemi'), false, '草稿未被重建: 清單不含他人新增之權限(保留載入時之版本)')
+            const dbBefore = await snapTables(['pemis'])
+            await clickSave(page)
+            await expectResultBox(page, 'saveStale 訊息框', `${await tOf(page, 'pemiSavePemisFail')}: ${await tOf(page, 'saveStale')}`)
+            await dismissResultModal(page)
+            assert.deepEqual(await snapTables(['pemis']), dbBefore, '被拒: pemis 零寫入')
+            return null
+        },
+        semantic: async () => {
+            const ps = await selectAllRows('pemis')
+            assert.ok(hasRow(ps, 'id-xr-p9'), '他人新增之權限仍在(未被草稿整表 diff 刪除)')
+            assert.notEqual(rowOf(ps, 'id-for-權限P1').description, 'A管理員未儲存之權限說明', 'P1 之說明未被被拒之儲存寫入')
+        },
+    },
+    {
+        //E2E-019(原則 7): 標的頁有未存編輯(「專案A/頁A/區塊A」之說明)時, 他人刪除了一個標的(表內少一列)→ 草稿保留、出現過期橫幅 → 按儲存被拒, 庫內零寫入(被他人刪除之標的維持已刪、A 之編輯未寫入)。純語意。
+        //6 步 user path: ①標的頁 ②雙擊首列之說明欄輸入新說明(未存) ③(他人刪除一個標的) ④看到橫幅、草稿與儲存鈕仍在、清單仍含被刪標的(保留載入時之版本) ⑤按儲存, 看到未儲存訊息框 ⑥庫內該標的維持已刪
+        name: 'E2E-019-targets-stale-other-deleted',
+        stages: [],
+        fixture: async () => { await editTableRows('targets', (rows) => [...rows, { id: 'zz-xr/t1', order: 999, description: 'xr暫存標的', from: '' }]) },
+        run: async (page, lang) => {
+            await gotoTargets(page)
+            await waitStoreCount(page, 'targets', 23)
+            const k = await rowIndexByCell(page, 'id', T.A)
+            const DRAFT = 'A管理員未儲存之標的說明'
+            await typeIntoCell(page, k, 'description', DRAFT)
+            assert.equal(await pageSaveShown(page), true, '前提: 有未存編輯')
+            await editTableRows('targets', (rows) => rows.filter((r) => r.id !== 'zz-xr/t1'))
+            await waitStoreCount(page, 'targets', 22)
+            await waitStale(page, 'targets-banner-stale')
+            assert.deepEqual(await staleTexts(page, 'targets-banner-stale'), [await tOf(page, 'staleDraftNotice')])
+            assert.ok((await staleTexts(page, 'targets-banner-stale'))[0].includes(LIT[lang].staleDraft), `橫幅應含字面片段「${LIT[lang].staleDraft}」`)
+            assert.equal(await cellText(page, k, 'description'), DRAFT, '草稿未被丟棄')
+            const dbBefore = await snapTables(['targets'])
+            await clickSave(page)
+            await expectResultBox(page, 'saveStale 訊息框', `${await tOf(page, 'targetSaveTargetsFail')}: ${await tOf(page, 'saveStale')}`)
+            await dismissResultModal(page)
+            assert.deepEqual(await snapTables(['targets']), dbBefore, '被拒: targets 零寫入')
+            return null
+        },
+        semantic: async () => {
+            const ts = await selectAllRows('targets')
+            assert.ok(!hasRow(ts, 'zz-xr/t1'), '他人刪除之標的維持已刪(被拒之草稿未使其復活)')
+            assert.notEqual(rowOf(ts, T.A).description, 'A管理員未儲存之標的說明', '首列之說明未被被拒之儲存寫入')
+        },
+    },
+    {
+        //E2E-020(原則 7, 反向關聯對話框): 群組頁開「所屬使用者」對話框並勾選 john(未存編輯)後, 他人改了 mary 之列 → 對話框草稿與基準維持開框時之版本、出現「資料已被更新」提示(本視窗已過期) →
+        //按對話框儲存被拒(saveStale 訊息框), 庫內零寫入, 對話框仍開著。
+        //6 步 user path: ①群組頁開 M1 對話框 ②勾選 john(未存) ③(他人改了 mary 之說明) ④看到對話框內之過期提示 ⑤按對話框儲存鈕, 看到未儲存訊息框 ⑥按確認後對話框仍開著、提示仍在
+        //圖: 觀察步驟(推播抵達後之反應, 無點擊前圖): 框住對話框內之提示整條
+        name: 'E2E-020-users-dialog-stale-notice',
+        stages: ['E2E-020-1-stale-banner'],
+        run: async (page, lang) => {
+            await gotoGrups(page)
+            await openBelongDialog(page, 0, BELONG_USERS) //row 0 = 權限群組M1(對話框列: row0=peter, row1=mary, row2=john, row3=admin)
+            await toggleDialogEnable(page, 2) //勾選 john(原不屬 M1) → 儲存鈕現身
+            assert.equal(await staleCount(page, 'grup-blng-users-banner-stale'), 0, '前提: 尚無過期提示')
+            const OTHER = '他人於對話框編輯中改過之說明'
+            await editTableRows('users', (rows) => {
+                rows.find((r) => r.id === 'id-for-mary').description = OTHER
+                return rows
+            })
+            await waitStoreField(page, 'users', 'id-for-mary', 'description', OTHER)
+            await waitStale(page, 'grup-blng-users-banner-stale')
+            //spec E2E-020 驗證1: 提示文字＝staleDraftNoticeDialog(單一提示)
+            assert.deepEqual(await staleTexts(page, 'grup-blng-users-banner-stale'), [await tOf(page, 'staleDraftNoticeDialog')])
+            assert.ok((await staleTexts(page, 'grup-blng-users-banner-stale'))[0].includes(LIT[lang].staleDialog), `提示應含字面片段「${LIT[lang].staleDialog}」`)
+            const s1 = await captureStableWithBox(page, itemsUnionBox('[data-fmid="grup-blng-users-banner-stale"]', { fit: true })) //結果: 對話框內出現過期提示(框住提示整條)
+            //spec E2E-020 驗證2: 按儲存被拒、零寫入、對話框不關閉、提示仍在
+            const dbBefore = await snapTables(['users'])
+            await clickDialogSave(page)
+            await expectResultBoxAbove(page, 'saveStale 訊息框', `${await tOf(page, 'userSaveUsersFail')}: ${await tOf(page, 'saveStale')}`)
+            await dismissResultModal(page)
+            assert.deepEqual(await snapTables(['users']), dbBefore, '被拒: users 零寫入')
+            assert.ok(await page.evaluate((k) => (document.body.innerText || '').includes(window.$vo.$t(k)), 'grupBlngEditUsers'), '被拒後對話框仍開著')
+            assert.equal(await staleCount(page, 'grup-blng-users-banner-stale'), 1, '被拒後提示仍在')
+            return [{ name: 'E2E-020-1-stale-banner', buf: s1 }]
+        },
+        semantic: async () => {
+            const us = await selectAllRows('users')
+            assert.equal(rowOf(us, 'id-for-mary').description, '他人於對話框編輯中改過之說明', 'mary 維持他人版本')
+            assert.ok(!JSON5.parse(rowOf(us, 'id-for-john').cgrups)['權限群組M1'], 'john 之授權設定不得被本次被拒之儲存改寫')
+        },
+    },
+    {
+        //E2E-021(原則 7, 反向關聯對話框): 權限頁開「所屬群組」對話框並勾選一個群組(未存編輯)後, 他人改了另一個群組 → 出現「資料已被更新」提示 → 按對話框儲存被拒(saveStale), 庫內零寫入, 對話框仍開著。純語意。
+        //6 步 user path: ①權限頁開 P1「所屬群組」對話框 ②勾選一個群組(未存) ③(他人改了另一群組之說明) ④看到對話框內之過期提示 ⑤按對話框儲存鈕, 看到未儲存訊息框 ⑥按確認後對話框仍開著
+        name: 'E2E-021-grups-dialog-stale-notice',
+        stages: [],
+        run: async (page, lang) => {
+            await gotoPemis(page)
+            await openBelongDialog(page, 0, BELONG_GRUPS) //row 0 = 權限P1; 對話框列依群組 order: row0=M1, row1=M2, row2=M3, row3=M4
+            await toggleDialogEnable(page, 1) //勾選 M2(原不屬 P1) → 儲存鈕現身
+            assert.equal(await staleCount(page, 'pemi-blng-grups-banner-stale'), 0, '前提: 尚無過期提示')
+            const OTHER = '他人於對話框編輯中改過之群組說明'
+            await editTableRows('grups', (rows) => {
+                rows.find((r) => r.id === 'id-for-權限群組M3').description = OTHER
+                return rows
+            })
+            await waitStoreField(page, 'grups', 'id-for-權限群組M3', 'description', OTHER)
+            await waitStale(page, 'pemi-blng-grups-banner-stale')
+            assert.deepEqual(await staleTexts(page, 'pemi-blng-grups-banner-stale'), [await tOf(page, 'staleDraftNoticeDialog')])
+            assert.ok((await staleTexts(page, 'pemi-blng-grups-banner-stale'))[0].includes(LIT[lang].staleDialog), `提示應含字面片段「${LIT[lang].staleDialog}」`)
+            const dbBefore = await snapTables(['grups'])
+            await clickDialogSave(page)
+            await expectResultBoxAbove(page, 'saveStale 訊息框', `${await tOf(page, 'grupSaveGrupsFail')}: ${await tOf(page, 'saveStale')}`)
+            await dismissResultModal(page)
+            assert.deepEqual(await snapTables(['grups']), dbBefore, '被拒: grups 零寫入')
+            assert.ok(await page.evaluate((k) => (document.body.innerText || '').includes(window.$vo.$t(k)), 'pemiBlngEditGrups'), '被拒後對話框仍開著')
+            assert.equal(await staleCount(page, 'pemi-blng-grups-banner-stale'), 1, '被拒後提示仍在')
+            return null
+        },
+        semantic: async () => {
+            const gs = await selectAllRows('grups')
+            assert.equal(rowOf(gs, 'id-for-權限群組M3').description, '他人於對話框編輯中改過之群組說明', 'M3 維持他人版本')
+            assert.ok(!JSON5.parse(rowOf(gs, 'id-for-權限群組M2').cpemis)['權限P1'], 'M2 之授權設定不得被本次被拒之儲存改寫')
+        },
+    },
+    {
+        //E2E-022(原則 7: 表雜湊以內容計算, 排除系統自動變更之欄位): 使用者頁有未存編輯(mary 之說明)時, 外部來源把同一批外部使用者原樣再同步一次(內容未變; 每列之建立者／時間欄皆重寫)→ 推播抵達,
+        //但表內容未變: 不出現過期橫幅、草稿保留 → 按儲存成功(不被誤擋), 外部列內容逐欄不變。純語意。
+        //6 步 user path: ①使用者頁(含 2 位外部使用者) ②雙擊 mary 之說明欄輸入新說明(未存) ③(外部來源原樣再同步一次) ④看不到過期橫幅、草稿與儲存鈕仍在 ⑤按儲存, 看到成功訊息 ⑥庫內 mary 已存、外部列內容不變
+        name: 'E2E-022-users-external-rewrite-unchanged',
+        stages: [],
+        fixture: fxUsers,
+        run: async (page) => {
+            await enter(page, 'users', 6)
+            const k = await rowIndexByCell(page, 'name', 'mary')
+            const DRAFT = 'A管理員未儲存之說明'
+            await typeIntoCell(page, k, 'description', DRAFT)
+            assert.equal(await pageSaveShown(page), true, '前提: 有未存編輯')
+            await markStoreRef(page, 'users')
+            await syncRows('users', [X_U1, X_U2], F_U) //內容與夾具逐欄相同(僅伺服器管理欄被重寫)
+            await waitStoreRefChanged(page, 'users')
+            await page.waitForTimeout(1500) //清單 computed 重算 settle
+            assert.equal(await staleCount(page, 'users-banner-stale'), 0, '外部同步內容未變: 不得出現過期橫幅')
+            assert.equal(await cellText(page, k, 'description'), DRAFT, '草稿保留')
+            assert.equal(await pageSaveShown(page), true, '儲存鈕仍在')
+            await saveAndWaitModal(page)
+            await assertModalMsg(page, 'userSaveUsersSuccess') //以載入時之基準存檔不被誤擋
+            await dismissResultModal(page)
+            return null
+        },
+        semantic: async () => {
+            const us = await selectAllRows('users')
+            assert.equal(rowOf(us, 'id-for-mary').description, 'A管理員未儲存之說明', 'mary 之編輯已存')
+            assert.deepEqual(pickRow(rowOf(us, 'id-xr-u1'), PICK_U), pickRow(asExt(X_U1, F_U), PICK_U), 'ext-u1 逐欄不變')
+            assert.deepEqual(pickRow(rowOf(us, 'id-xr-u2'), PICK_U), pickRow(asExt(X_U2, F_U), PICK_U), 'ext-u2 逐欄不變')
+        },
+    },
+    {
+        //E2E-023(原則 7: 無未存編輯時照舊重建): 使用者頁沒有未存編輯時, 他人改了 mary 之 email → 推播抵達後清單自行更新為最新資料, 不出現過期橫幅、無儲存鈕。純語意。
+        //6 步 user path: ①使用者頁(未編輯) ②(他人改了 mary 之 email) ③看到 mary 之 email 欄已更新為他人版本 ④看不到過期橫幅 ⑤看不到儲存鈕
+        name: 'E2E-023-users-no-draft-rebuild',
+        stages: [],
+        run: async (page) => {
+            await enter(page, 'users', 4)
+            const k = await rowIndexByCell(page, 'name', 'mary')
+            assert.equal(await pageSaveShown(page), false, '前提: 無未存編輯')
+            const OTHER = 'mary-by-other-23@example.com'
+            await editTableRows('users', (rows) => {
+                rows.find((r) => r.id === 'id-for-mary').email = OTHER
+                return rows
+            })
+            await waitStoreField(page, 'users', 'id-for-mary', 'email', OTHER)
+            await waitUntilExist(page, 'mary 之 email 欄更新', (a) => { const c = document.querySelector(`.ag-row[row-index="${a.k}"] .ag-cell[col-id="email"]`); return !!c && (c.textContent || '').trim() === a.v }, { arg: { k, v: OTHER }, timeout: 20000 })
+            assert.equal(await staleCount(page, 'users-banner-stale'), 0, '無未存編輯: 不得出現過期橫幅')
+            assert.equal(await pageSaveShown(page), false, '無未存編輯: 無儲存鈕')
+            return null
+        },
+        semantic: async () => {
+            assert.equal(rowOf(await selectAllRows('users'), 'id-for-mary').email, 'mary-by-other-23@example.com', '他人之版本維持')
+        },
+    },
+    {
+        //E2E-024(原則 7 之回歸守護): 清單頁以 computed 監看 store 與 genOpt 讀取之反應式來源; 草稿保留機制不得使「其他反應式來源之變動」(如頂列切換語系)失效——使用者頁於執行中切換語系後, 表頭文字隨之更新。純語意。
+        //6 步 user path: ①使用者頁 ②記下「名稱」欄之表頭文字 ③於頂列語系下拉切換為另一語系 ④看到表頭文字改為另一語系 ⑤無過期橫幅、無儲存鈕
+        name: 'E2E-024-users-lang-switch-headers',
+        stages: [],
+        run: async (page, lang) => {
+            await enter(page, 'users', 4)
+            const hdr = () => page.evaluate(() => ((document.querySelector('.ag-header-cell[col-id="name"]') || {}).textContent || '').trim())
+            const h0 = await hdr()
+            assert.ok(h0 !== '', '前提: 名稱欄表頭有文字')
+            await page.evaluate((l) => { window.$vo.$ui.setLang(l, 'e2e-lang-switch') }, lang === 'eng' ? 'cht' : 'eng') //e2e 之 setLang 對 eng 不動作(預設語系), 故直接呼叫前端切換語系
+            await waitUntilExist(page, '表頭文字隨語系更新', (a) => { const e = document.querySelector('.ag-header-cell[col-id="name"]'); const t = e ? (e.textContent || '').trim() : ''; return t !== '' && t !== a.h0 }, { arg: { h0 }, timeout: 20000 })
+            assert.notEqual(await hdr(), h0, '切換語系後表頭文字應改變')
+            assert.equal(await staleCount(page, 'users-banner-stale'), 0, '無過期橫幅')
+            assert.equal(await pageSaveShown(page), false, '無儲存鈕')
+            return null
+        },
+        semantic: async () => {
+            assert.equal((await selectAllRows('users')).length, 4, '庫內 users 不變')
+        },
+    },
+    {
+        //E2E-025(原則 7 之回歸守護; 外審 sol 第 4 點): 保留草稿(keep)期間 changeParams 不呼叫 genOpt, 其對語系等來源的反應式依賴會收縮; 「重新載入」須在 computed 內重建以恢復依賴——
+        //使用者頁有未存編輯、他人改了別列(出現過期橫幅)→ 按「重新載入」→ 於頂列切換語系 → 表頭文字仍隨語系更新。純語意。
+        //6 步 user path: ①使用者頁編輯 mary 說明(未存) ②他人改了 mary 之 email、出現過期橫幅 ③按「重新載入」④記下「名稱」欄表頭文字 ⑤切換語系 ⑥看到表頭文字改為另一語系
+        name: 'E2E-025-users-reload-then-lang-switch',
+        stages: [],
+        run: async (page, lang) => {
+            await enter(page, 'users', 4)
+            const k = await rowIndexByCell(page, 'name', 'mary')
+            await typeIntoCell(page, k, 'description', 'A管理員未儲存之說明(025)')
+            assert.equal(await pageSaveShown(page), true, '前提: 有未存編輯')
+            const OTHER = 'mary-by-other-25@example.com'
+            await editTableRows('users', (rows) => {
+                rows.find((r) => r.id === 'id-for-mary').email = OTHER
+                return rows
+            })
+            await waitStoreField(page, 'users', 'id-for-mary', 'email', OTHER)
+            await waitStale(page, 'users-banner-stale')
+            await page.locator('[data-fmid="users-banner-stale-reload"]').first().click()
+            await waitStaleGone(page, 'users-banner-stale')
+            await waitUntilExist(page, '重新載入後 mary 之 email 為他人版本', (a) => { const c = document.querySelector(`.ag-row[row-index="${a.k}"] .ag-cell[col-id="email"]`); return !!c && (c.textContent || '').trim() === a.v }, { arg: { k, v: OTHER }, timeout: 20000 })
+            assert.equal(await pageSaveShown(page), false, '重新載入: 草稿已放棄')
+            const hdr = () => page.evaluate(() => ((document.querySelector('.ag-header-cell[col-id="name"]') || {}).textContent || '').trim())
+            const h0 = await hdr()
+            assert.ok(h0 !== '', '前提: 名稱欄表頭有文字')
+            await page.evaluate((l) => { window.$vo.$ui.setLang(l, 'e2e-lang-switch-025') }, lang === 'eng' ? 'cht' : 'eng') //e2e 之 setLang 對 eng 不動作(預設語系), 故直接呼叫前端切換語系
+            await waitUntilExist(page, '重新載入後切換語系, 表頭文字隨之更新', (a) => { const e = document.querySelector('.ag-header-cell[col-id="name"]'); const t = e ? (e.textContent || '').trim() : ''; return t !== '' && t !== a.h0 }, { arg: { h0 }, timeout: 20000 })
+            assert.notEqual(await hdr(), h0, '重新載入後切換語系, 表頭文字應改變(依賴已恢復)')
+            assert.equal(await staleCount(page, 'users-banner-stale'), 0, '無過期橫幅')
+            assert.equal(await pageSaveShown(page), false, '無儲存鈕')
+            return null
+        },
+        semantic: async () => {
+            const mary = rowOf(await selectAllRows('users'), 'id-for-mary')
+            assert.equal(mary.email, 'mary-by-other-25@example.com', '他人之版本維持(本案未存檔)')
+        },
+    },
+    {
+        //E2E-026(原則 7; 外審 sol 第 1 點): 使用者頁父頁無未存編輯時開啟某列之「所屬群組」編輯器(VeCgrups)並勾選(編輯尚未回填父頁), 此時他人改了別列(john 之說明)→ 父頁因無草稿而重建並換新基準;
+        //按編輯器儲存(回填)時, 草稿所依據之整表已異於開框時之基準 → 放棄回填並提示 saveStale(舊寫法只比被編輯列之指紋而放行, 之後存檔會以新基準繞過「同表別列已被改動」之整表比對)。
+        //對照: 無他人變更時同一操作回填成功、出現儲存鈕。純語意。
+        //6 步 user path: ①使用者頁 ②開 mary 之所屬群組編輯器並勾選一列 ③(他人改了 john 之說明)④按編輯器儲存 ⑤看到 saveStale 提示、mary 之群組欄未變、無儲存鈕 ⑥(對照)重開編輯器勾選並儲存 → 群組欄改變、儲存鈕現身
+        name: 'E2E-026-users-editor-backfill-table-stale',
+        stages: [],
+        run: async (page) => {
+            await enter(page, 'users', 4)
+            const k = await rowIndexByCell(page, 'name', 'mary')
+            const kJ = await rowIndexByCell(page, 'name', 'john')
+            const CG = { colId: 'cgrups', titleKey: 'userEditCgrups', label: 'VeCgrups 對話框標題' }
+            const t0 = await cellText(page, k, 'cgrups')
+            assert.equal(await pageSaveShown(page), false, '前提: 父頁無未存編輯')
+            await openBelongDialog(page, k, CG)
+            await toggleDialogEnable(page, 3) //勾選(或取消)一個群組列 → 編輯器儲存鈕現身(編輯尚未回填)
+            const OTHER = '他人於編輯器開啟中改過john之說明(026)'
+            await editTableRows('users', (rows) => {
+                rows.find((r) => r.id === 'id-for-john').description = OTHER
+                return rows
+            })
+            await waitStoreField(page, 'users', 'id-for-john', 'description', OTHER)
+            await waitUntilExist(page, '父頁已重建(john 之說明為他人版本)', (a) => { const c = document.querySelector(`.ag-row[row-index="${a.k}"] .ag-cell[col-id="description"]`); return !!c && (c.textContent || '').trim() === a.v }, { arg: { k: kJ, v: OTHER }, timeout: 20000 })
+            await clickDialogSave(page)
+            await waitDialogClosed(page, CG.titleKey)
+            //spec E2E-026 驗證1: 放棄回填——mary 之群組欄未變、父頁仍無未存編輯; 出現 saveStale 提示
+            await waitUntilExist(page, 'saveStale 提示', () => (document.body.innerText || '').includes(window.$vo.$t('saveStale')), { timeout: 10000 })
+            assert.equal(await cellText(page, k, 'cgrups'), t0, '放棄回填: mary 之群組欄未變')
+            assert.equal(await pageSaveShown(page), false, '放棄回填: 父頁仍無未存編輯(未標記為已修改)')
+            //spec E2E-026 驗證2(對照): 無他人變更時同一操作回填成功
+            await waitUntilExist(page, 'saveStale 提示淡出', () => !(document.body.innerText || '').includes(window.$vo.$t('saveStale')), { timeout: 20000 })
+            await openBelongDialog(page, k, CG)
+            await toggleDialogEnable(page, 3)
+            await clickDialogSave(page)
+            await waitDialogClosed(page, CG.titleKey)
+            assert.notEqual(await cellText(page, k, 'cgrups'), t0, '對照: 無他人變更時回填成功, 群組欄改變')
+            assert.equal(await pageSaveShown(page), true, '對照: 回填後父頁有未存編輯, 儲存鈕現身')
+            return null
+        },
+        semantic: async () => {
+            const us = await selectAllRows('users')
+            assert.equal(rowOf(us, 'id-for-john').description, '他人於編輯器開啟中改過john之說明(026)', '他人之版本維持(本案未存檔)')
+        },
+    },
+    {
+        //E2E-027(R-RELOAD-GUARD-01; run12, AF-037 不穩定失敗之根因): 自己儲存成功並關閉結果框之後, 伺服端對自己這次寫入的推播(整表)才抵達, 且可能兩筆相隔不到 20ms(權限改名連帶更新群組引用端時為兩張表; 此處以內容相同之第二筆代表)——
+        //清單頁先後重建兩次; 修正前第 1 次重建之「程式端重載旗標」計時器在第 2 次重建之 rowsChange 事件之前把旗標解除, 該事件被當成使用者編輯, 儲存成功後儲存鈕殘留(並使其後之推播被當成「有未存編輯」)。
+        //人為固定推播時刻: 攔住真實推播, 待儲存成功且結果框關閉後才放行(先一筆; 第一次重建之 Vue 更新跑完後立即再一筆內容相同者, 見 releasePushes), 使窗口必然命中、不靠碰運氣。純語意。
+        //6 步 user path: ①使用者頁雙擊 mary 之說明輸入新說明(未存) ②按儲存, 看到成功訊息 ③按確認關閉 ④(自己存檔所致之推播於此後抵達, 兩筆相隔不到 20ms) ⑤看到 mary 之說明為剛存內容 ⑥看不到儲存鈕、過期橫幅
+        name: 'E2E-027-users-own-save-late-double-push',
+        stages: [],
+        run: async (page) => {
+            await enter(page, 'users', 4)
+            const k = await rowIndexByCell(page, 'name', 'mary')
+            const DRAFT = 'A管理員自己儲存之說明(027)'
+            await typeIntoCell(page, k, 'description', DRAFT)
+            assert.equal(await pageSaveShown(page), true, '前提: 有未存編輯')
+            await holdPushes(page)
+            await saveAndWaitModal(page)
+            await assertModalMsg(page, 'userSaveUsersSuccess')
+            await dismissResultModal(page)
+            assert.equal(await pageSaveShown(page), false, '儲存成功並關閉結果框: 儲存鈕消失(推播尚未套用)')
+            await waitUntilExist(page, '自己存檔所致之推播已抵達(被攔住)', () => (window.__heldPushes || []).some((h) => h.payload.tableName === 'users'), { timeout: 30000 })
+            await releasePushes(page, 'users')
+            await waitUntilExist(page, '兩筆推播皆已套用', () => window.__pairDone === true, { timeout: 20000 })
+            await page.waitForTimeout(1500) //負向觀察窗: 重建後 ag-grid 之 rowsChange 事件非同步抵達, 若被誤當成使用者編輯則儲存鈕於此期間現身
+            //spec E2E-027 驗證1: 清單為剛存內容、儲存鈕不出現、無過期橫幅
+            assert.equal(await cellText(page, k, 'description'), DRAFT, '清單為剛存之內容')
+            assert.equal(await pageSaveShown(page), false, '自己存檔所致之延遲推播(兩筆)不得使儲存鈕殘留或再現')
+            assert.equal(await staleCount(page, 'users-banner-stale'), 0, '無過期橫幅')
+            return null
+        },
+        semantic: async () => {
+            assert.equal(rowOf(await selectAllRows('users'), 'id-for-mary').description, 'A管理員自己儲存之說明(027)', 'mary 之編輯已存')
+        },
+    },
+    {
+        //E2E-028(R-DRAFT-KEEP-01; run12): 自己按儲存、伺服端已寫入但回應尚未抵達時, 約 2 秒輪詢之推播(自己這次寫入所致)先到——此時 isModified 仍為真, 修正前被當成「有未存編輯時他人更新」而保留草稿並顯示過期橫幅
+        //(回應抵達後才被重建清除); 自己存檔所致之推播不是他人更新, 全程不得出現橫幅。以扣住儲存回應固定「推播先於回應」之次序。純語意。
+        //6 步 user path: ①使用者頁雙擊 mary 之說明輸入新說明(未存) ②按儲存(伺服端已寫入、回應被扣住) ③(自己存檔所致之推播於回應之前抵達) ④看不到過期橫幅 ⑤回應抵達, 看到成功訊息, 按確認 ⑥看不到儲存鈕、過期橫幅
+        name: 'E2E-028-users-own-save-push-before-response',
+        stages: [],
+        run: async (page) => {
+            await enter(page, 'users', 4)
+            const k = await rowIndexByCell(page, 'name', 'mary')
+            const DRAFT = 'A管理員自己儲存之說明(028)'
+            await typeIntoCell(page, k, 'description', DRAFT)
+            assert.equal(await pageSaveShown(page), true, '前提: 有未存編輯')
+            await holdSaveResponse(page, 'updateUsers')
+            await markStoreRef(page, 'users')
+            await clickSave(page)
+            await waitSaveWritten(page)
+            await waitStoreRefChanged(page, 'users') //自己這次寫入所致之推播先於回應抵達
+            await page.waitForTimeout(800) //負向觀察窗: 清單 computed 重算 settle
+            //spec E2E-028 驗證1: 回應尚未抵達、推播已套用, 不得出現過期橫幅
+            assert.equal(await staleCount(page, 'users-banner-stale'), 0, '自己存檔進行中所致之推播不是他人更新: 不得出現過期橫幅')
+            await releaseSaveResponse(page)
+            await waitUntilExist(page, '成功訊息框', () => (document.body.innerText || '').includes(window.$vo.$t('userSaveUsersSuccess')), { timeout: 20000 })
+            await assertModalMsg(page, 'userSaveUsersSuccess')
+            await dismissResultModal(page)
+            await page.waitForTimeout(1000)
+            //spec E2E-028 驗證2: 儲存成功後儲存鈕消失、無橫幅、清單為剛存內容
+            assert.equal(await pageSaveShown(page), false, '儲存成功後儲存鈕消失')
+            assert.equal(await staleCount(page, 'users-banner-stale'), 0, '儲存成功後無過期橫幅')
+            assert.equal(await cellText(page, k, 'description'), DRAFT, '清單為剛存之內容')
+            return null
+        },
+        semantic: async () => {
+            assert.equal(rowOf(await selectAllRows('users'), 'id-for-mary').description, 'A管理員自己儲存之說明(028)', 'mary 之編輯已存')
+        },
+    },
+    {
+        //E2E-029(R-DRAFT-KEEP-01; run12, 反向關聯對話框): 群組頁開「所屬使用者」對話框勾選 john 後按儲存, 伺服端已寫入、回應尚未抵達時, 自己這次寫入所致之推播先到 → 對話框不得顯示「資料已被更新」提示(自己存檔所致之推播不是他人更新);
+        //回應抵達後出現成功訊息、對話框關閉。以扣住儲存回應固定「推播先於回應」之次序。純語意。
+        //6 步 user path: ①群組頁開 M1 對話框 ②勾選 john(未存) ③按對話框儲存(伺服端已寫入、回應被扣住) ④(自己存檔所致之推播於回應之前抵達) ⑤看不到對話框內之過期提示 ⑥回應抵達, 看到成功訊息, 按確認, 對話框關閉
+        name: 'E2E-029-users-dialog-own-save-push-before-response',
+        stages: [],
+        run: async (page) => {
+            await gotoGrups(page)
+            await openBelongDialog(page, 0, BELONG_USERS) //row 0 = 權限群組M1(對話框列: row0=peter, row1=mary, row2=john, row3=admin)
+            await toggleDialogEnable(page, 2) //勾選 john(原不屬 M1) → 儲存鈕現身
+            assert.equal(await staleCount(page, 'grup-blng-users-banner-stale'), 0, '前提: 尚無過期提示')
+            await holdSaveResponse(page, 'updateUsers')
+            await markStoreRef(page, 'users')
+            await clickDialogSave(page)
+            await waitSaveWritten(page)
+            await waitStoreRefChanged(page, 'users')
+            await page.waitForTimeout(800)
+            assert.equal(await staleCount(page, 'grup-blng-users-banner-stale'), 0, '自己存檔進行中所致之推播不是他人更新: 對話框不得顯示過期提示')
+            await releaseSaveResponse(page)
+            await waitUntilExist(page, '成功訊息框', () => (document.body.innerText || '').includes(window.$vo.$t('userSaveUsersSuccess')), { timeout: 20000 })
+            await dismissResultModal(page)
+            await waitDialogClosed(page, BELONG_USERS.titleKey)
+            return null
+        },
+        semantic: async () => {
+            assert.ok(JSON5.parse(rowOf(await selectAllRows('users'), 'id-for-john').cgrups)['權限群組M1'], 'john 已屬於 M1')
+        },
+    },
+    {
+        //E2E-030(R-DRAFT-KEEP-01; run12, 反向關聯對話框): 權限頁開「所屬群組」對話框勾選 M2 後按儲存, 伺服端已寫入、回應尚未抵達時, 自己這次寫入所致之推播先到 → 對話框不得顯示過期提示; 回應抵達後出現成功訊息、對話框關閉。純語意。
+        //6 步 user path: ①權限頁開 P1「所屬群組」對話框 ②勾選 M2(未存) ③按對話框儲存(伺服端已寫入、回應被扣住) ④(自己存檔所致之推播於回應之前抵達) ⑤看不到對話框內之過期提示 ⑥回應抵達, 看到成功訊息, 按確認, 對話框關閉
+        name: 'E2E-030-grups-dialog-own-save-push-before-response',
+        stages: [],
+        run: async (page) => {
+            await gotoPemis(page)
+            await openBelongDialog(page, 0, BELONG_GRUPS) //row 0 = 權限P1; 對話框列依群組 order: row0=M1, row1=M2, row2=M3, row3=M4
+            await toggleDialogEnable(page, 1) //勾選 M2(原不屬 P1) → 儲存鈕現身
+            assert.equal(await staleCount(page, 'pemi-blng-grups-banner-stale'), 0, '前提: 尚無過期提示')
+            await holdSaveResponse(page, 'updateGrups')
+            await markStoreRef(page, 'grups')
+            await clickDialogSave(page)
+            await waitSaveWritten(page)
+            await waitStoreRefChanged(page, 'grups')
+            await page.waitForTimeout(800)
+            assert.equal(await staleCount(page, 'pemi-blng-grups-banner-stale'), 0, '自己存檔進行中所致之推播不是他人更新: 對話框不得顯示過期提示')
+            await releaseSaveResponse(page)
+            await waitUntilExist(page, '成功訊息框', () => (document.body.innerText || '').includes(window.$vo.$t('grupSaveGrupsSuccess')), { timeout: 20000 })
+            await dismissResultModal(page)
+            await waitDialogClosed(page, BELONG_GRUPS.titleKey)
+            return null
+        },
+        semantic: async () => {
+            assert.ok(JSON5.parse(rowOf(await selectAllRows('grups'), 'id-for-權限群組M2').cpemis)['權限P1'], 'M2 已含 P1')
         },
     },
 ]

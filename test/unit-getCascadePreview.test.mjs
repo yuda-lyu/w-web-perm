@@ -853,12 +853,13 @@ describe('unit-getCascadePreview (儲存前引用連帶預覽, R-REF-CASCADE-01)
     describe('SITE-GCP 三個清單頁之 core() 接線', function() {
 
         let code = (rel) => sourceLines(path.join(projRoot, rel), 'code').map((l) => l.text).join('\n')
+        //run11: 預覽之「舊」為草稿所依據之那份 store 列(vo.baseRows; 有未存編輯時 store 可能已被推播更新, 不用 vo.<表>)
         //Grup／Pemi 傳 cascadeRename(伺服端 opt.cascadeRename 經 webInfor 帶給前端, 關閉時預覽不得說「將一併更新」); Target 不傳(標的 id 改名本即不級聯)
         let CR = `cascadeRename: get(vo, 'webInfor.cascadeRename', true)`
         let PAGES_SITE = [
-            ['LayoutContentGrups', 'Grup', `rowsOld: vo.grups, rowsNew: rows, holdersOld: vo.users, ${CR}`, 'grupSaveGrupsSuccess'],
-            ['LayoutContentPemis', 'Pemi', `rowsOld: vo.pemis, rowsNew: rows, holdersOld: vo.grups, ${CR}`, 'pemiSavePemisSuccess'],
-            ['LayoutContentTargets', 'Target', `rowsOld: vo.targets, rowsNew: rowsSend, holdersOld: vo.pemis`, 'targetSaveTargetsSuccess'],
+            ['LayoutContentGrups', 'Grup', `rowsOld: vo.baseRows, rowsNew: rows, holdersOld: vo.users, ${CR}`, 'grupSaveGrupsSuccess'],
+            ['LayoutContentPemis', 'Pemi', `rowsOld: vo.baseRows, rowsNew: rows, holdersOld: vo.grups, ${CR}`, 'pemiSavePemisSuccess'],
+            ['LayoutContentTargets', 'Target', `rowsOld: vo.baseRows, rowsNew: rowsSend, holdersOld: vo.pemis`, 'targetSaveTargetsSuccess'],
         ]
 
         it('SITE-GCP-001 先預覽、確認框前 unlockBtn()、選否中止(不送出)、確認在開 loading 與打 API 之前; 只有改名連帶才附筆數(群組頁／權限頁), 否則原成功訊息; 標的頁不讀 successText; 群組頁／權限頁傳 cascadeRename; 確認框走專案 DOM 模態', function() {

@@ -1,0 +1,15 @@
+start Fri Oct 23 2026 05:41:12 GMT+0800 (台北標準時間)
+U0 基準(無變異): OK(基準全過) passing=149 failing=0 
+U1 dataReloadGuard: 還原舊實作(無序號判斷): KILLED passing=147 failing=2 RG-2 重疊重載(AF-037 之次序): 第 1 次之計時器在第 2 次重建之事件前觸發 → 旗 | RG-3 全排列: 2 次與 3 次呼叫之全部事件次序, 每個前綴旗標皆等於「最近一次呼叫之計時器尚 | dataReloadGuard (程式端重載旗標守門, R-RELOAD-GUARD-01)
+U2 dataReloadGuard: 序號判斷反向: KILLED passing=145 failing=4 RG-1 單次呼叫: 呼叫即為真; nextTick 回呼後、1ms 計時器觸發前仍為真; 計時器觸 | RG-2 重疊重載(AF-037 之次序): 第 1 次之計時器在第 2 次重建之事件前觸發 → 旗 | RG-3 全排列: 2 次與 3 次呼叫之全部事件次序, 每個前綴旗標皆等於「最近一次呼叫之計時器尚 | RG-4 不同元件實例互不影響
+U3 dataReloadGuard: 永不遞增序號: KILLED passing=147 failing=2 RG-2 重疊重載(AF-037 之次序): 第 1 次之計時器在第 2 次重建之事件前觸發 → 旗 | RG-3 全排列: 2 次與 3 次呼叫之全部事件次序, 每個前綴旗標皆等於「最近一次呼叫之計時器尚 | dataReloadGuard (程式端重載旗標守門, R-RELOAD-GUARD-01)
+U4 draftSync: 忽略 saving(恆回 keep): KILLED passing=147 failing=2 DS-2 first=false editChanged=false storeChanged=tr | DS-2d saving 惰性求值: 只在「非首次、編輯模式未變、store 變新、有未存編輯」才呼 | unit-draftSync (清單頁草稿對推播之處置, R-PRINCIPLE-00 原則 7)
+U5 draftSync: 未給 saving 亦回 keepQuiet: KILLED passing=147 failing=2 DS-2c 未給 saving(舊呼叫方式)視為否: 有未存編輯而 store 變新 → keep; | DS-2b hasDraft 惰性求值: 只在「非首次、編輯模式未變、store 變新」時才呼叫 | unit-draftSync (清單頁草稿對推播之處置, R-PRINCIPLE-00 原則 7)
+U6 draftSync: saving 先於 hasDraft 求值(非惰性): KILLED passing=148 failing=1 DS-2d saving 惰性求值: 只在「非首次、編輯模式未變、store 變新、有未存編輯」才呼 | unit-draftSync (清單頁草稿對推播之處置, R-PRINCIPLE-00 原則 7)
+U7 Pemis 頁: 存檔 API 前不設 saving: KILLED passing=148 failing=1 DS-4o LayoutContentPemis: 自己存檔進行中所致之推播不顯示過期橫幅——cre | unit-draftSync (清單頁草稿對推播之處置, R-PRINCIPLE-00 原則 7)
+U8 Users 頁: then 不歸零 saving: KILLED passing=148 failing=1 DS-4o LayoutContentUsers: 自己存檔進行中所致之推播不顯示過期橫幅——cre | unit-draftSync (清單頁草稿對推播之處置, R-PRINCIPLE-00 原則 7)
+U9 Grups 頁: catch 不重算 staleNotice: KILLED passing=148 failing=1 DS-4o LayoutContentGrups: 自己存檔進行中所致之推播不顯示過期橫幅——cre | unit-draftSync (清單頁草稿對推播之處置, R-PRINCIPLE-00 原則 7)
+U10 Targets 頁: changeParams 不傳 saving: KILLED passing=148 failing=1 DS-4o LayoutContentTargets: 自己存檔進行中所致之推播不顯示過期橫幅——c | unit-draftSync (清單頁草稿對推播之處置, R-PRINCIPLE-00 原則 7)
+U11 Users 頁: finally 不歸零 saving: KILLED passing=148 failing=1 DS-4o LayoutContentUsers: 自己存檔進行中所致之推播不顯示過期橫幅——cre | unit-draftSync (清單頁草稿對推播之處置, R-PRINCIPLE-00 原則 7)
+U12 mUI: 不再自 dataReloadGuard 匯入(回到內建定義): KILLED passing=148 failing=1 SITE-RG-001 mUI.markDataReload 即 dataReloadGuard 之 | dataReloadGuard (程式端重載旗標守門, R-RELOAD-GUARD-01)
+done

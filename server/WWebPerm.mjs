@@ -294,7 +294,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     //部署方常以 w-web-sso 對外 helper(≤1.1.4)包裝 getUserByToken, 其 reject 字串含已代入系統介接權杖與使用者權杖之完整網址.
     //包裝後失敗視同否定結果(getUserByToken → null 等同查無, verify* → false 等同無權限), 走各呼叫點既有分支回自家 key;
     //上游原文不回前端、不入 log, 只於此記 warn(白名單 key, 或型別與 Error.name). 同一次失敗 log 2~3 筆: 此處 warn(因) + 呼叫點 error(果).
-    //以下取代後, 本函數內除此三行外不得再直接使用原始參數(盤點見 CLAUDE_rulebook.md「權杖不外洩」, 測試 unit-wrapInjected WRAP-SITE-*)
+    //以下取代後, 本函數內除此三行外不得再直接使用原始參數(盤點見 sgud/rule/rulebook.md「權杖不外洩」, 測試 unit-wrapInjected WRAP-SITE-*)
     let logInjectFail = (name) => {
         return (d) => {
             srLog.warn({ event: `inject-${name}-fail`, ...d })

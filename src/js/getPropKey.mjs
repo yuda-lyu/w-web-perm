@@ -1,5 +1,5 @@
 //資料驅動之名稱轉屬性鍵: 供權限評估(src/plugins/mShare.mjs mergeRules)與編輯對話框(經 cvKpToObj)共用
-//規則見 CLAUDE_rulebook.md「關聯對話框容錯、以身分配對、資料驅動屬性鍵」之 R-KEY-PROP-01
+//規則見 sgud/rule/rulebook.md「關聯對話框容錯、以身分配對、資料驅動屬性鍵」之 R-KEY-PROP-01
 //本檔無外部相依
 
 

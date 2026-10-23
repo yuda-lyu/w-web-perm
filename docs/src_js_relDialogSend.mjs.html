@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    
+    <meta charset="utf-8">
+    <title>src/js/relDialogSend.mjs - Documentation</title>
+    
+    
+    <script src="scripts/prettify/prettify.js"></script>
+    <script src="scripts/prettify/lang-css.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc.css">
+    <script src="scripts/nav.js" defer></script>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+<input type="checkbox" id="nav-trigger" class="nav-trigger" />
+<label for="nav-trigger" class="navicon-button x">
+  <div class="navicon"></div>
+</label>
+
+<label for="nav-trigger" class="overlay"></label>
+
+<nav >
+    
+    
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="WWebPerm.html">WWebPerm</a></li></ul><h3>Global</h3><ul><li><a href="global.html#applyPurgePlan">applyPurgePlan</a></li><li><a href="global.html#auditFrom">auditFrom</a></li><li><a href="global.html#auditRefs">auditRefs</a></li><li><a href="global.html#buildReport">buildReport</a></li><li><a href="global.html#buildRowsSend">buildRowsSend</a></li><li><a href="global.html#buildSyncRowsNew">buildSyncRowsNew</a></li><li><a href="global.html#checkBaseline">checkBaseline</a></li><li><a href="global.html#checkCascadePlan">checkCascadePlan</a></li><li><a href="global.html#checkDbNotInUse">checkDbNotInUse</a></li><li><a href="global.html#checkExternalWrite">checkExternalWrite</a></li><li><a href="global.html#checkMapKeyBatch">checkMapKeyBatch</a></li><li><a href="global.html#checkUsersWrite">checkUsersWrite</a></li><li><a href="global.html#cleanOutOf">cleanOutOf</a></li><li><a href="global.html#compareBaseline">compareBaseline</a></li><li><a href="global.html#countAndRefs">countAndRefs</a></li><li><a href="global.html#countExternalRows">countExternalRows</a></li><li><a href="global.html#countIdRenumber">countIdRenumber</a></li><li><a href="global.html#createAuthorizeExec">createAuthorizeExec</a></li><li><a href="global.html#createLegendMeasurer">createLegendMeasurer</a></li><li><a href="global.html#createLockSave">createLockSave</a></li><li><a href="global.html#cvKpToArr">cvKpToArr</a></li><li><a href="global.html#cvKpToObj">cvKpToObj</a></li><li><a href="global.html#decideLegendType">decideLegendType</a></li><li><a href="global.html#describeUpstream">describeUpstream</a></li><li><a href="global.html#diffRefTargets">diffRefTargets</a></li><li><a href="global.html#dropServerOnlyDiff">dropServerOnlyDiff</a></li><li><a href="global.html#eachOwn">eachOwn</a></li><li><a href="global.html#fetchJson">fetchJson</a></li><li><a href="global.html#fillIdlessIds">fillIdlessIds</a></li><li><a href="global.html#findDupIndex">findDupIndex</a></li><li><a href="global.html#findKeyOtherFrom">findKeyOtherFrom</a></li><li><a href="global.html#findRefRows">findRefRows</a></li><li><a href="global.html#findTouchedDup">findTouchedDup</a></li><li><a href="global.html#fmtLossyMsg">fmtLossyMsg</a></li><li><a href="global.html#fmtVars">fmtVars</a></li><li><a href="global.html#fmtWarn">fmtWarn</a></li><li><a href="global.html#formatFixReport">formatFixReport</a></li><li><a href="global.html#formatFromAudit">formatFromAudit</a></li><li><a href="global.html#formatPurgeReport">formatPurgeReport</a></li><li><a href="global.html#genLegend">genLegend</a></li><li><a href="global.html#getAddConfirmText">getAddConfirmText</a></li><li><a href="global.html#getAddImpact">getAddImpact</a></li><li><a href="global.html#getBannerLines">getBannerLines</a></li><li><a href="global.html#getBaselineDigest">getBaselineDigest</a></li><li><a href="global.html#getCascadePreview">getCascadePreview</a></li><li><a href="global.html#getChangedIdx">getChangedIdx</a></li><li><a href="global.html#getDelConfirmText">getDelConfirmText</a></li><li><a href="global.html#getDelImpact">getDelImpact</a></li><li><a href="global.html#getDelRefCount">getDelRefCount</a></li><li><a href="global.html#getDigestFields">getDigestFields</a></li><li><a href="global.html#getDupRowsInconsistent">getDupRowsInconsistent</a></li><li><a href="global.html#getEffMode">getEffMode</a></li><li><a href="global.html#getExternalEdits">getExternalEdits</a></li><li><a href="global.html#getItemWarnText">getItemWarnText</a></li><li><a href="global.html#getKpLossy">getKpLossy</a></li><li><a href="global.html#getLockFields">getLockFields</a></li><li><a href="global.html#getNameErrs">getNameErrs</a></li><li><a href="global.html#getOwn">getOwn</a></li><li><a href="global.html#getPropKey">getPropKey</a></li><li><a href="global.html#getRawModeMap">getRawModeMap</a></li><li><a href="global.html#getRefRowsExtra">getRefRowsExtra</a></li><li><a href="global.html#getRefState">getRefState</a></li><li><a href="global.html#getRefWarnText">getRefWarnText</a></li><li><a href="global.html#getRefWarns">getRefWarns</a></li><li><a href="global.html#getRowIdxs">getRowIdxs</a></li><li><a href="global.html#getRowState">getRowState</a></li><li><a href="global.html#getRuleEnable">getRuleEnable</a></li><li><a href="global.html#getRuleWarnText">getRuleWarnText</a></li><li><a href="global.html#getRuleWarns">getRuleWarns</a></li><li><a href="global.html#getSavePreview">getSavePreview</a></li><li><a href="global.html#getSyncWarnLines">getSyncWarnLines</a></li><li><a href="global.html#hasDupKey">hasDupKey</a></li><li><a href="global.html#hasExternalDiff">hasExternalDiff</a></li><li><a href="global.html#isAuthMode">isAuthMode</a></li><li><a href="global.html#isBaselineStale">isBaselineStale</a></li><li><a href="global.html#isBaselineValid">isBaselineValid</a></li><li><a href="global.html#isDraftStale">isDraftStale</a></li><li><a href="global.html#isExternalRow">isExternalRow</a></li><li><a href="global.html#isJsonLossy">isJsonLossy</a></li><li><a href="global.html#isMain">isMain</a></li><li><a href="global.html#joinList">joinList</a></li><li><a href="global.html#joinNames">joinNames</a></li><li><a href="global.html#keepAssignByEntity">keepAssignByEntity</a></li><li><a href="global.html#keepAssignOnMissing">keepAssignOnMissing</a></li><li><a href="global.html#makeBaseline">makeBaseline</a></li><li><a href="global.html#makeRowStates">makeRowStates</a></li><li><a href="global.html#mapKeyOf">mapKeyOf</a></li><li><a href="global.html#mapNameKp">mapNameKp</a></li><li><a href="global.html#markDataReload">markDataReload</a></li><li><a href="global.html#markHasKey">markHasKey</a></li><li><a href="global.html#maskQuery">maskQuery</a></li><li><a href="global.html#maskTok">maskTok</a></li><li><a href="global.html#maskUrl">maskUrl</a></li><li><a href="global.html#mergePickKeysOnly">mergePickKeysOnly</a></li><li><a href="global.html#pairRowsToSnapshot">pairRowsToSnapshot</a></li><li><a href="global.html#pickUniqueUser">pickUniqueUser</a></li><li><a href="global.html#planDraftSync">planDraftSync</a></li><li><a href="global.html#planFixFromType">planFixFromType</a></li><li><a href="global.html#planPurgeChain">planPurgeChain</a></li><li><a href="global.html#planPurgeFrom">planPurgeFrom</a></li><li><a href="global.html#planRefChanges">planRefChanges</a></li><li><a href="global.html#putRefEntry">putRefEntry</a></li><li><a href="global.html#putRowsToKp">putRowsToKp</a></li><li><a href="global.html#refsChanged">refsChanged</a></li><li><a href="global.html#resolveShellWorker">resolveShellWorker</a></li><li><a href="global.html#restoreExternalOrder">restoreExternalOrder</a></li><li><a href="global.html#restoreServerFields">restoreServerFields</a></li><li><a href="global.html#reuseDeletedIds">reuseDeletedIds</a></li><li><a href="global.html#rewriteRefs">rewriteRefs</a></li><li><a href="global.html#rowDigest">rowDigest</a></li><li><a href="global.html#runAuditFrom">runAuditFrom</a></li><li><a href="global.html#runClean">runClean</a></li><li><a href="global.html#runFixFromType">runFixFromType</a></li><li><a href="global.html#runPurgeFrom">runPurgeFrom</a></li><li><a href="global.html#splitCheckedRows">splitCheckedRows</a></li><li><a href="global.html#submitGuard">submitGuard</a></li><li><a href="global.html#tabWriteKey">tabWriteKey</a></li><li><a href="global.html#validateRowsBeforeWrite">validateRowsBeforeWrite</a></li><li><a href="global.html#withTabLocks">withTabLocks</a></li><li><a href="global.html#wrapInjected">wrapInjected</a></li><li><a href="global.html#wrapOperOrm">wrapOperOrm</a></li><li><a href="global.html#writeWithCascade">writeWithCascade</a></li></ul>
+    
+</nav>
+
+<div id="main">
+    
+    <h1 class="page-title">src/js/relDialogSend.mjs</h1>
+    
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>//反向關聯對話框(VeGrupBlngUsers／VePemiBlngGrups)存檔時「送出之整表」之組裝(F-26 對話框部分、S4; R-PRINCIPLE-00 原則 3; 規則帳本 R-BASELINE-01): 純函數(不依賴 Vue／DOM), 兩個對話框共用.
+//
+//背景: 對話框之列是開框時 store 快照之投影(只含「歸屬」一欄可改). 修前存檔以「對話框之列」映射成整表送出, 開框期間他人／外部同步新增之列不在對話框內, 被伺服端整表 diff 刪除(S4);
+//且對話框之列為開框時之草稿值, 若某列之歸屬於開框後被他人改過而使用者並未碰它, 以草稿值改寫即以舊值覆蓋他人之變更.
+//修後: 送出之整表＝存檔當下 store 快照之全部列; 使用者於本次編輯有變更之列(相對開框時之歸屬狀態)才以 putRefEntry 只改本群組／權限之一項(套用於存檔當下快照之字串);
+//其餘一律原樣帶回(同一個物件、逐字不動). 注意(run11 起): 伺服端載入基準比對為表級(整表, R-BASELINE-01), 與「帶回哪個版本之列」無關——開框後他人若改了任何一列或增刪列, 本次存檔仍整次拒收 saveStale(請重新開啟); 帶回存檔當下 store 版本之列只是避免誤刪／誤改他人之列.
+//本檔不解析授權字串(解析與 putRefEntry 留在 .vue 之 doSave, 站點由 unit-cvKpToObj SITE-AD-001 盤點), 只處理狀態比對與整表組裝.
+
+import getEffMode from './getEffMode.mjs'
+import { toId } from './pairRowsToSnapshot.mjs'
+
+
+let isObj = (v) => v !== null &amp;&amp; typeof v === 'object'
+let hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k)
+
+
+/**
+ * 取得對話框列之歸屬有效狀態(與 putRefEntry 之相等判定同一口徑: 不歸屬 → 'n'; 歸屬 → 'y:' 加有效 mode)
+ *
+ * 不歸屬時 mode 無授權效果(putRefEntry 對停用目標不看 mode), 故不納入; 歸屬時 mode 取 getEffMode(非 'OR' 者為 'AND').
+ *
+ * @param {*} enable 輸入列之 enable('y' 為歸屬, 其他為不歸屬)
+ * @param {*} mode 輸入列之 mode
+ * @returns {String} 回傳 'n'、'y:OR' 或 'y:AND'
+ * @example
+ *
+ * console.log(getRowState('n', 'AND'), getRowState('y', 'OR'), getRowState('y', 'or'))
+ * // => n y:OR y:AND
+ *
+ */
+function getRowState(enable, mode) {
+    return enable === 'y' ? `y:${getEffMode(mode)}` : 'n'
+}
+
+
+/**
+ * 由開框時生成之列(items)記錄各列之歸屬有效狀態(以列身分為鍵), 供存檔時判定「使用者於本次編輯有無變更該列」
+ *
+ * 須於 show() 生成 items 之同一處、尚未有任何切換操作前呼叫(opt.rows 與 items 為同一份陣列, 切換會就地改 enable／mode).
+ *
+ * @param {Array} rows 輸入開框時生成之列(各列帶 id、enable、mode); 非陣列視為無列
+ * @returns {Object} 回傳無原型物件 id(字串形式; 數字身分以其字串形式) → 'n'｜'y:OR'｜'y:AND'; 缺身分之列不記, 同身分重複者取第一筆
+ */
+function makeRowStates(rows) {
+    let kp = Object.create(null) //無原型: 鍵為使用者資料(R-KEY-01)
+    ;(Array.isArray(rows) ? rows : []).forEach((r) => {
+        let id = isObj(r) ? toId(r.id) : null
+        if (id !== null &amp;&amp; !(id in kp)) {
+            kp[id] = getRowState(r.enable, r.mode)
+        }
+    })
+    return kp
+}
+
+
+/**
+ * 找出對話框之列中「使用者於本次編輯相對開框時有變更」者之列索引
+ *
+ * 比對列目前之歸屬有效狀態與開框時記錄者(makeRowStates); 相同(含切換後又切回)視為未變更.
+ * 無法證明未變更者一律視為有變更(fail toward 既有流程: 對存檔當下快照字串套用 putRefEntry, 再由伺服端基準比對把關): 列缺身分、開框時無該列之記錄、未給記錄(null／非物件).
+ *
+ * @param {Array} rows 輸入對話框目前之列(opt.rows); 非陣列回傳空物件
+ * @param {Object} states 輸入 makeRowStates 之結果
+ * @returns {Object} 回傳無原型物件 列索引 → true(只含有變更者)
+ * @example
+ *
+ * let s = makeRowStates([{ id: 'u1', enable: 'n', mode: 'OR' }, { id: 'u2', enable: 'y', mode: 'OR' }])
+ * let ch = getChangedIdx([{ id: 'u1', enable: 'y', mode: 'OR' }, { id: 'u2', enable: 'y', mode: 'OR' }], s)
+ * console.log(Object.keys(ch))
+ * // => ['0']
+ *
+ */
+function getChangedIdx(rows, states) {
+    let kp = Object.create(null)
+    if (!Array.isArray(rows)) {
+        return kp
+    }
+    for (let kr = 0; kr &lt; rows.length; kr++) { //索引迴圈: 稀疏陣列之空洞視為無法證明未變更
+        let r = rows[kr]
+        let id = isObj(r) ? toId(r.id) : null
+        let st0 = (id !== null &amp;&amp; isObj(states) &amp;&amp; hasOwn(states, id)) ? states[id] : undefined
+        if (st0 === undefined || !isObj(r) || st0 !== getRowState(r.enable, r.mode)) {
+            kp[kr] = true
+        }
+    }
+    return kp
+}
+
+
+/**
+ * 組裝送出之整表: 存檔當下 store 快照之全部列(依快照列序), 僅「有新值」之列改其引用欄位, 其餘原樣帶回
+ *
+ * 不改輸入; 未被改之列即快照中同一個物件(逐字不動, 含開框後他人新增而不在對話框內之列、使用者未變更之列).
+ * 被改之列為快照列之淺拷貝加新值(只換 refKey 一欄, 其餘欄位逐字保留).
+ *
+ * @param {Array} snapshot 輸入存檔當下之 store 快照(依 order 排序之全部列); 非陣列回傳空陣列
+ * @param {Array} pairs 輸入 pairRowsToSnapshot 之 pairs(對話框第 kr 列配到之快照列, 同一個物件參考; 配不到者為 null)
+ * @param {Object} newVals 輸入列索引 → 該列新字串(只放使用者有變更且確需改寫者)
+ * @param {String} refKey 輸入引用欄位名('cgrups'｜'cpemis')
+ * @returns {Array} 回傳送出之整表(與 snapshot 等長同序)
+ * @example
+ *
+ * let snapshot = [{ id: 'u1', cgrups: '{}' }, { id: 'u2', cgrups: '{"G":{}}' }, { id: 'u3', cgrups: '{}' }]
+ * let rows = buildRowsSend(snapshot, [snapshot[0], snapshot[1]], { 0: '{"G1":{"mode":"OR","isActive":"y"}}' }, 'cgrups')
+ * console.log(rows.map((r) => r.cgrups), rows[1] === snapshot[1], rows[2] === snapshot[2])
+ * // => [ '{"G1":{"mode":"OR","isActive":"y"}}', '{"G":{}}', '{}' ] true true
+ *
+ */
+function buildRowsSend(snapshot, pairs, newVals, refKey) {
+    if (!Array.isArray(snapshot)) {
+        return []
+    }
+    let kpNew = new Map() //快照列(物件參考) → 新字串; 同一快照列被多個對話框列配到時取第一個(對話框每個身分只有一列, 防禦用)
+    if (Array.isArray(pairs) &amp;&amp; isObj(newVals)) {
+        for (let kr = 0; kr &lt; pairs.length; kr++) {
+            let u = pairs[kr]
+            if (isObj(u) &amp;&amp; hasOwn(newVals, kr) &amp;&amp; typeof newVals[kr] === 'string' &amp;&amp; !kpNew.has(u)) {
+                kpNew.set(u, newVals[kr])
+            }
+        }
+    }
+    return snapshot.map((row) => (kpNew.has(row) ? { ...row, [refKey]: kpNew.get(row) } : row))
+}
+
+
+export { getRowState, makeRowStates, getChangedIdx, buildRowsSend }
+export default buildRowsSend
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+    
+    
+</div>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Fri Oct 23 2026 10:56:39 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+</footer>
+
+<script>prettyPrint();</script>
+<script src="scripts/polyfill.js"></script>
+<script src="scripts/linenumber.js"></script>
+
+
+
+</body>
+</html>

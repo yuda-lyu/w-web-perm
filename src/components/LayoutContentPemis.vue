@@ -210,6 +210,18 @@
                 <span>{{ b.text }}</span>
             </div>
 
+            <!-- 資料已被更新提示(R-PRINCIPLE-00 原則 7): 有未存編輯而他人或外部同步改了本表時, 保留草稿並提示, 存檔將被伺服端拒收; 以 v-for 渲染(無提示時不渲染任何節點, 畫面與 DOM 同未啟用前) -->
+            <div
+                v-for="ks in (staleNotice ? 1 : 0)"
+                :key="`stale-${ks}`"
+                data-fmid="pemis-banner-stale"
+                :style="getBannerStyle('warn')"
+            >
+                <img style="vertical-align:sub; width:16px; height:16px; margin-right:4px;" :src="$ui.getIcon('warning')" />
+                <span>{{ $t('staleDraftNotice') }}</span>
+                <button class="staleReloadBtn" data-fmid="pemis-banner-stale-reload" @click="reloadDraft">{{ $t('staleDraftReload') }}</button>
+            </div>
+
         </div>
 
         <template
@@ -295,7 +307,8 @@ import { getDelImpact, getDelConfirmText } from '../js/getDelRefCount.mjs'
 import { getSavePreview } from '../js/getCascadePreview.mjs'
 import { getAddImpact, getAddConfirmText } from '../js/getAddImpact.mjs'
 import { isExternalRow } from '../js/externalRows.mjs'
-import { makeBaseline, getBaselineDigest } from '../js/rowDigest.mjs'
+import { makeBaseline } from '../js/rowDigest.mjs'
+import { refsChanged, planDraftSync, isDraftStale } from '../js/draftSync.mjs'
 import { fmtVars, getBannerLines, splitCheckedRows, getExternalEdits } from '../js/externalUi.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
 import WSwitch from 'w-component-vue/src/components/WSwitch.vue'
@@ -384,10 +397,20 @@ export default {
 
             items: [],
             baseline: [], //載入基準([[id, 內容指紋]]): 與 items 於 changeParams 同一處由同一份來源列產生(草稿所依據之版本), 存檔時隨 RPC 送伺服端比對是否過期(F-26, R-BASELINE-01); 不得於存檔當下由最新 store 重算
+            baseRows: [], //草稿所依據之那份 store 列(與 baseline 同時產生): 存檔前之預覽、外部列守門以它為「舊」, 不用已變新之 store(有未存編輯時 store 可能已被推播更新, 見 draftSync)
+            staleNotice: false, //草稿所依據之整表已被他人／外部同步更新(R-PRINCIPLE-00 原則 7): true 時顯示「資料已被更新」橫幅與重新載入鈕
+            syncTick: 0, //重新載入觸發器(reloadDraft 遞增): changeParams 讀它而於重算時於 computed 內重建草稿, 使 genOpt 讀取之反應式來源(語系等)的依賴重新收集——保留草稿(keep)時 changeParams 不呼叫 genOpt, 依賴會收縮, 若在 computed 外直接重建則不會恢復(外審 sol 第 4 點)
             itemsCheck: [],
             opt: null,
 
         }
+    },
+    created: function() {
+        //syncMark(非響應式; changeParams 讀它而不因它建立響應式依賴, 見 draftSync.planDraftSync): refs／editable 為上次建立草稿時之各表 store 參照與編輯模式, dirty 為未存編輯旗標(isModified)之鏡像(由 watch 維護),
+        //baseline 為草稿載入時之基準之副本(供保留草稿時判定是否已過期). 不讓 changeParams 依賴 isModified／baseline: 旗標切換或重新載入不得觸發它重算(其重算＝重建草稿, 見 draftSync)
+        this.syncMark = { refs: null, editable: undefined, dirty: false, baseline: [], tick: 0 }
+        //saveMark(非響應式, 同 syncMark 之理由): saving 為「自己之存檔請求進行中」(送出前設真, 回應〔成功或失敗〕一到歸零)——此期間伺服端寫入所致之推播若先於回應抵達, 不是他人更新(planDraftSync 回 'keepQuiet': 保留草稿但不顯示過期橫幅; run12)
+        this.saveMark = { saving: false }
     },
     mounted: function() {
         // console.log('mounted')
@@ -418,6 +441,17 @@ export default {
 
         }
 
+    },
+    watch: {
+        //未存編輯旗標: 維護 syncMark.dirty 鏡像(changeParams 以之判斷「有未存編輯」而不依賴旗標本身). 旗標歸零(已儲存或已放棄)而 store 於保留草稿期間已變新者, 立即依最新 store 重建
+        //(儲存成功之推播若先於儲存回應抵達, 其時有未存編輯而被保留; 回應回來旗標歸零時須補上這次重建, 否則畫面停在儲存前之草稿而基準已過期)
+        isModified: function(b) {
+            let vo = this
+            vo.syncMark.dirty = b === true
+            if (b !== true && vo.syncMark.refs !== null && refsChanged(vo.syncMark.refs, vo.curRefs())) {
+                vo.reloadDraft()
+            }
+        },
     },
     computed: {
 
@@ -552,24 +586,24 @@ export default {
 
             //trigger
             let isEditable = vo.isEditable
-            let pemis = cloneDeep(vo.pemis)
-            let kpUsePemiGrup = cloneDeep(vo.kpUsePemiGrup)
+            let rows = vo.pemis
+            let kpUse = vo.kpUsePemiGrup
 
-            //baseline, 與 items 同一處由同一份來源列(pemis, genItems 之前)計算: 草稿所依據之版本(F-26), 推播重建 items 時一併更新, 存檔時不重算
-            let baseline = makeBaseline(pemis, vo.$ds.pemis.keys)
-
-            //items
-            let items = vo.genItems(pemis, kpUsePemiGrup)
-
-            //save
-            vo.items = items
-            vo.baseline = baseline
-
-            //genOpt
-            vo.genOpt({ isEditable })
-
-            //firstLoading
-            vo.firstLoading = false
+            //草稿同步(R-PRINCIPLE-00 原則 7, draftSync.planDraftSync): store(本表或群組表)變新(推播)時, 無未存編輯 → 重建 items 與基準(同修改前); 有未存編輯 → 保留草稿與其載入時之基準, 不重建;
+            //提示「資料已被更新」只看本表基準(儲存權限只寫權限表; 群組表之變動只影響顯示用之所屬群組欄)
+            let act = planDraftSync({
+                first: vo.syncMark.refs === null || vo.syncMark.tick !== vo.syncTick, //首次載入或使用者按了「重新載入」(syncTick 遞增)
+                editChanged: vo.syncMark.editable !== isEditable,
+                storeChanged: refsChanged(vo.syncMark.refs, [rows, kpUse]),
+                hasDraft: () => vo.syncMark.dirty === true,
+                saving: () => vo.saveMark.saving === true, //自己之存檔請求進行中所致之推播 → 'keepQuiet'(不改過期提示)
+            })
+            if (act === 'rebuild') {
+                vo.rebuildDraft(rows, kpUse, isEditable)
+            }
+            else if (act === 'keep') {
+                vo.staleNotice = isDraftStale({ keys: vo.$ds.pemis.keys, rows, baseline: vo.syncMark.baseline })
+            }
 
             return ''
         },
@@ -607,7 +641,7 @@ export default {
 
             //名稱擋存只針對「本次造成或觸及」者, 庫內既有的歷史同名(僅外部同步可造成)不擋、改為警告圖示(R-PRINCIPLE-00 g, R-NAME-UNIQ-02);
             //判準與伺服端同一份(findTouchedDup), 基準為 store 之 pemis(最近一次由伺服端載入的列, 儲存成功後 store 推播更新, 基準隨之更新)
-            return getNameErrs(get(vo, 'opt.rows', []), vo.pemis, 'name')
+            return getNameErrs(get(vo, 'opt.rows', []), vo.baseRows, 'name')
         },
 
         errItemsByName: function() {
@@ -735,6 +769,48 @@ export default {
             //外部列提示為中性灰底(#f2f2f2, 同按鈕 hover 底)、文字 #444(同工具鈕圖示色); 外部同步警示為淡橘底(#FFE0B2, 同編輯模式開關之橫條色)搭既有警告圖示; 長來源名稱以 overflow-wrap:anywhere 折行, 窄螢幕不溢出
             let bg = kind === 'warn' ? '#FFE0B2' : '#f2f2f2'
             return `padding:5px 15px; border-top:1px solid #ddd; background:${bg}; color:#444; font-size:0.8rem; overflow-wrap:anywhere;`
+        },
+
+        rebuildDraft: function(rows, kpUse, isEditable) {
+            let vo = this
+
+            //pemis, kpUsePemiGrup
+            let pemis = cloneDeep(rows)
+            let kpUsePemiGrup = cloneDeep(kpUse)
+
+            //baseline, 與 items 同一處由同一份來源列(pemis, genItems 之前)計算: 草稿所依據之版本(F-26), 重建 items 時一併更新, 存檔時不重算
+            let baseline = makeBaseline(pemis, vo.$ds.pemis.keys)
+
+            //items
+            let items = vo.genItems(pemis, kpUsePemiGrup)
+
+            //save; 重建即放棄未存編輯(isModified 歸零)與過期提示, syncMark 記下本次所依據之 store 參照與編輯模式
+            vo.items = items
+            vo.baseline = baseline
+            vo.baseRows = rows
+            vo.isModified = false
+            vo.staleNotice = false
+            vo.syncMark = { refs: [rows, kpUse], editable: isEditable, dirty: false, baseline, tick: vo.syncTick }
+
+            //genOpt
+            vo.genOpt({ isEditable })
+
+            //firstLoading
+            vo.firstLoading = false
+
+        },
+
+        curRefs: function() {
+            //目前各來源 store 之參照(與 changeParams 之 refsChanged 同一組)
+            let vo = this
+            return [vo.pemis, vo.kpUsePemiGrup]
+        },
+
+        reloadDraft: function() {
+            //「重新載入」鈕(資料已被更新橫幅): 使用者明確放棄未存編輯, 以目前 store 重建草稿與基準. 不在此直接呼叫 rebuildDraft: 遞增 syncTick 使 changeParams 重算並於 computed 內重建,
+            //genOpt 之反應式依賴(語系等)才會重新收集(保留草稿期間 changeParams 未呼叫 genOpt, 依賴已收縮; 於 computed 外重建不會恢復, 重新載入後再切換語系表頭將停留舊值, 外審 sol 第 4 點)
+            let vo = this
+            vo.syncTick++
         },
 
         genOpt: function() {
@@ -1149,7 +1225,7 @@ export default {
             //與伺服端同一純函數 planRefChanges, 只算本次刪除, ADR-036、R-REF-CASCADE-01), nAnd 為其中以 AND 引用且刪除後查無該權限者(引用被移除後其限制解除, 授權可能變多, R-PRINCIPLE-00 c),
             //nWiden 為引用的權限名稱有多筆同名而只刪其一之群組數(各候選之交集變寬, 授權可能變多, R-PRINCIPLE-00 d);
             //被刪名稱只取基準(store 之 pemis, 已儲存)列中存在者: 尚未儲存的新增列刪除不影響他人
-            let impact = getDelImpact(delIds, vo.pemis, vo.grups, 'Pemi', getRowsRemain())
+            let impact = getDelImpact(delIds, vo.baseRows, vo.grups, 'Pemi', getRowsRemain())
             let confirmText = getDelConfirmText(impact, (k) => vo.$t(k), 'Pemi')
 
             //無影響他人之授權時維持現行流程(直接刪除, 不彈框)
@@ -1315,9 +1391,10 @@ export default {
                 return
             }
 
-            //dg0: 開啟編輯器當下該列於載入基準中之指紋(F-26, 外審 sol R1): 編輯器開著時若他人／外部同步改了該列, 推播會重建 items 與基準, 編輯器回傳之字串仍是舊版內容,
-            //回填後存檔會以「新基準」證明過期內容新鮮而還原已被撤銷之授權; 故回填前比對該列指紋, 變動即放棄回填並提示重新載入
-            let dg0 = getBaselineDigest(vo.baseline, id)
+            //baseline0: 開啟編輯器當下之載入基準(整表, F-26、原則 7 表級比對, 外審 sol R1 與 run11 第 1 點): 編輯器開著時若他人／外部同步改了任何一列或增刪列, 而父頁當時無未存編輯, 推播會重建 items 與基準,
+            //編輯器回傳之字串仍是舊版內容, 回填後存檔會以「新基準」證明過期內容新鮮(還原已被撤銷之授權, 或繞過同表別列已被改動之整表比對); 故回填前比對「草稿現所依據之那份表」與開框時之基準, 有異即放棄回填並提示重新載入.
+            //父頁已有未存編輯時推播只保留草稿與其基準(baseRows 不變), 此比對不誤擋, 存檔時由伺服端表級比對拒收
+            let baseline0 = cloneDeep(vo.baseline)
             //showVeCrules
             vo.$dg.showVeCrules({
                 isEditable: vo.isEditable,
@@ -1339,8 +1416,8 @@ export default {
                         return
                     }
 
-                    //該列於編輯器開啟後已被改動(基準指紋不同): 放棄回填並提示重新載入(同伺服端 saveStale 之語意)
-                    if (getBaselineDigest(vo.baseline, id) !== dg0) {
+                    //草稿所依據之表於編輯器開啟後已被改動(整表指紋與開框時之基準不同; 僅 order／伺服器管理欄不同不算): 放棄回填並提示重新載入(同伺服端 saveStale 之語意)
+                    if (isDraftStale({ keys: vo.$ds.pemis.keys, rows: vo.baseRows, baseline: baseline0 })) {
                         vo.$alert(`${vo.$t('saveStale')}`, { type: 'warning' })
                         return
                     }
@@ -1395,7 +1472,7 @@ export default {
 
                 //外部列保護(啟用時): 外部列之身分／結構欄以逐列唯讀與刪除過濾擋下, 但貼上(Ctrl+V)等路徑可繞過逐列唯讀, 送出前再比對一次(基準為 store 之 pemis);
                 //有違規即不送出並提示(伺服端同樣整次拒收 saveExternalRowChanged); 於開 loading 之前, 訊息框前釋放按鈕鎖
-                if (vo.isLockExternal && getExternalEdits({ keyTable: 'pemis', keys: vo.$ds.pemis.keys, rowsNew: rows, rowsOld: vo.pemis }) !== null) {
+                if (vo.isLockExternal && getExternalEdits({ keyTable: 'pemis', keys: vo.$ds.pemis.keys, rowsNew: rows, rowsOld: vo.baseRows }) !== null) {
                     unlockBtn()
                     await vo.$dg.showCheckYes(vo.$t('saveExternalRowChanged'), { type: 'warning' })
                     return
@@ -1406,11 +1483,11 @@ export default {
 
                 //2) 引用連帶預覽(ADR-036、R-REF-CASCADE-01; 與伺服端同一純函數 planRefChanges, 基準為 store 之 pemis／grups, 筆數以伺服端實際為準): 權限改名時引用它之群組 cpemis 於同一次寫入內連帶改名,
                 //有引用端將被更新時先確認(確認框文字與成功訊息之判定見 src/js/getCascadePreview.mjs); plan.err 非 null(新名撞懸空名等)不彈框、照常送出, 伺服端以固定語系鍵拒存並由下方 showCheckYes 顯示
-                let pv = getSavePreview({ kind: 'Pemi', rowsOld: vo.pemis, rowsNew: rows, holdersOld: vo.grups, cascadeRename: get(vo, 'webInfor.cascadeRename', true), $t: (k) => vo.$t(k) })
+                let pv = getSavePreview({ kind: 'Pemi', rowsOld: vo.baseRows, rowsNew: rows, holdersOld: vo.grups, cascadeRename: get(vo, 'webInfor.cascadeRename', true), $t: (k) => vo.$t(k) })
 
                 //新增撞懸空名(F-23／F-26 原則 7; src/js/getAddImpact.mjs): 本次新增之權限名稱查無既有同名實體, 而仍有啟用中之群組 cpemis 引用該名稱——新增後即解到新權限而取得或受其限制,
                 //須明確同意才送出; 與改名預覽同於開 loading 之前同步計算(基準為 store 之 pemis／grups), 無懸空引用時不彈框; 與改名確認框依序(先改名預覽、再新增確認), 各自只在需要時彈出
-                let addText = getAddConfirmText(getAddImpact({ keyTable: 'pemis', rowsOld: vo.pemis, rowsNew: rows, holders: vo.grups }), (k) => vo.$t(k), 'Pemi')
+                let addText = getAddConfirmText(getAddImpact({ keyTable: 'pemis', rowsOld: vo.baseRows, rowsNew: rows, holders: vo.grups }), (k) => vo.$t(k), 'Pemi')
 
                 if (pv.confirmText !== '') {
 
@@ -1444,9 +1521,15 @@ export default {
 
                 //4) updatePemis, 各自 catch + 旗標短路; 第 2 參 { baseline } 為載入基準(伺服端於表鎖內比對本次將寫入之列是否仍與草稿所依據之版本相同, 否則整次拒收 saveStale)
                 let okSave = false
+                vo.saveMark.saving = true //自己之存檔請求進行中: 此期間之推播不是他人更新(changeParams 的 planDraftSync 回 'keepQuiet'); 回應(成功或失敗)一到即歸零
                 await vo.$fapi.updatePemis(rows, { baseline })
-                    .then(() => { okSave = true })
+                    .then(() => {
+                        okSave = true
+                        vo.saveMark.saving = false
+                    })
                     .catch(async (err) => {
+                        vo.saveMark.saving = false
+                        vo.staleNotice = isDraftStale({ keys: vo.$ds.pemis.keys, rows: vo.pemis, baseline: vo.syncMark.baseline }) //失敗(含 saveStale 被拒): 請求進行中被安靜保留之推播, 此時依目前 store 重算過期提示(同 changeParams 之保留分支)
                         vo.$ui.updateLoading(false) //showCheckYes 前關 loading（modal 阻斷期間避免 loading 疊在底下）
                         await vo.$dg.showCheckYes(`${vo.$t('pemiSavePemisFail')}: ${vo.$tErr(err)}`)
                     })
@@ -1478,6 +1561,9 @@ export default {
                     })
                     .finally(() => {
 
+                        //非預期例外時亦歸零, 避免之後之推播永遠被當成自己存檔所致
+                        vo.saveMark.saving = false
+
                         //hide loading
                         vo.$ui.updateLoading(false)
 
@@ -1491,4 +1577,18 @@ export default {
 </script>
 
 <style scoped>
+/* 「資料已被更新」橫幅之重新載入鈕: 底色 #fff(同工具鈕底)、hover #f2f2f2(同工具鈕 hover)、邊線 #ddd(同橫幅邊線)、文字 #444(同橫幅文字), 與橫幅同字級 */
+.staleReloadBtn {
+    margin-left: 8px;
+    padding: 1px 10px;
+    font-size: 0.8rem;
+    color: #444;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.staleReloadBtn:hover {
+    background: #f2f2f2;
+}
 </style>

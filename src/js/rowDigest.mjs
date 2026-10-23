@@ -1,9 +1,11 @@
 //列內容指紋與載入基準(F-26 過期快照保護; R-PRINCIPLE-00 原則 3「遇衝突或歧義:收嚴＋提示」; 規則帳本 R-BASELINE-01; ADR-037): 純函數(不依賴 Vue／DOM／ORM), 前端與伺服端同一份.
 //
-//基準(baseline)＝「編輯草稿所依據之那一版資料」之逐列內容指紋 [[id, digest], ...]; 於**開啟編輯(建立草稿)時**由草稿所依據之那份列計算並綁定,
+//基準(baseline)＝「編輯草稿所依據之那一版資料」之逐列內容指紋 [[id, digest], ...]; 於**開啟編輯(建立草稿)時**由草稿所依據之那份整表計算並綁定,
 //之後即使資料推播使 store 變新, 舊草稿仍帶舊基準(外審 B.1: 存檔當下才取基準, 證明的是「store 新」而不是「待存之編輯內容新」).
-//伺服端於整表寫入之互斥鎖內以庫內現況比對: 本次將寫入(新增／修改／刪除)之列, 其庫內版本須與草稿所依據者相同, 否則整次拒收 saveStale、零寫入, 提示重新載入.
-//指紋只含內容欄位(排除 order 與伺服器管理欄 userId／timeCreate／userIdUpdate／timeUpdate): 外部同步整來源重寫使每列之建立／更新時間皆變, 內容未變者不應使草稿作廢; order 由儲存時依列序重給.
+//伺服端於整表寫入之互斥鎖內以庫內整表現況比對(表級, R-PRINCIPLE-00 原則 7, 使用者 2026-10-22 裁示): 表內任何一列之內容與載入時不同, 或列被增刪, 即整次拒收 saveStale、零寫入, 提示重新載入;
+//不部分變更、不上鎖, 先動先贏(run07 版只比對「本次將寫入之列」, run11 改為整表).
+//指紋只含內容欄位(排除 order 與伺服器管理欄 userId／timeCreate／userIdUpdate／timeUpdate): 外部同步整來源重寫使每列之建立／更新時間皆變, 內容未變者不應使草稿作廢; order 由儲存時依列序重給
+//(外部列之 order 由外部擁有), 僅 order 不同不是內容變更.
 //
 //未帶基準之舊客戶端: 後台列維持舊行為(最後寫入者勝, ADR-013); 但**修改外部列之指派欄**無從證明快照新舊(Lv1 放行之指派欄不得因舊快照還原外部已撤銷之授權, 外審 B.2), 依原則 3 收嚴拒收(saveBaselineRequired).
 
@@ -112,52 +114,80 @@ function getBaselineDigest(baseline, id) {
 
 
 /**
- * 以載入基準檢查本次寫入是否基於過期快照(於 ltdtDiffByKey 之後、寫入之前, 在表鎖內以庫內現況比對; 不符整次拒收、零寫入)
+ * 表級比對: 目前整表與載入基準(草稿所依據之整表)逐列內容指紋與列集合之差異數
  *
- * 只檢查「本次將寫入」之列: 修改列與刪除列之庫內版本須與基準相同(基準無該列＝草稿之後才新增, 亦視為過期); 新增列之主鍵若在基準內＝草稿所依據之版本有、現已不在(被刪或被同步移除), 復活會使已撤銷之列回來, 亦視為過期.
- * 未異動之列(same)不檢查, 故他人在草稿之後新增而草稿原樣帶回之列、內容未變之外部列不使存檔作廢; 修改列若內容指紋與庫內相同(僅 order／伺服器管理欄不同, 如他人新增之列因列序被重編 order)亦不檢查——送入之內容並未覆蓋他人版本.
+ * 比對對象是整表而非「本次將寫入之列」(R-PRINCIPLE-00 原則 7, 使用者 2026-10-22 裁示「以表雜湊比對, 先動先贏」): 表內任何一列之內容(指紋口徑見 getDigestFields: 排除 order 與伺服器管理欄)與基準不同,
+ * 或列被增刪(id 集合不同), 即視為資料已被他人／外部同步更新. 只含主鍵為字串之列(同 makeBaseline; 主鍵非字串之列 ORM 不允許入庫, 兩側一致忽略).
+ * 前端(判定草稿是否過期、顯示提示)與伺服端(checkBaseline)共用本函數, 口徑單一.
  *
  * @param {Object} p 輸入參數物件
  * @param {Array} p.keys 輸入該表 schema 欄位名陣列
- * @param {Object} p.r 輸入 { add, del, diff, same }
- * @param {Array} p.ltdtOld 輸入該表庫內全部列
- * @param {Array} p.baseline 輸入客戶端載入基準(須已通過 isBaselineValid)
- * @returns {Object|null} 回傳 null 為通過; 否則 { key: 'saveStale', reason, n }: reason 為 diffStale／delStale／addExisted
+ * @param {Array} p.rows 輸入目前整表之列(伺服端為庫內全部列, 前端為 store 之該表列)
+ * @param {Array} p.baseline 輸入載入基準 [[id, digest], ...](須已通過 isBaselineValid; 非陣列視為空基準)
+ * @returns {Object} 回傳 { nChanged, nRemoved, nAdded }: 內容指紋不同之列數／基準有而現已不在之列數／基準無而現在才有之列數; 三者皆 0 為一致
  */
-function checkBaseline({ keys, r, ltdtOld, baseline }) {
-    let kp = new Map(baseline)
-    let oldById = new Map()
-    ltdtOld.forEach((o) => {
-        if (isObj(o) && isStr(o.id)) {
-            oldById.set(o.id, o)
+function compareBaseline({ keys, rows, baseline }) {
+    let kp = new Map(Array.isArray(baseline) ? baseline : [])
+    let nChanged = 0
+    let nAdded = 0
+    let seen = new Set()
+    ;(Array.isArray(rows) ? rows : []).forEach((o) => {
+        if (!isObj(o) || !isStr(o.id) || seen.has(o.id)) {
+            return
+        }
+        seen.add(o.id)
+        if (!kp.has(o.id)) {
+            nAdded++
+        }
+        else if (kp.get(o.id) !== rowDigest(o, keys)) {
+            nChanged++
         }
     })
-    let bad = []
-    r.diff.forEach((row) => {
-        let o = isObj(row) && isStr(row.id) ? oldById.get(row.id) : undefined
-        if (o !== undefined && rowDigest(row, keys) === rowDigest(o, keys)) {
-            return //內容與庫內相同(僅 order 或伺服器管理欄不同, 如開框後他人新增之列依列序被重編 order): 草稿之內容並未覆蓋他人版本, 不算過期
-        }
-        if (o === undefined || !kp.has(row.id) || kp.get(row.id) !== rowDigest(o, keys)) {
-            bad.push('diffStale')
+    let nRemoved = 0
+    kp.forEach((v, id) => {
+        if (!seen.has(id)) {
+            nRemoved++
         }
     })
-    r.del.forEach((o) => {
-        if (!isObj(o) || !isStr(o.id) || !kp.has(o.id) || kp.get(o.id) !== rowDigest(o, keys)) {
-            bad.push('delStale')
-        }
-    })
-    r.add.forEach((row) => {
-        if (isObj(row) && isStr(row.id) && kp.has(row.id)) {
-            bad.push('addExisted')
-        }
-    })
-    if (bad.length === 0) {
-        return null
-    }
-    return { key: 'saveStale', reason: bad[0], n: bad.length }
+    return { nChanged, nRemoved, nAdded }
 }
 
 
-export { cyrb53, getDigestFields, rowDigest, makeBaseline, isBaselineValid, getBaselineDigest, checkBaseline }
+/**
+ * 判斷載入基準相對於目前整表是否已過期(compareBaseline 之布林版, 供前端提示用)
+ *
+ * @param {Object} p 輸入參數物件(同 compareBaseline)
+ * @returns {Boolean} 回傳 true 為過期(有任何一列內容不同或列被增刪)
+ */
+function isBaselineStale(p) {
+    let c = compareBaseline(p)
+    return c.nChanged + c.nRemoved + c.nAdded > 0
+}
+
+
+/**
+ * 以載入基準做表級過期檢查(在表鎖內, 以庫內整表現況比對; 不符整次拒收、零寫入; R-PRINCIPLE-00 原則 7)
+ *
+ * 規則: 載入時之整表與目前整表有任何差異(compareBaseline: 任一列內容指紋不同, 或列被增刪)即過期, 不論差異是否落在「本次將寫入之列」——
+ * 不部分變更(不逐項判斷哪些可蓋)、不上鎖, 先動先贏; 指紋排除 order 與伺服器管理欄, 故外部同步整批重寫但內容未變(含時間／建立者改變、order 重編)、純粹重排 order 皆不使草稿作廢.
+ * 修改前之 run07 版只檢查「本次將寫入之列」(他人改別列不擋), 使用者 2026-10-22 裁示改為表級, 見 ADR-037 Update(run11).
+ *
+ * @param {Object} p 輸入參數物件
+ * @param {Array} p.keys 輸入該表 schema 欄位名陣列
+ * @param {Array} p.ltdtOld 輸入該表庫內全部列
+ * @param {Array} p.baseline 輸入客戶端載入基準(須已通過 isBaselineValid)
+ * @returns {Object|null} 回傳 null 為通過; 否則 { key: 'saveStale', reason, n }: reason 為 rowChanged(有列內容不同)／rowRemoved(基準之列已不在)／rowAdded(多出基準沒有的列), 依序取第一個成立者; n 為差異總列數
+ */
+function checkBaseline({ keys, ltdtOld, baseline }) {
+    let c = compareBaseline({ keys, rows: ltdtOld, baseline })
+    let n = c.nChanged + c.nRemoved + c.nAdded
+    if (n === 0) {
+        return null
+    }
+    let reason = c.nChanged > 0 ? 'rowChanged' : (c.nRemoved > 0 ? 'rowRemoved' : 'rowAdded')
+    return { key: 'saveStale', reason, n }
+}
+
+
+export { cyrb53, getDigestFields, rowDigest, makeBaseline, isBaselineValid, getBaselineDigest, compareBaseline, isBaselineStale, checkBaseline }
 export default makeBaseline

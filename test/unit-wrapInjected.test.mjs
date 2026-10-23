@@ -3,7 +3,7 @@
 //  describeUpstream(err): reject 值(或 Error.message)屬 w-web-sso K 契約之 14 個 key → { upstream: key }; 否則 → { upstreamType, upstreamName }(只記型別與 Error.name, 絕不記原文)
 //why: 部署方常以 w-web-sso 對外 helper(≤1.1.4)包裝 getUserByToken, 其 reject 字串含已代入系統介接權杖與使用者權杖之完整網址;
 //  未包裝時原文經 pm2resolve 回前端、經 verifyConn 之 msg 入 srLog(修正前探測 tmp/probe-v3/result-before.json)。
-//站點不變式(WRAP-SITE-*)為 CLAUDE_rulebook.md「注入函數只經 wrapInjected」之可執行版: 靜態掃描 server/WWebPerm.mjs(可執行碼行, 見 test/tools/srcScan.mjs)。
+//站點不變式(WRAP-SITE-*)為 sgud/rule/rulebook.md「注入函數只經 wrapInjected」之可執行版: 靜態掃描 server/WWebPerm.mjs(可執行碼行, 見 test/tools/srcScan.mjs)。
 import assert from 'assert'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -16,7 +16,7 @@ const projRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const SECRET = 'SYNTH-WRAP-SECRET'
 const OLD_HELPER_REJECT = `can not get user data by url[http://127.0.0.1:11007/api/getSsoUserInfor?token=${SECRET}-SYS&key=token&value=${SECRET}-USER]`
 
-//w-web-sso K 契約之 14 個 key(與 sso 之同步點, 見 CLAUDE_rulebook.md)
+//w-web-sso K 契約之 14 個 key(與 sso 之同步點, 見 sgud/rule/rulebook.md)
 const K_KEYS = [
     'invalidUrl', 'invalidTokenSelf', 'invalidTokenTar', 'invalidUserIdTar',
     'noTokenKeyValueInUrl', 'noTokenKeyUserIdInUrl', 'noTokenInUrl',

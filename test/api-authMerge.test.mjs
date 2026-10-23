@@ -1,13 +1,13 @@
 //授權合併規格之 API 層抽驗(第 101 項 run04): 單元層(unit-authMerge)的代表格,經真後端 syncAndReplaceTabs 寫入、getPermUserInfor 查詢,結果須與單元層一致.
 //
-//【規格】CLAUDE_rulebook.md 之 R-AUTH-MERGE-00(未給＝n、OR 聯集後與所有 AND 交集、與排列順序無關; ADR-033). 規則說明與窮舉見 unit-authMerge.test.mjs 檔頭.
+//【規格】sgud/rule/rulebook.md 之 R-AUTH-MERGE-00(未給＝n、OR 聯集後與所有 AND 交集、與排列順序無關; ADR-033). 規則說明與窮舉見 unit-authMerge.test.mjs 檔頭.
 //前身為 run01 之現況刻畫(api-authMerge-characterize, 預期值為舊規則之順序相依結果), 2026-10-21 依使用者最終裁示改為規格; 各案「舊規則」結果見 CASES 註解.
 //做法: 以 tools/authMerge.mjs 的 buildData 由規格組出四表字串 → POST /syncAndReplaceTabs(全量取代本檔專屬 from)→ 唯讀 select 讀回,
 //  ①授權字串(crules／cpemis／cgrups)逐字不變(後端不改寫、不補齊稠密)②getPermUserInfor 回傳之 rules 等於單元層對讀回資料呼叫 getUserRules 之結果 ③等於本檔寫死之規格預期值.
-//DB 斷言一律 getWoItems() 後唯讀 select; 本檔專屬 from 於 after 以 delAll 清除(base seed 不動).
+//DB 斷言一律 getWoItems() 後唯讀 select; 本檔專屬 from 於 after 經 cleanExternalFixtures 清除(base seed 不動).
 
 import assert from 'assert'
-import { startApi, urlSync, urlGetPermUserInfor, TOKEN_APP, getWoItems } from './tools/api-setup.mjs'
+import { startApi, urlSync, urlGetPermUserInfor, TOKEN_APP, getWoItems, cleanExternalFixtures } from './tools/api-setup.mjs'
 import getPermUserInfor from '../src/getPermUserInfor.mjs'
 import { getUserRules } from '../src/plugins/mShare.mjs'
 import { buildData } from './tools/authMerge.mjs'
@@ -102,11 +102,7 @@ describe('api-authMerge - 授權合併規格(R-AUTH-MERGE-00)之 API 層抽驗',
 
     after(async function() {
         this.timeout(60000)
-        let woItems = await getWoItems()
-        for (let kt of ['users', 'grups', 'pemis', 'targets']) {
-            await woItems[kt].delAll({ from: F })
-            await woItems[kt].delAll({ from: F2 })
-        }
+        await cleanExternalFixtures({ froms: [F, F2] }) //外部列夾具收尾之單一入口(R-TEST-EXT-CLEAN-01)
     })
 
     it('API-chm-099-同步入口對授權字串內容不設限: 空字串、非 JSON、截斷、型別錯誤之 crules／cpemis／cgrups 皆被接受並逐字存入(外審 sol R13；故這類字串是實務上可達的輸入)', async function() {

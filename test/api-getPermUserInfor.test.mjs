@@ -3,7 +3,7 @@
 //cleanup 由 e2e-setup.mjs 的 mocha root after hook 自動觸發，本檔不寫 after(cleanup)。
 
 import assert from 'assert'
-import { startApi, apiBaseUrl, TOKEN_APP, TOKEN_BAD, urlGetPermUserInfor, urlSync, SEED, getWoItems } from './tools/api-setup.mjs'
+import { startApi, apiBaseUrl, TOKEN_APP, TOKEN_BAD, urlGetPermUserInfor, urlSync, SEED, cleanExternalFixtures } from './tools/api-setup.mjs'
 import getPermUserInfor from '../src/getPermUserInfor.mjs'
 
 
@@ -171,10 +171,7 @@ describe('api-getPermUserInfor', function() {
 
         after(async function() {
             this.timeout(60000)
-            let woItems = await getWoItems()
-            for (let kt of ['users', 'grups', 'pemis']) {
-                await woItems[kt].delAll({ from: F })
-            }
+            await cleanExternalFixtures({ kts: ['users', 'grups', 'pemis'], froms: [F] }) //外部列夾具收尾之單一入口(R-TEST-EXT-CLEAN-01)
         })
 
         it('API-getPermUserInfor-007-length-key-in-json-strings：三層 JSON 字串皆含 length 鍵 → 群組名稱與標的權限仍正確', async function() {
@@ -210,10 +207,7 @@ describe('api-getPermUserInfor', function() {
 
         after(async function() {
             this.timeout(60000)
-            let woItems = await getWoItems()
-            for (let kt of ['users', 'grups', 'pemis', 'targets']) {
-                await woItems[kt].delAll({ from: F })
-            }
+            await cleanExternalFixtures({ froms: [F] }) //外部列夾具收尾之單一入口(R-TEST-EXT-CLEAN-01)
         })
 
         it('API-getPermUserInfor-008-target-id-not-a-path：只授權 apQ 與精確鍵 apR.exact → apQ.0／apQ[0]／apQ.length／constructor／toString 皆 n，精確鍵為 y', async function() {

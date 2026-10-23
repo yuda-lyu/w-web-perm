@@ -1,4 +1,5 @@
-//run07 外審 sol R1／R2 之前端站點守護(靜態, 讀 .vue 原始碼文字): 真實行為(編輯器開著時他人改列→回填被放棄; 存檔中再次 show() 不改寫新實體)由 e2e 與 Node 內 harness 驗證, 此處守護接線不被回退.
+//run07 外審 sol R1／R2 之前端站點守護(靜態, 讀 .vue 原始碼文字): 真實行為(編輯器開著時他人改表→回填被放棄; 存檔中再次 show() 不改寫新實體)由 e2e 與 Node 內 harness 驗證, 此處守護接線不被回退.
+//run11 修訂(外審 sol 第 1 點): R1 之回填比對由「該列指紋」改為「草稿所依據之整表 vs 開框時之整表基準」(原則 7 表級; 他人改別列、父頁無未存編輯而重建基準時, 舊寫法會放行回填並以新基準繞過整表比對).
 //規格來源: tmp/run07/design-digest.md 第 3 點「推播不得替舊草稿換新基準」; 外審 R1(直接指派編輯器之回填)、R2(對話框存檔期間重開).
 //輸入空間: 站點 5(三個清單頁之 show 編輯器方法 × 兩個反向對話框之 doSave)× 守護項(R1: 3 項／頁; R2: 5 項／對話框), 全測;
 //刻意不測: 瀏覽器內實際互動(e2e), 四清單頁中 Targets 無指派編輯器.
@@ -26,15 +27,16 @@ describe('unit-sitesStale (外審 R1／R2 之前端站點守護)', function() {
         ['src/components/LayoutContentGrups.vue', 'showVeCpemisById: function(id)', 'saveGrups: function', 'showVeCpemis', 'cpemis'],
         ['src/components/LayoutContentPemis.vue', 'showVeCrulesById: function(id)', 'savePemis: function', 'showVeCrules', 'crules'],
     ]) {
-        it(`SITE-ST-R1 ${path.basename(rel)}: 開啟指派編輯器前記下該列基準指紋, 回填前比對, 變動即放棄回填並提示 saveStale`, function() {
+        it(`SITE-ST-R1 ${path.basename(rel)}: 開啟指派編輯器前記下整表基準(baseline0), 回填前以草稿所依據之列(baseRows)比對, 有異即放棄回填並提示 saveStale`, function() {
             let txt = read(rel)
-            assert.ok(txt.includes(`import { makeBaseline, getBaselineDigest } from '../js/rowDigest.mjs'`), '須匯入 getBaselineDigest')
+            assert.ok(txt.includes(`import { makeBaseline } from '../js/rowDigest.mjs'`) && !txt.includes('getBaselineDigest'), '列級比對已由表級取代, 不再匯入 getBaselineDigest')
             let b = region(txt, fn, nextFn)
-            let iDg0 = b.indexOf('let dg0 = getBaselineDigest(vo.baseline, id)')
+            let t = path.basename(rel).replace('LayoutContent', '').replace('.vue', '').toLowerCase()
+            let iDg0 = b.indexOf('let baseline0 = cloneDeep(vo.baseline)')
             let iShow = b.indexOf(`vo.$dg.${show}(`)
-            let iCmp = b.indexOf('if (getBaselineDigest(vo.baseline, id) !== dg0) {')
+            let iCmp = b.indexOf(`if (isDraftStale({ keys: vo.$ds.${t}.keys, rows: vo.baseRows, baseline: baseline0 })) {`)
             let iSet = b.indexOf(`set(vo, \`opt.rows[\${krNow}].${field}\``)
-            assert.ok(iDg0 >= 0 && iShow > iDg0, 'dg0 須於開啟編輯器之前取得')
+            assert.ok(iDg0 >= 0 && iShow > iDg0, 'baseline0 須於開啟編輯器之前取得')
             assert.ok(iCmp > iShow && iSet > iCmp, '比對須在回填(set)之前、編輯器 then 內')
             assert.ok(b.slice(iCmp, iSet).includes("vo.$t('saveStale')") && b.slice(iCmp, iSet).includes('return'), '指紋變動須提示 saveStale 並放棄回填')
         })

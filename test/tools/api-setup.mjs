@@ -22,6 +22,8 @@ import { fileURLToPath } from 'url'
 import obj2u8arr from 'wsemi/src/obj2u8arr.mjs'
 import u8arr2obj from 'wsemi/src/u8arr2obj.mjs'
 import { startServersOnce, cleanup, apiBaseUrl } from './e2e-setup.mjs'
+import { assertPristineSeed } from './baseSeed.mjs'
+import { markAfterSentinel, readLinesAfter } from './srLogMark.mjs'
 
 export { startServersOnce, cleanup, apiBaseUrl }
 
@@ -126,15 +128,21 @@ export async function readTables() {
 //  why: 後台整表寫入 updateXxx 自 run07 起不得刪除外部列(saveExternalRowChanged), 故「以整表寫入把表還原為 base seed」之收尾無法移除測試以同步灌入之夾具列;
 //  外部同步端點又拒絕空 rows(isearr 安全閘), 亦不能用它清。與 api-syncAndReplaceTabs／api-mapKey 之 after 同法, 由測試行程直接以 woItems.delAll 刪除(測試框架之重置, 非測試中手動改寫資料庫)。
 //  只刪外部列, 後台列(from '')不動; 直接刪除不經引用連帶, 故呼叫端須於其後以整表寫入還原引用端表(被引用者先、引用端後)。
-//  kts: 要清理之表名陣列(預設四表); opt.keepIds: { 表名: [id] }——這些 id 之外部列不刪(收尾快照本身若含外部列)。回傳 { 表名: 刪除筆數 }。
+//  kts: 要清理之表名陣列(預設四表); opt.keepIds: { 表名: [id] }——這些 id 之外部列不刪(收尾快照本身若含外部列);
+//  opt.froms: 字串陣列(run09)——只刪這些 from 分區之外部列(測試檔只清自己專屬之 from, 不動他人之分區); 未給則不限分區。回傳 { 表名: 刪除筆數 }。
+//  外部列夾具之收尾請走 cleanExternalFixtures(單一入口, 規則帳本 R-TEST-EXT-CLEAN-01), 本函式為其底層, 各檔不再自寫 woItems[kt].delAll({ from })。
 export async function purgeExternalRows(kts = ['users', 'grups', 'pemis', 'targets'], opt = {}) {
     const keep = (opt && opt.keepIds) || {}
+    const froms = (opt && Array.isArray(opt.froms)) ? opt.froms.map((v) => String(v)) : null
+    if (froms !== null && froms.includes('')) {
+        throw new Error('purgeExternalRows: froms 不得含空字串(from 為空字串者是後台列, 不是外部列)')
+    }
     const woItems = await getWoItems()
     const out = {}
     for (const kt of kts) {
         const keepSet = new Set((keep[kt] || []).map((v) => String(v)))
         const ids = (await woItems[kt].select())
-            .filter((r) => typeof r.from === 'string' && r.from !== '' && !keepSet.has(String(r.id)))
+            .filter((r) => typeof r.from === 'string' && r.from !== '' && (froms === null || froms.includes(r.from)) && !keepSet.has(String(r.id)))
             .map((r) => String(r.id))
         out[kt] = ids.length
         if (ids.length > 0) {
@@ -146,6 +154,51 @@ export async function purgeExternalRows(kts = ['users', 'grups', 'pemis', 'targe
         }
     }
     return out
+}
+
+//cleanExternalFixtures(run09, 規則帳本 R-TEST-EXT-CLEAN-01): 外部列夾具(from 為非空字串者; 經 /syncAndReplaceTabs 灌入)收尾之「單一入口」, 各測試檔不得自寫收尾。
+//  why: 外部列受產品保護(R-EXT-OWN-01 Lv1: 後台整表寫入不得刪, 回 saveExternalRowChanged), 外部同步端點又拒空 rows(isearr 閘, ADR-008), 故
+//    「同一 from 重送不含該列之批次」只在分區仍保留 ≥1 列時可用, 要清空整個分區只剩測試框架之直接重置(purgeExternalRows);
+//    restartBackend({ reseed:true }) 在單一 mocha 行程內亦不能指望: api 檔已使本行程持有 lmdb 映射, 刪不掉 ./db 而退化為 upsert(只補種子列, 不移除多餘列)。
+//    (2026-10-22 全套: e2e-init E2E-006 收尾退而以管理者寫入移除 id-mk-dup → saveExternalRowChanged, 夾具殘留, 其後 4 個檔 12 案失敗。)
+//  不放寬產品: 本函式只動測試資料庫, 產品之 Lv1 守門不變(對照: api-cleanExternal CE-003 驗管理者寫入仍刪不掉外部列)。
+//  步驟: ①經資料通道 select 偵測(無待清者不 import g_mOrm, 不使本行程新增 lmdb 映射) ②有則 purgeExternalRows(只清 opt.froms 之分區) ③再經 select 回驗無殘留;
+//    opt.pristine 時並以 assertPristineSeed 回驗各表主鍵集合＝種子(整檔只動外部夾具之收尾用; 後台列有多餘則拋錯, 不放寬)。
+//  opt.kts: 要清理之表名陣列(預設四表); opt.froms: 只清這些 from 分區(預設不限分區); opt.keepIds: 同 purgeExternalRows; opt.pristine: 預設 false。回傳 { 表名: 移除筆數 }。
+export async function cleanExternalFixtures(opt = {}) {
+    const kts = Array.isArray(opt.kts) ? opt.kts : ['users', 'grups', 'pemis', 'targets']
+    const keepIds = opt.keepIds || {}
+    const froms = Array.isArray(opt.froms) ? opt.froms.map((v) => String(v)) : null
+    if (froms !== null && froms.includes('')) {
+        throw new Error('cleanExternalFixtures: froms 不得含空字串(from 為空字串者是後台列, 不是外部列)')
+    }
+    const isFixture = (kt, r) => typeof r.from === 'string' && r.from !== '' && (froms === null || froms.includes(r.from)) && !(keepIds[kt] || []).map((v) => String(v)).includes(String(r.id))
+    const pending = {}
+    for (const kt of kts) {
+        const n = (await selectAllRows(kt)).filter((r) => isFixture(kt, r)).length
+        if (n > 0) {
+            pending[kt] = n
+        }
+    }
+    if (Object.keys(pending).length > 0) {
+        await purgeExternalRows(Object.keys(pending), { keepIds, froms })
+    }
+    for (const kt of kts) {
+        const rows = await selectAllRows(kt)
+        const left = rows.filter((r) => isFixture(kt, r))
+        if (left.length > 0) {
+            throw new Error(`cleanExternalFixtures(${kt}): 移除後仍有 ${left.length} 筆外部列 [${left.map((r) => `${r.id}(from=${r.from})`).join(', ')}]`)
+        }
+        if (opt.pristine === true) {
+            try {
+                assertPristineSeed(kt, rows)
+            }
+            catch (err) {
+                throw new Error(`cleanExternalFixtures(${kt}): 移除外部夾具後仍不是 pristine base seed: ${err.message}`)
+            }
+        }
+    }
+    return Object.fromEntries(kts.map((kt) => [kt, pending[kt] || 0]))
 }
 
 export async function restoreTables(snap) {
@@ -197,42 +250,35 @@ export async function editTableRows(kt, fn) {
     }
 }
 
-//readSrLogSince：讀本專案後端 srLog 中 time ≥ t0 之各行（已 JSON.parse；解析失敗之行略過；_raw 為原始行文字）。
-//  目錄＝settings.json 之 logFd（相對專案根＝後端 cwd；未給同 server/srLog.mjs 預設 './logs'）；只讀 mtime ≥ t0 − 2s 之檔。
-//  srLog 經 pino transport 非同步落檔，呼叫端須以哨兵事件等待（見 api-tokenSafety），不得讀到空集合即斷言「無外洩」。
-export function readSrLogSince(t0) {
+//srLog 讀取（第 101 項 run10，R-SRLOG-MARK-01）：以「檔案位置」定位某動作之後新增的行，不比對測試行程與後端行程兩個時鐘。
+//  舊式 readSrLogSince(t0) 取 time ≥ t0 之行，t0 是測試行程的 Date.now()、time 是後端行程的 Date.now()（pino 蓋印）；兩個 node 行程的時鐘在本機實測有 1~2 ms 偏差（隨行程配對而異），
+//  請求到記 log 僅隔約 2 ms 時目標行被濾掉，其後後端閒置、waitLines 等滿 30 秒回報「讀到 0 行」（2026-10-22 13:04:35、14:57:41 兩次 API-RC-044 偶發失敗）。
+//  markSrLog()：在動作「之前」呼叫，回傳標記＝送一個哨兵請求並等它落檔後各 log 檔的位元組數（同一後端行程的 srLog 依呼叫序落檔，見哨兵即其前各行已落檔，
+//    故前一步驟仍在 pino 管線中的行不會落到標記之後）。哨兵為不在白名單的 keyTable，後端只記一行 api/syncAndReplaceTabs-error 後拒絕，不動資料。
+//  readSrLogSince(mark)：標記之後新增的各行（已 JSON.parse；解析失敗之行略過；_raw 為原始行文字）；傳入時間戳等非標記值拋 TypeError。
+//  目錄＝settings.json 之 logFd（相對專案根＝後端 cwd；未給同 server/srLog.mjs 預設 './logs'）。
+//  srLog 經 pino transport 非同步落檔，呼叫端須以「預期的行」等待（見 api-refCascade waitLines、api-tokenSafety 哨兵），不得讀到空集合即斷言「無外洩」。
+const srLogDir = () => {
     let st = {}
     try {
         st = JSON5.parse(fs.readFileSync(path.join(projRoot, 'settings.json'), 'utf8'))
     }
     catch (e) {}
     const fd = (typeof st.logFd === 'string' && st.logFd !== '') ? st.logFd : './logs'
-    const dir = path.resolve(projRoot, fd)
-    const out = []
-    if (!fs.existsSync(dir)) {
-        return out
-    }
-    for (const fn of fs.readdirSync(dir)) {
-        const fp = path.join(dir, fn)
-        const s = fs.statSync(fp)
-        if (!s.isFile() || s.mtimeMs < t0 - 2000) {
-            continue
-        }
-        for (const ln of fs.readFileSync(fp, 'utf8').split(/\r?\n/)) {
-            if (!ln) {
-                continue
-            }
-            let o = null
-            try {
-                o = JSON.parse(ln)
-            }
-            catch (e) {
-                continue
-            }
-            if (o && typeof o.time === 'number' && o.time >= t0) {
-                out.push({ ...o, _raw: ln })
-            }
-        }
-    }
-    return out
+    return path.resolve(projRoot, fd)
+}
+let markSeq = 0
+export async function markSrLog() {
+    const sentinel = `srMark${process.pid}x${Date.now()}x${++markSeq}` //Date.now() 僅作唯一字串, 不與後端時間比對
+    return await markAfterSentinel({
+        dir: srLogDir(),
+        send: async () => {
+            const r = await fetch(`${apiBaseUrl}/syncAndReplaceTabs?keyTable=${sentinel}&token=x`, { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: '{}' })
+            await r.text()
+        },
+        isSentinel: (o) => o.keyTable === sentinel,
+    })
+}
+export function readSrLogSince(mark) {
+    return readLinesAfter(srLogDir(), mark)
 }

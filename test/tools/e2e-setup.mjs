@@ -225,6 +225,9 @@ function killOwnSrvProcesses() {
 //用法：before restartBackend(genTempSettings({ language })), after restartBackend('./settings.json') 還原預設。
 //opts.reseed=true：port 釋放後、spawn 前重跑 hermetic base seed（刪 ./db 重建），供「測試把資料弄到 UI/RPC 無法還原之狀態」
 //（如 admin 自己 isActive='n' 後所有通道皆拒）的 api 測試還原用；seed 須在後端開 lmdb 前完成，故只能在此時機做。
+//  【注意(run09, R-TEST-EXT-CLEAN-01)】reseed 只在「本行程未持有 lmdb 映射」時才是 hermetic 重種（逐檔隔離）；單一 mocha 行程（npm test）內 api 檔已使本行程持有映射，
+//  刪不掉 ./db 而退化為 upsert（wipeDbVerified strict:false）——只補回種子列，不移除多餘列（含經同步灌入之外部列夾具，後台寫入亦刪不掉）。
+//  故凡曾建立多餘列者，須在 reseed 前（或之後）先經 api-setup 之 cleanExternalFixtures 移除，不得倚賴 reseed 清除。
 //opts.seedExtra=<json 檔路徑>（run05）：port 釋放後、spawn 前（reseed 之後）以子行程 test/tools/seedExtraRows.mjs 對 ./db 追加完整列
 //（{ pemis?, grups?, users? }; 檔案放 test/_tmp/<案名>/, 由呼叫端刪除）。供「現行寫入入口皆拒而須旁路造出」之資料（歷史同名, R-PRINCIPLE-00 d／g）；
 //  收尾一律 restartBackend(…, { reseed: true }) 重建 base seed 並回驗筆數。
@@ -592,7 +595,7 @@ export function navBtn(page, which) {
 //等導覽區收合／展開落定——採「使用者可觀察之幾何」：目標圓鈕已出現 + 面板與內容區 rect 連續 3 次取樣不變。
 //不用 WDrawer 根節點 [state]（hidden/opened）：w-component-vue 2.5.13 於負載高時 [state] 偶發卡在 hiding/opening 直到 200s 兜底
 //（wsemi domIsStable core() 丟棄 await 前的動畫、v-domstable 只在翻轉時 emit），2.5.14 + wsemi 1.8.94 已修（transitionend 為主訊號、兜底 1.3s）；
-//幾何訊號為使用者可觀察之終態，故沿用。根因史見 CLAUDE_experience.md。
+//幾何訊號為使用者可觀察之終態，故沿用。根因史見 sgud/exp/experience.md。
 export async function waitNavSettled(page, collapsed) {
     await navBtn(page, collapsed ? 'show' : 'hide').first().waitFor({ state: 'visible', timeout: 15000 })
     const snap = () => page.evaluate((sel) => {

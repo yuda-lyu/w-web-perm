@@ -33,7 +33,7 @@ import fs from 'fs'
 import path from 'path'
 import { cleanup, launchBrowser, captureStableWithBox, apiBaseUrl, genTempSettings, restartBackend, assertBaselineMatch } from './tools/e2e-setup.mjs'
 import { runBaselineCase, createBaselineGate, openCasePage, itemsUnionBox } from './tools/e2eLib.mjs'
-import { urlSync, TOKEN_APP, TOKEN_ADMIN, callRpc } from './tools/api-setup.mjs'
+import { urlSync, TOKEN_APP, cleanExternalFixtures } from './tools/api-setup.mjs'
 
 
 const baselineDir = './test/pics/init'
@@ -306,7 +306,7 @@ else {
         //  資料前置（非使用者操作, 同 api-mapKey MK-010）: 預設對應鍵（mappingBy='id'）下經同步端點推入 email 與 admin 相同之 active 使用者 → 以臨時設定 { language, mappingBy:'email', urlRedirect } 重啟後端（DB 保留, 開瀏覽器前）。
         //  開啟網址用 localhost（非 127.0.0.1）: 登入失敗之回呼 App.vue:loginError 只在「開發環境」（wsemi isDev: location.href 含 'localhost'）延遲 60 秒轉址, 否則立即轉址;
         //  spec 之觀察「畫面停在拒絕登入」只在開發環境可見（本機 11006 同時監聽 IPv4／IPv6, localhost 可連）。urlRedirect 改為本機不存在之路徑, 避免逾時後轉往外部網站。
-        //  清理: restartBackend('./settings.json', { reseed: true }) 還原設定並重建 base seed（本行程不開資料庫, reseed 可刪 ./db）, 回驗 users 為 4 筆。
+        //  清理: restartBackend('./settings.json', { reseed: true }) 還原設定; 同步灌入之外部列（from=FROM_006）經 cleanExternalFixtures 移除並回驗 users 為 base seed（單一 mocha 行程全跑時 reseed 刪不掉 ./db, 見 finally 註解）。
         const FROM_006 = 'appE2eInit006'
         const LOCAL_BASE = apiBaseUrl.replace('127.0.0.1', 'localhost')
         const postSync = async (rows) => {
@@ -389,17 +389,12 @@ else {
                     }
                 }
                 finally {
+                    //還原預設設定; 逐檔隔離執行時本行程未持有 lmdb 映射, reseed 刪得掉 ./db 而得全新種子
                     await restartBackend('./settings.json', { reseed: true })
-                    let us = await callRpc('users.select', [], TOKEN_ADMIN)
-                    //單一 mocha 行程全跑(npm test)時, 持有 lmdb 映射者為 mocha 行程自身(api 檔先開過), reseed 之刪庫失敗而退化為 upsert, 殘留的 id-mk-dup 不會被移除
-                    //(2026-10-22 全套實測: 殘留列污染其後的 e2e-users 等): 以管理者寫入 RPC 還原(同 readTables／restoreTables 之收尾作法)
-                    if (us.ok && us.output.some((u) => u.id === 'id-mk-dup')) {
-                        const rowsBase = us.output.filter((u) => u.id !== 'id-mk-dup').sort((a, b) => (a.order || 0) - (b.order || 0))
-                        const rr = await callRpc('updateUsers', [rowsBase], TOKEN_ADMIN)
-                        assert.ok(rr.ok, `以管理者寫入移除殘留之 id-mk-dup 應成功, 實得 ${JSON.stringify(rr).slice(0, 200)}`)
-                        us = await callRpc('users.select', [], TOKEN_ADMIN)
-                    }
-                    assert.ok(us.ok && us.output.length === 4 && !us.output.some((u) => u.id === 'id-mk-dup'), `清理後 users 應回到 base seed 4 筆, 實得 ${JSON.stringify(us).slice(0, 200)}`)
+                    //id-mk-dup 為外部列(from=FROM_006): 後台整表寫入不得刪(Lv1 saveExternalRowChanged, 2026-10-22 全套實測以管理者寫入移除而失敗)、
+                    //  外部同步又拒空 rows, 且單一 mocha 行程全跑(npm test)時 api 檔已使本行程持有 lmdb 映射, reseed 退化為 upsert 而不移除多餘列(殘留列污染其後的
+                    //  e2e-ref-cascade／e2e-rela-user-grup／e2e-targets／e2e-users 之 captureBaseSeedOnce)。故經單一收尾入口(規則帳本 R-TEST-EXT-CLEAN-01)移除本案分區並回驗 users 為 base seed
+                    await cleanExternalFixtures({ kts: ['users'], froms: [FROM_006], pristine: true })
                 }
             })
         }

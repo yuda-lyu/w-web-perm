@@ -1,7 +1,7 @@
 //引用連帶純函數(src/js/refCascade.mjs 之 rewriteRefs／diffRefTargets／planRefChanges)規格測試(run06)
 //
 //【受測規格句】(測試是規格之翻譯: 每條斷言之註解標明所依之規格句代號)
-//  來源: CLAUDE_rulebook.md 之 R-PRINCIPLE-00(原則 3、6、適用表 m、n)與 R-AUTH-MERGE-00; spec/evidence/run06-design-digest.md; src/js/refCascade.mjs 之 JSDoc
+//  來源: sgud/rule/rulebook.md 之 R-PRINCIPLE-00(原則 3、6、適用表 m、n)與 R-AUTH-MERGE-00; spec/evidence/run06-design-digest.md; src/js/refCascade.mjs 之 JSDoc
 //  P6  原則 6: 群組/權限/標的改名時, 引用須連帶更新; 被刪除時, 引用須連帶清理(效果等同舊版「找不到即忽略」); 不得靜默失效或被同名新資料接管. 不採「被引用則禁止刪除」
 //  P3  原則 3: 遇衝突或歧義 → 收嚴＋提示, 不靜默擇一(不取首筆、不靜默丟棄)
 //  M   適用表 m: 伺服端連帶更新引用; 歷史同名組改名、新名撞懸空引用 → 拒絕(整次拒存、零變更)

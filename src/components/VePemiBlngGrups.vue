@@ -126,6 +126,17 @@
 
                     </div>
 
+                    <!-- 資料已被更新提示(R-PRINCIPLE-00 原則 7): 開框後他人或外部同步改了群組表, 本視窗之草稿與基準維持開框時之版本、不重建, 存檔將被伺服端拒收; 以 v-for 渲染(無提示時不渲染任何節點) -->
+                    <div
+                        v-for="ks in (staleNotice ? 1 : 0)"
+                        :key="`stale-${ks}`"
+                        data-fmid="pemi-blng-grups-banner-stale"
+                        style="padding:5px 15px; border-top:1px solid #ddd; background:#FFE0B2; color:#444; font-size:0.8rem; overflow-wrap:anywhere;"
+                    >
+                        <img style="vertical-align:sub; width:16px; height:16px; margin-right:4px;" :src="$ui.getIcon('warning')" />
+                        <span>{{ $t('staleDraftNoticeDialog') }}</span>
+                    </div>
+
                 </div>
 
                 <template
@@ -210,6 +221,7 @@ import getKpLossy from '../js/getKpLossy.mjs'
 import fmtLossyMsg from '../js/fmtLossyMsg.mjs'
 import pairRowsToSnapshot from '../js/pairRowsToSnapshot.mjs'
 import { makeBaseline } from '../js/rowDigest.mjs'
+import { isDraftStale } from '../js/draftSync.mjs'
 import { makeRowStates, getChangedIdx, buildRowsSend } from '../js/relDialogSend.mjs'
 import { getRefState, getRawModeMap, putRefEntry } from '../js/editorRefRows.mjs'
 import { getRefWarns, getRefWarnText } from '../js/getAuthWarn.mjs'
@@ -252,6 +264,7 @@ export default {
             firstSetting: true,
             isEditable: false,
             isModified: false,
+            ownSaving: false, //本視窗自己之存檔已送出(成功後視窗隨即關閉): 自己之寫入所致之推播(grups 表更新)不是「他人更新」, watch 不得據以提示; 每次 show() 歸零, 存檔失敗時歸零
 
             pemi: null,
 
@@ -259,6 +272,7 @@ export default {
             //baseline 為草稿所依據之那份群組列之逐列內容指紋, 存檔隨 updateGrups 第 2 參送伺服端; rowStates 為開框時各列之歸屬狀態, 存檔時判定使用者有無變更該列
             baseline: null,
             rowStates: null,
+            staleNotice: false, //有未存編輯時收到推播、且群組表已異於本視窗載入時之基準(R-PRINCIPLE-00 原則 7): true 時顯示「資料已被更新」提示; 每次 show() 歸零
 
             items: [],
             itemsCheck: [],
@@ -288,6 +302,17 @@ export default {
 
         }
 
+    },
+    watch: {
+        //store 之群組表被推播更新(整表以新陣列取代): 本視窗不重建(草稿與基準維持開框時之版本, 見 show()). 此刻有未存編輯者, 若表已異於載入時之基準(任一列內容不同或列增刪; 僅 order／伺服器管理欄不同不算)
+        //即顯示「資料已被更新」提示, 存檔時由伺服端以表雜湊拒收(saveStale); 無未存編輯者維持原行為(靜默, 存檔時才由伺服端拒收). 唯讀檢視無存檔, 不提示
+        grups: function(rows) {
+            let vo = this
+            if (!vo.bShow || !vo.isEditable || !vo.isModified || vo.ownSaving || !Array.isArray(vo.baseline)) {
+                return
+            }
+            vo.staleNotice = isDraftStale({ keys: vo.$ds.grups.keys, rows, baseline: vo.baseline })
+        },
     },
     computed: {
 
@@ -1017,9 +1042,11 @@ export default {
             //3) updateGrups, 各自 catch + okX 旗標短路 (canonical 五段結構; 空清單檢查已上移至 doSave core())
             //第 2 參 { baseline }: 開框時綁定之草稿基準(由 doSave 於流程開頭取得並傳入, 不於此讀 vo.baseline——存檔進行中若再次 show() 會換成新草稿之基準); 伺服端比對「本次將寫入之列」之庫內版本, 草稿之後被改過即整次拒收 saveStale(失敗路徑沿用下方 catch 顯示語系文字)
             let okSave = false
+            vo.ownSaving = true //自己之寫入所致之推播不提示(成功路徑維持至視窗關閉; show() 歸零)
             await vo.$fapi.updateGrups(rows, { baseline })
                 .then(() => { okSave = true })
                 .catch(async (err) => {
+                    vo.ownSaving = false //失敗(含 saveStale 被拒): 視窗仍開著, 恢復監看
                     vo.$ui.updateLoading(false) //showCheckYes 前關 loading（modal 阻斷期間避免 loading 疊在底下）
                     await vo.$dg.showCheckYes(`${vo.$t('grupSaveGrupsFail')}: ${vo.$tErr(err)}`)
                 })
@@ -1181,7 +1208,7 @@ export default {
                 })
 
                 //grupsNew: 送出之整表＝存檔當下 store 快照(grups)之全部列、依其 order 序(F-26 c0, S4): 修前只送「對話框之列」, 開框後他人／外部同步新增之列被伺服端整表 diff 刪除;
-                //只有 kpNewCpemis 之列換其 cpemis 一欄, 其餘列(使用者未變更者、有損列、開框後新增而不在對話框內者)與快照同一物件、逐字不動(伺服端只對本次將寫入之列比對基準, 故不因開框後他人之變更而被拒)
+                //只有 kpNewCpemis 之列換其 cpemis 一欄, 其餘列(使用者未變更者、有損列、開框後新增而不在對話框內者)與快照同一物件、逐字不動(帶回存檔當下 store 版本以免誤刪／誤改他人之列; 但載入基準仍是開框時之版本, 伺服端表級比對〔R-BASELINE-01, run11〕會因開框後他人之任何變更而整次拒收 saveStale)
                 let grupsNew = buildRowsSend(grups, pairs, kpNewCpemis, 'cpemis')
 
                 // //check
@@ -1260,6 +1287,8 @@ export default {
 
             //default
             vo.isModified = false
+            vo.staleNotice = false
+            vo.ownSaving = false
 
             //isEditable, pemi
             let isEditable = get(msg, 'isEditable', false)

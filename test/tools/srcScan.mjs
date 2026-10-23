@@ -1,4 +1,4 @@
-//原始碼靜態盤點工具(供 unit-maskLog / unit-wrapInjected 之站點不變式 SITE-* / WRAP-SITE-* 共用; 規則見 CLAUDE_rulebook.md「權杖不外洩」)。
+//原始碼靜態盤點工具(供 unit-maskLog / unit-wrapInjected 之站點不變式 SITE-* / WRAP-SITE-* 共用; 規則見 sgud/rule/rulebook.md「權杖不外洩」)。
 //以行為單位處理: 本專案之 console 呼叫與注入函數呼叫皆為單行; 跨行之 console 呼叫會回報為「無法解析」而非靜默略過。
 import fs from 'fs'
 import path from 'path'

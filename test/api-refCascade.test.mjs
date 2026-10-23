@@ -1,6 +1,6 @@
 //引用連帶(改名級聯＋刪除連帶清理)之真後端 API 測試(run06; 規則帳本 R-REF-CASCADE-01、R-WRITE-LOCK-02; R-PRINCIPLE-00 適用表 m／n; ADR-036)。
 //
-//規格句(來源: CLAUDE_rulebook.md「引用連帶」R-REF-CASCADE-01 規則 1～8、R-WRITE-LOCK-02、spec/evidence/run06-design-digest.md「不變式」):
+//規格句(來源: sgud/rule/rulebook.md「引用連帶」R-REF-CASCADE-01 規則 1～8、R-WRITE-LOCK-02、spec/evidence/run06-design-digest.md「不變式」):
 //  S1 群組／權限改名(同 id 異名)時, 引用字串(users.cgrups、grups.cpemis)於同一次寫入內連帶改名; 互換 A↔B、鏈式 A→B 且 B→C 同時套用; 物件／陣列形式不互轉; 其他欄位原樣;
 //  S2 級聯後各使用者之最終授權與改名前逐使用者相等(以真 getPermUserInfor 驗, 外部應用實際查到之結果);
 //  S3 群組／權限／標的被刪除(舊 id 不在新表)時, 同一次寫入內清理所有引用(cgrups／cpemis／crules), 不論 isActive; 效果等同「找不到即忽略」; 刪後以同名新增(新 id)者不繼承;
@@ -26,7 +26,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import JSON5 from 'json5'
-import { startApi, TOKEN_ADMIN, TOKEN_APP, getWoItems, callRpc, urlSync, urlGetPermUserInfor, readSrLogSince, purgeExternalRows } from './tools/api-setup.mjs'
+import { startApi, TOKEN_ADMIN, TOKEN_APP, getWoItems, callRpc, urlSync, urlGetPermUserInfor, markSrLog, readSrLogSince, purgeExternalRows } from './tools/api-setup.mjs'
 import { restartBackend, genTempSettings } from './tools/e2e-setup.mjs'
 import { BASE_SEED_COUNT, assertPristineSeed } from './tools/baseSeed.mjs'
 import getPermUserInfor from '../src/getPermUserInfor.mjs'
@@ -184,15 +184,15 @@ let checkHolders = ({ label, before, after, field, ren = new Map(), del = new Se
     return rewritten.sort()
 }
 
-//等待 srLog(pino 非同步落檔)出現符合 pred 之行, 回傳 time ≥ t0 之全部行
-let waitLines = async (t0, pred, label, ms = 30000) => {
+//等待 srLog(pino 非同步落檔)出現符合 pred 之行, 回傳標記(markSrLog, 動作之前取)之後新增之全部行(以檔案位置定位, 不比對測試與後端兩行程之時鐘; R-SRLOG-MARK-01)
+let waitLines = async (mark, pred, label, ms = 30000) => {
     let tEnd = Date.now() + ms
     let lines = []
     while (Date.now() < tEnd) {
-        lines = readSrLogSince(t0)
+        lines = readSrLogSince(mark)
         if (lines.some(pred)) {
             await sleep(800) //同批其他行落檔
-            return readSrLogSince(t0)
+            return readSrLogSince(mark)
         }
         await sleep(300)
     }
@@ -400,7 +400,7 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
             let pemisS = await snapKt('pemis')
             let targetsS = await snapKt('targets')
             let permB = await permAll()
-            let t0 = Date.now()
+            let mark = await markSrLog()
 
             let r = await edit('grups', (rows) => rows.map((g) => (g.name === OLD ? { ...g, name: NEW } : g)))
             A.ok(r.ok, `updateGrups 改名應成功，實得: ${JSON.stringify(r)}`)
@@ -440,7 +440,7 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
             A.equal(await snapKt('targets'), targetsS, 'targets 須逐位元不變')
 
             //規則 8 log: refCascade-done 帶計數、不帶引用端 id／email／name
-            let lines = await waitLines(t0, (l) => l.event === 'refCascade-done' && l.keyTable === 'grups', 'refCascade-done')
+            let lines = await waitLines(mark, (l) => l.event === 'refCascade-done' && l.keyTable === 'grups', 'refCascade-done')
             let done = lines.find((l) => l.event === 'refCascade-done' && l.keyTable === 'grups')
             A.deepEqual({ holder: done.holder, nRename: done.nRename, nDelName: done.nDelName, nHolders: done.nHolders, nRenameHolders: done.nRenameHolders, nDelHolders: done.nDelHolders, nExternal: done.nExternal }, { holder: 'users', nRename: 1, nDelName: 0, nHolders: 6, nRenameHolders: 6, nDelHolders: 0, nExternal: 1 }, `refCascade-done 計數(實得 ${done._raw})`)
             checkNoSecrets(lines, ['id-for-peter', 'id-rc-uo', 'id-rc-ua', 'id-rc-ui', 'id-rc-uctl1', 'id-rc-001x', 'peter@example.com', '@rc.example.com'], '001')
@@ -557,7 +557,7 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
             let usersB = await rowsOf('users')
             let permB = await permAll()
             let pemisS = await snapKt('pemis')
-            let t0 = Date.now()
+            let mark = await markSrLog()
             let r = await edit('grups', (rows) => rows.filter((g) => g.name !== G.m2))
             A.ok(r.ok, `刪除群組應成功，實得: ${JSON.stringify(r)}`)
             A.ok(!(await rowsOf('grups')).some((g) => g.name === G.m2), 'M2 已刪除')
@@ -576,7 +576,7 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
             }
             A.equal(await snapKt('pemis'), pemisS, 'pemis 不動')
             //規則 8 log: refCascade-done 之刪除計數(020x 來源 appRC20 為外部列, 其餘為後台列; run07 前為 mary 來源 teamA)
-            let lines = await waitLines(t0, (l) => l.event === 'refCascade-done' && l.keyTable === 'grups', 'refCascade-done')
+            let lines = await waitLines(mark, (l) => l.event === 'refCascade-done' && l.keyTable === 'grups', 'refCascade-done')
             let done = lines.find((l) => l.event === 'refCascade-done' && l.keyTable === 'grups')
             A.deepEqual({ holder: done.holder, nRename: done.nRename, nDelName: done.nDelName, nHolders: done.nHolders, nRenameHolders: done.nRenameHolders, nDelHolders: done.nDelHolders, nExternal: done.nExternal }, { holder: 'users', nRename: 0, nDelName: 1, nHolders: 4, nRenameHolders: 0, nDelHolders: 4, nExternal: 1 }, `refCascade-done 計數(實得 ${done._raw})`)
             checkNoSecrets(lines, ['id-for-mary', 'id-rc-uo', 'id-rc-ui', 'id-rc-020x', 'mary@example.com', '@rc.example.com'], '020')
@@ -659,13 +659,13 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
             const SEC = { id: 'id-rc-secret-ghost', name: 'rcSecretGhostName', email: 'rc-secret-ghost@rc.example.com' }
             await mustEdit('users', (rows) => [...rows, uRow(SEC.id, SEC.name, { '幽靈群組': ON('OR') }, { email: SEC.email })])
             let s0 = await snap4()
-            let t0 = Date.now()
+            let mark = await markSrLog()
             let r = await edit('grups', (rows) => rows.map((g) => (g.name === G.m3 ? { ...g, name: '幽靈群組' } : g)))
             A.equal(r.ok, false, `應被拒，實得: ${JSON.stringify(r)}`)
             A.equal(r.msg, 'renameCascadeNameInUse', `應回語系鍵 renameCascadeNameInUse，實得: ${r.msg}`)
             checkLangKey('renameCascadeNameInUse')
             A.deepEqual(await snap4(), s0, '被拒時四表須逐位元不變')
-            let lines = await waitLines(t0, (l) => l.event === 'updateTabItems-refCascade-error' && l.msg === 'renameCascadeNameInUse', 'refCascade-error')
+            let lines = await waitLines(mark, (l) => l.event === 'updateTabItems-refCascade-error' && l.msg === 'renameCascadeNameInUse', 'refCascade-error')
             checkNoSecrets(lines, [SEC.id, SEC.name, SEC.email], '030')
 
             //對照 1: 停用之懸空引用不擋(規則 3: 停用之懸空引用不擋)
@@ -689,13 +689,13 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
             const SEC = { id: 'id-rc-secret-conf', name: 'rcSecretConfName', email: 'rc-secret-conf@rc.example.com' }
             await mustEdit('users', (rows) => [...rows, uRow(SEC.id, SEC.name, { [G.m1]: ON('OR'), '停用懸空': OFF('OR') }, { email: SEC.email })])
             let s0 = await snap4()
-            let t0 = Date.now()
+            let mark = await markSrLog()
             let r = await edit('grups', (rows) => rows.map((g) => (g.name === G.m1 ? { ...g, name: '停用懸空' } : g)))
             A.equal(r.ok, false, `應被拒，實得: ${JSON.stringify(r)}`)
             A.equal(r.msg, 'renameCascadeConflict', `應回語系鍵 renameCascadeConflict，實得: ${r.msg}`)
             checkLangKey('renameCascadeConflict')
             A.deepEqual(await snap4(), s0, '被拒時四表須逐位元不變')
-            let lines = await waitLines(t0, (l) => l.event === 'updateTabItems-refCascade-error' && l.msg === 'renameCascadeConflict', 'refCascade-error')
+            let lines = await waitLines(mark, (l) => l.event === 'updateTabItems-refCascade-error' && l.msg === 'renameCascadeConflict', 'refCascade-error')
             checkNoSecrets(lines, [SEC.id, SEC.name, SEC.email], '031')
         })
 
@@ -714,12 +714,12 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
             ]
             for (let c of cases) {
                 let s0 = await snap4()
-                let t0 = Date.now()
+                let mark = await markSrLog()
                 let r = await edit('pemis', c.mut)
                 A.equal(r.ok, false, `${c.label} 應被拒，實得: ${JSON.stringify(r)}`)
                 A.equal(r.msg, c.key, `${c.label} 應回語系鍵 ${c.key}，實得: ${r.msg}`)
                 A.deepEqual(await snap4(), s0, `${c.label} 被拒時四表須逐位元不變`)
-                let lines = await waitLines(t0, (l) => l.event === 'updateTabItems-refCascade-error' && l.keyTable === 'pemis' && l.msg === c.key, `${c.label} reason`)
+                let lines = await waitLines(mark, (l) => l.event === 'updateTabItems-refCascade-error' && l.keyTable === 'pemis' && l.msg === c.key, `${c.label} reason`)
                 checkNoSecrets(lines, [SEC1.id, SEC1.name, SEC2.id, SEC2.name], `036 ${c.label}`)
             }
         })
@@ -747,10 +747,10 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
             let usersB = await rowsOf('users')
             let grupsBase = (await rowsOf('grups')).filter((g) => g.from !== 'appRC')
             let permB = await permAll()
-            let t0 = Date.now()
+            let mark = await markSrLog()
             let res = await postSync('grups', { from: 'appRC', rows: [xGrup(1, 'rcX1new'), xGrup(2), xGrup(3)] })
             A.equal(res.state, 'success', `同步應成功，實得: ${JSON.stringify(res)}`)
-            let lines = await waitLines(t0, (l) => l.event === 'refCascade-done' && l.keyTable === 'grups', 'refCascade-done')
+            let lines = await waitLines(mark, (l) => l.event === 'refCascade-done' && l.keyTable === 'grups', 'refCascade-done')
             let done = lines.find((l) => l.event === 'refCascade-done' && l.keyTable === 'grups')
             A.deepEqual({ holder: done.holder, nRename: done.nRename, nDelName: done.nDelName, nHolders: done.nHolders, nRenameHolders: done.nRenameHolders, nDelHolders: done.nDelHolders, nExternal: done.nExternal, userId: done.userId }, { holder: 'users', nRename: 1, nDelName: 0, nHolders: 3, nRenameHolders: 3, nDelHolders: 0, nExternal: 2, userId: ID_APP }, `同步路徑 refCascade-done 計數與操作者(實得 ${done._raw})`)
             let usersA = await rowsOf('users')
@@ -825,12 +825,12 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
             ]
             for (let c of cases) {
                 let s0 = await snap4()
-                let t0 = Date.now()
+                let mark = await markSrLog()
                 let res = await postSync('grups', { from: 'appRC', rows: c.rows })
                 A.equal(res.state, 'error', `${c.label} 應被拒，實得: ${JSON.stringify(res)}`)
                 A.equal(res.msg, 'invalidRows', `${c.label} 外部應用只收固定鍵 invalidRows，實得: ${JSON.stringify(res.msg)}`)
                 A.deepEqual(await snap4(), s0, `${c.label} 被拒時四表須逐位元不變`)
-                let lines = await waitLines(t0, (l) => l.event === 'syncAndReplaceTabs-error' && l.reason === c.reason, `${c.label} reason`)
+                let lines = await waitLines(mark, (l) => l.event === 'syncAndReplaceTabs-error' && l.reason === c.reason, `${c.label} reason`)
                 checkNoSecrets(lines, [SEC1.id, SEC1.name, SEC1.email, SEC2.id, SEC2.name, SEC2.email], `044 ${c.label}`)
             }
         })
@@ -1049,9 +1049,9 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
                     () => write('users', payU),
                     () => postSync('grups', swBody),
                 ]
-                let t0 = Date.now()
+                let tRun = Date.now()
                 let rs = await settleWithin(rotate(jobs, r).map((j) => j()), 30000, `第 ${r} 輪`)
-                A.ok(Date.now() - t0 < 30000, '整體須於 30 秒內完成')
+                A.ok(Date.now() - tRun < 30000, '整體須於 30 秒內完成')
                 rs.forEach((st, k) => A.ok(okOf(st), `第 ${r} 輪第 ${k} 個寫入者應成功，實得: ${JSON.stringify(st)}`))
 
                 //終態(無遺失更新: 各寫入者之意圖皆在; 無懸空)
@@ -1212,24 +1212,24 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
             //run07(F-23): 原迴圈為 dg2／dg1; dg1 現為外部列(appRC-d)、後台改名外部列屬 saveExternalRowChanged(非本案之 renameCascadeDupGroup), 故「任一筆」改以兩列皆後台之 dk1／dk2(rc-dup-k, 被 dkh 引用)驗, dg2 仍驗(其同名者 dg1 為外部列)
             for (let id of ['id-rc-dg2', 'id-rc-dk1', 'id-rc-dk2']) {
                 let s0 = await snap4()
-                let t0 = Date.now()
+                let mark = await markSrLog()
                 let r = await edit('grups', (rows) => rows.map((g) => (g.id === id ? { ...g, name: 'rc-dup-g-renamed' } : g)))
                 A.equal(r.ok, false, `${id} 改名應被拒，實得: ${JSON.stringify(r)}`)
                 A.equal(r.msg, 'renameCascadeDupGroup', `${id} 應回語系鍵 renameCascadeDupGroup，實得: ${r.msg}`)
                 A.deepEqual(await snap4(), s0, `${id} 被拒時四表須逐位元不變`)
-                let lines = await waitLines(t0, (l) => l.event === 'updateTabItems-refCascade-error' && l.msg === 'renameCascadeDupGroup', 'refCascade-error')
+                let lines = await waitLines(mark, (l) => l.event === 'updateTabItems-refCascade-error' && l.msg === 'renameCascadeDupGroup', 'refCascade-error')
                 checkNoSecrets(lines, ['id-rc-du', 'rcDupHolder', 'rc-dup-holder@example.com', 'id-rc-dkh', 'rcDupHolderK', 'rc-dup-holder-k@example.com'], `032 ${id}`)
             }
         })
 
         it('API-RC-033 renameCascadeDupGroup(外部同步): 同步歷史同名組中屬該 from 之一列改名 → 回固定鍵 invalidRows、四表逐位元不變、srLog 之 reason 為 renameCascadeDupGroup 且不含引用端值(S4、S5e)', async function() {
             let s0 = await snap4()
-            let t0 = Date.now()
+            let mark = await markSrLog()
             let res = await postSync('grups', { from: 'appRC-d', rows: [{ id: 'id-rc-dg1', order: 0, name: 'rc-dup-g-s', description: 'rc-dup-g 1', cpemis: JSON.stringify({ [P.p1]: ON('OR') }) }] })
             A.equal(res.state, 'error', `應被拒，實得: ${JSON.stringify(res)}`)
             A.equal(res.msg, 'invalidRows', `外部應用只收固定鍵 invalidRows，實得: ${JSON.stringify(res.msg)}`)
             A.deepEqual(await snap4(), s0, '被拒時四表須逐位元不變')
-            let lines = await waitLines(t0, (l) => l.event === 'syncAndReplaceTabs-error' && l.reason === 'renameCascadeDupGroup', 'reason')
+            let lines = await waitLines(mark, (l) => l.event === 'syncAndReplaceTabs-error' && l.reason === 'renameCascadeDupGroup', 'reason')
             checkNoSecrets(lines, ['id-rc-du', 'rcDupHolder', 'rc-dup-holder@example.com'], '033')
         })
 

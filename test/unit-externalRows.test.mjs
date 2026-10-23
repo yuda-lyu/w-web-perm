@@ -1,12 +1,14 @@
 //外部列受保護純函數單元測試(F-23; R-PRINCIPLE-00 原則 5「開了外部同步就以外部為主」、原則 3「遇衝突或歧義:收嚴＋提示」; 規則帳本 R-EXT-OWN-01; ADR-037; run07 U1)
 //
-//受測: src/js/externalRows.mjs(純函數, 前後端共用): isExternalRow／getLockFields／restoreExternalOrder／dropServerOnlyDiff／checkExternalWrite／hasExternalDiff 與常數 SERVER_FIELDS／ASSIGN_FIELD.
+//受測: src/js/externalRows.mjs(純函數, 前後端共用): isExternalRow／getLockFields／restoreExternalOrder／dropServerOnlyDiff／restoreServerFields／checkExternalWrite／hasExternalDiff 與常數 SERVER_FIELDS／ASSIGN_FIELD.
 //
 //規格來源(期望由下列規則逐格推導, 不抄實作; 規格常數見 test/tools/unitExt.mjs 之 SPEC_*, 由 src/schema/tables/*.mjs 逐表手列):
 //  EX-S1 外部列判別(設計摘要「外部列」、externalRows.mjs 檔頭定案 D1): from 為非空字串者為外部列; from 為 ''、缺欄、非字串(null／數字／布林)者為後台列.
 //  EX-S2 鎖定欄: 外部列之身分／結構欄 = schema 全部欄位扣除 id、from、order、指派欄(users.cgrups／grups.cpemis／pemis.crules)、伺服器管理欄(userId／timeCreate／userIdUpdate／timeUpdate).
 //  EX-S3 外部列之 order 由外部擁有: 後台儲存重編 order 時, 庫內為外部列者之 order 還原為庫內值; 後台列、庫內無之列不動; 不改輸入.
 //  EX-S4 外部列「僅伺服器管理欄不同」之 diff 列視為無變更(移入 same, 不回退建立者／建立時間); 後台列不適用, 內容有異者仍為 diff.
+//  EX-S4b (run11 外審 sol 第 3 點) 外部列之 diff 列(內容確有改動, 如指派欄)改帶庫內之伺服器管理欄(userId／timeCreate／userIdUpdate／timeUpdate), 免持舊草稿(保留未存編輯期間外部同步已重寫該列)把建立者與建立時間回退為舊值;
+//        只處理庫內為外部列者, 後台列、庫內無對應者原樣; 庫內缺該欄者不補; add／del／same 原樣; 不改輸入.
 //  EX-S5 守門(違規整次拒收、零寫入, 不靜默忽略):
 //        ①from 型別(不論 lockExternalRows): 新增列 from 須為字串(缺欄視為 ''); 修改列若把 from 改成非字串且異於庫內值 → 拒; 歷史非字串 from 原樣送回之 diff 列不拒(否則已有歷史資料之庫無法儲存);
 //        ②lockExternalRows 為真: 新增列 from 須為 ''(含復活他來源之列、複製繼承、手打); 外部列不可刪; 外部列不可改 from 與鎖定欄; 後台列不可改成非空 from;
@@ -21,6 +23,7 @@
 //  B getLockFields          表4 × {精確集合, 排除項(含「鎖定欄∪排除項＝schema 全欄」), 依 keys 次序} 12 格 ＋ keys 非陣列 1 ＋ 表名未知／原型鍵名 1 ＋ 他表指派欄 1 = 15, 全測
 //  C restoreExternalOrder   庫內歸屬{外部 pd,外部 ' ',後台 '',缺欄,null} × 送入 from{同庫內,pd,''} 15 格 ＋ 混合／無 order／缺 order／庫內無／非陣列／雜訊／非物件元素／不改輸入／空陣列 9 格 = 24, 全測
 //  D dropServerOnlyDiff     表4 × 伺服器管理欄{單欄 4,全欄 1}=20 ＋ 表4 × 非伺服器欄逐欄(users 8、grups 5、pemis 5、targets 3)=21 ＋ 後台列{'',缺欄,null,0} 4 ＋ 陣列保持／缺欄≡''／庫內無／不改輸入 4 = 49, 全測
+//  D2 restoreServerFields   表4 × 伺服器管理欄{單欄 4,全欄 1}=20 ＋ 外部列改指派欄(三表)3 ＋ 後台列{'',缺欄,null,0} 4 ＋ 庫內無對應／缺 id 1 ＋ 庫內缺伺服器欄 1 ＋ add／del／same 原樣與同一物件 1 ＋ 不改輸入與回傳新物件 1 = 31, 全測
 //  E checkExternalWrite     E_add 新增列 from 10 格 × lock{真,假} 2 × 表 4 = 80
 //                           E_del 刪除列之庫內歸屬 8 格({pd,' ',''、缺欄,null,0,123,false}) × 2 × 4 = 64
 //                           E_from 修改列之 from: 舊歸屬{外部 pd 11 新值,後台 '' 10,後台缺欄 9,歷史 null 7,歷史 0 4,歷史 123 3,歷史 false 3}=47 格 × 2 × 4 = 376
@@ -31,7 +34,7 @@
 //  未測: 無.
 //跑法: npx mocha test/unit-externalRows.test.mjs --reporter list --timeout 30000
 import assert from 'assert'
-import { SERVER_FIELDS, ASSIGN_FIELD, isExternalRow, getLockFields, restoreExternalOrder, dropServerOnlyDiff, checkExternalWrite, hasExternalDiff } from '../src/js/externalRows.mjs'
+import { SERVER_FIELDS, ASSIGN_FIELD, isExternalRow, getLockFields, restoreExternalOrder, dropServerOnlyDiff, restoreServerFields, checkExternalWrite, hasExternalDiff } from '../src/js/externalRows.mjs'
 import { TABLES, KEYS, SPEC_LOCK, SPEC_ASSIGN, SPEC_SERVER, MISSING, mkRow, rowWith, deepFreeze } from './tools/unitExt.mjs'
 
 
@@ -45,7 +48,7 @@ const EXTFROM = { key: 'saveExternalRowChanged', reason: 'fromChanged' }
 const FIELD = { key: 'saveExternalRowChanged', reason: 'fieldChanged' }
 
 //cells: 各矩陣實測格數(檔尾核對)
-const cells = { A: 0, B: 0, C: 0, D: 0, E_add: 0, E_del: 0, E_from: 0, E_field: 0, E_norm: 0, E_multi: 0, E_robust: 0, F: 0 }
+const cells = { A: 0, B: 0, C: 0, D: 0, D2: 0, E_add: 0, E_del: 0, E_from: 0, E_field: 0, E_norm: 0, E_multi: 0, E_robust: 0, F: 0 }
 
 let mkR = (o = {}) => ({ add: [], del: [], diff: [], same: [], ...o })
 let sortCopy = (a) => [...a].sort()
@@ -356,6 +359,99 @@ describe('unit-externalRows (外部列受保護純函數, F-23, R-EXT-OWN-01)', 
             assert.strict.notEqual(out, r)
             assert.strict.equal(r.diff.length, 1)
             assert.strict.equal(out.diff.length, 0)
+        })
+
+    })
+
+
+    describe('restoreServerFields(EX-S4b)', function() {
+
+        let ext = (t, o = {}) => mkRow(t, { id: 'e1', from: 'pd', ...o })
+        let SRV_OLD = { userId: 'sync-new', timeCreate: 'T-new', userIdUpdate: 'sync-new', timeUpdate: 'T-new' }
+        let SRV_STALE = { userId: 'sync-old', timeCreate: 'T-old', userIdUpdate: 'sync-old', timeUpdate: 'T-old' }
+
+        for (let t of TABLES) {
+            //伺服器管理欄: 單欄與全欄(草稿持舊值, 庫內為較新值)
+            let serverCases = [...SPEC_SERVER.map((f) => [f, [f]]), ['四欄同時', SPEC_SERVER]]
+            for (let [title, fs] of serverCases) {
+                it(`EX-047 ${t}: 外部列內容有改動(description)且伺服器管理欄(${title})持舊值 → diff 列改帶庫內較新之值, 其餘欄(含被改之內容)不動`, function() {
+                    cells.D2++
+                    let old = [ext(t, SRV_OLD)]
+                    let row = ext(t, { ...Object.fromEntries(fs.map((f) => [f, SRV_STALE[f]])), description: 'edited' })
+                    let r = deepFreeze({ add: [], del: [], diff: [row], same: [] })
+                    let out = restoreServerFields({ r, ltdtOld: deepFreeze(old) })
+                    assert.strict.equal(out.diff.length, 1)
+                    for (let f of SPEC_SERVER) {
+                        assert.strict.equal(out.diff[0][f], SRV_OLD[f], `${t}.${f} 應為庫內值`)
+                    }
+                    assert.strict.equal(out.diff[0].description, 'edited', '被改之內容欄不得被覆蓋')
+                    assert.strict.equal(out.diff[0].id, 'e1')
+                })
+            }
+        }
+
+        for (let [t, f] of [['users', 'cgrups'], ['grups', 'cpemis'], ['pemis', 'crules']]) {
+            it(`EX-048 ${t}: 外部列改指派欄 ${f}(後台唯一可改之欄)且伺服器欄持舊值 → 指派欄為草稿值、伺服器欄為庫內值`, function() {
+                cells.D2++
+                let old = [ext(t, SRV_OLD)]
+                let row = ext(t, { ...SRV_STALE, [f]: '{"X":"y"}' })
+                let out = restoreServerFields({ r: { add: [], del: [], diff: [row], same: [] }, ltdtOld: old })
+                assert.strict.equal(out.diff[0][f], '{"X":"y"}')
+                assert.strict.equal(out.diff[0].userId, 'sync-new')
+                assert.strict.equal(out.diff[0].timeCreate, 'T-new')
+            })
+        }
+
+        for (let [title, from] of [['空字串', ''], ['缺欄', MISSING], ['null', null], ['0', 0]]) {
+            it(`EX-049 後台列(from ${title})之 diff 原樣(同一物件, 伺服器管理欄不動; 後台列寫入行為不變)`, function() {
+                cells.D2++
+                let base = rowWith(mkRow('grups', { id: 'b1', ...SRV_OLD }), { from })
+                let row = rowWith(base, { ...SRV_STALE, description: 'edited' })
+                let out = restoreServerFields({ r: { add: [], del: [], diff: [row], same: [] }, ltdtOld: [base] })
+                assert.strict.equal(out.diff[0], row)
+                assert.strict.equal(out.diff[0].userId, 'sync-old')
+            })
+        }
+
+        it('EX-050 庫內無對應 id／diff 列缺 id → 原樣(同一物件), 不拋例外', function() {
+            cells.D2++
+            let old = [ext('grups', SRV_OLD)]
+            let r1 = ext('grups', { id: 'zz', ...SRV_STALE })
+            let r2 = rowWith(ext('grups', SRV_STALE), { id: MISSING })
+            let out = restoreServerFields({ r: { add: [], del: [], diff: [r1, r2], same: [] }, ltdtOld: old })
+            assert.strict.equal(out.diff[0], r1)
+            assert.strict.equal(out.diff[1], r2)
+        })
+
+        it('EX-051 庫內該外部列缺某伺服器管理欄 → 不補(不憑空寫入 undefined), 草稿值保留', function() {
+            cells.D2++
+            let o = rowWith(ext('grups', SRV_OLD), { timeCreate: MISSING })
+            let row = ext('grups', { ...SRV_STALE, description: 'edited' })
+            let out = restoreServerFields({ r: { add: [], del: [], diff: [row], same: [] }, ltdtOld: [o] })
+            assert.strict.equal(out.diff[0].userId, 'sync-new')
+            assert.strict.equal(out.diff[0].timeCreate, 'T-old', '庫內缺欄者不補, 草稿值原樣')
+        })
+
+        it('EX-052 add／del／same 原樣(同一陣列)', function() {
+            cells.D2++
+            let add = [mkRow('grups', { id: 'a1' })]
+            let del = [mkRow('grups', { id: 'd1', from: 'pd' })]
+            let same = [mkRow('grups', { id: 's1', from: 'pd' })]
+            let out = restoreServerFields({ r: { add, del, diff: [], same }, ltdtOld: [ext('grups', SRV_OLD)] })
+            assert.strict.equal(out.add, add)
+            assert.strict.equal(out.del, del)
+            assert.strict.equal(out.same, same)
+        })
+
+        it('EX-053 不改輸入(凍結之 r／ltdtOld 不拋錯)且回傳新物件與新 diff 列', function() {
+            cells.D2++
+            let o = ext('grups', SRV_OLD)
+            let row = ext('grups', { ...SRV_STALE, description: 'edited' })
+            let r = deepFreeze({ add: [], del: [], diff: [row], same: [] })
+            let out = restoreServerFields({ r, ltdtOld: deepFreeze([o]) })
+            assert.strict.notEqual(out, r)
+            assert.strict.notEqual(out.diff[0], row)
+            assert.strict.equal(row.userId, 'sync-old', '輸入列不被改')
         })
 
     })
@@ -732,6 +828,7 @@ describe('unit-externalRows (外部列受保護純函數, F-23, R-EXT-OWN-01)', 
                 B: 15,
                 C: 24,
                 D: 49,
+                D2: 31,
                 E_add: 80,
                 E_del: 64,
                 E_from: 376,

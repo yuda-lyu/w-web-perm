@@ -1,0 +1,11 @@
+start Fri Oct 23 2026 04:05:44 GMT+0800 (台北標準時間) grep=AF-037 probe=true file=test/e2e-array-form.test.mjs
+run 11: exit=1 passing=1 failing=1 pending=0 34s 1) AF-037-rename-pemi-preview [eng]: (spec 流程_後台權限清單 E2E-015) 改名 ren-p→ren-p-new || 1) e2e-array-form run06 引用連帶: 改名預覽確認、刪除確認與清理、預檢被拒、cascadeRename:false (ADR-036; 
+run 12: exit=1 passing=1 failing=1 pending=0 34s 1) AF-037-rename-pemi-preview [eng]: (spec 流程_後台權限清單 E2E-015) 改名 ren-p→ren-p-new || 1) e2e-array-form run06 引用連帶: 改名預覽確認、刪除確認與清理、預檢被拒、cascadeRename:false (ADR-036; 
+run 13: exit=1 passing=1 failing=1 pending=0 33s 1) AF-037-rename-pemi-preview [cht]: (spec 流程_後台權限清單 E2E-015) 改名 ren-p→ren-p-new || 1) e2e-array-form run06 引用連帶: 改名預覽確認、刪除確認與清理、預檢被拒、cascadeRename:false (ADR-036; 
+run 14: exit=1 passing=1 failing=1 pending=0 32s 1) AF-037-rename-pemi-preview [cht]: (spec 流程_後台權限清單 E2E-015) 改名 ren-p→ren-p-new || 1) e2e-array-form run06 引用連帶: 改名預覽確認、刪除確認與清理、預檢被拒、cascadeRename:false (ADR-036; 
+run 15: exit=1 passing=1 failing=1 pending=0 32s 1) AF-037-rename-pemi-preview [eng]: (spec 流程_後台權限清單 E2E-015) 改名 ren-p→ren-p-new || 1) e2e-array-form run06 引用連帶: 改名預覽確認、刪除確認與清理、預檢被拒、cascadeRename:false (ADR-036; 
+run 16: exit=2 passing=0 failing=2 pending=0 32s 1) AF-037-rename-pemi-preview [eng]: (spec 流程_後台權限清單 E2E-015) 改名 ren-p→ren-p-new || 2) AF-037-rename-pemi-preview [cht]: (spec 流程_後台權限清單 E2E-015) 改名 ren-p→ren-p-new || 1) e2e-array-form run06 引用連帶: 改名預覽確認、刪除確認與清理、預檢被拒、cascadeRename:false (ADR-036;  || 2) e2e-array-form run06 引用連帶: 改名預覽確認、刪除確認與清理、預檢被拒、cascadeRename:false (ADR-036; 
+run 17: exit=1 passing=1 failing=1 pending=0 32s 1) AF-037-rename-pemi-preview [eng]: (spec 流程_後台權限清單 E2E-015) 改名 ren-p→ren-p-new || 1) e2e-array-form run06 引用連帶: 改名預覽確認、刪除確認與清理、預檢被拒、cascadeRename:false (ADR-036; 
+run 18: exit=1 passing=1 failing=1 pending=0 32s 1) AF-037-rename-pemi-preview [eng]: (spec 流程_後台權限清單 E2E-015) 改名 ren-p→ren-p-new || 1) e2e-array-form run06 引用連帶: 改名預覽確認、刪除確認與清理、預檢被拒、cascadeRename:false (ADR-036; 
+run 19: exit=0 passing=2 failing=0 pending=0 33s 
+run 20: exit=1 passing=1 failing=1 pending=0 32s 1) AF-037-rename-pemi-preview [cht]: (spec 流程_後台權限清單 E2E-015) 改名 ren-p→ren-p-new || 1) e2e-array-form run06 引用連帶: 改名預覽確認、刪除確認與清理、預檢被拒、cascadeRename:false (ADR-036; 

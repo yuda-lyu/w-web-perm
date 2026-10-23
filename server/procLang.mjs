@@ -417,6 +417,20 @@ let kpLang = {
         eng: `Not saved: the data changed (by someone else or by an external synchronization) after this page was loaded. Nothing was changed. Please reload the page and try again.`,
         cht: `未儲存：載入此頁面後資料已被他人或外部同步更新。資料未變更，請重新整理頁面後再操作。`,
     },
+    //R-PRINCIPLE-00 原則 7(多人同時編輯, 2026-10-22; ADR-037 Update run11): 有未存編輯時他人或外部同步改了本表 → 清單頁保留草稿並顯示 staleDraftNotice(附「重新載入」鈕 staleDraftReload);
+    //反向關聯對話框(開框後資料已被更新)顯示 staleDraftNoticeDialog. 存檔時由伺服端以表雜湊比對拒收, 訊息仍為 saveStale(不改其文字)
+    staleDraftNotice: {
+        eng: `The data was updated by someone else or by an external synchronization after you started editing. Your unsaved edits are kept here, but saving now will be rejected. Click "Reload" to get the latest data (your unsaved edits will be discarded).`,
+        cht: `資料已被他人或外部同步更新。您尚未儲存的編輯仍保留於此，但現在儲存將被拒絕。請按「重新載入」取得最新資料（未儲存的編輯將被捨棄）。`,
+    },
+    staleDraftReload: {
+        eng: `Reload`,
+        cht: `重新載入`,
+    },
+    staleDraftNoticeDialog: {
+        eng: `The data was updated by someone else or by an external synchronization after this window was opened. Saving from this window will be rejected. Please close this window and open it again to get the latest data.`,
+        cht: `資料已被他人或外部同步更新，本視窗內的資料已過期，儲存將被拒絕。請關閉本視窗後重新開啟，以取得最新資料。`,
+    },
     saveBaselineRequired: {
         eng: `Not saved: changing the assignment settings of rows synchronized from an external source requires the latest loaded data, which this request did not carry. Nothing was changed. Please reload the page and try again.`,
         cht: `未儲存：修改外部來源同步列之授權指派設定須附載入時之資料版本，此次請求未附。資料未變更，請重新整理頁面後再操作。`,

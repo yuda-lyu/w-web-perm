@@ -11,7 +11,7 @@ import isfun from 'wsemi/src/isfun.mjs'
 
 
 //keysUpstream: 上游失敗可照記之 key 白名單 = w-web-sso 對外 helper 之 K 契約 14 個 key(w-web-sso ADR-068)
-//與 sso 之同步點: sso 之 K 契約增減 key 時須同步本表(見 CLAUDE_rulebook.md「權杖不外洩」)
+//與 sso 之同步點: sso 之 K 契約增減 key 時須同步本表(見 sgud/rule/rulebook.md「權杖不外洩」)
 let keysUpstream = [
     'invalidUrl',
     'invalidTokenSelf',

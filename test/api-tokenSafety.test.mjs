@@ -5,13 +5,13 @@
 //  '{token-for-reject}'       → getUserByToken 以舊版 w-web-sso helper(≤1.1.4)之失敗形狀 reject: 字串含已代入權杖之完整網址(夾 SYNTH-SYS-SECRET-FOR-TEST 與所送權杖)
 //  '{token-for-verify-throw}' → getUserByToken 回 id-for-verify-throw; verifyClientUser / verifyAppUser 對其 throw Error('SYNTH-VERIFY-SECRET-FOR-TEST')
 //  client 通道(api/getUserByToken、api/getPerm、資料通道)會反查 perm users 表(mappingBy), 故 before 以 app token 經 /syncAndReplaceTabs 於本檔專用 from
-//  插入 id-for-verify-throw 使驗證走到 verifyClientUser; after 以 delAll({from}) 清除(同 api-syncAndReplaceTabs 之清理慣例)。
+//  插入 id-for-verify-throw 使驗證走到 verifyClientUser; after 經 cleanExternalFixtures 清除(外部列夾具收尾之單一入口, R-TEST-EXT-CLEAN-01)。
 //述語(W 契約): 注入函數拋錯或 reject 視同否定結果——getUserByToken 失敗 ≡ 查無使用者(自家 key cannotFindUserFromToken / cannotFindUserId),
 //  verify* 失敗 ≡ 無權限(userNoPermission); 上游原文不回前端、不入 srLog, srLog 只記 warn(白名單 key, 或型別與 Error.name)。
 //述語(M 契約): verifyConn 之 srLog referer 只記 origin + pathname。
 //修正前(2026-09-24 探測 tmp/probe-v3/result-before.json 之 perm 段): 回應 msg 為上游原文、verifyConn 之 srLog msg 與 referer 皆含權杖。
 import assert from 'assert'
-import { startApi, apiBaseUrl, callRpc, readSrLogSince, getWoItems, TOKEN_ADMIN, TOKEN_APP, TOKEN_REJECT, TOKEN_VERIFY_THROW, SEED } from './tools/api-setup.mjs'
+import { startApi, apiBaseUrl, callRpc, markSrLog, readSrLogSince, getWoItems, cleanExternalFixtures, TOKEN_ADMIN, TOKEN_APP, TOKEN_REJECT, TOKEN_VERIFY_THROW, SEED } from './tools/api-setup.mjs'
 
 
 const SECRET_SYS = 'SYNTH-SYS-SECRET-FOR-TEST' //srv.mjs 之 '{token-for-reject}' 夾帶之合成介接權杖
@@ -58,11 +58,11 @@ function entries(tokenQuery) {
 describe('api-tokenSafety', function() {
     this.timeout(300000)
 
-    let t0 = 0
+    let mark = null //srLog 標記(以檔案位置定位本檔動作之後新增之行, 不比對跨行程時鐘; R-SRLOG-MARK-01)
 
     before(async function() {
         await startApi()
-        t0 = Date.now()
+        mark = await markSrLog()
         //插入 id-for-verify-throw(isActive='y'), 使 client 通道之驗證走到 verifyClientUser
         let r = await httpText(`${apiBaseUrl}/syncAndReplaceTabs?keyTable=users&token=${encodeURIComponent(TOKEN_APP)}`, {
             method: 'POST',
@@ -73,9 +73,7 @@ describe('api-tokenSafety', function() {
     })
 
     after(async function() {
-        let woItems = await getWoItems()
-        await woItems.users.delAll({ from: FROM_VT })
-        await woItems.users.delAll({ from: FROM_BLOCKED })
+        await cleanExternalFixtures({ kts: ['users'], froms: [FROM_VT, FROM_BLOCKED] }) //外部列夾具收尾之單一入口(R-TEST-EXT-CLEAN-01)
     })
 
 
@@ -147,12 +145,12 @@ describe('api-tokenSafety', function() {
         }
 
         //哨兵: keyTable 不在白名單時 srLog 會記 keyTable(本次唯一值); 同一行程之 srLog 依呼叫序落檔, 見哨兵即前面各行已落檔
-        let sentinel = `tsSentinel${t0}`
+        let sentinel = `tsSentinel${process.pid}x${Date.now()}`
         await httpText(`${apiBaseUrl}/syncAndReplaceTabs?keyTable=${sentinel}&token=x`, { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: '{}' })
         let lines = []
         let tEnd = Date.now() + 30000
         while (Date.now() < tEnd) {
-            lines = readSrLogSince(t0)
+            lines = readSrLogSince(mark)
             if (lines.some((l) => l.keyTable === sentinel)) {
                 break
             }

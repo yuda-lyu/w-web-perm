@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    
+    <meta charset="utf-8">
+    <title>server/tools/fromTools.mjs - Documentation</title>
+    
+    
+    <script src="scripts/prettify/prettify.js"></script>
+    <script src="scripts/prettify/lang-css.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc.css">
+    <script src="scripts/nav.js" defer></script>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+<input type="checkbox" id="nav-trigger" class="nav-trigger" />
+<label for="nav-trigger" class="navicon-button x">
+  <div class="navicon"></div>
+</label>
+
+<label for="nav-trigger" class="overlay"></label>
+
+<nav >
+    
+    
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="WWebPerm.html">WWebPerm</a></li></ul><h3>Global</h3><ul><li><a href="global.html#applyPurgePlan">applyPurgePlan</a></li><li><a href="global.html#auditFrom">auditFrom</a></li><li><a href="global.html#auditRefs">auditRefs</a></li><li><a href="global.html#buildReport">buildReport</a></li><li><a href="global.html#buildRowsSend">buildRowsSend</a></li><li><a href="global.html#buildSyncRowsNew">buildSyncRowsNew</a></li><li><a href="global.html#checkBaseline">checkBaseline</a></li><li><a href="global.html#checkCascadePlan">checkCascadePlan</a></li><li><a href="global.html#checkDbNotInUse">checkDbNotInUse</a></li><li><a href="global.html#checkExternalWrite">checkExternalWrite</a></li><li><a href="global.html#checkMapKeyBatch">checkMapKeyBatch</a></li><li><a href="global.html#checkUsersWrite">checkUsersWrite</a></li><li><a href="global.html#cleanOutOf">cleanOutOf</a></li><li><a href="global.html#compareBaseline">compareBaseline</a></li><li><a href="global.html#countAndRefs">countAndRefs</a></li><li><a href="global.html#countExternalRows">countExternalRows</a></li><li><a href="global.html#countIdRenumber">countIdRenumber</a></li><li><a href="global.html#createAuthorizeExec">createAuthorizeExec</a></li><li><a href="global.html#createLegendMeasurer">createLegendMeasurer</a></li><li><a href="global.html#createLockSave">createLockSave</a></li><li><a href="global.html#cvKpToArr">cvKpToArr</a></li><li><a href="global.html#cvKpToObj">cvKpToObj</a></li><li><a href="global.html#decideLegendType">decideLegendType</a></li><li><a href="global.html#describeUpstream">describeUpstream</a></li><li><a href="global.html#diffRefTargets">diffRefTargets</a></li><li><a href="global.html#dropServerOnlyDiff">dropServerOnlyDiff</a></li><li><a href="global.html#eachOwn">eachOwn</a></li><li><a href="global.html#fetchJson">fetchJson</a></li><li><a href="global.html#fillIdlessIds">fillIdlessIds</a></li><li><a href="global.html#findDupIndex">findDupIndex</a></li><li><a href="global.html#findKeyOtherFrom">findKeyOtherFrom</a></li><li><a href="global.html#findRefRows">findRefRows</a></li><li><a href="global.html#findTouchedDup">findTouchedDup</a></li><li><a href="global.html#fmtLossyMsg">fmtLossyMsg</a></li><li><a href="global.html#fmtVars">fmtVars</a></li><li><a href="global.html#fmtWarn">fmtWarn</a></li><li><a href="global.html#formatFixReport">formatFixReport</a></li><li><a href="global.html#formatFromAudit">formatFromAudit</a></li><li><a href="global.html#formatPurgeReport">formatPurgeReport</a></li><li><a href="global.html#genLegend">genLegend</a></li><li><a href="global.html#getAddConfirmText">getAddConfirmText</a></li><li><a href="global.html#getAddImpact">getAddImpact</a></li><li><a href="global.html#getBannerLines">getBannerLines</a></li><li><a href="global.html#getBaselineDigest">getBaselineDigest</a></li><li><a href="global.html#getCascadePreview">getCascadePreview</a></li><li><a href="global.html#getChangedIdx">getChangedIdx</a></li><li><a href="global.html#getDelConfirmText">getDelConfirmText</a></li><li><a href="global.html#getDelImpact">getDelImpact</a></li><li><a href="global.html#getDelRefCount">getDelRefCount</a></li><li><a href="global.html#getDigestFields">getDigestFields</a></li><li><a href="global.html#getDupRowsInconsistent">getDupRowsInconsistent</a></li><li><a href="global.html#getEffMode">getEffMode</a></li><li><a href="global.html#getExternalEdits">getExternalEdits</a></li><li><a href="global.html#getItemWarnText">getItemWarnText</a></li><li><a href="global.html#getKpLossy">getKpLossy</a></li><li><a href="global.html#getLockFields">getLockFields</a></li><li><a href="global.html#getNameErrs">getNameErrs</a></li><li><a href="global.html#getOwn">getOwn</a></li><li><a href="global.html#getPropKey">getPropKey</a></li><li><a href="global.html#getRawModeMap">getRawModeMap</a></li><li><a href="global.html#getRefRowsExtra">getRefRowsExtra</a></li><li><a href="global.html#getRefState">getRefState</a></li><li><a href="global.html#getRefWarnText">getRefWarnText</a></li><li><a href="global.html#getRefWarns">getRefWarns</a></li><li><a href="global.html#getRowIdxs">getRowIdxs</a></li><li><a href="global.html#getRowState">getRowState</a></li><li><a href="global.html#getRuleEnable">getRuleEnable</a></li><li><a href="global.html#getRuleWarnText">getRuleWarnText</a></li><li><a href="global.html#getRuleWarns">getRuleWarns</a></li><li><a href="global.html#getSavePreview">getSavePreview</a></li><li><a href="global.html#getSyncWarnLines">getSyncWarnLines</a></li><li><a href="global.html#hasDupKey">hasDupKey</a></li><li><a href="global.html#hasExternalDiff">hasExternalDiff</a></li><li><a href="global.html#isAuthMode">isAuthMode</a></li><li><a href="global.html#isBaselineStale">isBaselineStale</a></li><li><a href="global.html#isBaselineValid">isBaselineValid</a></li><li><a href="global.html#isDraftStale">isDraftStale</a></li><li><a href="global.html#isExternalRow">isExternalRow</a></li><li><a href="global.html#isJsonLossy">isJsonLossy</a></li><li><a href="global.html#isMain">isMain</a></li><li><a href="global.html#joinList">joinList</a></li><li><a href="global.html#joinNames">joinNames</a></li><li><a href="global.html#keepAssignByEntity">keepAssignByEntity</a></li><li><a href="global.html#keepAssignOnMissing">keepAssignOnMissing</a></li><li><a href="global.html#makeBaseline">makeBaseline</a></li><li><a href="global.html#makeRowStates">makeRowStates</a></li><li><a href="global.html#mapKeyOf">mapKeyOf</a></li><li><a href="global.html#mapNameKp">mapNameKp</a></li><li><a href="global.html#markDataReload">markDataReload</a></li><li><a href="global.html#markHasKey">markHasKey</a></li><li><a href="global.html#maskQuery">maskQuery</a></li><li><a href="global.html#maskTok">maskTok</a></li><li><a href="global.html#maskUrl">maskUrl</a></li><li><a href="global.html#mergePickKeysOnly">mergePickKeysOnly</a></li><li><a href="global.html#pairRowsToSnapshot">pairRowsToSnapshot</a></li><li><a href="global.html#pickUniqueUser">pickUniqueUser</a></li><li><a href="global.html#planDraftSync">planDraftSync</a></li><li><a href="global.html#planFixFromType">planFixFromType</a></li><li><a href="global.html#planPurgeChain">planPurgeChain</a></li><li><a href="global.html#planPurgeFrom">planPurgeFrom</a></li><li><a href="global.html#planRefChanges">planRefChanges</a></li><li><a href="global.html#putRefEntry">putRefEntry</a></li><li><a href="global.html#putRowsToKp">putRowsToKp</a></li><li><a href="global.html#refsChanged">refsChanged</a></li><li><a href="global.html#resolveShellWorker">resolveShellWorker</a></li><li><a href="global.html#restoreExternalOrder">restoreExternalOrder</a></li><li><a href="global.html#restoreServerFields">restoreServerFields</a></li><li><a href="global.html#reuseDeletedIds">reuseDeletedIds</a></li><li><a href="global.html#rewriteRefs">rewriteRefs</a></li><li><a href="global.html#rowDigest">rowDigest</a></li><li><a href="global.html#runAuditFrom">runAuditFrom</a></li><li><a href="global.html#runClean">runClean</a></li><li><a href="global.html#runFixFromType">runFixFromType</a></li><li><a href="global.html#runPurgeFrom">runPurgeFrom</a></li><li><a href="global.html#splitCheckedRows">splitCheckedRows</a></li><li><a href="global.html#submitGuard">submitGuard</a></li><li><a href="global.html#tabWriteKey">tabWriteKey</a></li><li><a href="global.html#validateRowsBeforeWrite">validateRowsBeforeWrite</a></li><li><a href="global.html#withTabLocks">withTabLocks</a></li><li><a href="global.html#wrapInjected">wrapInjected</a></li><li><a href="global.html#wrapOperOrm">wrapOperOrm</a></li><li><a href="global.html#writeWithCascade">writeWithCascade</a></li></ul>
+    
+</nav>
+
+<div id="main">
+    
+    <h1 class="page-title">server/tools/fromTools.mjs</h1>
+    
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>//來源欄 from 之離線維運工具之執行核心(run07 升版工具; F-23 外部列受保護之配套): 由專案根之 g_fixFromType.mjs／g_purgeFrom.mjs 呼叫(連專案資料庫);
+//邏輯抽成可注入 woItems 之函數, 供單元測試以 ORM 替身與真 lmdb 臨時庫驗證(test/unit-fromAudit.test.mjs). 風格與安全機制同 server/tools/authRefsClean.mjs(runClean).
+//純函數(稽核、規劃、清除計畫)在 src/js/fromAudit.mjs; 本檔負責讀寫、備份、驗證與文字報告.
+//
+//共通安全機制(apply 之順序, 任一步失敗即中止、其後步驟不執行; 備份失敗時零寫入):
+//  1. 讀取四表並稽核／規劃; 無須處理者不備份、不寫入; 規劃被拒(如引用端含無法安全重新編碼之內容)者整體拒絕、零寫入
+//  2. (a) 備份整個資料庫(getDb.backup(woItems), 落點為模組載入時之工作目錄之 backup-時間.json, 同 g_backupDb.mjs; 可由 backupDb 注入)
+//  3. (b) 另匯出四表全部列為 json(backupPath; wx 建立, 不覆寫既有檔), 寫後讀回驗證筆數
+//  4. 重新讀取四表, 與規劃時逐表逐列比對(稽核後被他人改動者中止, 免以過期資料覆寫)
+//  5. 寫入(經 ORM; 引用端只改該欄位: save(…, { autoInsert: false }); 清除以 del): 逐筆結果不為成功者視為失敗並列出, 立即中止後續寫入
+//  6. 重新讀取四表, 與「預期結果」逐位元比對(fix: 該些列 from 改為 ''、其餘不變; purge: 規劃套用後之預測狀態), 另做不變式檢查
+//冪等: 失敗後修正原因可原樣重跑同一指令(已完成之部分於下次稽核不再出現), 不需手動還原; 要還原則依備份檔(資料庫備份 backup-時間.json 可由 w-serv-orm 之 recover 於清空資料表後還原; 四表全部列備份檔為 json).
+//備份檔含 email 等個資, 請妥善保管、勿外傳、勿納入版控.
+//
+//輸出(stdout)可列主鍵 id 與群組／權限／標的名稱, 不列使用者姓名與 email(同 authRefsAudit 之慣例); 不寫 srLog(離線工具).
+
+import fs from 'fs'
+import path from 'path'
+import { isDeepStrictEqual } from 'util'
+import getDb from 'w-serv-orm/src/getDb.mjs'
+import now2strp from 'wsemi/src/now2strp.mjs'
+import auditRefs from '../../src/js/refAudit.mjs'
+import { TABLE_ORDER, auditFrom, planFixFromType, planPurgeChain } from '../../src/js/fromAudit.mjs'
+
+
+const TABLES = ['users', 'grups', 'pemis', 'targets'] //讀取順序同 authRefsClean.mjs
+const MAX_LIST = 50 //報告每表最多列出之被清除列數
+const MAX_IDS = 10 //報告每表最多列出之待改列 id 數
+
+const KIND_TXT = {
+    empty: '\'\' (後台列)',
+    missing: '缺欄(視同 \'\', 後台列)',
+    null: 'null(非字串, 後台列)',
+    number: '數字(非字串, 後台列)',
+    boolean: '布林(非字串, 後台列)',
+    object: '物件(非字串, 後台列)',
+    array: '陣列(非字串, 後台列)',
+    other: '其他型別(非字串, 後台列)',
+    notObject: '列本身非物件',
+}
+const ERR_TXT = {
+    invalidTable: '表名須為 targets／pemis／grups／users 之一',
+    invalidFrom: 'from 須為非空字串',
+    purgeRowNoId: '被清除列缺非空字串主鍵而無從刪除(不做部分清除)',
+    renameCascadeUnsupported: '引用端授權字串含無法安全重新編碼之內容(JSON5 Infinity／NaN 數值), 清理引用會改指別的規則, 須先人工處理該引用端列',
+    renameCascadeConflict: '引用端授權字串之改寫發生名稱相撞, 無法自動清理',
+}
+
+
+let arr = (v) => (Array.isArray(v) ? v : [])
+let j = (v) => JSON.stringify(v)
+let msgOf = (err) => (err &amp;&amp; err.message ? err.message : String(err))
+let strCmp = (a, b) => (a &lt; b ? -1 : (a > b ? 1 : 0))
+let sortById = (rows) => arr(rows).slice().sort((a, b) => strCmp(String(a !== null &amp;&amp; typeof a === 'object' ? a.id : ''), String(b !== null &amp;&amp; typeof b === 'object' ? b.id : '')))
+let rowId = (r) => (r !== null &amp;&amp; typeof r === 'object' ? r.id : undefined)
+
+
+//readTables: 讀取四表全部列
+async function readTables(woItems) {
+    let rows = {}
+    for (let t of TABLES) {
+        let rs = await woItems[t].select()
+        if (!Array.isArray(rs)) {
+            throw new Error(`select ${t} did not return an array`)
+        }
+        rows[t] = rs
+    }
+    return rows
+}
+
+
+//diffTables: 兩份四表資料(依主鍵排序後逐列深度嚴格相等)有差異之表名陣列
+let diffTables = (a, b) => TABLES.filter((t) => !isDeepStrictEqual(sortById(a[t]), sortById(b[t])))
+
+
+//checkWo: woItems 之表與函數檢查, 回傳錯誤訊息或 ''
+let checkWo = (woItems, fns) => {
+    if (woItems === null || typeof woItems !== 'object') {
+        return 'invalid woItems'
+    }
+    for (let t of TABLES) {
+        for (let f of fns) {
+            if (!woItems[t] || typeof woItems[t][f] !== 'function') {
+                return `woItems.${t} lacks ${f}`
+            }
+        }
+    }
+    return ''
+}
+
+
+//saveRows: 逐表 save(只改指定欄位; autoInsert: false, 列已不存在時不得補出只有一欄之殘列), 逐筆結果非成功者回傳失敗清單
+async function saveRows(wo, table, items) {
+    let failed = []
+    let rs = null
+    try {
+        rs = await wo.save(items, { autoInsert: false })
+    }
+    catch (err) {
+        return { written: [], failed: items.map((x) => ({ table, id: x.id, err: msgOf(err) })) }
+    }
+    if (!Array.isArray(rs) || rs.length !== items.length) {
+        return { written: [], failed: items.map((x) => ({ table, id: x.id, err: 'unexpected save result' })) }
+    }
+    let written = []
+    items.forEach((x, k) => {
+        let r = rs[k]
+        if (r &amp;&amp; r.ok === 1 &amp;&amp; r.n !== 0 &amp;&amp; !(r.nInserted > 0)) {
+            written.push({ table, id: x.id })
+        }
+        else {
+            failed.push({ table, id: x.id, err: (r &amp;&amp; r.err) ? String(r.err) : `save result ${j(r)}` })
+        }
+    })
+    return { written, failed }
+}
+
+
+//delRows: 逐表 del, 逐筆結果須為 n=1／nDeleted=1／ok=1(列已不存在 n 為 0 視為失敗: 稽核後被改動)
+async function delRows(wo, table, ids) {
+    let rs = null
+    try {
+        rs = await wo.del(ids.map((id) => ({ id })))
+    }
+    catch (err) {
+        return { written: [], failed: ids.map((id) => ({ table, id, err: msgOf(err) })) }
+    }
+    if (!Array.isArray(rs) || rs.length !== ids.length) {
+        return { written: [], failed: ids.map((id) => ({ table, id, err: 'unexpected del result' })) }
+    }
+    let written = []
+    let failed = []
+    ids.forEach((id, k) => {
+        let r = rs[k]
+        if (r &amp;&amp; r.ok === 1 &amp;&amp; r.n === 1 &amp;&amp; r.nDeleted === 1) {
+            written.push({ table, id })
+        }
+        else {
+            failed.push({ table, id, err: (r &amp;&amp; r.err) ? String(r.err) : `del result ${j(r)}` })
+        }
+    })
+    return { written, failed }
+}
+
+
+/**
+ * 值是否無法經 JSON 往返而保真(備份為 JSON 檔, 不保真者無法依備份還原原列)
+ *
+ * 以「JSON 編碼再解碼須與原值嚴格深度相等」判定(run07 增量外審 N3): 比逐型別列舉完備——NaN／±Infinity／bigint／Date(被編成字串)／自有 undefined(被丟棄)／陣列內 undefined(被改 null)／Buffer(被改物件)皆不相等;
+ * 無法 JSON 編碼者(bigint、循環參照)亦視為不保真. 同時供 server/tools/authRefsClean.mjs 之 runClean 使用(run08 外審 sol #2)
+ *
+ * @param {*} v 輸入任意值(如四表全部列之陣列)
+ * @returns {Boolean} 回傳不保真為 true
+ */
+function isJsonLossy(v) {
+    try {
+        return !isDeepStrictEqual(JSON.parse(JSON.stringify(v)), v)
+    }
+    catch (err) {
+        return true //bigint 等無法 JSON 編碼者
+    }
+}
+
+
+//backupBefore: 備份(a)整個資料庫 (b)四表全部列(wx); 成功回傳 null, 失敗回傳 { stage, err }
+async function backupBefore(p) {
+    let { res, rows0, tool, meta, backupPath, backupDb, log } = p
+
+    //備份保真(外審 sol R11): 兩份備份皆為 JSON, NaN／±Infinity／bigint 等非 JSON 值會被存成 null 或失敗而無法還原原列, 筆數回驗不會發現;
+    //列內含此類值時於任何備份與寫入之前中止(零寫入), 須人工處理該列
+    res.stage = 'backupFidelity'
+    for (let t of TABLES) {
+        if (isJsonLossy(rows0[t])) {
+            return { stage: 'backupFidelity', err: new Error(`backup would be lossy: table ${t} has a row that does not survive a JSON round trip (NaN, Infinity, bigint, Date, undefined, Buffer...); nothing was written. Please fix that row first`) }
+        }
+    }
+
+    res.stage = 'backupDb'
+    try {
+        await backupDb()
+        res.dbBackup = true
+    }
+    catch (err) {
+        return { stage: 'backupDb', err }
+    }
+    res.stage = 'backupRows'
+    try {
+        let fp = path.resolve(backupPath || `./${tool}-backup-${now2strp()}.json`)
+        res.backupPath = fp
+        let body = { meta: { tool, time: new Date().toISOString(), ...meta, note: '四表全部列(寫入前)之備份; 含個資, 請妥善保管.' } }
+        for (let t of TABLES) {
+            body[t] = rows0[t]
+        }
+        fs.writeFileSync(fp, JSON.stringify(body), { encoding: 'utf8', flag: 'wx' }) //wx: 既有檔不覆寫
+        let back = JSON.parse(fs.readFileSync(fp, 'utf8'))
+        for (let t of TABLES) {
+            if (!Array.isArray(back[t]) || back[t].length !== rows0[t].length) {
+                throw new Error(`backup file verification failed: ${t}`)
+            }
+        }
+        log(`已備份: 資料庫(backup-時間.json, 於工作目錄)、四表全部列 ${fp}`)
+    }
+    catch (err) {
+        return { stage: 'backupRows', err }
+    }
+    return null
+}
+
+
+//mkFail: 失敗收尾(印原因、已寫入進度與還原提示)
+let mkFail = (res, log) => (stage, err) => {
+    res.ok = false
+    res.stage = stage
+    res.err = msgOf(err)
+    log(`失敗(階段 ${stage}): ${res.err}`)
+    if (res.written.length > 0 || res.failed.length > 0) {
+        log(`已寫入 ${res.written.length} 筆, 失敗 ${res.failed.length} 筆${res.failed.length > 0 ? ': ' + res.failed.slice(0, 10).map((f) => `${f.table} id=${f.id}(${f.err})`).join('; ') : ''}`)
+    }
+    if (res.dbBackup || res.backupPath !== '') {
+        log(`請依備份檔還原(資料庫備份 backup-時間.json 於工作目錄${res.backupPath !== '' ? `; 四表全部列 ${res.backupPath}` : ''}); 本工具冪等, 修正原因後可原樣重跑同一指令`)
+    }
+    return res
+}
+
+
+// ---------------------------------------------------------------
+// 文字報告
+// ---------------------------------------------------------------
+
+/**
+ * 各表 from 值分佈之文字報告(g_purgeFrom 預設輸出; 亦為 g_fixFromType 之前置說明)
+ *
+ * @param {Object} audit 輸入 auditFrom 之結果
+ * @returns {String} 回傳多行文字
+ */
+function formatFromAudit(audit) {
+    let c = audit.counts
+    let L = []
+    L.push(`資料筆數: ${TABLE_ORDER.map((t) => `${t} ${c.byTable[t].nRows}`).join('、')}`)
+    L.push('')
+    L.push('== 各表 from 值分佈(表, from 值型別/值: 筆數) ==')
+    for (let t of TABLE_ORDER) {
+        L.push(`-- ${t}(共 ${c.byTable[t].nRows} 列)`)
+        let es = audit.entries.filter((x) => x.table === t)
+        if (es.length === 0) {
+            L.push('   (無列)')
+        }
+        for (let x of es) {
+            if (x.kind === 'string') {
+                L.push(`   ${j(x.from)}(外部列, 升版後唯讀): ${x.n}`)
+            }
+            else {
+                L.push(`   ${KIND_TXT[x.kind]}: ${x.n}`)
+            }
+        }
+    }
+    L.push('')
+    L.push(`== 升版後將成為外部列(唯讀)之(表, from)與筆數: 共 ${c.nExternal} 列、${audit.external.length} 個(表, from) ==`)
+    if (audit.external.length === 0) {
+        L.push('   (無: 所有列皆為後台列)')
+    }
+    for (let x of audit.external) {
+        L.push(`   ${x.table} from=${j(x.from)}: ${x.n} 列`)
+    }
+    L.push('')
+    L.push('== 提示 ==')
+    L.push(`- 非字串 from(null／數字／布林／物件／陣列)共 ${c.nNonString} 列: 為後台列, 升版後後台寫入起拒收非字串 from; 以 node g_fixFromType.mjs 列出、--apply 正規化為 ''(缺欄視同 '', 不須處理).`)
+    L.push(`- 非空 from 共 ${c.nExternal} 列: 升版後為外部列, 後台不得改其身分／結構欄、不得刪除、不得改 from(指派欄 users.cgrups／grups.cpemis／pemis.crules 仍可寫); 若該來源已不再同步而須整批移除, 以 node g_purgeFrom.mjs --table &lt;表|all> --from &lt;來源> 列出將被清除之列與連帶清理之引用(預設只列不改), 確認後才加 --apply.`)
+    L.push('- 本工具不做「認領」(把外部列改成後台列); 要保留為後台資料者請於升版前於後台處理(或另行評估), 不在本工具範圍.')
+    return L.join('\n')
+}
+
+
+/**
+ * g_fixFromType 之文字報告: 各表非字串 from 之列數、型別分佈、前 N 個 id
+ *
+ * @param {Object} plans 輸入 { 表: planFixFromType 之結果 }
+ * @returns {String} 回傳多行文字
+ */
+function formatFixReport(plans) {
+    let L = []
+    let nAll = 0
+    L.push('== 非字串 from(null／數字／布林／物件／陣列)之列(將改為 \'\'; 缺欄視同 \'\', 不改) ==')
+    for (let t of TABLE_ORDER) {
+        let pl = plans[t]
+        let c = pl.counts
+        nAll += pl.changes.length
+        let kinds = Object.keys(c.kinds).filter((k) => c.kinds[k] > 0).map((k) => `${k} ${c.kinds[k]}`).join('、')
+        L.push(`-- ${t}: 共 ${c.nRows} 列; 非字串 from ${c.nNonString} 列${kinds !== '' ? `(${kinds})` : ''}; 缺欄 ${c.nMissing} 列(視同 '', 不改); 非空 from(外部列, 不動) ${c.nExternal} 列`)
+        if (pl.changes.length > 0) {
+            L.push(`   待改前 ${Math.min(MAX_IDS, pl.changes.length)} 個 id: ${pl.changes.slice(0, MAX_IDS).map((x) => j(x.id)).join('、')}${pl.changes.length > MAX_IDS ? `…(其餘 ${pl.changes.length - MAX_IDS} 列從略)` : ''}`)
+        }
+        if (c.nNoId > 0) {
+            L.push(`   另有 ${c.nNoId} 列非字串 from 但缺非空字串主鍵而無從寫回(不改, 須人工處理)`)
+        }
+    }
+    L.push('')
+    L.push(`== 將改為 '' 之列共 ${nAll} 列(只改 from 欄, 其餘欄位與更新者／更新時間不動) ==`)
+    return L.join('\n')
+}
+
+
+/**
+ * g_purgeFrom 指定來源之清除計畫文字報告: 將被清除之列與將被連帶清理之引用端筆數
+ *
+ * @param {Object} chain 輸入 planPurgeChain 之結果
+ * @param {Object} [opt={}] 輸入 { maxList }
+ * @returns {String} 回傳多行文字
+ */
+function formatPurgeReport(chain, opt = {}) {
+    let maxList = Number.isInteger(opt.maxList) ? opt.maxList : MAX_LIST
+    let L = []
+    L.push(`來源 from=${j(chain.from)}(精確比對, 不 trim、不分大小寫); 範圍: ${chain.plans.map((p) => p.keyTable).join(' → ')}`)
+    for (let pl of chain.plans) {
+        L.push('')
+        L.push(`== ${pl.keyTable}: 將清除 ${pl.nRows} 列 ==`)
+        pl.rows.slice(0, maxList).forEach((r) => L.push(`   id=${j(r.id)}${r.name !== undefined &amp;&amp; r.name !== r.id ? ` name=${j(r.name)}` : ''}`))
+        if (pl.rows.length > maxList) {
+            L.push(`   …(其餘 ${pl.rows.length - maxList} 列從略)`)
+        }
+        if (pl.err !== null) {
+            L.push(`   [拒絕] ${pl.err}: ${ERR_TXT[pl.err] || pl.err}(--apply 亦將拒絕, 零寫入)`)
+        }
+        if (pl.holder !== '' &amp;&amp; pl.nRows > 0 &amp;&amp; pl.err === null) {
+            L.push(`   連帶清理引用 ${pl.holder}.${pl.field}: 須改寫 ${pl.nHolders} 列(受刪除影響 ${pl.nDelHolders} 列; 其中來源非空(外部應用)者 ${pl.nExternal} 列: 下次外部同步時可能被外部資料覆寫)`)
+            if (pl.impact.nAnd > 0) {
+                L.push(`   其中以 AND 引用者 ${pl.impact.nAnd} 列: 移除引用後其 AND 限制解除, 授權可能變多`)
+            }
+            if (pl.impact.nWiden > 0) {
+                L.push(`   歷史同名只刪其一(名稱仍有存續列, 引用不清理)致授權可能變多者 ${pl.impact.nWiden} 列`)
+            }
+        }
+        if (pl.holder === '' &amp;&amp; pl.nRows > 0) {
+            L.push('   (users 無引用端, 不連帶清理)')
+        }
+        if (pl.keyTable === 'users' &amp;&amp; pl.nAdmin > 0) {
+            L.push(`   注意: 被清除列中有 ${pl.nAdmin} 列為系統管理員(isAdmin='y')`)
+        }
+        if (pl.similar.length > 0) {
+            L.push(`   提示: 另有相近但不相同之來源(不會被清除): ${pl.similar.map((s) => `${j(s.from)} ${s.n} 列`).join('、')}`)
+        }
+    }
+    if (chain.plans.length > 1) {
+        L.push('')
+        L.push('(逐表依序套用: 較早之表所改寫之引用端列, 可能為稍後同次被清除之列, 仍計入該表之改寫列數)')
+    }
+    L.push('')
+    L.push(`== 合計: 清除 ${chain.totals.nRows} 列, 改寫引用端 ${chain.totals.nHolders} 列(其中 AND 引用 ${chain.totals.nAnd} 列、外部來源 ${chain.totals.nExternal} 列) ==`)
+    return L.join('\n')
+}
+
+
+// ---------------------------------------------------------------
+// 後端占用偵測(apply 前; 須於本行程開啟 lmdb 之前)
+// ---------------------------------------------------------------
+
+//IN_USE_CODES: Windows 對含「已被他行程開啟之檔案(lmdb 之 data.mdb／lock.mdb)」之資料夾改名時之錯誤碼(2026-10-22 實測: 持有時 EPERM, 閒置時成功)
+const IN_USE_CODES = ['EPERM', 'EBUSY', 'EACCES']
+
+/**
+ * 偵測資料庫資料夾是否被其他行程占用(如後端 srv.mjs 仍在執行)
+ *
+ * 原理(僅 Windows): 把 &lt;url>/&lt;dbName> 資料夾改名為暫名再改回; Windows 對含「已被其他行程開啟之檔案」之資料夾改名會失敗(EPERM), 閒置則成功.
+ * 非 Windows 平台(改名不受開啟檔影響)無法偵測, 回傳 checked: false, 由呼叫端提示人工確認後端已停止.
+ * 判定不明(改名失敗而非上述錯誤碼, 或暫名已存在)一律視為不可寫(fail-closed). 改回失敗時拋錯並指明資料夾暫置之路徑.
+ * lmdb 本身允許多行程同時開啟(後端運作中仍可開啟與寫入), 故不可靠「開得起來」判定未被占用.
+ *
+ * @param {Object} p 輸入參數物件
+ * @param {String} p.url 輸入資料庫連線資料夾(如 ./db)
+ * @param {String} p.dbName 輸入資料庫名稱(如 wperm)
+ * @returns {Object} 回傳 { ok, checked, err }: ok 為 true 表可進行寫入(未偵測到占用或無法偵測); checked 表是否真的偵測過; err 為拒絕原因(ok 為 false 時)
+ */
+function checkDbNotInUse(p) {
+    let dir = path.resolve(p.url, p.dbName)
+    if (!fs.existsSync(dir)) {
+        return { ok: false, checked: false, err: `資料庫不存在: ${dir}` }
+    }
+    if (process.platform !== 'win32') {
+        return { ok: true, checked: false, err: '' }
+    }
+    let tmp = `${dir}.__inuse-probe-${process.pid}__`
+    if (fs.existsSync(tmp)) {
+        return { ok: false, checked: true, err: `占用偵測之暫名已存在: ${tmp}(請先確認並移除後重試)` }
+    }
+    try {
+        fs.renameSync(dir, tmp)
+    }
+    catch (err) {
+        if (IN_USE_CODES.includes(err &amp;&amp; err.code)) {
+            return { ok: false, checked: true, err: `資料庫仍被其他行程占用(${err.code}): ${dir}; 請先停止後端(srv.mjs)等占用者後重試` }
+        }
+        return { ok: false, checked: true, err: `無法判定資料庫是否被占用(${msgOf(err)}): ${dir}; 為安全起見拒絕寫入` }
+    }
+    let lastErr = null
+    for (let i = 0; i &lt; 20; i++) {
+        try {
+            fs.renameSync(tmp, dir)
+            return { ok: true, checked: true, err: '' }
+        }
+        catch (err) {
+            lastErr = err
+            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100)
+        }
+    }
+    throw new Error(`占用偵測改回資料夾名稱失敗(${msgOf(lastErr)}): 資料庫資料夾暫置於 ${tmp}, 請手動改回 ${dir}`)
+}
+
+
+// ---------------------------------------------------------------
+// 唯讀稽核(g_purgeFrom 預設)
+// ---------------------------------------------------------------
+
+/**
+ * 唯讀: 讀四表並輸出各表 from 值分佈(不寫、不備份)
+ *
+ * @param {Object} p 輸入參數物件
+ * @param {Object} p.woItems 輸入 ORM 資料表物件(四表各有 select)
+ * @param {Function} [p.log] 輸入輸出文字之函數, 預設 console.log
+ * @returns {Promise&lt;Object>} 回傳 { ok, stage, err, audit }; 不 reject
+ */
+async function runAuditFrom(p = {}) {
+    let log = typeof p.log === 'function' ? p.log : console.log
+    let res = { ok: false, apply: false, stage: 'check', err: '', audit: null, written: [], failed: [], dbBackup: false, backupPath: '' }
+    let fail = mkFail(res, log)
+    let bad = checkWo(p.woItems, ['select'])
+    if (bad !== '') {
+        return fail('check', bad)
+    }
+    let rows0 = null
+    try {
+        rows0 = await readTables(p.woItems)
+    }
+    catch (err) {
+        return fail('select', err)
+    }
+    res.audit = auditFrom(rows0)
+    log(formatFromAudit(res.audit))
+    res.ok = true
+    res.stage = 'audit'
+    return res
+}
+
+
+// ---------------------------------------------------------------
+// g_fixFromType: 非字串 from 正規化為 ''
+// ---------------------------------------------------------------
+
+/**
+ * 稽核並(apply 時)把非字串 from 正規化為 ''
+ *
+ * @param {Object} p 輸入參數物件
+ * @param {Object} p.woItems 輸入 ORM 資料表物件(四表各有 select／save)
+ * @param {Boolean} [p.apply=false] 輸入是否寫入, 預設 false(只列不改)
+ * @param {String} [p.backupPath] 輸入四表備份檔路徑, 預設 ./fixFromType-backup-&lt;時間戳>.json(相對工作目錄)
+ * @param {Function} [p.backupDb] 輸入資料庫備份函數(回傳 Promise, reject 表失敗), 預設 getDb.backup(woItems)
+ * @param {Function} [p.log] 輸入輸出文字之函數, 預設 console.log
+ * @returns {Promise&lt;Object>} 回傳 { ok, apply, stage, err, plans, nChanges, dbBackup, backupPath, written, failed, stale, nNoId }; ok 為 false 時 stage 為失敗之階段(check／select／backupDb／backupRows／stale／write／verify); 不 reject
+ */
+async function runFixFromType(p = {}) {
+    let woItems = p.woItems
+    let apply = p.apply === true
+    let log = typeof p.log === 'function' ? p.log : console.log
+    let backupDb = typeof p.backupDb === 'function' ? p.backupDb : () => getDb.backup(woItems)
+    let res = { ok: false, apply, stage: 'check', err: '', plans: null, nChanges: 0, nNoId: 0, dbBackup: false, backupPath: '', written: [], failed: [], stale: [] }
+    let fail = mkFail(res, log)
+
+    //check
+    let bad = checkWo(woItems, apply ? ['select', 'save'] : ['select'])
+    if (bad !== '') {
+        return fail('check', bad)
+    }
+
+    //select, plan
+    let rows0 = null
+    try {
+        rows0 = await readTables(woItems)
+    }
+    catch (err) {
+        return fail('select', err)
+    }
+    let plans = {}
+    for (let t of TABLE_ORDER) {
+        plans[t] = planFixFromType(rows0[t])
+    }
+    res.plans = plans
+    res.nChanges = TABLE_ORDER.reduce((a, t) => a + plans[t].changes.length, 0)
+    res.nNoId = TABLE_ORDER.reduce((a, t) => a + plans[t].counts.nNoId, 0)
+    log(formatFixReport(plans))
+    let noIdNote = res.nNoId > 0 ? `另有 ${res.nNoId} 列非字串 from 缺非空字串主鍵而無從寫回, 本工具不改, 須人工處理` : ''
+    if (!apply) {
+        log('')
+        log('(預設只列不改; 確認清單後加 --apply 才寫入, 寫入前會自動備份; 後端須先停止)')
+        res.ok = true
+        res.stage = 'audit'
+        return res
+    }
+    if (res.nChanges === 0) {
+        log('')
+        log('無須修正(沒有可改之非字串 from), 不備份、不寫入.')
+        if (noIdNote !== '') {
+            log(noIdNote)
+        }
+        res.ok = true
+        res.stage = 'audit'
+        return res
+    }
+
+    //backup
+    let bk = await backupBefore({ res, rows0, tool: 'fixFromType', meta: {}, backupPath: p.backupPath, backupDb, log })
+    if (bk !== null) {
+        return fail(bk.stage, bk.err)
+    }
+
+    //stale
+    res.stage = 'stale'
+    let rows1 = null
+    try {
+        rows1 = await readTables(woItems)
+    }
+    catch (err) {
+        return fail('stale', err)
+    }
+    res.stale = diffTables(rows0, rows1)
+    if (res.stale.length > 0) {
+        return fail('stale', `tables changed since the audit: ${res.stale.join(', ')}`)
+    }
+
+    //write
+    res.stage = 'write'
+    for (let t of TABLE_ORDER) {
+        if (plans[t].changes.length === 0) {
+            continue
+        }
+        let r = await saveRows(woItems[t], t, plans[t].changes.map((c) => ({ id: c.id, from: c.after })))
+        res.written.push(...r.written)
+        res.failed.push(...r.failed)
+        if (r.failed.length > 0) {
+            return fail('write', `${r.failed.length} rows failed to save in ${t}`)
+        }
+    }
+
+    //verify: 預期 ＝ 該些列 from 改為 ''、其餘逐位元不變; 且再規劃無待改列
+    res.stage = 'verify'
+    try {
+        let rows2 = await readTables(woItems)
+        let exp = {}
+        for (let t of TABLES) {
+            let m = new Map(plans[t].changes.map((c) => [c.id, c]))
+            exp[t] = rows0[t].map((r) => (m.has(rowId(r)) ? { ...r, from: '' } : r))
+        }
+        let diff = diffTables(rows2, exp)
+        if (diff.length > 0) {
+            return fail('verify', `rows differ from expected after write: ${diff.join(', ')}`)
+        }
+        let rest = TABLE_ORDER.reduce((a, t) => a + planFixFromType(rows2[t]).changes.length, 0)
+        if (rest !== 0) {
+            return fail('verify', `${rest} non-string from remain after fix`)
+        }
+    }
+    catch (err) {
+        return fail('verify', err)
+    }
+
+    res.ok = true
+    res.stage = 'done'
+    let n = (t) => res.written.filter((w) => w.table === t).length
+    log('')
+    log(`已修正: 寫入 ${res.written.length} 列(${TABLE_ORDER.map((t) => `${t} ${n(t)}`).join('、')}); 重新稽核已無非字串 from(缺主鍵者除外).`)
+    if (noIdNote !== '') {
+        log(noIdNote)
+    }
+    return res
+}
+
+
+// ---------------------------------------------------------------
+// g_purgeFrom: 整來源清除
+// ---------------------------------------------------------------
+
+/**
+ * 規劃並(apply 時)整來源清除: 刪除指定表中 from 精確等於指定值之全部列, 並於同一次清理引用
+ *
+ * 順序(逐表依 targets → pemis → grups → users): 先寫引用端改寫(只改引用欄位)、後刪被清除列; 任一步失敗即中止(不自動還原, 依備份提示手動回復; 本工具冪等, 可重跑).
+ * 寫後比對「規劃套用後之預測狀態」並檢查不變式: 指定表內已無 from 為該值之列; 清除未製造新的懸空引用(寫後之懸空項皆已存在於寫前).
+ *
+ * @param {Object} p 輸入參數物件
+ * @param {Object} p.woItems 輸入 ORM 資料表物件(四表各有 select／save／del)
+ * @param {String} p.table 輸入表名('targets'、'pemis'、'grups'、'users' 或 'all')
+ * @param {String} p.from 輸入來源名稱(非空字串, 精確比對; 空字串一律拒絕)
+ * @param {Boolean} [p.apply=false] 輸入是否寫入, 預設 false(只列不改)
+ * @param {String} [p.backupPath] 輸入四表備份檔路徑, 預設 ./purgeFrom-backup-&lt;時間戳>.json(相對工作目錄)
+ * @param {Function} [p.backupDb] 輸入資料庫備份函數, 預設 getDb.backup(woItems)
+ * @param {Function} [p.planFn] 輸入規劃函數(僅供測試注入), 預設 planPurgeChain
+ * @param {Function} [p.log] 輸入輸出文字之函數, 預設 console.log
+ * @returns {Promise&lt;Object>} 回傳 { ok, apply, stage, err, chain, nRows, dbBackup, backupPath, written, failed, stale }; 規劃被拒時 ok 為 false、stage 為 plan(dry-run 亦然, 表示 --apply 亦將拒絕); 不 reject
+ */
+async function runPurgeFrom(p = {}) {
+    let woItems = p.woItems
+    let apply = p.apply === true
+    let log = typeof p.log === 'function' ? p.log : console.log
+    let backupDb = typeof p.backupDb === 'function' ? p.backupDb : () => getDb.backup(woItems)
+    let planFn = typeof p.planFn === 'function' ? p.planFn : planPurgeChain //planFn 僅供測試注入有缺陷之規劃器, 以驗證寫後不變式檢查(正式使用不給)
+    let res = { ok: false, apply, stage: 'check', err: '', chain: null, nRows: 0, dbBackup: false, backupPath: '', written: [], failed: [], stale: [] }
+    let fail = mkFail(res, log)
+
+    //check
+    let bad = checkWo(woItems, apply ? ['select', 'save', 'del'] : ['select'])
+    if (bad !== '') {
+        return fail('check', bad)
+    }
+    if (typeof p.from !== 'string' || p.from === '') {
+        return fail('check', 'from must be a non-empty string')
+    }
+    let keyTables = p.table === 'all' ? TABLE_ORDER : [p.table]
+    if (!keyTables.every((t) => TABLE_ORDER.includes(t))) {
+        return fail('check', `invalid table: ${String(p.table)}`)
+    }
+
+    //select, plan
+    let rows0 = null
+    try {
+        rows0 = await readTables(woItems)
+    }
+    catch (err) {
+        return fail('select', err)
+    }
+    let chain = planFn({ from: p.from, tables: rows0, keyTables })
+    res.chain = chain
+    res.nRows = chain.totals.nRows
+    log(formatPurgeReport(chain))
+    if (chain.err !== null) {
+        return fail('plan', `purge refused at ${chain.errTable}: ${chain.err}${ERR_TXT[chain.err] ? `(${ERR_TXT[chain.err]})` : ''}; nothing written`)
+    }
+    if (!apply) {
+        log('')
+        log('(預設只列不改; 確認清單後加 --apply 才寫入——不可逆, 寫入前會自動備份; 後端須先停止)')
+        res.ok = true
+        res.stage = 'audit'
+        return res
+    }
+    if (res.nRows === 0) {
+        log('')
+        log('無須清除(沒有 from 精確等於指定值之列), 不備份、不寫入.')
+        res.ok = true
+        res.stage = 'audit'
+        return res
+    }
+
+    //backup
+    let bk = await backupBefore({ res, rows0, tool: 'purgeFrom', meta: { table: p.table, from: p.from }, backupPath: p.backupPath, backupDb, log })
+    if (bk !== null) {
+        return fail(bk.stage, bk.err)
+    }
+
+    //stale
+    res.stage = 'stale'
+    let rows1 = null
+    try {
+        rows1 = await readTables(woItems)
+    }
+    catch (err) {
+        return fail('stale', err)
+    }
+    res.stale = diffTables(rows0, rows1)
+    if (res.stale.length > 0) {
+        return fail('stale', `tables changed since the audit: ${res.stale.join(', ')}`)
+    }
+
+    //write: 逐表(引用鏈序)先寫引用端改寫、後刪被清除列
+    res.stage = 'write'
+    for (let pl of chain.plans) {
+        if (pl.changes.length > 0) {
+            let r = await saveRows(woItems[pl.holder], pl.holder, pl.changes.map((c) => ({ id: c.id, [c.field]: c.after })))
+            res.written.push(...r.written.map((w) => ({ ...w, op: 'save' })))
+            res.failed.push(...r.failed)
+            if (r.failed.length > 0) {
+                return fail('write', `${r.failed.length} holder rows failed to save in ${pl.holder} (purge of ${pl.keyTable} not started)`)
+            }
+        }
+        if (pl.delIds.length > 0) {
+            let r = await delRows(woItems[pl.keyTable], pl.keyTable, pl.delIds)
+            res.written.push(...r.written.map((w) => ({ ...w, op: 'del' })))
+            res.failed.push(...r.failed)
+            if (r.failed.length > 0) {
+                return fail('write', `${r.failed.length} rows failed to delete in ${pl.keyTable}`)
+            }
+        }
+    }
+
+    //verify: 與預測狀態逐位元相同; 指定表已無該來源之列; 未製造新的懸空引用
+    res.stage = 'verify'
+    try {
+        let rows2 = await readTables(woItems)
+        let diff = diffTables(rows2, chain.tablesAfter)
+        if (diff.length > 0) {
+            return fail('verify', `tables differ from the predicted state after write: ${diff.join(', ')}`)
+        }
+        for (let t of keyTables) {
+            let left = rows2[t].filter((r) => r !== null &amp;&amp; typeof r === 'object' &amp;&amp; r.from === p.from).length
+            if (left !== 0) {
+                return fail('verify', `${left} rows of ${t} still have the purged from`)
+            }
+        }
+        let key = (x) => [x.table, x.holderId, x.field, x.name].map((v) => j(v)).join('\u0000')
+        let before = new Set(auditRefs(rows0).items.map(key))
+        let fresh = auditRefs(rows2).items.filter((x) => !before.has(key(x)))
+        if (fresh.length > 0) {
+            return fail('verify', `${fresh.length} new dangling refs after purge`)
+        }
+    }
+    catch (err) {
+        return fail('verify', err)
+    }
+
+    res.ok = true
+    res.stage = 'done'
+    let nDel = res.written.filter((w) => w.op === 'del').length
+    let nSave = res.written.filter((w) => w.op === 'save').length
+    log('')
+    log(`已清除: 刪除 ${nDel} 列、改寫引用端 ${nSave} 列; 寫後狀態與預測逐位元相同, 指定來源已無殘列, 未製造新的懸空引用. 請重啟後端並抽查授權.`)
+    return res
+}
+
+
+export { TABLES, isJsonLossy, checkDbNotInUse, formatFromAudit, formatFixReport, formatPurgeReport, runAuditFrom, runFixFromType, runPurgeFrom }
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+    
+    
+</div>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Fri Oct 23 2026 10:56:39 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+</footer>
+
+<script>prettyPrint();</script>
+<script src="scripts/polyfill.js"></script>
+<script src="scripts/linenumber.js"></script>
+
+
+
+</body>
+</html>

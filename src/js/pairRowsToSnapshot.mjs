@@ -1,5 +1,5 @@
 //反向關聯對話框(VeGrupBlngUsers／VePemiBlngGrups)之「列 ↔ 資料快照」身分配對
-//規則見 CLAUDE_rulebook.md「關聯對話框容錯、以身分配對、資料驅動屬性鍵」之 R-REL-PAIR-01
+//規則見 sgud/rule/rulebook.md「關聯對話框容錯、以身分配對、資料驅動屬性鍵」之 R-REL-PAIR-01
 //本檔無外部相依
 
 

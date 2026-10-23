@@ -117,6 +117,42 @@ function dropServerOnlyDiff({ keys, r, ltdtOld }) {
 
 
 /**
+ * 外部列之 diff 列(內容確有改動, 例如指派欄)改帶庫內之伺服器管理欄(userId／timeCreate／userIdUpdate／timeUpdate)
+ *
+ * 伺服器管理欄由伺服器擁有(procOrm save 只覆寫 userIdUpdate／timeUpdate, 建立者與建立時間取自送入之列); 外部同步每次整來源重寫使外部列之建立者／建立時間更新,
+ * 持舊草稿(前端保留未存編輯, 見 draftSync)送回該列時, 基準因排除伺服器管理欄而通過(內容未變), 若原樣寫入就把較新之建立者與建立時間回退為舊值(R-EXT-OWN-01 S2 之同一缺陷, 外審 sol 第 3 點).
+ * 故改動之外部列一律以庫內之伺服器管理欄寫入. 只處理庫內為外部列者(後台列之寫入不變); 庫內無該欄者不補.
+ *
+ * @param {Object} p 輸入參數物件
+ * @param {Object} p.r 輸入 ltdtDiffByKey(及 dropServerOnlyDiff)結果 { add, del, diff, same }
+ * @param {Array} p.ltdtOld 輸入該表庫內全部列
+ * @returns {Object} 回傳新之 { add, del, diff, same }(不改輸入; 未改動之列為同一物件)
+ */
+function restoreServerFields({ r, ltdtOld }) {
+    let oldById = new Map()
+    ltdtOld.forEach((o) => {
+        if (isObj(o) && isStr(o.id)) {
+            oldById.set(o.id, o)
+        }
+    })
+    let diff = r.diff.map((row) => {
+        let o = isObj(row) && isStr(row.id) ? oldById.get(row.id) : undefined
+        if (o === undefined || !isExternalRow(o)) {
+            return row
+        }
+        let out = { ...row }
+        SERVER_FIELDS.forEach((k) => {
+            if (hasOwn(o, k)) {
+                out[k] = o[k]
+            }
+        })
+        return out
+    })
+    return { add: r.add, del: r.del, diff, same: r.same }
+}
+
+
+/**
  * 後台整表寫入對外部列之守門(於 ltdtDiffByKey 與 dropServerOnlyDiff 之後、寫入之前; 違規整次拒收、零寫入, 不靜默忽略)
  *
  * from 型別(不論 lockExternalRows): 新增列之 from 須為字串(缺欄視為 ''), 修改列之 from 若改為非字串須與庫內值相同(歷史 null 原樣送回不拒, 否則已有歷史資料之庫無法儲存);
@@ -226,5 +262,5 @@ function hasExternalDiff({ r, ltdtOld }) {
 }
 
 
-export { SERVER_FIELDS, ASSIGN_FIELD, isExternalRow, getLockFields, restoreExternalOrder, dropServerOnlyDiff, checkExternalWrite, hasExternalDiff }
+export { SERVER_FIELDS, ASSIGN_FIELD, isExternalRow, getLockFields, restoreExternalOrder, dropServerOnlyDiff, restoreServerFields, checkExternalWrite, hasExternalDiff }
 export default isExternalRow

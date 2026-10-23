@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    
+    <meta charset="utf-8">
+    <title>server/tools/nameDupReport.mjs - Documentation</title>
+    
+    
+    <script src="scripts/prettify/prettify.js"></script>
+    <script src="scripts/prettify/lang-css.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc.css">
+    <script src="scripts/nav.js" defer></script>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+<input type="checkbox" id="nav-trigger" class="nav-trigger" />
+<label for="nav-trigger" class="navicon-button x">
+  <div class="navicon"></div>
+</label>
+
+<label for="nav-trigger" class="overlay"></label>
+
+<nav >
+    
+    
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="WWebPerm.html">WWebPerm</a></li></ul><h3>Global</h3><ul><li><a href="global.html#applyPurgePlan">applyPurgePlan</a></li><li><a href="global.html#auditFrom">auditFrom</a></li><li><a href="global.html#auditRefs">auditRefs</a></li><li><a href="global.html#buildReport">buildReport</a></li><li><a href="global.html#buildRowsSend">buildRowsSend</a></li><li><a href="global.html#buildSyncRowsNew">buildSyncRowsNew</a></li><li><a href="global.html#checkBaseline">checkBaseline</a></li><li><a href="global.html#checkCascadePlan">checkCascadePlan</a></li><li><a href="global.html#checkDbNotInUse">checkDbNotInUse</a></li><li><a href="global.html#checkExternalWrite">checkExternalWrite</a></li><li><a href="global.html#checkMapKeyBatch">checkMapKeyBatch</a></li><li><a href="global.html#checkUsersWrite">checkUsersWrite</a></li><li><a href="global.html#cleanOutOf">cleanOutOf</a></li><li><a href="global.html#compareBaseline">compareBaseline</a></li><li><a href="global.html#countAndRefs">countAndRefs</a></li><li><a href="global.html#countExternalRows">countExternalRows</a></li><li><a href="global.html#countIdRenumber">countIdRenumber</a></li><li><a href="global.html#createAuthorizeExec">createAuthorizeExec</a></li><li><a href="global.html#createLegendMeasurer">createLegendMeasurer</a></li><li><a href="global.html#createLockSave">createLockSave</a></li><li><a href="global.html#cvKpToArr">cvKpToArr</a></li><li><a href="global.html#cvKpToObj">cvKpToObj</a></li><li><a href="global.html#decideLegendType">decideLegendType</a></li><li><a href="global.html#describeUpstream">describeUpstream</a></li><li><a href="global.html#diffRefTargets">diffRefTargets</a></li><li><a href="global.html#dropServerOnlyDiff">dropServerOnlyDiff</a></li><li><a href="global.html#eachOwn">eachOwn</a></li><li><a href="global.html#fetchJson">fetchJson</a></li><li><a href="global.html#fillIdlessIds">fillIdlessIds</a></li><li><a href="global.html#findDupIndex">findDupIndex</a></li><li><a href="global.html#findKeyOtherFrom">findKeyOtherFrom</a></li><li><a href="global.html#findRefRows">findRefRows</a></li><li><a href="global.html#findTouchedDup">findTouchedDup</a></li><li><a href="global.html#fmtLossyMsg">fmtLossyMsg</a></li><li><a href="global.html#fmtVars">fmtVars</a></li><li><a href="global.html#fmtWarn">fmtWarn</a></li><li><a href="global.html#formatFixReport">formatFixReport</a></li><li><a href="global.html#formatFromAudit">formatFromAudit</a></li><li><a href="global.html#formatPurgeReport">formatPurgeReport</a></li><li><a href="global.html#genLegend">genLegend</a></li><li><a href="global.html#getAddConfirmText">getAddConfirmText</a></li><li><a href="global.html#getAddImpact">getAddImpact</a></li><li><a href="global.html#getBannerLines">getBannerLines</a></li><li><a href="global.html#getBaselineDigest">getBaselineDigest</a></li><li><a href="global.html#getCascadePreview">getCascadePreview</a></li><li><a href="global.html#getChangedIdx">getChangedIdx</a></li><li><a href="global.html#getDelConfirmText">getDelConfirmText</a></li><li><a href="global.html#getDelImpact">getDelImpact</a></li><li><a href="global.html#getDelRefCount">getDelRefCount</a></li><li><a href="global.html#getDigestFields">getDigestFields</a></li><li><a href="global.html#getDupRowsInconsistent">getDupRowsInconsistent</a></li><li><a href="global.html#getEffMode">getEffMode</a></li><li><a href="global.html#getExternalEdits">getExternalEdits</a></li><li><a href="global.html#getItemWarnText">getItemWarnText</a></li><li><a href="global.html#getKpLossy">getKpLossy</a></li><li><a href="global.html#getLockFields">getLockFields</a></li><li><a href="global.html#getNameErrs">getNameErrs</a></li><li><a href="global.html#getOwn">getOwn</a></li><li><a href="global.html#getPropKey">getPropKey</a></li><li><a href="global.html#getRawModeMap">getRawModeMap</a></li><li><a href="global.html#getRefRowsExtra">getRefRowsExtra</a></li><li><a href="global.html#getRefState">getRefState</a></li><li><a href="global.html#getRefWarnText">getRefWarnText</a></li><li><a href="global.html#getRefWarns">getRefWarns</a></li><li><a href="global.html#getRowIdxs">getRowIdxs</a></li><li><a href="global.html#getRowState">getRowState</a></li><li><a href="global.html#getRuleEnable">getRuleEnable</a></li><li><a href="global.html#getRuleWarnText">getRuleWarnText</a></li><li><a href="global.html#getRuleWarns">getRuleWarns</a></li><li><a href="global.html#getSavePreview">getSavePreview</a></li><li><a href="global.html#getSyncWarnLines">getSyncWarnLines</a></li><li><a href="global.html#hasDupKey">hasDupKey</a></li><li><a href="global.html#hasExternalDiff">hasExternalDiff</a></li><li><a href="global.html#isAuthMode">isAuthMode</a></li><li><a href="global.html#isBaselineStale">isBaselineStale</a></li><li><a href="global.html#isBaselineValid">isBaselineValid</a></li><li><a href="global.html#isDraftStale">isDraftStale</a></li><li><a href="global.html#isExternalRow">isExternalRow</a></li><li><a href="global.html#isJsonLossy">isJsonLossy</a></li><li><a href="global.html#isMain">isMain</a></li><li><a href="global.html#joinList">joinList</a></li><li><a href="global.html#joinNames">joinNames</a></li><li><a href="global.html#keepAssignByEntity">keepAssignByEntity</a></li><li><a href="global.html#keepAssignOnMissing">keepAssignOnMissing</a></li><li><a href="global.html#makeBaseline">makeBaseline</a></li><li><a href="global.html#makeRowStates">makeRowStates</a></li><li><a href="global.html#mapKeyOf">mapKeyOf</a></li><li><a href="global.html#mapNameKp">mapNameKp</a></li><li><a href="global.html#markDataReload">markDataReload</a></li><li><a href="global.html#markHasKey">markHasKey</a></li><li><a href="global.html#maskQuery">maskQuery</a></li><li><a href="global.html#maskTok">maskTok</a></li><li><a href="global.html#maskUrl">maskUrl</a></li><li><a href="global.html#mergePickKeysOnly">mergePickKeysOnly</a></li><li><a href="global.html#pairRowsToSnapshot">pairRowsToSnapshot</a></li><li><a href="global.html#pickUniqueUser">pickUniqueUser</a></li><li><a href="global.html#planDraftSync">planDraftSync</a></li><li><a href="global.html#planFixFromType">planFixFromType</a></li><li><a href="global.html#planPurgeChain">planPurgeChain</a></li><li><a href="global.html#planPurgeFrom">planPurgeFrom</a></li><li><a href="global.html#planRefChanges">planRefChanges</a></li><li><a href="global.html#putRefEntry">putRefEntry</a></li><li><a href="global.html#putRowsToKp">putRowsToKp</a></li><li><a href="global.html#refsChanged">refsChanged</a></li><li><a href="global.html#resolveShellWorker">resolveShellWorker</a></li><li><a href="global.html#restoreExternalOrder">restoreExternalOrder</a></li><li><a href="global.html#restoreServerFields">restoreServerFields</a></li><li><a href="global.html#reuseDeletedIds">reuseDeletedIds</a></li><li><a href="global.html#rewriteRefs">rewriteRefs</a></li><li><a href="global.html#rowDigest">rowDigest</a></li><li><a href="global.html#runAuditFrom">runAuditFrom</a></li><li><a href="global.html#runClean">runClean</a></li><li><a href="global.html#runFixFromType">runFixFromType</a></li><li><a href="global.html#runPurgeFrom">runPurgeFrom</a></li><li><a href="global.html#splitCheckedRows">splitCheckedRows</a></li><li><a href="global.html#submitGuard">submitGuard</a></li><li><a href="global.html#tabWriteKey">tabWriteKey</a></li><li><a href="global.html#validateRowsBeforeWrite">validateRowsBeforeWrite</a></li><li><a href="global.html#withTabLocks">withTabLocks</a></li><li><a href="global.html#wrapInjected">wrapInjected</a></li><li><a href="global.html#wrapOperOrm">wrapOperOrm</a></li><li><a href="global.html#writeWithCascade">writeWithCascade</a></li></ul>
+    
+</nav>
+
+<div id="main">
+    
+    <h1 class="page-title">server/tools/nameDupReport.mjs</h1>
+    
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>//名稱重複與使用者對應鍵之唯讀稽核工具(F-02／F-14; 規則帳本 R-NAME-UNIQ-03; ADR-034). 不屬測試, 不寫任何資料, 不提供自動刪除/改名——清理由管理者於後台逐一處理並確認授權.
+//
+//用法(自專案根; 套件安裝後此檔位於 node_modules/w-web-perm/server/tools/, 以該路徑執行即可, 匯出檔路徑相對於目前工作目錄):
+//  node server/tools/nameDupReport.mjs &lt;匯出檔.json> [--mapping-by id|email|name] [--json]
+//  node server/tools/nameDupReport.mjs --audit &lt;匯出檔.json> [--mapping-by id|email|name] [--json]   (同上; 與 authMergeReport.mjs --audit 寫法一致)
+//
+//  匯出檔內容 { users, grups, pemis, targets }(各為列陣列, 如以資料通道 select 之結果或資料庫匯出)。
+//  --mapping-by 省略時 email 與 name 皆報告(部署之 mappingBy 設定不在資料庫內); 給 id 則只查 id 缺漏(id 為主鍵, 不會重複).
+//  --json 輸出結構化結果(供其他工具), 省略則輸出文字報告.
+//
+//報告內容:
+//  1. grups／pemis 同名組: 各筆之 id／from／isActive／order, 以及被哪些 users.cgrups(查 grups 名)／grups.cpemis(查 pemis 名)以該名稱引用(只計名稱字串出現之引用; 解碼用 src/js/cvKpToArr.mjs,
+//     JSON5 解析失敗之列容錯: 視為無引用並列入「壞 JSON」清單). 比對為精確 ===(同伺服端 arrFinder).
+//     已知邊界(增量外審 mmd-N8, 未處理): 陣列形式之引用元素缺 name 時, 伺服端 arrFinder 以 get(vv,'name','') 取得 ''(可對應名稱為 '' 之列), 本工具解碼後名稱為索引數字, 不計入該引用;
+//     須同時存在「名稱為空字串之群組/權限」與「陣列形式且缺 name 之引用」, 空名稱者已另由 authMergeReport --audit 列出, 請一併人工檢視.
+//  2. users 對應鍵: isActive==='y' 之列, 對應鍵(email／name／id)為空／空白／非字串者, 以及值重複者(精確 ===; 與 getTokenUser 之 select 一致), 附各列 id／name／from.
+//
+//【清理須知】引用以「名稱」比對, 改名級聯(F-07)尚未實作: 同名組中改名或刪除其一, 引用該名稱者會全部指向剩下的那一筆或失效.
+//  請先以本報告列出引用者, 清理後逐一確認授權(getPermUserInfor／getPerm 之結果), 再處理下一組.
+//  報告含 email(對應鍵)原文, 請妥善保管、勿外傳.
+
+import fs from 'fs'
+import isMain from './isMain.mjs'
+import JSON5 from 'json5'
+import cvKpToArr from '../../src/js/cvKpToArr.mjs'
+
+
+let isStr = (v) => typeof v === 'string'
+let arr = (v) => (Array.isArray(v) ? v : [])
+
+
+//decodeNames: 解碼授權字串(cgrups／cpemis)為 [{ name, mode, isActive }], 失敗回 null(壞 JSON); 空字串視為無內容([])
+function decodeRefs(s) {
+    if (!isStr(s) || s.trim() === '') {
+        return []
+    }
+    let kp = null
+    try {
+        kp = JSON5.parse(s)
+    }
+    catch (err) {
+        return null
+    }
+    try {
+        //名稱保留原型別: 伺服端 arrFinder 以 === 比對, 非字串名稱(如 1、['1'])不會對應任何群組／權限, 不得轉字串後報成引用者(外審 sol R8)
+        return cvKpToArr(kp).map((r) => ({ name: r.name, mode: r.mode, isActive: r.isActive }))
+    }
+    catch (err) {
+        return null
+    }
+}
+
+
+//dupGroups: 表內 name 為字串且出現 ≥ 2 次者之組(精確 ===)
+function dupGroups(rows) {
+    let kp = new Map()
+    for (let r of arr(rows)) {
+        if (r &amp;&amp; isStr(r.name)) {
+            if (!kp.has(r.name)) {
+                kp.set(r.name, [])
+            }
+            kp.get(r.name).push(r)
+        }
+    }
+    return [...kp].filter(([, rs]) => rs.length >= 2).map(([name, rs]) => ({ name, rows: rs }))
+}
+
+
+//refsTo: 以 refTable 各列之授權欄位(refCol)引用 name 者
+function refsTo(name, refRows, refCol, badJson) {
+    let out = []
+    for (let r of arr(refRows)) {
+        let ds = decodeRefs(r &amp;&amp; r[refCol])
+        if (ds === null) {
+            badJson.push({ table: refCol === 'cgrups' ? 'users' : 'grups', id: r.id })
+            continue
+        }
+        for (let d of ds) {
+            if (d.name === name) {
+                out.push({ id: r.id, name: r.name, mode: d.mode, isActive: d.isActive })
+            }
+        }
+    }
+    return out
+}
+
+
+//mapKeyIssues: isActive==='y' 之 users, 對應鍵 key 為空／空白／非字串(empty), 以及值重複(dup)
+function mapKeyIssues(users, key) {
+    let act = arr(users).filter((u) => u &amp;&amp; u.isActive === 'y')
+    let brief = (u) => ({ id: u.id, name: u.name, from: u.from })
+    let empty = act.filter((u) => !(isStr(u[key]) &amp;&amp; u[key].trim().length > 0)).map(brief)
+    let kp = new Map()
+    for (let u of act) {
+        if (isStr(u[key]) &amp;&amp; u[key].trim().length > 0) {
+            if (!kp.has(u[key])) {
+                kp.set(u[key], [])
+            }
+            kp.get(u[key]).push(brief(u))
+        }
+    }
+    let dup = [...kp].filter(([, rs]) => rs.length >= 2).map(([value, rows]) => ({ value, rows }))
+    return { empty, dup }
+}
+
+
+/**
+ * 建立稽核結果(純函數, 不讀寫檔案)
+ *
+ * @param {Object} data { users, grups, pemis, targets }
+ * @param {Object} [opt={}] 設定
+ * @param {String} [opt.mappingBy] 'id'｜'email'｜'name', 省略時 email 與 name 皆報告
+ * @returns {Object} 稽核結果
+ */
+function buildReport(data, opt = {}) {
+    let d = data || {}
+    let badJson = []
+    let brief = (r) => ({ id: r.id, from: r.from, isActive: r.isActive, order: r.order })
+    let grups = dupGroups(d.grups).map((g) => ({
+        name: g.name,
+        rows: g.rows.map(brief),
+        refs: refsTo(g.name, d.users, 'cgrups', badJson), //users.cgrups 以群組名引用
+    }))
+    let pemis = dupGroups(d.pemis).map((g) => ({
+        name: g.name,
+        rows: g.rows.map(brief),
+        refs: refsTo(g.name, d.grups, 'cpemis', badJson), //grups.cpemis 以權限名引用
+    }))
+    //壞 JSON 全表掃描(外審 sol R9): 不論有無同名組, users.cgrups／grups.cpemis 解析失敗者皆列出(refsTo 只掃同名組之引用者, 會漏列)
+    for (let [rows, col, table] of [[d.users, 'cgrups', 'users'], [d.grups, 'cpemis', 'grups']]) {
+        for (let r of arr(rows)) {
+            if (r &amp;&amp; decodeRefs(r[col]) === null) {
+                badJson.push({ table, id: r.id })
+            }
+        }
+    }
+    let keys = (opt.mappingBy === 'id' || opt.mappingBy === 'email' || opt.mappingBy === 'name') ? [opt.mappingBy] : ['email', 'name']
+    let mapKey = {}
+    for (let key of keys) {
+        mapKey[key] = (key === 'id')
+            ? { empty: arr(d.users).filter((u) => u &amp;&amp; u.isActive === 'y' &amp;&amp; !(isStr(u.id) &amp;&amp; u.id !== '')).map((u) => ({ id: u.id, name: u.name, from: u.from })), dup: [] }
+            : mapKeyIssues(d.users, key)
+    }
+    //壞 JSON 去重(同一列被多個重複名稱之解碼重複記錄)
+    let seen = new Set()
+    badJson = badJson.filter((b) => {
+        let k = `${b.table}:${b.id}`
+        return seen.has(k) ? false : (seen.add(k), true)
+    })
+    return {
+        counts: { users: arr(d.users).length, grups: arr(d.grups).length, pemis: arr(d.pemis).length, targets: arr(d.targets).length },
+        grups,
+        pemis,
+        mapKey,
+        badJson,
+    }
+}
+
+
+//formatReport: 結果轉文字
+function formatReport(rp) {
+    let L = []
+    let rowTxt = (r) => `id=${r.id} from=${JSON.stringify(r.from)} isActive=${JSON.stringify(r.isActive)} order=${r.order}`
+    L.push(`資料筆數: users ${rp.counts.users}、grups ${rp.counts.grups}、pemis ${rp.counts.pemis}、targets ${rp.counts.targets}`)
+    for (let [tab, refFrom, label] of [['grups', 'users.cgrups', '群組'], ['pemis', 'grups.cpemis', '權限']]) {
+        L.push('')
+        L.push(`== ${label}(${tab})同名組: ${rp[tab].length} 組 ==`)
+        for (let g of rp[tab]) {
+            L.push(`- 「${g.name}」${g.rows.length} 筆`)
+            g.rows.forEach((r) => L.push(`    ${rowTxt(r)}`))
+            L.push(`  被 ${refFrom} 引用: ${g.refs.length} 處`)
+            g.refs.forEach((r) => L.push(`    ${tab === 'grups' ? 'user' : 'grup'} id=${r.id} name=${JSON.stringify(r.name)} mode=${JSON.stringify(r.mode)} isActive=${JSON.stringify(r.isActive)}`))
+        }
+    }
+    for (let [key, v] of Object.entries(rp.mapKey)) {
+        L.push('')
+        L.push(`== users 對應鍵 ${key}(僅 isActive='y'): 空／空白／非字串 ${v.empty.length} 筆, 值重複 ${v.dup.length} 組 ==`)
+        v.empty.forEach((u) => L.push(`- 空: id=${u.id} name=${JSON.stringify(u.name)} from=${JSON.stringify(u.from)}`))
+        for (let g of v.dup) {
+            L.push(`- 重複「${g.value}」${g.rows.length} 筆`)
+            g.rows.forEach((u) => L.push(`    id=${u.id} name=${JSON.stringify(u.name)} from=${JSON.stringify(u.from)}`))
+        }
+    }
+    L.push('')
+    L.push(`== 授權字串壞 JSON(解析失敗, 視為無引用): ${rp.badJson.length} 列 ==`)
+    rp.badJson.forEach((b) => L.push(`- ${b.table} id=${b.id}`))
+    return L.join('\n')
+}
+
+
+//CLI
+if (isMain(import.meta.url)) {
+    let args = process.argv.slice(2)
+    let iMap = args.indexOf('--mapping-by')
+    let mappingBy = (iMap >= 0) ? args[iMap + 1] : undefined
+    let iAudit = args.indexOf('--audit')
+    let fp = (iAudit >= 0) ? args[iAudit + 1] : args.find((a, k) => !a.startsWith('--') &amp;&amp; !(iMap >= 0 &amp;&amp; k === iMap + 1))
+    if (!fp || (iMap >= 0 &amp;&amp; !['id', 'email', 'name'].includes(mappingBy))) {
+        console.log('用法: node server/tools/nameDupReport.mjs &lt;匯出檔.json> [--mapping-by id|email|name] [--json]')
+        process.exit(2)
+    }
+    let data = JSON.parse(fs.readFileSync(fp, 'utf8'))
+    let rp = buildReport(data, { mappingBy })
+    console.log(args.includes('--json') ? JSON.stringify(rp, null, 1) : formatReport(rp))
+}
+
+
+export { buildReport, formatReport, decodeRefs }
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+    
+    
+</div>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Fri Oct 23 2026 10:56:39 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+</footer>
+
+<script>prettyPrint();</script>
+<script src="scripts/polyfill.js"></script>
+<script src="scripts/linenumber.js"></script>
+
+
+
+</body>
+</html>

@@ -1,5 +1,5 @@
 //迭代使用端傳入之物件: 供伺服端寫入前驗證(server/validateRows.mjs)、權限評估(src/plugins/mShare.mjs)與前端清單元件解析 cgrups／cpemis／crules 後之物件共用
-//規則見 CLAUDE_rulebook.md「迭代使用端傳入之物件」(R-OBJ-ITER-01)
+//規則見 sgud/rule/rulebook.md「迭代使用端傳入之物件」(R-OBJ-ITER-01)
 //本檔無外部相依
 
 

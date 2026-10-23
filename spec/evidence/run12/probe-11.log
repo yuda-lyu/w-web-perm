@@ -1,0 +1,45 @@
+
+===== probe start 2026-10-22T20:05:45.140Z pid=15856 =====
+[PROBE]   4396ms store.commit UpdateTableData grups rows=7
+[PROBE]   4397ms store.commit UpdateTableData pemis rows=5
+[PROBE]   4398ms store.commit UpdateTableData targets rows=22
+[PROBE]   4398ms store.commit UpdateTableData users rows=7
+[PROBE]   5415ms HOOK LayoutContentPemis {"iM":false,"pS":false,"sP":true,"sN":false}
+[PROBE]   7085ms LayoutContentPemis isModified false -> true {"iM":true,"pS":false,"sP":false,"sN":false} at invokeWithErrorHandling (vue.runtime.esm.js:3083:30) | at Watcher.run (vue.runtime.esm.js:3600:21) | at Watcher.update (vue.runtime.esm.js:3576:18) | at Dep.notify (vue.runtime.esm.js:792:17) | at Object.reactiveSetter [as isModified] (vue.runtime.esm.js:1025:21)
+[PROBE]   7630ms dg.showCheckYesNo OPEN
+[PROBE]   8191ms dg.showCheckYesNo CLOSED(reject)
+[PROBE]   8742ms dg.showCheckYesNo OPEN
+[PROBE]   9290ms dg.showCheckYesNo CLOSED(resolve)
+[PROBE]   9290ms fapi.updatePemis START
+[PROBE]   9314ms fapi.updatePemis RESOLVED
+[PROBE]   9314ms LayoutContentPemis postSaving false -> true
+[PROBE]   9314ms LayoutContentPemis isModified true -> false
+[PROBE]   9314ms dg.showCheckYes OPEN
+[PROBE]   9856ms dg.showCheckYes CLOSED(resolve)
+[PROBE]  10161ms LayoutContentPemis postSaving true -> false
+[PROBE]  10206ms store.commit UpdateTableData grups rows=7
+[PROBE]  10207ms LayoutContentPemis rebuildDraft {"iM":false,"pS":false,"sP":false,"sN":false}
+[PROBE]  10224ms store.commit UpdateTableData pemis rows=5
+[PROBE]  10224ms LayoutContentPemis rebuildDraft {"iM":false,"pS":false,"sP":true,"sN":false}
+[PROBE]  10240ms LayoutContentPemis isModified false -> true {"iM":true,"pS":false,"sP":false,"sN":false} at invokeWithErrorHandling (vue.runtime.esm.js:3083:30) | at Watcher.run (vue.runtime.esm.js:3600:21) | at Watcher.update (vue.runtime.esm.js:3576:18) | at Dep.notify (vue.runtime.esm.js:792:17) | at Object.reactiveSetter [as isModified] (vue.runtime.esm.js:1025:21)
+[PROBE]   4493ms store.commit UpdateTableData grups rows=7
+[PROBE]   4493ms store.commit UpdateTableData pemis rows=5
+[PROBE]   4494ms store.commit UpdateTableData targets rows=22
+[PROBE]   4494ms store.commit UpdateTableData users rows=7
+[PROBE]   5293ms HOOK LayoutContentPemis {"iM":false,"pS":false,"sP":true,"sN":false}
+[PROBE]   6930ms LayoutContentPemis isModified false -> true {"iM":true,"pS":false,"sP":false,"sN":false} at invokeWithErrorHandling (vue.runtime.esm.js:3083:30) | at Watcher.run (vue.runtime.esm.js:3600:21) | at Watcher.update (vue.runtime.esm.js:3576:18) | at Dep.notify (vue.runtime.esm.js:792:17) | at Object.reactiveSetter [as isModified] (vue.runtime.esm.js:1025:21)
+[PROBE]   7474ms dg.showCheckYesNo OPEN
+[PROBE]   8033ms dg.showCheckYesNo CLOSED(reject)
+[PROBE]   8584ms dg.showCheckYesNo OPEN
+[PROBE]   9148ms dg.showCheckYesNo CLOSED(resolve)
+[PROBE]   9149ms fapi.updatePemis START
+[PROBE]   9165ms fapi.updatePemis RESOLVED
+[PROBE]   9165ms LayoutContentPemis postSaving false -> true
+[PROBE]   9165ms LayoutContentPemis isModified true -> false
+[PROBE]   9165ms dg.showCheckYes OPEN
+[PROBE]   9731ms dg.showCheckYes CLOSED(resolve)
+[PROBE]  10041ms LayoutContentPemis postSaving true -> false
+[PROBE]  10211ms store.commit UpdateTableData grups rows=7
+[PROBE]  10212ms LayoutContentPemis rebuildDraft {"iM":false,"pS":false,"sP":false,"sN":false}
+[PROBE]  10227ms store.commit UpdateTableData pemis rows=5
+[PROBE]  10228ms LayoutContentPemis rebuildDraft {"iM":false,"pS":false,"sP":true,"sN":false}

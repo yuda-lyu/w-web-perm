@@ -1,4 +1,4 @@
-//迭代使用端傳入之物件(規則帳本 R-OBJ-ITER-01「迭代使用端傳入之物件」; 對應 wsemi CLAUDE_rulebook.md 同名規則)
+//迭代使用端傳入之物件(規則帳本 R-OBJ-ITER-01「迭代使用端傳入之物件」; 對應 wsemi sgud/rule/rulebook.md 同名規則)
 //
 //受測: src/js/eachOwn.mjs 之 eachOwn(真陣列索引迴圈、一般物件自有可列舉字串鍵、其餘不迭代; callback 回 false 跳出, 同 lodash each)
 //EO-0xx: 函數契約(與 lodash each 對「無 length 鍵之物件與真陣列」逐項等價; 對帶 length 鍵之物件改走自有鍵, 與 length 之值無關).

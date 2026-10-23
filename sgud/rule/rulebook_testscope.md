@@ -1,0 +1,187 @@
+# 規則帳本:改動範圍 → e2e 檔對照(中間輪選測)
+
+本檔為 `sgud/rule/rulebook.md` 之分冊(2026-10-22 主控依使用者指示自原 312KB 之帳本依類型分拆;節之標題與內容不變).索引與其他分冊見 `rulebook.md`.
+
+## R-TEST-SCOPE-01 改動範圍 → e2e 檔對照表(2026-10-22 run06; 來源: 主控第 12 條「中間輪只跑受影響之測試」)
+
+軸: 改動範圍(清單頁／編輯對話框／前端純函數／伺服端寫入核心／共用設施) × e2e 檔(11 檔) × 影響方式(導覽進入／開對話框／寫入 RPC／授權樹斷言／標準圖). e2e 檔本身不 import `src/`、`server/`(`rg "\.\./(src|server)/" test/e2e-*.test.mjs` 無命中, 證據 A-0), 涵蓋面全由「真瀏覽器操作之頁面、後端入口、資料表」決定, 故本表依**執行路徑**建立, 不依 import 圖. 本表只選 e2e; 伺服端邏輯之判定性驗證在 unit／api 層(見「規格 → 測試檔對照」), e2e 僅作 UI 端到端與回歸.
+
+### 用法
+
+- 取本輪改動檔清單(`git diff --name-only`), 逐檔查**表二**(必跑檔), 多列取聯集; 不在表二者以「盤點指令」找其 importer／呼叫端再依元件列判定; 落入**表三**(共用基礎)即擴大.
+- 中間輪只跑聯集, 單檔指令 `npx mocha test/e2e-<flow>.test.mjs --reporter list --timeout 300000`(見「分層與執行指令」); 表二「可縮減為」欄為**判斷**(以改動性質縮小範圍), 加 `--grep '<樣式>' --fail-zero`(mocha 11.8.0 支援, 對不到案例即失敗, 不假綠); 拿不準時取「完整影響集」. 逐檔之間宜殺 11006 後端使每檔得全新種子(同 `run-e2e-isolated.mjs`; 套件 `runIsolatedE2e` 支援 `targets:[{file,grep}]`, 見 `node_modules/w-package-tools-e2e/src/runIsolatedE2e.mjs:12,24,25`, 本表未實跑).
+- 收尾輪(外審採納並凍結碼之後)仍跑全套: 全套 e2e 約 80 分(表一合計, 來源 run05 `final6` 逐案毫秒加總), 加 unit／api 約 7 分, 實測 `npm test` 86m44s; 本表不取代全套, 只用於中間輪.
+- 新增／改名／拆分 e2e 檔或案例後須同步維護本表(「盤點指令」之期望輸出會失配, 即為維護訊號). 工作樹持續變動時(如 run06 進行中), `src/`、`server/` 之 importer 與行號會漂移, 引用本表前先重跑「盤點指令」3; 「必跑」只表示需重跑, **不表示該檔會綠**(已知會紅者見「已知限制」).
+
+### 表一 e2e 檔 → 涵蓋面(耗時: run05 `20261022-003548-final6.log` 各檔逐案毫秒加總, 含 eng／cht; 括號為 run05 單檔 wall, 含啟動, 僅 exit=0 者列出)
+
+| e2e 檔(案數) | 頁面／元件 | 後端入口 | 資料表 | 標準圖 flow(張數) | 約略耗時 |
+|---|---|---|---|---|---|
+| `e2e-array-form`(69) | 使用者／群組／權限三清單頁＋五個編輯對話框＋刪除確認框(CheckYesNo, AF-026／027)＋名稱擋存(AF-031／033)＋清單警告 tooltip; 語意斷言, 多為單語(預設語系) | `syncAndReplaceTabs`(每案前置夾具, :320-322; 部分案另以 `syncRows`)、`updateUsers`／`updateGrups`(清單頁存檔、對話框自行存檔, AF-014 以 `callRpc` 模擬他端改寫)、`getPermUserInfor`(28 案斷言授權樹)、資料通道 `select`、`restartBackend`(`seedExtra`／`reseed`／`mappingBy:'name'`) | users／grups／pemis(targets 唯讀作標的來源) | 無(:8) | 12.5 分 |
+| `e2e-grups`(20) | 群組清單頁(LayoutContentGrups); E2E-008 開 `VeGrupBlngUsers`、E2E-009 開 `VeCpemis`(僅驗對話框出現) | `updateGrups`(E2E-003～007、010)、`getPermUserInfor`(E2E-005 刪群組後之授權樹) | grups(讀 users／pemis 驗樹) | `grups`(48) | 7.3 分(wall 7m51s) |
+| `e2e-pemis`(20) | 權限清單頁(LayoutContentPemis); E2E-008 開 `VeCrules`、E2E-009 開 `VePemiBlngGrups`(僅驗出現) | `updatePemis`、`getPermUserInfor`(E2E-005 刪權限後之授權樹) | pemis(讀 grups／targets 驗樹) | `pemis`(48) | 7.2 分(wall 7m43s) |
+| `e2e-targets`(22) | 標的清單頁(LayoutContentTargets; 無對話框); E2E-011 路徑含 HTML 標記被拒 | `updateTargets`(含寫入前驗證 `htmlMarkupNotAllowed`)、資料通道 `targets.select`(E2E-011)、`getPermUserInfor`(E2E-005 刪標的後之孤兒不變式) | targets(讀 pemis／grups 驗樹) | `targets`(60) | 8.4 分 |
+| `e2e-users`(24) | 使用者清單頁(LayoutContentUsers); E2E-011 開 `VeCgrups`(僅出現)、E2E-012 `for:grups` 模式走完 VeCgrups 勾選→回填→清單頁存檔 | `updateUsers`; `restartBackend`(`modeEditUsers:'for:grups'`, E2E-012 前後換／還原設定) | users(對話框列出 grups) | `users`(64) | 9.2 分(wall 9m48s) |
+| `e2e-rela-user-grup`(20) | 入口 A: 使用者頁→`VeCgrups`(E2E-001～003、007 唯讀); 入口 B: 群組頁→`VeGrupBlngUsers`(E2E-004～006、008 唯讀、009 chips 收合、010 同名使用者); RelationChips／RelationChip／ModeSelectChip | 入口 A 為 resolve 型(不打 API); 入口 B 對話框自行 `updateUsers`(E2E-005／010); `getPermUserInfor`(E2E-005); E2E-010 以 `$fapi.updateUsers` 造夾具 | users／grups | `rela-user-grup`(104) | 9.8 分(wall 10m26s) |
+| `e2e-rela-grup-pemi`(14) | 入口 A: 群組頁→`VeCpemis`(E2E-001、002、005 唯讀); 入口 B: 權限頁→`VePemiBlngGrups`(E2E-003、004、006 唯讀、007 chips 收合); ModeSelectChip／RelationChips | E2E-002 經群組頁工具列 `updateGrups`; E2E-004 對話框自行 `updateGrups`; `getPermUserInfor`(E2E-002) | grups／pemis | `rela-grup-pemi`(92) | 8.5 分 |
+| `e2e-rela-pemi-rule`(12) | 權限頁→`VeCrules`(E2E-001～006, 單一編輯器, resolve 型) | E2E-004 經權限頁工具列 `updatePemis`; `getPermUserInfor`(E2E-004) | pemis／targets(列來源) | `rela-pemi-rule`(36) | 4.5 分(wall 5m00s) |
+| `e2e-stainfor`(16) | 統計資訊頁(LayoutContentStaInfor＋`legendFit`)、頂列語系下拉、導覽收合(E2E-007)、窄視窗圖例 | `getStaEvent`／`getStaEventTable`(`procStaInfor`; `staEventMock`); `restartBackend`(E2E-008 `staEventMock:'many'`) | 無(以 log 為源) | `stainfor`(48) | 7.9 分 |
+| `e2e-layout`(6) | 導覽隱藏／顯示(`Layout`／`LayoutContent` 之 WDrawer)、視窗縮放自動收合、五頁標題讓位(逐頁進入五頁; E2E-003 含統計圖圖例檢查) | `restartBackend`(每案 `staEventMock:true`)、統計頁 `getStaEvent`; 無寫入 | 無 | `layout`(12) | 3.4 分 |
+| `e2e-init`(12; 其中 E2E-006 於 final6 失敗, 耗時另以 run05 單跑補) | 連線狀態畫面(`LayoutState`: 連線中／已登入／拒絕登入／無法連線)、登入後頂列(`Layout` 之 `app-topbar`)、server 注入語系; E2E-006 對應鍵命中多筆→拒絕登入 | WWebPerm 啟動(`{language}` 注入 `dist/index.tmp`)、`getUserByToken`(登入)、`syncAndReplaceTabs`(users, E2E-006 前置)、`updateUsers`(管理者 RPC, E2E-006 清理)、`users.select`; `restartBackend`(`language`／`mappingBy`／`staEventMock`／`reseed`) | users(僅 E2E-006) | `init`(10; E2E-006 無圖) | 1.2 分(10 案 0.8＋E2E-006 兩語系約 0.4) |
+| `e2e-external-rows`(26; run07 新增 15 案, run11 改寫 E2E-012 並新增 E2E-016～026; run11 已實跑) | 使用者／群組清單頁之外部列呈現(橫幅 `data-fmid="<表>-banner-ext"`、鎖頭、逐列唯讀、isAdmin／isActive 核選方塊 disabled、from 欄唯讀)、刪除濾除警告框、複製重置 from、名稱撞外部來源提示; E2E-008 開 `VeCpemis`(外部群組改指派並存檔)、E2E-011～013 開 `VeGrupBlngUsers`(過期快照拒存 `saveStale`、開框後新增列存檔仍在、重開框以新基準可存)、E2E-010 同步警示橫幅(`data-fmid="grups-banner-warn"`); **run11(原則 7)**: E2E-016～019 四清單頁有未存編輯時他人／外部同步改了表 → 草稿保留＋過期橫幅(`<表>-banner-stale`)＋存檔被拒＋「重新載入」(016)、E2E-020／021 兩反向對話框之過期提示、E2E-022 外部同步內容未變不擋、E2E-023 無草稿照舊重建、E2E-024 語系切換後表頭仍更新(其他反應式依賴觸發之重算不得失效); E2E-012 改寫為開框後新增列存檔被拒、重開可存 | `syncAndReplaceTabs`(每案夾具, 經 `syncRows`; E2E-010 重送同名異 id 批次)、`updateUsers`／`updateGrups`(清單頁存檔、對話框自行存檔、`editTableRows` 之管理者寫入 RPC)、資料通道 `select`、`getPermUserInfor`(E2E-008)、`restartBackend`(E2E-014 `lockExternalRows:'n'`) | users／grups(外部列夾具; 收尾 `restoreTables`＋`purgeExternalRows`; pemis 僅隨整表快照還原) | `external-rows`(13 張/語系, 共 26; run07 產 22 張、run11 新增 E2E-016／020 共 4 張) | 未實跑(15 案×2 語系, 其中 6 案有圖) |
+| `e2e-ref-cascade`(8; run07 新增, 未實跑) | 群組頁刪除確認框(被引用／無引用)、群組頁改名預覽確認框、權限頁改名撞懸空名被拒訊息框、標的頁刪除之儲存前確認框(按否)、群組頁新增撞懸空名確認框(`confirmAddRefs*`)與無懸空引用之直接儲存、`cascadeRename:false` 下改名後使用者頁懸空警告圖示 | `updateGrups`／`updatePemis`／`updateTargets`(清單頁存檔)、`syncAndReplaceTabs`(外部引用端夾具)、`updateUsers`／`updateGrups`(`editTableRows` 之管理者寫入 RPC 夾具)、`getPermUserInfor`、資料通道 `select`、`restartBackend`(E2E-008 `cascadeRename:false`) | users／grups／pemis(targets 只經 E2E-005 之按否路徑, 零寫入) | `ref-cascade`(10 張/語系, 共 20; 未產製) | 未實跑(8 案×2 語系, 其中 5 案有圖) |
+
+涵蓋矩陣(●＝該檔以之為主要受測對象; ◐＝僅作入口／驗「對話框出現」／冒煙, 不斷言其內部行為; -＝不涉及):
+
+| e2e 檔 | Targets 頁 | Pemis 頁 | Grups 頁 | Users 頁 | VeCgrups | VeCpemis | VeCrules | VeGrupBlngUsers | VePemiBlngGrups | StaInfor 頁 | 導覽／頂列 | 連線狀態畫面 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `e2e-array-form` | - | ● | ● | ● | ● | ● | ● | ● | ● | - | - | - |
+| `e2e-grups` | - | - | ● | - | - | ◐ | - | ◐ | - | - | - | - |
+| `e2e-pemis` | - | ● | - | - | - | - | ◐ | - | ◐ | - | - | - |
+| `e2e-targets` | ● | - | - | - | - | - | - | - | - | - | - | - |
+| `e2e-users` | - | - | - | ● | ● | - | - | - | - | - | - | - |
+| `e2e-rela-user-grup` | - | - | ◐ | ◐ | ● | - | - | ● | - | - | - | - |
+| `e2e-rela-grup-pemi` | - | ◐ | ◐ | - | - | ● | - | - | ● | - | - | - |
+| `e2e-rela-pemi-rule` | - | ◐ | - | - | - | - | ● | - | - | - | - | - |
+| `e2e-stainfor` | - | - | - | - | - | - | - | - | - | ● | ◐ | - |
+| `e2e-layout` | ◐ | ◐ | ◐ | ◐ | - | - | - | - | - | ◐ | ● | - |
+| `e2e-init` | - | - | - | - | - | - | - | - | - | - | ◐ | ● |
+| `e2e-external-rows`(run07 新增, run11 增) | ◐ | ◐ | ● | ● | - | ◐ | - | ● | ● | - | - | - |
+| `e2e-ref-cascade`(run07 新增) | ◐ | ◐ | ● | ◐ | - | - | - | - | - | - | - | - |
+
+### 表二 改動範圍 → 必跑 e2e 檔(「完整影響集」依 import／導覽／RPC 實證; 「可縮減為」為判斷, 附耗時; 證據見證據檔 spec/evidence/R-TEST-SCOPE-01-證據.md 之附錄 A, 括號內 A-n)
+
+| 改動範圍 | 完整影響集 | 可縮減為(中間輪, 需符合條件) | 理由 |
+|---|---|---|---|
+| `src/components/LayoutContentGrups.vue` | `e2e-grups`、`e2e-rela-user-grup`、`e2e-rela-grup-pemi`、`e2e-array-form`(群組頁案, 證據檔之附錄 B) | `e2e-grups`＋`e2e-array-form` 群組頁案(21 案 4.7 分); 僅當改到開對話框函數(`showVeGrupBlngUsersById`:1151／`showVeCpemisById`:1193)時加 rela-user-grup E2E-004～006、008～010 與 rela-grup-pemi E2E-001、002、005, 改到存檔流程(:1295 `getSavePreview`、:1317 `updateGrups`)時加 rela-grup-pemi E2E-002 | 四檔皆以 `gotoGrups` 進本頁(10／6／3／21 處, A-1); rela-grup-pemi E2E-002 經本頁工具列存檔、`e2e-grups` E2E-008／009 經本頁 belongUsers／cpemis 欄按鈕開對話框(A-2、A-3); 本頁刪除／存檔已接「引用連帶」確認框(:1057-1067、:1295-1310), `e2e-grups` E2E-005 與 AF-026 為受影響案(見已知限制) |
+| `src/components/LayoutContentPemis.vue` | `e2e-pemis`、`e2e-rela-pemi-rule`、`e2e-rela-grup-pemi`、`e2e-array-form`(權限頁案) | `e2e-pemis`＋`e2e-array-form` 權限頁案(15 案 3.6 分); 觸及 `showVeCrulesById`(:1195)加 `e2e-rela-pemi-rule`(全), 觸及存檔流程(:1297 `getSavePreview`、:1319 `updatePemis`)加 `e2e-rela-pemi-rule` E2E-004, 觸及 `showVePemiBlngGrupsById`(:1153)加 `e2e-rela-grup-pemi` E2E-003、004、006、007 | 以 `gotoPemis` 進本頁(10／6／4／15 處, A-1); rela-pemi-rule E2E-004 經本頁工具列存檔(A-2、A-3); 本頁刪除／存檔已接「引用連帶」確認框(:1058-1068、:1297-1303), `e2e-pemis` E2E-005 與 AF-027 為受影響案(見已知限制) |
+| `src/components/LayoutContentTargets.vue` | `e2e-targets` | 全檔 8.4 分; 僅改新增／複製命名時 `--grep 'E2E-00[34]-'`; 改存檔流程(:879 `getSavePreview`、:885 確認框、:901 `updateTargets`)或刪除／改 id 時 `--grep 'E2E-00[56]-'`(刪除、就地改)＋`--grep 'E2E-011-'`(改 id 被拒; 其中 E2E-005／011 為受影響案, 見已知限制) | `gotoTargets` 只出現在 e2e-targets(11 處); 其他檔不進本頁, 僅 e2e-layout:22 與 e2e-init:175 等以頁籤文字出現(A-1). 本頁無編輯對話框. 動到頁首／標題／工具列版面另加 `e2e-layout`; 本頁已 import `getCascadePreview`(:254, 標的刪除／改 id 時確認引用權限之規則將被清理, A-6) |
+| `src/components/LayoutContentUsers.vue` | `e2e-users`、`e2e-rela-user-grup`、`e2e-array-form`(使用者頁案) | `e2e-users`＋`e2e-array-form` 使用者頁案(16 案 4.5 分); 觸及 `showVeCgrupsById`／`updateUsers`(:1227)加 `e2e-rela-user-grup` | 以 `gotoUsers` 進本頁(12／4／16 處, A-1); E2E-012 於本頁走完 `for:grups` 存檔 |
+| `src/components/VeCgrups.vue` | `e2e-users`(E2E-011、012)、`e2e-rela-user-grup`(入口 A: E2E-001～003、007)、`e2e-array-form`(`userEditCgrups` 集 11 案 3.1 分) | `e2e-rela-user-grup` 入口 A 案＋`e2e-users --grep 'E2E-01[12]-'`(1.9 分)＋array 集 | resolve 型(不打 API), 存檔延到使用者頁工具列; E2E-012 為其完整存檔路徑(A-2、A-3) |
+| `src/components/VeCpemis.vue` | `e2e-grups`(E2E-009)、`e2e-rela-grup-pemi`(入口 A: E2E-001、002、005)、`e2e-array-form`(`grupEditCpemis` 集 5 案 1.1 分) | `e2e-rela-grup-pemi` 入口 A 案＋array 集 | 同上; 存檔經群組頁 `updateGrups`(A-2、A-3) |
+| `src/components/VeCrules.vue` | `e2e-pemis`(E2E-008)、`e2e-rela-pemi-rule`(全 6 案)、`e2e-array-form`(`pemiEditCrules` 集 5 案 1.1 分) | `e2e-rela-pemi-rule`(4.5 分)＋array 集 | 唯一編輯器為 VeCrules(resolve 型); 無 mode 欄, 不經 `editorRefRows`／`getKpLossy`(A-6) |
+| `src/components/VeGrupBlngUsers.vue` | `e2e-grups`(E2E-008)、`e2e-rela-user-grup`(入口 B: E2E-004～006、008～010)、`e2e-array-form`(`grupBlngEditUsers` 集 11 案 2.3 分) | `e2e-rela-user-grup` 之 E2E-004～006、010＋array 集(AF-014／015 驗開框期間 store 重排與批次鈕) | 對話框自行 `updateUsers`(VeGrupBlngUsers.vue:1016, A-3) |
+| `src/components/VePemiBlngGrups.vue` | `e2e-pemis`(E2E-009)、`e2e-rela-grup-pemi`(入口 B: E2E-003、004、006、007)、`e2e-array-form`(`pemiBlngEditGrups` 集 6 案 1.4 分) | `e2e-rela-grup-pemi` 之 E2E-003、004、007＋array 集 | 對話框自行 `updateGrups`(VePemiBlngGrups.vue:1012, A-3) |
+| `src/components/ModeSelectChip.vue`／`RelationChip.vue`／`RelationChips.vue`(對話框共用小元件) | `e2e-rela-user-grup`、`e2e-rela-grup-pemi`、`e2e-array-form`; 另含開對話框之 `e2e-grups` E2E-008／009、`e2e-pemis` E2E-008／009、`e2e-users` E2E-011／012(3.1 分) | `e2e-rela-user-grup`＋`e2e-rela-grup-pemi`(皆有 chips 收合案與模式切換; 18.3 分) | ModeSelectChip 為 VeCgrups／VeCpemis／RelationChip 所 import; RelationChips 為 VeGrupBlngUsers／VePemiBlngGrups 所 import(A-6) |
+| `src/js/getDelRefCount.mjs`(`getDelImpact`／`getDelConfirmText`) | `e2e-grups` E2E-005、`e2e-pemis` E2E-005、`e2e-array-form` AF-026／027 | 同左(10 案 3.0 分, 含 `e2e-targets` E2E-005 作對照; `--grep` 見附錄 C) | 僅 LayoutContentGrups.vue:280(用 :1057-1058)／LayoutContentPemis.vue:281(用 :1058-1059) import, 標的頁不 import; 現行(2026-10-22 工作樹)凡被引用之刪除皆彈確認框(`getDelImpact` 以 `planRefChanges` 計 `nRefs`, getDelRefCount.mjs:76-96、:110-122), 非僅 AND 引用; 三個刪除案皆受影響(A-6、A-13) |
+| `src/js/getCascadePreview.mjs`(儲存前引用連帶預覽: `getSavePreview`／`getCascadePreview`) | `e2e-grups`、`e2e-pemis`、`e2e-targets`(三頁每次存檔皆經 `getSavePreview`)、`e2e-rela-grup-pemi` E2E-002、`e2e-rela-pemi-rule` E2E-004(經清單頁工具列存檔)、`e2e-array-form` 群組頁／權限頁案(證據檔之附錄 B) | **S2**(41 案 15.7 分; 含四清單新增／刪除、兩個 rela 之清單頁存檔、AF-026／027)＋`e2e-targets --grep 'E2E-011-'`(改 id) | 三頁 import: LayoutContentGrups.vue:281(用 :1295)、LayoutContentPemis.vue:282(用 :1297)、LayoutContentTargets.vue:254(用 :879); 使用者頁不 import. 受影響案: grups／pemis／targets 之 E2E-005 與 targets E2E-011(見已知限制)(A-6) |
+| `src/js/refAudit.mjs`／`g_authRefsClean.mjs`／`test/tools/authRefs*.mjs`(懸空引用稽核與一次性清理) | 無 e2e | - | 僅 `server/tools/authRefsAudit.mjs:21`、`test/unit-refAudit.test.mjs:28` 等離線工具與 unit import, UI 與 e2e 不經此(A-7) |
+| `src/js/getAuthWarn.mjs` | 三清單頁＋五對話框之 importer 全集: `e2e-users`、`e2e-grups`、`e2e-pemis`、`e2e-rela-user-grup`、`e2e-rela-grup-pemi`、`e2e-rela-pemi-rule`、`e2e-array-form`; 另經 `getCascadePreview.mjs`／`getDelRefCount.mjs` 之 import 波及三頁存檔／刪除路徑, 含 `e2e-targets`(`rg` 重驗: 盤點指令 3) | `e2e-array-form` run05 段(AF-017 起 39 案 6.8 分; 判定性: base seed 無衝突資料, 警告圖示只在此檔之夾具出現)＋三清單頁 E2E-001 冒煙(確認無警告路徑未壞) | importer: LayoutContentPemis.vue:279／Grups.vue:278／Users.vue:285／VeCrules.vue:174／VeCgrups.vue:198／VeCpemis.vue:198／VeGrupBlngUsers.vue:214／VePemiBlngGrups.vue:213／getDelRefCount.mjs／getCascadePreview.mjs(A-6) |
+| `src/js/editorRefRows.mjs` | `e2e-rela-user-grup`、`e2e-rela-grup-pemi`、`e2e-array-form`(四個帶 mode 之對話框案, 不含 VeCrules 集)、`e2e-users` E2E-012(VeCgrups 完整存檔) | rela-user-grup＋rela-grup-pemi＋array 之四對話框集 | importer 僅 VeCgrups.vue:197／VeCpemis.vue:197／VeGrupBlngUsers.vue:213／VePemiBlngGrups.vue:212(A-6) |
+| `src/js/cvKpToObj.mjs` | 三清單頁＋五對話框之 importer 全集(即 users、grups、pemis、三個 rela、array-form 共 7 檔) | `e2e-array-form` 全(12.5 分; 清單頁解碼 AF-007～009＋各對話框)＋`e2e-rela-pemi-rule`(VeCrules:826 與權限清單頁 crules 欄 LayoutContentPemis.vue:1108 為不帶 `hasMode` 之呼叫端, 其餘皆 `{ hasMode: true }`) | importer: LayoutContentPemis.vue:277／Grups.vue:277／Users.vue:284／VeCrules.vue:173／VeCgrups.vue:194／VeCpemis.vue:194／VeGrupBlngUsers.vue:209／VePemiBlngGrups.vue:208(A-6) |
+| `src/js/getKpLossy.mjs` | `e2e-array-form` AF-011a～d(fail-closed 判定性)、`e2e-rela-user-grup`、`e2e-rela-grup-pemi` | AF-011a～d(0.9 分)＋rela-user-grup E2E-005＋rela-grup-pemi E2E-004(冒煙) | importer 僅四個帶 mode 之對話框(VeCgrups.vue:195／VeCpemis.vue:195／VeGrupBlngUsers.vue:210／VePemiBlngGrups.vue:209); 清單頁與 VeCrules 不 import(A-6) |
+| `src/js/refCascade.mjs`(`planRefChanges`／`diffRefTargets`／`rewriteRefs`) | 伺服端 importer(`server/procCore.mjs:16`、`server/WWebPerm.mjs:40`)＝下列「伺服端寫入核心」列; 前端 importer 為 `src/js/getCascadePreview.mjs`、`src/js/getDelRefCount.mjs`(再經上兩列波及三清單頁); `src/js/refAudit.mjs` 為離線稽核, 無 e2e | 同「伺服端寫入核心」＋`getCascadePreview`／`getDelRefCount` 兩列之縮減集(S2 即涵蓋) | 純函數, 前端預覽與伺服端計畫同一份; 2026-10-22 工作樹實測 importer 已與稍早不同(稍早 src/ 內無 importer), 每輪須重跑「盤點指令」3(A-7) |
+| `server/procCore.mjs`／`server/cascadeWrite.mjs`／`server/keyCheck.mjs`(伺服端寫入核心) | 所有經 `update<Key>` 之 e2e(8 檔): `e2e-grups`、`e2e-pemis`、`e2e-targets`、`e2e-users`、`e2e-rela-user-grup`、`e2e-rela-grup-pemi`、`e2e-rela-pemi-rule`、`e2e-array-form`(約 67 分). `e2e-stainfor`／`e2e-layout` 不寫表, 不必跑; `e2e-init` 僅 E2E-006 清理路徑經 `updateUsers`, 改動涉 `users` 時加 `--grep E2E-006` | **S2 寫入核心代表集**(41 案 15.7 分): 四清單 `--grep 'E2E-00[135]-'`＋rela-user-grup `E2E-005-`＋rela-grup-pemi `E2E-00[24]-`＋rela-pemi-rule `E2E-004-`＋array-form `AF-014[a-e]` 與 `AF-02[67]`(指令見附錄 C) | `resetDb`(e2e-setup.mjs:795-803)在每案前以 `update<Key>(seed)` 還原, 故 7 個資料檔每案皆過 `updateTabItems`(procCore.mjs:100 `withTabLocks`); array-form 每案前置以 `syncAndReplaceTabs` 寫夾具, 同過 `withTabLocks`(WWebPerm.mjs:609)(A-3、A-4、A-8). **刪除連帶清理之既有 e2e 載體**: 三個清單 E2E-005 皆刪除 base seed 中被引用者(grups E2E-005 刪 M1←peter、pemis E2E-005 刪 P1←M1、targets E2E-005 刪 `專案A/頁A/區塊A`←P1), 以授權樹斷言(A-5、A-13); 惟三案於 2026-10-22 工作樹已被前端確認框中斷(見已知限制), 須先改寫才能當回歸載體 |
+| `server/WWebPerm.mjs`: 僅 `syncAndReplaceTabs`(:604 起) | `e2e-array-form`(第一段 30 案每案 `beforeEach` 經同步端點寫夾具, 第二段多數案以 `syncRows` 寫分區夾具, 其中 AF-027、AF-030～033、AF-035 不呼叫; 12.5 分)、`e2e-init` `--grep E2E-006`(postSync, 0.4 分) | `e2e-array-form` run05 段＋`e2e-init --grep E2E-006`(7.2 分); 只動同步內部之錯誤碼／驗證可再縮為 `AF-03[0-5]`(12 案 2.0 分)＋`E2E-006` | array-form beforeEach `seedArrayForm`(:320-322, :102-108)與 `syncRows`(:111-115)逐案打同步端點; init E2E-006:312-316(A-8) |
+| `server/WWebPerm.mjs`: 僅 `opt` 設定／`getWebInfor` 回傳值(`language`、`modeEdit*`、`mappingBy`、`staEventMock`、`urlRedirect`、新增 `cascadeRename`) | 依設定逐項: `language`→`e2e-init`; `modeEditUsers`→`e2e-users` E2E-012; `staEventMock`→`e2e-stainfor`、`e2e-layout`、`e2e-init` E2E-003; `mappingBy`→`e2e-init` E2E-006、`e2e-array-form` AF-035; **預設值變更(`modeEdit*` 預設 'y' 在 `settings.json:14-17`)→ 全部資料檔(表三)** | 同左(逐項); `cascadeRename`: 現無任何 e2e 設定它(`rg cascadeRename test` 無命中, A-17), 以 procCore 列(S2)為準 | 各檔以 `genTempSettings`／`restartBackend` 注入設定(A-9) |
+| `server/WWebPerm.mjs`: 其他(建構、路由、`getUserByToken`／`checkToken`、`getPerm*`) | 全 11 檔(表三「server 啟動／資料通道」) | 無 | 所有 e2e 經 `startServersOnce` 起後端並 `openApp` 登入(e2e-setup.mjs:255-269) |
+| `server/procLang.mjs`(語系鍵) | 只**新增**鍵且尚無 UI 引用: 不必跑 e2e(unit 站點不變式 `unit-relDialogs`／`unit-keyCheck`／`unit-getNameErrs`／`unit-getAuthWarn` 已盤); **改既有鍵之文字**: 以 `rg -n "'<key>'" src` 找出顯示該文字之元件, 再依表二該元件列; **改 `webName`／`webDescription`／頂列文字**: `e2e-init`(E2E-003 截 `app-topbar`)、`e2e-stainfor` E2E-008(`staTotal` 長度影響圖例排版, :113) | 改文字 → 該元件所屬 flow 之 e2e(標準圖含該文字者必然像素不符); 語意斷言以 `$t(key)` 取值(不寫死), 文字改動不會使語意斷言失敗 | `e2e-init` 之 `expectedText`(:46-49)為 mUI `kpFallback` 之連線前文字, 非 procLang(:44); 其改動走 `src/plugins/mUI.mjs` 列(表三)(A-11) |
+| `src/plugins/mShare.mjs`(授權計算 `getUserRules`; 及 `getNameNew`) | `getUserRules`(僅 `server/WWebPerm.mjs:31` 呼叫, 供 `getPerm`／`getPermUserInfor`): 所有斷言授權樹之案例——`e2e-grups` E2E-005、`e2e-pemis` E2E-005、`e2e-targets` E2E-005、`e2e-rela-grup-pemi` E2E-002、`e2e-rela-user-grup` E2E-005、`e2e-rela-pemi-rule` E2E-004、`e2e-array-form` 28 案(證據檔之附錄 B 之 tree 集)(A-5); `getNameNew`(`vo.$s`, 四清單頁新增／複製命名): 四清單 E2E-003／004 | `getUserRules`: 上列 50 案 13.5 分; `getNameNew`: 四清單 `--grep 'E2E-00[34]-'`(16 案 6.4 分) | `src/main.js:9` 將 mShare 掛為 `vo.$s`, 前端只用 `getNameNew`(Grups.vue:884／961、Pemis.vue:884／962、Targets.vue:704／773、Users.vue:935／1003); 授權樹經 `/api/getPermUserInfor`(e2e-setup.mjs:836-838)(A-5、A-10) |
+| `src/components/LayoutContentStaInfor.vue`／`src/js/legendFit.mjs`／`server/procStaInfor.mjs` | `e2e-stainfor`、`e2e-layout`(E2E-003 圖例檢查與統計頁)、`e2e-init` E2E-003(`staEventMock` 預設頁) | `e2e-stainfor`(7.9 分)＋`e2e-layout --grep 'E2E-003-'`; 僅改 `procStaInfor` 之 mock 資料集時三檔皆須(圖表為其像素來源) | `getStaEvent`／`getStaEventTable` 僅統計頁呼叫(LayoutContentStaInfor.vue:455／476); `unit-legendFit`、`unit-staEvent*` 為判定性驗證 |
+| `src/components/LayoutState.vue`／`src/plugins/mUI.mjs` 之連線前 fallback 文字 | `e2e-init`(E2E-001～005; 12 案 1.2 分) | 同左 | `data-fmid="conn-state"`(LayoutState.vue:7)僅 init 截圖(e2e-init.test.mjs:100); fallback 文字見 init:44 |
+| `src/perm.mjs`／`src/getPerm.mjs`／`src/getPermUserInfor.mjs`／`src/fetchJson.mjs`(外部應用 SDK) | 無 e2e | - | 無 e2e 引用(A-0; 另 `rg "src/perm" test/e2e-*.test.mjs`、`rg "fetchJson" test/e2e-*.test.mjs` 皆無命中); 以 `unit-fetchJson-sdk`／`unit-perm-active`／`api-getPerm*` 驗 |
+| `src/js/externalRows.mjs`／`src/js/externalUi.mjs`(外部列判定、橫幅與鎖頭資料、刪除濾除、送出前守門; run07 F-23) | importer 全集(盤點指令 6): 四清單頁(`LayoutContent{Users,Grups,Pemis,Targets}.vue` 皆 import)→ `e2e-users`、`e2e-grups`、`e2e-pemis`、`e2e-targets`、`e2e-array-form`(三清單頁案); 另 `src/js/getNameErrs.mjs` import `externalRows`(經四清單頁名稱擋存)→ 各頁名稱擋存案; 新增 `e2e-external-rows`(全 15 案) | `e2e-external-rows` 全(15 案)＋四清單頁 `--grep 'E2E-001-'`(冒煙: 無外部列時橫幅區不渲染任何節點、`lockOfRow` 回空陣列, 既有標準圖不得變) | 無外部列且無同步警示時畫面與 DOM 須同改動前(UI1 設計約束, 既有標準圖即回歸守門); 外部列之真瀏覽器行為只有 `e2e-external-rows` 涵蓋(users／grups 頁), pemis／targets 頁無 e2e(見 spec/流程_外部列保護與過期快照.md〈已知落差〉) |
+| `src/js/rowDigest.mjs`／`src/js/relDialogSend.mjs`(載入基準與對話框存檔整表組裝; run07 F-26) | importer 全集(盤點指令 6): 四清單頁(`makeBaseline`; 每次清單頁存檔隨 RPC 第 3 參送基準, 故四頁之新增／複製／刪除／存檔案皆經此路徑)與 `VeGrupBlngUsers`／`VePemiBlngGrups`(`makeBaseline`、`relDialogSend`)→ `e2e-rela-user-grup` 入口 B(E2E-004～006、010)、`e2e-rela-grup-pemi` 入口 B(E2E-003、004)、`e2e-array-form` 對話框案(AF-014／015)、`e2e-grups` E2E-008、`e2e-pemis` E2E-009(僅開框); 新增 `e2e-external-rows` E2E-008、011～013(基準通過與 `saveStale` 拒存) | `e2e-external-rows --grep 'E2E-01[1-9]-|E2E-02[0-4]-'`＋`e2e-rela-user-grup --grep 'E2E-005-'`＋`e2e-rela-grup-pemi --grep 'E2E-004-'`＋`e2e-array-form --grep 'AF-014[a-e]-'`＋四清單 `--grep 'E2E-003-'`(新增存檔帶基準) | 草稿之基準於 `changeParams`／`show()` 與列同處產生, 存檔不重算(R-BASELINE-01); 過期快照之拒存只有 `e2e-external-rows` E2E-011、013 在真瀏覽器端涵蓋 |
+| `src/js/draftSync.mjs`(run11 原則 7: 清單頁有未存編輯時推播不丟棄草稿, 提示與重新載入) | importer: 四清單頁(`rg "draftSync" src`)與兩對話框(`isDraftStale`)→ `e2e-external-rows`(E2E-016～026 之唯一真瀏覽器載體)、四清單頁之其餘 e2e 檔(凡有未存編輯期間發生推播者, 如 `e2e-users`／`e2e-grups`／`e2e-pemis`／`e2e-targets` 之新增／刪除／存檔案: 推播重建與保留之分岔) | `e2e-external-rows` 全(24 案; 其中 E2E-012、016～024 為本輪新增或改寫)＋四清單頁各 `--grep 'E2E-00[135]-'`＋`e2e-rela-user-grup`／`e2e-rela-grup-pemi` 入口 B(兩對話框之 watch 與提示) | 判定性在 `unit-draftSync`(純函數＋站點靜態斷言) |
+| `src/plugins/dataReloadGuard.mjs`／`mUI.markDataReload` 與四清單頁 `saveMark`(run12: 重疊重載旗標、自己存檔進行中之推播) | importer: `mUI.mjs` 轉出 `$ui.markDataReload`(`rg "markDataReload" src`)→ 四清單頁 `genOpt` 各 1 處; `saveMark` 在四清單頁 `created`／`changeParams`／`doSave*`(`rg "saveMark" src`)→ 凡有「儲存成功後儲存鈕須消失」斷言者: `e2e-array-form`(AF-037 為重疊重載之原失敗案例; 整檔)、`e2e-users`／`e2e-grups`／`e2e-pemis`／`e2e-targets`(存檔案)、`e2e-ref-cascade`(連帶使兩表推播)、`e2e-external-rows`(E2E-027～030 之載體; 整檔) | `e2e-array-form --grep AF-037`(連跑 20 次)＋`e2e-external-rows --grep 'E2E-02[6-9]|E2E-030'`＋四清單頁各 `--grep 'E2E-00[135]-'`＋`e2e-ref-cascade`＋`e2e-rela-user-grup`／`e2e-rela-grup-pemi`(兩對話框之父頁重建) | 判定性在 `unit-dataReloadGuard`(全排列＋見證)與 `unit-draftSync`(DS-2 決策表含 saving 軸、DS-4o 站點); 改共用旗標守門＝擴大到上列全部 |
+| `src/js/getAddImpact.mjs`(新增撞懸空名確認; run07 F-23 原則 7) | importer: `LayoutContentGrups.vue`／`LayoutContentPemis.vue`／`LayoutContentTargets.vue`(盤點指令 6)→ `e2e-ref-cascade`(E2E-006、007)＋三頁新增案(`e2e-grups`／`e2e-pemis`／`e2e-targets` 之 E2E-003 路徑: 無懸空引用不彈框) | `e2e-ref-cascade --grep 'E2E-00[67]-'`＋`e2e-grups`／`e2e-pemis`／`e2e-targets` 各 `--grep 'E2E-003-'` | 新增撞懸空名之確認框在權限頁與標的頁無 e2e(見 spec/流程_引用連帶確認框.md〈已知落差〉), 判定性由 `unit-getAddImpact` 涵蓋 |
+| 外部列／基準相關之伺服端改動: `server/WWebPerm.mjs` 之 `lockExternalRows`／`syncWarns`／`syncAndReplaceTabs`(users 缺 `cgrups` 鍵保留、同名異 id 偵測)、`server/syncKeep.mjs`、`server/procCore.mjs` 之 `checkExternalWrite`／`checkBaseline`／`restoreExternalOrder`(run07) | `e2e-external-rows`(全 15 案: 外部列夾具皆經 `/syncAndReplaceTabs`, 守門與基準由清單頁與對話框存檔走到)、`e2e-ref-cascade`(夾具含外部引用端: E2E-001、003、004、006、008)、`e2e-array-form`(夾具經同步端點; 夾具是否另以後台寫入 RPC 寫外部列須逐案核對)、其餘經 `update<Key>` 之 7 檔(後台列整表寫入須不被外部列守門誤拒且被帶基準) | `e2e-external-rows` 全＋`e2e-ref-cascade` 全＋S2 寫入核心代表集 | 外部列守門與基準比對在 `updateTabItems` 同一路徑(其後接引用連帶預檢與寫入), 故與既有「伺服端寫入核心」列同時適用; 兩個新檔為其僅有之真瀏覽器載體(判定性在 `unit-procCore-external`／`api-externalRows`) |
+
+### 表三 擴大條件(改到共用基礎即擴大; 「全 11 檔」＝全部 e2e 約 80 分, 等同收尾輪之 e2e 部分)
+
+| 改動 | 擴大為 | 理由(證據見證據檔 spec/evidence/R-TEST-SCOPE-01-證據.md 之附錄 A) |
+|---|---|---|
+| `test/tools/e2e-setup.mjs` | 全 11 檔. 若只動單一 helper, 以該 helper 名盤點使用檔即可縮小(例: `getResolvedActiveTargets` 僅 7 檔, `saveBelongAndWaitModal` 僅 3 檔) | 11 檔皆 import(A-14); helper 級盤點: `rg -l "\b<helper>\b" test/e2e-*.test.mjs` |
+| `test/tools/e2eLib.mjs`、devDependency `w-package-tools-e2e`／`playwright` 版本 | 全 11 檔, 且 Chromium 換版必然使全部標準圖像素變動(見規則帳本 ADR-020 與 C1 列) | 11 檔皆經 e2e-setup／e2eLib 啟動瀏覽器與比對(A-14) |
+| `test/tools/api-setup.mjs` | `e2e-init`＋`e2e-array-form`＋`e2e-ref-cascade`＋`e2e-external-rows`＋`e2e-targets`(另含全部 `api-*`, 非本表範圍) | **2026-10-22 run10 實測 5 檔 import**(`rg -l "api-setup\.mjs" test/e2e-*.test.mjs`; 原記「僅 init:36、array-form:29」已落後); 改動只涉 `readSrLogSince`／`markSrLog` 者(僅 api 檔使用)這 5 檔不受影響, 改其他匯出(`callRpc`／`restoreTables`／`cleanExternalFixtures`／`purgeExternalRows` 等)才須跑 |
+| `test/tools/baseSeed.mjs`／`seedChild.mjs`／`g_initialTestData.mjs`／`src/schema/**`／`g_*.mjs`(種子與表結構) | 全 11 檔(且種子列數／欄值之變動使全部標準圖與 `BASE_SEED_COUNT` 失配) | `baseSeed.mjs:8` import `src/schema/index.mjs`, `assertPristineSeed` 於每個資料檔 `captureBaseSeedOnce`(e2e-setup.mjs:773)守門; 種子於每檔後端啟動時重建(e2e-setup.mjs:148-151)(A-15) |
+| `test/tools/seedExtraRows.mjs` | 僅 `e2e-array-form` 之 `AF-03[0-4]-`(`restartBackend({seedExtra})`) | e2e-array-form.test.mjs:1913(A-16) |
+| 版面共用: `src/components/Layout.vue`、`LayoutContent.vue`、`App.vue`、`Common/CheckYes.vue`／`CheckYesNo.vue`／`LoadingWinBar.vue` | 全 11 檔(外觀改動); 僅邏輯(不改像素)時先跑 **S1＋S3**(CRUD 煙霧 8.3 分＋版面煙霧 4.7 分, 共約 13 分), 收尾輪再全套 | 導覽由 `Layout`／`LayoutContent` 提供, 每個頁面案皆經 `clickNavItem`(e2e-setup.mjs:478); `app-topbar`(Layout.vue:9)為 init／stainfor 截圖目標; `CheckYes` 為全部存檔案之結果 modal(`saveAndWaitModal`)(A-11) |
+| 樣式(全域 CSS、`public/`、`vue.config.js`、`babel.config.js`)、`w-component-vue`／ag-grid 版本 | 全 11 檔(10 個有標準圖的 flow＋array-form 之 DOM 結構斷言) | pics 目錄 10 個 flow(A-12) |
+| server 啟動／資料通道／設定: `srv.mjs`、`g_getSettings.mjs`、`g_mOrm.mjs`、`settings.json`、`server/dataChannel.mjs`、`server/srLog.mjs` | 全 11 檔 | 所有 e2e 經 `startServersOnce` 起後端、`openApp` 等 `csLogin`＋`webInfor`＋`syncState`(e2e-setup.mjs:255-269); 前端 store 經資料通道同步(`captureBaseSeed` 讀 `$store.state`, e2e-setup.mjs:757-764); `settings.json:14-17` 之 `modeEdit*` 預設 'y' 決定各清單頁預設編輯模式 |
+| `src/store/**`、`src/plugins/mUI.mjs`、`src/plugins/submitGuard.mjs`、`src/main.js` | 全 11 檔(外觀或登入流程); 僅 `submitGuard`／`lockSave` 類雙擊防護邏輯: S2(15.7 分)已含存檔路徑 | 登入、語系、`showCheckYes`／`updateLoading`、`promiseUnlock` 皆經此(init:44 mUI fallback; 各檔 `$ui.setLang`／`$ui.updateUserToken`) |
+| `server/lockSave.mjs`／`server/validateRows.mjs` | S2(15.7 分)＋`e2e-targets --grep 'E2E-011-'`(寫入前驗證 `htmlMarkupNotAllowed` 唯一 e2e 載體) | 兩者皆在 `updateTabItems` 路徑(procCore.mjs:96-100、:253); targets E2E-011:339-369 |
+| `package.json` 依賴(`wsemi`、`w-serv-orm`、`w-serv-hapi`、`w-ui-loginout`、`w-component-vue` …) | 先 `git diff package.json` 找變動套件: `w-package-tools-e2e`／`playwright`→全 11 檔; `w-component-vue`／ag-grid→全 11 檔; `wsemi`／`w-serv-*`／`w-orm-*`→ S2＋`e2e-init`＋`e2e-stainfor`(伺服端行為, 判定性在 unit／api); 其餘→ S1 | 判斷(未實證各套件之波及面); 拿不準取全 11 檔 |
+| 單一 e2e 檔自身之案例／夾具改動 | 該檔(＋依賴其夾具之檔, 如 `e2e-array-form` 夾具不被他檔共用) | 各檔自含 `before`／`after` 還原(R-E2E-ISO-01) |
+
+常用縮減集(耗時為 run05 逐案毫秒加總, 不含每檔 `before`／`after` 之啟動與還原, 每檔另加約 0.5～1 分, 首檔另加前端 webpack 首編約 2 分):
+
+- **S1 CRUD 煙霧**: `e2e-grups`／`e2e-pemis`／`e2e-targets`／`e2e-users` 各 `--grep 'E2E-00[135]-'`(列表、新增、刪除; 24 案, 約 8.3 分).
+- **S2 寫入核心代表**: S1＋`e2e-rela-user-grup` `'E2E-005-'`＋`e2e-rela-grup-pemi` `'E2E-00[24]-'`＋`e2e-rela-pemi-rule` `'E2E-004-'`＋`e2e-array-form` `'AF-(014[a-e]|02[67])-'`(41 案, 約 15.7 分; 四表各一條寫入入口、三個授權樹刪除案、AF-014 過期快照、AF-026／027 刪除確認; 其中三清單 E2E-005 與 AF-026／027 於現工作樹預期紅燈, 須先改寫, 見「已知限制」).
+- **S3 版面煙霧**: `e2e-layout`(6 案)＋`e2e-init`(10 案)＋`e2e-grups --grep 'E2E-001-'`(18 案, 約 4.7 分).
+
+### 盤點指令(可重跑; 期望輸出為 2026-10-22 實測, 失配即本表須維護)
+
+```bash
+# 1) 某頁被哪些 e2e 檔操作(導覽進入次數). 期望: gotoGrups = grups 10／rela-user-grup 6／rela-grup-pemi 3／array-form 21; gotoPemis = pemis 10／rela-pemi-rule 6／rela-grup-pemi 4／array-form 15;
+#    gotoUsers = users 12／rela-user-grup 4／array-form 16; gotoTargets = targets 11(其餘檔 0); 四頁合計每檔: array-form 52／users 12／targets 11／grups 10／pemis 10／rela-user-grup 10／rela-grup-pemi 7／rela-pemi-rule 6
+rg -c "await gotoGrups\(" test/e2e-*.test.mjs
+rg -c "await gotoPemis\(" test/e2e-*.test.mjs
+rg -c "await gotoUsers\(" test/e2e-*.test.mjs
+rg -c "await gotoTargets\(" test/e2e-*.test.mjs
+# 2) 某對話框被哪些 e2e 檔開啟(以標題語系鍵偵測; 值為命中行數). 期望: userEditCgrups = users 5／rela-user-grup 11／array-form 26;
+#    grupEditCpemis = rela-grup-pemi 7／grups 3／array-form 10; pemiEditCrules = rela-pemi-rule 11／array-form 10／pemis 3;
+#    grupBlngEditUsers = grups 3／array-form 13／rela-user-grup 9(含 colId: 'belongUsers'); pemiBlngEditGrups = array-form 8／rela-grup-pemi 8／pemis 3(含 colId: 'belongGrups')
+rg -c "userEditCgrups" test/e2e-*.test.mjs
+rg -c "grupEditCpemis" test/e2e-*.test.mjs
+rg -c "pemiEditCrules" test/e2e-*.test.mjs
+rg -c "grupBlngEditUsers|colId: 'belongUsers'" test/e2e-*.test.mjs
+rg -c "pemiBlngEditGrups|colId: 'belongGrups'" test/e2e-*.test.mjs
+# 3) 某純函數／元件被哪些 src／server 檔 import(工作樹持續變動, 每輪須重盤). 2026-10-22 期望: getCascadePreview ← LayoutContentGrups.vue:281／LayoutContentPemis.vue:282／LayoutContentTargets.vue:254;
+#    getDelRefCount ← LayoutContentGrups.vue:280／LayoutContentPemis.vue:281; refCascade ← server/procCore.mjs:16／server/WWebPerm.mjs:40／src/js/{getCascadePreview,getDelRefCount,refAudit}.mjs; 其餘見證據檔 spec/evidence/R-TEST-SCOPE-01-證據.md 之附錄 A-6
+rg -n "from '.*(getDelRefCount|getAuthWarn|editorRefRows|cvKpToObj|getKpLossy|refCascade|getCascadePreview)\.mjs'" src server
+# 4) e2e 檔數與 e2e 不直接 import src／server(期望: 11 檔; 無命中)
+ls test/e2e-*.test.mjs
+rg -n "\.\./(src|server)/" test/e2e-*.test.mjs
+# 5) 授權樹斷言載體(期望 7 檔: grups 1／pemis 1／targets 1／rela-grup-pemi 1／rela-user-grup 1／rela-pemi-rule 1／array-form 48, 含 helper 定義行)
+rg -c "getResolvedActiveTargets\(|resolvedTargetsOf\(" test/e2e-*.test.mjs
+```
+
+**run07 增補**(2026-10-22; 新增 `e2e-external-rows`、`e2e-ref-cascade` 兩檔之盤點指令與期望值。新增兩檔後, 上列指令 1／2／4／5 之輸出會多出此二檔之列、指令 4 之檔數由 11 變 13——為預期之失配, 不是漂移; 上列各指令對既有檔之期望值不變。新檔以 `enterPage`／`gotoTargets`(`test/tools/e2eExt.mjs`)進頁, 故指令 1 只計其直接 `await gotoGrups(`／`await gotoTargets(`, 進頁總數用下列 1'):
+
+```bash
+# 1') 新檔進頁(enterPage 包 gotoUsers／gotoGrups／gotoPemis; 以 enter(page, '<表>', n) 呼叫). 期望(行數): external-rows 16(enter users 7＋enter grups 4＋直接 await gotoGrups( 5); ref-cascade 9(enter users 1＋grups 6＋pemis 1＋直接 await gotoTargets( 1)
+rg -c "enter\(page, 'users'|enter\(page, 'grups'|enter\(page, 'pemis'|await gotoGrups\(|await gotoTargets\(" test/e2e-external-rows.test.mjs test/e2e-ref-cascade.test.mjs
+# 2') 新檔開對話框. 期望: external-rows grupBlngEditUsers|colId: 'belongUsers' = 5、grupEditCpemis = 2; ref-cascade 皆 0(上列指令 2 之 grupBlngEditUsers／grupEditCpemis 輸出各多此二檔之列)
+rg -c "grupBlngEditUsers|colId: 'belongUsers'" test/e2e-external-rows.test.mjs test/e2e-ref-cascade.test.mjs
+rg -c "grupEditCpemis" test/e2e-external-rows.test.mjs test/e2e-ref-cascade.test.mjs
+# 4') e2e 檔數與不直接 import src／server(期望: 13 檔; 無命中——新檔經 test/tools/e2eExt.mjs 引用共用層, 不 import src／server)
+ls test/e2e-*.test.mjs
+rg -n "\.\./(src|server)/" test/e2e-*.test.mjs test/tools/e2eExt.mjs
+# 5') 授權樹斷言載體(期望 2 檔: external-rows 2／ref-cascade 16, 指令 5 之輸出多此二檔之列)
+rg -c "getResolvedActiveTargets\(|resolvedTargetsOf\(" test/e2e-external-rows.test.mjs test/e2e-ref-cascade.test.mjs
+# 6) 外部列／基準相關純函數之 importer(2026-10-22 期望 26 行: server/WWebPerm.mjs:44(syncKeep)／server/procCore.mjs:17-18(externalRows、rowDigest)／src/js/externalUi.mjs:1／src/js/getNameErrs.mjs:4／src/js/fromAudit.mjs:1／src/js/rowDigest.mjs:10／
+#    LayoutContentGrups.vue 295-298／LayoutContentPemis.vue 296-299／LayoutContentTargets.vue 268-271／LayoutContentUsers.vue 300-302／VePemiBlngGrups.vue 212-213／VeGrupBlngUsers.vue 213-214; 工作樹持續變動時行號會漂移, 以命中檔與 import 名稱為準)
+rg -n "from '.*(externalRows|externalUi|rowDigest|getAddImpact|relDialogSend|syncKeep)\.mjs'" src server
+# 7) 新檔案例與標準圖鍵(期望: 案例數 external-rows 15／ref-cascade 8; 有圖案例 6／5; 純語意案例(stages 為空) 9／3; 每語系圖鍵 11／10, 共 22／20 張, 皆未產製)
+rg -c "^        name: 'E2E-" test/e2e-external-rows.test.mjs test/e2e-ref-cascade.test.mjs
+rg -c "^        stages: \[\]," test/e2e-external-rows.test.mjs test/e2e-ref-cascade.test.mjs
+rg -c "^        stages: \['" test/e2e-external-rows.test.mjs test/e2e-ref-cascade.test.mjs
+```
+
+新增兩檔不使用 `resetDb(browser, '<表>', …)`(以 `readTables`／`restoreTables` 對稱收尾, 同 `e2e-array-form`), 故 `unit-e2e-lifecycle` LC-001 之「用 resetDb 之 e2e 檔為 7 個」盤點不變、免改該測試; 新檔夾具之外部列一律經真 `/syncAndReplaceTabs` 建立、後台列以 `editTableRows` 先建, 收尾經 `restoreTables`(內含 `purgeExternalRows` 直刪外部列, 後台不得刪外部列)並回驗三表筆數與無外部列殘留.
+
+(同等之 Grep 工具呼叫: `pattern` 同上, `glob: "e2e-*.test.mjs"`, `output_mode: "count"`.)
+
+### 已知限制
+
+- **人工推定**: 表為依實際程式(import、導覽呼叫、RPC、`settings`)人工歸納, 非自動依賴分析; e2e 以 UI 路徑為主, 漏列風險在「元件間隱性共用」(如 CSS、全域 store)——此類歸表三擴大. 新增／改名 e2e 檔或案例、新增元件被頁面 import 時須同步維護, 並重跑「盤點指令」.
+- **耗時為估算**: 取自 run05 全套單一 mocha 行程(負載與逐檔隔離 runner 不同); `final6` 中 `e2e-init` E2E-006 兩案與 `e2e-array-form` 一個 `after all` hook 失敗(`final6.summary.txt`: 1257 passing／3 failing), 故 init 耗時以 `t4-init` 單跑(2×11.8 s)補入; 子集耗時未含每檔 `before`／`after`.
+- **改名級聯無既有 e2e 載體**: 現有 e2e 對既有群組／權限之 `name`、既有標的之 `id` 就地改名的案例為 0(`typeIntoCell(page, N, 'name'|'id', …)` 除 `e2e-targets` E2E-011 對既有列 id 改為含標記之值〔被拒〕外, 皆為新增列; array-form 之 `typeIntoCell` 亦同, A-17). 故改名級聯(適用表 m; 後端與前端預覽確認框已於 2026-10-22 工作樹落地)目前無任何 e2e 案例走到改名路徑, 表二「procCore／refCascade／getCascadePreview」列只能涵蓋寫入與刪除路徑之回歸; 改名級聯本身須**新增 e2e 案例**(先寫 spec 再寫測試, 標準圖須取得授權)後再補入本表.
+- **2026-10-22 工作樹已使既有 e2e 預期紅燈之案(依程式閱讀推定, 未實跑; 工作樹正被 run06 其他子任務修改, 以重跑為準)**: ① `e2e-array-form` AF-026／AF-027 以舊語系鍵斷言確認框: `expWarn(page, 'confirmDelAndRefsGrup'／'confirmDelAndRefsPemi', { n: 1 })`(e2e-array-form.test.mjs:1746、:1782), 而 procLang 現為 `confirmDelRefs[And][Dup]Grup／Pemi`(procLang.mjs:231-271), 舊鍵已移除(`unit-getNameErrs.test.mjs:730、:742` 明文斷言其不存在; `src`／`server` 無任何舊鍵引用, 僅此二案仍引用); 且 :1765-1766、:1800-1801 斷言「引用字串不變、授權為空」凍結「刪除不清理、AND 引用查無即全 n」之舊語意(新語意: 引用被連帶清理、AND 限制解除、授權可能變多), 須先依 spec(流程_後台群組清單／權限清單 E2E-014)改寫. ② 凡被引用之刪除皆彈確認框(LayoutContentGrups.vue:1057-1067、LayoutContentPemis.vue:1058-1068; getDelRefCount.mjs:76-122, 非僅 AND 引用): `e2e-grups` E2E-005(刪 M1←peter)、`e2e-pemis` E2E-005(刪 P1←M1)點 trash 後被 `confirmDelRefs…` 框擋住, 列未刪、工具列無儲存鈕, 後續 `saveAndWaitModal`(e2e-setup.mjs:365-372)與語意斷言失敗. ③ 標的頁儲存前確認(LayoutContentTargets.vue:879-894, `confirmSaveDelRefsTarget`): `e2e-targets` E2E-005(刪被 P1 引用之標的)與 E2E-011(改既有標的 id＝刪舊增新, 舊 id 被 P1 引用)儲存時先彈確認框, `saveAndWaitModal` 以 `systemMessage` 標題偵測 modal, 恐把確認框當結果 modal, 其後 `targetSaveTargetsSuccess`／`targetSaveTargetsFail` 斷言失敗(推定). ④ 有引用端被連帶更新時結果訊息改為 `…SuccessCascade`(procLang.mjs:299-309; 以原成功訊息為前綴, `assertModalMsg`〔e2e-setup.mjs:374-378〕之 `includes` 仍可過), 但 E2E-005-3 結果 modal 標準圖之文字變動(須授權重產). ⑤ 三案授權樹斷言(grups:202、pemis:202、targets:203)於級聯後語意仍成立(M1 引用自 peter 移除→空; P1 引用自 M1 移除→剩 P2; 標的引用自 P1 移除→樹不變), 改寫流程(點確認)後即為級聯成功之端到端回歸. 其餘案例(新增／複製／空值／名稱重複／token 失效、users 頁、三個 rela、stainfor、layout、init)不經被引用之刪除或改名, 預期不受影響; **表二／表三「必跑」意在找出需重跑之檔, 不等於這些檔會綠**.
+- **`--grep` 與 hooks**: 子集僅執行被選案例, 但各 `describe` 之 `before`(啟動後端、擷取 base seed)與 `after`(還原)仍會執行; array-form 為兩個頂層 `describe`(:309 AF-000～016; :1267 AF-017～029), 後者內含兩個巢狀 `describe`(歷史同名 :1886、`mappingBy` :2091, 各有 `before`／`after` 並重啟後端), 選取不同段之 hook 副作用不同(`--grep` 選到之段才執行其 hook, 本表未實跑驗證), 請以 `--fail-zero` 與案數對照.
+- **隔離**: 同一 mocha 行程連跑多個 e2e 檔時沿用同一後端與 `./db`(各檔以 `restoreDbOnce` 檔尾還原, R-E2E-ISO-01); 「對話框類案例列序與 solo 自產標準圖不符」之歷史問題見 `run-e2e-isolated.mjs:4-7`. 中間輪建議逐檔各一個 mocha 行程且檔間殺 11006, 或以 `runIsolatedE2e({ targets })`; 本表未實跑此兩種方式。
+- **範圍**: 本表只涵蓋 `test/e2e-*.test.mjs` 11 檔; `api-*`／`unit-*` 之對應(尤其伺服端寫入核心之判定性驗證 `unit-procCore-*`／`unit-keyCheck`／`api-updateTabs`／`api-syncAndReplaceTabs`)不在此列, 中間輪另行依規則帳本「規格 → 測試檔對照」選取.
+
+### 縮減集之 --grep 指令(原附錄 C) 縮減集之 `--grep` 指令(皆需 `--fail-zero`; `|` 與括號須整段加引號, 經 quiet-run 時注意其參數引號; 未實跑)
+
+```bash
+npx mocha test/e2e-grups.test.mjs --grep "E2E-00[135]-" --fail-zero --reporter list --timeout 300000
+npx mocha test/e2e-array-form.test.mjs --grep "AF-(014[a-e]|02[67])-" --fail-zero --reporter list --timeout 300000
+# 刪除路徑(getDelRefCount; 10 案 3.0 分): grups／pemis／targets 各 --grep "E2E-005-"; array-form --grep "AF-02[67]-"
+# 對話框開啟冒煙(grups E2E-008／009、pemis E2E-008／009、users E2E-011; 10 案 3.1 分): --grep "E2E-00[89]-"(grups、pemis)、--grep "E2E-011-"(users)
+# 多檔依序(各檔間先殺 11006 後端以得全新種子; 或用 runIsolatedE2e 之 targets)
+node -e "import('./test/tools/e2eLib.mjs').then(async (m)=>{ const r = await m.runIsolatedE2e({ projRoot: process.cwd(), testDir: './test', targets:[{file:'e2e-grups.test.mjs',grep:'E2E-00[135]-'},{file:'e2e-array-form.test.mjs',grep:'AF-(014[a-e]|02[67])-'}] }); process.exit(r.failed===0?0:1) })"
+```
+
+(最後一個 `node -e` 為示意, 執行即會實跑所列目標, 該指令本身未實跑: 已確認者僅 `e2eLib.mjs` 匯出 `runIsolatedE2e`／`killPortListeners` 為 function〔2026-10-22 以 `typeof` 確認〕, 傳參簽章取自套件 JSDoc `runIsolatedE2e.mjs:24-25`; 每檔前殺 11006 後端之 `beforeEachFile` 須自行補, 可仿 `test/tools/run-e2e-isolated.mjs:30-34`.)

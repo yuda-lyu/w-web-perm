@@ -3,7 +3,7 @@
 //  maskTok  : 空值 → ''; 陣列逐元素; 字串露出 k=min(4, floor(n/8)) 字(k=0 只給長度), 露出之控制字元換 '?'; 其他型別只給 (typeof)
 //  maskQuery: 淺拷貝, 鍵名小寫為 token 者以 maskTok 處理(Hapi 對重複之 query 參數給陣列)
 //  maskUrl  : http(s) 只留 origin + pathname(捨棄 query / fragment / userinfo); 非 http(s) 只回 protocol; 無法解析 '(invalid-url)'
-//站點不變式(SITE-*)為 CLAUDE_rulebook.md「印權杖只經 maskLog」之可執行版: 靜態掃描 server/WWebPerm.mjs、srv.mjs 之可執行 console 呼叫,
+//站點不變式(SITE-*)為 sgud/rule/rulebook.md「印權杖只經 maskLog」之可執行版: 靜態掃描 server/WWebPerm.mjs、srv.mjs 之可執行 console 呼叫,
 //與 WWebPerm.mjs 之 JSDoc 範例、README.md 範例; 引數含權杖類識別字(token / tokenSelf / authorization / headers / referer)或 req.query
 //而未經 maskTok / maskQuery / maskUrl 者即違規(後端 stdout 由測試 harness 丟棄, console 通道以此守護; 判準實作見 test/tools/srcScan.mjs)。
 import assert from 'assert'
