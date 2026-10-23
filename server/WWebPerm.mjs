@@ -35,7 +35,7 @@ import srLogInit from './srLog.mjs'
 import procStaInfor from './procStaInfor.mjs'
 import { maskTok, maskQuery, maskUrl } from './maskLog.mjs'
 import wrapInjected from './wrapInjected.mjs'
-import { pickUniqueUser } from './keyCheck.mjs'
+import { pickUniqueUser, findLoginUsers } from './keyCheck.mjs'
 import { createAuthorizeExec, wrapOperOrm } from './dataChannel.mjs'
 
 
@@ -62,7 +62,7 @@ import { createAuthorizeExec, wrapOperOrm } from './dataChannel.mjs'
  * @param {String} [opt.webLogo=''] 輸入站台logo字串，採base64格式，預設''
  * @param {String} [opt.subfolder=''] 輸入站台所在子目錄字串，提供站台位於內網採反向代理進行服務時，故需支援位於子目錄情形，預設''
  * @param {String} [opt.urlRedirect=''] 輸入錯誤時自動轉址字串，提供站台例如無法登入或驗證失敗時須自動轉址，預設''
- * @param {String} [opt.mappingBy='id'] 輸入外部系統識別使用者token後所提供之資料物件，與權限系統之使用者資料物件，兩者間查找之對應欄位，可選'id'、'email'、'name'，未給或非此三者時為'id'，預設'id'。對應鍵須能唯一指出使用者：mappingBy為'email'或'name'時，外部同步(syncAndReplaceTabs)users之有效(isActive為'y')列，該欄位須為非空字串且與本批及其他from之有效列皆不重複(違規整批拒收invalidRows)；登入查找以對應鍵於權限系統users命中多於1筆有效使用者時一律拒絕(ambiguousUserFromPerm)，不取首筆；mappingBy為'id'(預設)時不另檢查
+ * @param {String} [opt.mappingBy='id'] 輸入外部系統識別使用者token後所提供之資料物件，與權限系統之使用者資料物件，兩者間查找之對應欄位，可選'id'、'email'、'name'，未給或非此三者時為'id'，預設'id'。對應鍵須能唯一指出使用者：mappingBy為'email'或'name'時，外部同步(syncAndReplaceTabs)users之有效(isActive為'y')列，該欄位須為非空字串且與本批及其他from之有效列皆不重複(違規整批拒收invalidRows)；登入查找以對應鍵於權限系統users命中多於1筆有效使用者時一律拒絕(ambiguousUserFromPerm)，不取首筆；mappingBy為'id'(預設)時，後台列(from為空)以其id對應外部token使用者之id，外部同步列(from非空)則以其來源鍵srcKey對應(外部列之id為本系統配發之內部主鍵，不是登入識別；升版前同步寫入、尚無srcKey之舊外部列在首次匯入補上srcKey前暫以id對應)，並防止撞值：有效外部列之srcKey等於有效後台列之id時，外部同步(syncAndReplaceTabs)整批拒收(loginIdCollision，零寫入)、後台存檔(updateUsers)新增或啟用之後台列id撞到有效外部列srcKey時整次拒收(loginIdCollision，零變更)，登入時若仍命中多於1筆則拒絕(ambiguousUserFromPerm)；停用(isActive非'y')列不參與
  * @param {Boolean} [opt.cascadeRename=true] 輸入群組、權限改名時是否連帶更新引用它之授權字串(users.cgrups、grups.cpemis)，預設true。改名以主鍵id判定(同id異名)，後台整表儲存與外部同步(同一from內)皆適用，於同一次寫入內改寫並可能寫入外部來源之users列之cgrups；給false則不連帶(引用成為懸空，視同引用查無對象而收嚴並於頁面提示)。群組、權限、標的被刪除時之引用連帶清理(users.cgrups、grups.cpemis、pemis.crules)不受此設定影響
  * @param {String} [opt.lockExternalRows='y'] 輸入後台是否不得改外部列(from為非空字串，即經syncAndReplaceTabs由外部來源同步之列)，可選'y'或'n'，預設'y'。'y'時伺服端強制：後台新增列from須為空字串、外部列不可刪除、不可改from、身分/結構欄(指派欄與順序以外之欄位)不可改，違規整次拒收(saveFromNotAllowed／saveExternalRowChanged)；授權指派欄(users.cgrups、grups.cpemis、pemis.crules)後台可寫，但須附載入基準(用戶端自動附帶)，無基準者拒收(saveBaselineRequired)；外部列之order由外部擁有、後台儲存不重編。給'n'回到舊行為(僅保留from須為字串之檢查)。升版後既有庫中from為非空字串之列即視為外部列而唯讀，請先以g_fixFromType.mjs／g_purgeFrom.mjs盤點(見README Upgrade Notes)
  * @param {String} [opt.logFd='./logs'] 輸入log紀錄儲存位置字串，預設'./logs'
@@ -461,8 +461,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         }
 
         //userFind, 對應鍵須唯一(F-14, 規則帳本 R-MAPKEY-02): 命中多於 1 筆即拒絕, 不取首筆(取首筆等於由資料庫列序決定登入者為誰)
-        let userRs = await woItems.users.select({ [mappingBy]: vSelf, isActive: 'y' })
-        let { user: userFind, count: countFind } = pickUniqueUser(userRs)
+        //mappingBy 為 'id' 時(perm-run04, R-MAPKEY-04, O1): 後台列(from 空)對 id、外部列(from 非空)對 srcKey(外部列之 id 是本系統配發之內部主鍵, 不是登入識別); 判準單一擁有者 keyCheck.findLoginUsers
+        let { user: userFind, count: countFind } = await findLoginUsers(woItems.users, mappingBy, vSelf)
         // console.log('userFind', userFind)
 
         //check, 多筆: 只記 mappingBy 與筆數, 不記使用者之對應值(email／name 為個資); 0 筆行為不變

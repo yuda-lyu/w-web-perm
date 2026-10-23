@@ -451,17 +451,22 @@ describe('unit-keyCheck (名稱唯一與對應鍵檢查之純函數, F-02／F-14
         })
 
         it('SITE-KC-004 反查 users 之站點只有兩處且皆經 pickUniqueUser; 不得再以 get(userFind, 0 取首筆(R-MAPKEY-02)', function() {
+            //perm-run04(R-MAPKEY-04): getTokenUser 之登入查找改由 keyCheck.findLoginUsers 承擔(mappingBy='id' 須以 id／srcKey 兩次帶條件查詢再複判, 判準單一擁有者在 keyCheck.mjs),
+            //  故 WWebPerm.mjs 內直接 woItems.users.select( 之站點只剩 getGenUserByKV; getTokenUser 的 select 全在 findLoginUsers 內, 且該函數的結果一律經 pickUniqueUser(多筆不取首筆)
             let code = readCode('server/WWebPerm.mjs')
             let sel = code.match(/woItems\.users\.select\(/g) || []
-            assert.strict.equal(sel.length, 2, 'woItems.users.select( 之站點: getTokenUser、getGenUserByKV')
-            let pu = code.match(/pickUniqueUser\(/g) || []
-            assert.strict.ok(pu.length >= 2, `pickUniqueUser 應被兩個站點呼叫, 實得 ${pu.length}`)
+            assert.strict.equal(sel.length, 1, 'WWebPerm.mjs 內 woItems.users.select( 之站點: getGenUserByKV(getTokenUser 經 findLoginUsers)')
             assert.strict.ok(!/get\(userFind,\s*0/.test(code), '不得取首筆')
             let tok = takeBody(code, /let getTokenUser = async/)
-            assert.strict.ok(tok.includes('pickUniqueUser('), 'getTokenUser 須經 pickUniqueUser')
+            assert.strict.ok(tok.includes('findLoginUsers('), 'getTokenUser 須經 findLoginUsers')
             assert.strict.ok(tok.includes('ambiguousUserFromPerm'), 'getTokenUser 須回 ambiguousUserFromPerm')
+            assert.strict.ok(!/userRs\b|\[0\]/.test(tok), 'getTokenUser 不得自行取列(首筆)')
             let gen = takeBody(code, /let getGenUserByKV = async/)
             assert.strict.ok(gen.includes('pickUniqueUser('), 'getGenUserByKV 須經 pickUniqueUser')
+            let kc = readCode('server/keyCheck.mjs')
+            let fl = kc.slice(kc.indexOf('async function findLoginUsers'), kc.indexOf('function findLoginIdClash'))
+            assert.strict.ok((fl.match(/\.select\(/g) || []).length === 3, 'findLoginUsers 內 select 站點: email／name 一處＋id 模式 id、srcKey 兩處')
+            assert.strict.equal((fl.match(/return pickUniqueUser\(/g) || []).length, 2, 'findLoginUsers 的兩個回傳點皆經 pickUniqueUser')
         })
 
         it('SITE-KC-005 getTokenUser 之 srLog 不記對應值(email／name 為個資): 記 mappingBy 與 count, 不記 vSelf／userSelf', function() {

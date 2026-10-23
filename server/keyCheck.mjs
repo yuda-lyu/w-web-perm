@@ -269,4 +269,98 @@ function pickUniqueUser(rs) {
 }
 
 
-export { findDupIndex, hasDupKey, findKeyOtherFrom, findTouchedDup, withTabLocks, mapKeyOf, checkMapKeyBatch, checkUsersWrite, pickUniqueUser }
+//users 登入對應 mappingBy='id' 之 O1 規則(perm-run04, 規則帳本 R-MAPKEY-04; 規格 dspec/外部匯入之定義與機制.md 第 9 節末, 主控 2026-10-24 定案):
+//  外部列(from 非空)以外部 token 之使用者 id 對 srcKey(其 id 是本系統配發之內部主鍵, 不是登入識別), 後台列(from 空)對 id.
+//  外部列 srcKey 與後台列 id 相同即「撞值」(登入會同時匹配兩筆): 匯入批次、後台存檔、登入三處皆拒(原則 3 收嚴＋提示、原則 4 所有入口一致).
+//  只有有效(isActive='y')列參與: 登入只匹配有效列, 停用列不構成撞值(轉為有效時才算被觸及).
+//  判準(loginIdOf／findLoginUsers／findLoginIdClash)單一擁有者在本檔; 外部同步(syncCore.mjs)、後台整表寫入(procCore.mjs)、登入查找(WWebPerm.mjs:getTokenUser)只呼叫本檔.
+let isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v)
+let isEStr = (v) => isStr(v) && v.length > 0
+
+
+/**
+ * users 列在 mappingBy='id' 下的登入識別值: 後台列(from 空)為 id; 外部列(from 非空)為 srcKey;
+ * 遷移前之舊外部列(升版前同步寫入、尚無 srcKey)暫以 id(與升版前行為相同, 首次匯入依規格補上 srcKey 後即改以 srcKey).
+ *
+ * @param {Object} row users 列
+ * @returns {String} 登入識別值; 無可用鍵(非物件、id 空或非字串)為 ''
+ */
+function loginIdOf(row) {
+    if (!isObj(row)) {
+        return ''
+    }
+    if (isEStr(row.from) && isEStr(row.srcKey)) {
+        return row.srcKey
+    }
+    return isEStr(row.id) ? row.id : ''
+}
+
+
+/**
+ * 登入查找(getTokenUser): 以對應鍵查 perm users 中有效(isActive='y')之列, 回 { user, count }(同 pickUniqueUser: 僅恰 1 筆時 user 為該列, 多筆不取首筆).
+ * 'email'／'name': 以該欄位查(不變). 其餘(含預設 'id'): 後台列對 id、外部列對 srcKey(見上方 O1 規則): 兩次帶條件之 select(id、srcKey 各一; 皆含 isActive, 不做全表讀取), 合併去重後以 loginIdOf 複判.
+ * ORM 讀取失敗原樣拋出(不吞成 0 筆).
+ *
+ * @param {Object} tabUsers 輸入 users 表之 ORM 物件(select)
+ * @param {String} mappingBy 'id'｜'email'｜'name'(其他值視同 'id')
+ * @param {String} vSelf 外部 token 之使用者對應值(須為非空字串)
+ * @returns {Promise<Object>} { user, count }
+ */
+async function findLoginUsers(tabUsers, mappingBy, vSelf) {
+    let key = mapKeyOf(mappingBy)
+    if (key !== null) {
+        return pickUniqueUser(await tabUsers.select({ [key]: vSelf, isActive: 'y' }))
+    }
+    let rsId = await tabUsers.select({ id: vSelf, isActive: 'y' })
+    let rsSrc = await tabUsers.select({ srcKey: vSelf, isActive: 'y' })
+    let kp = new Map() //以 id 去重(srcKey 等於 id 之遷移後外部列會被兩次查詢各命中一次)
+    for (let r of [...(Array.isArray(rsId) ? rsId : []), ...(Array.isArray(rsSrc) ? rsSrc : [])]) {
+        if (isObj(r) && isEStr(r.id)) {
+            kp.set(r.id, r)
+        }
+    }
+    return pickUniqueUser([...kp.values()].filter((r) => r.isActive === 'y' && loginIdOf(r) === vSelf))
+}
+
+
+/**
+ * 登入識別撞值(mappingBy='id'): 回傳寫入後之表 rowsAfter 中第一個「被本次觸及」之有效列, 其與對向有效列撞值者之索引, 無則 -1.
+ *  - 被觸及之有效外部列(from 非空且有 srcKey), 其 srcKey 等於某有效後台列(from 空)之 id;
+ *  - 被觸及之有效後台列, 其 id 等於某有效外部列之 srcKey.
+ * 歷史既有(未被觸及)之撞值不擋(否則已有歷史資料之庫無法在後台修復; 同 R-MAPKEY-03); 停用列不參與; 舊外部列(無 srcKey)與外部列之 id 不是登入識別, 不參與;
+ * 他來源外部列彼此同 srcKey 不在此檢查(srcKey 僅在 from 內唯一; 登入時命中多筆即拒絕).
+ *
+ * @param {Array} rowsAfter 寫入後之 users 全表(後台整表寫入為送入之整表; 外部匯入為「他 from 之列＋本批」)
+ * @param {Function} isTouched (row, index) → Boolean, 該列是否為本次造成或觸及
+ * @returns {Number} 撞值列之索引, 無為 -1
+ */
+function findLoginIdClash(rowsAfter, isTouched) {
+    if (!Array.isArray(rowsAfter)) {
+        return -1
+    }
+    let isAct = (r) => isObj(r) && r.isActive === 'y'
+    let admIds = new Set()
+    let extKeys = new Set()
+    for (let r of rowsAfter) {
+        if (!isAct(r)) {
+            continue
+        }
+        if (isEStr(r.from)) {
+            if (isEStr(r.srcKey)) {
+                extKeys.add(r.srcKey)
+            }
+        }
+        else if (isEStr(r.id)) {
+            admIds.add(r.id)
+        }
+    }
+    return rowsAfter.findIndex((r, k) => {
+        if (!isAct(r) || !isTouched(r, k)) {
+            return false
+        }
+        return isEStr(r.from) ? (isEStr(r.srcKey) && admIds.has(r.srcKey)) : (isEStr(r.id) && extKeys.has(r.id))
+    })
+}
+
+
+export { findDupIndex, hasDupKey, findKeyOtherFrom, findTouchedDup, withTabLocks, mapKeyOf, checkMapKeyBatch, checkUsersWrite, pickUniqueUser, loginIdOf, findLoginUsers, findLoginIdClash }

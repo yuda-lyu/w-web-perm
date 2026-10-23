@@ -71,6 +71,17 @@ describe('unit-externalUi (清單頁外部列前端輔助與接線, F-23 / R-EXT
                 }
             }
         })
+
+        it('EU-405 syncWarnIdRenumber 的口徑與差異同步一致(perm-run04): 述「同名異來源鍵(srcKey)」並請來源端保持 srcKey 穩定; 不再要求「保持 id 穩定或不帶 id」(外部端不得送 id, 照做無效)  [spec 流程_外部列保護與過期快照 E2E-010]', function() {
+            let eng = LANG.eng.syncWarnIdRenumber
+            let cht = LANG.cht.syncWarnIdRenumber
+            assert.strict.ok(/source key/i.test(eng) && /srcKey/.test(eng), 'eng 須述來源鍵(source key)與 srcKey')
+            assert.strict.ok(/來源鍵/.test(cht) && /srcKey/.test(cht), 'cht 須述來源鍵與 srcKey')
+            assert.strict.ok(!/\bids?\b/i.test(eng), `eng 不得再述 id: ${eng}`)
+            assert.strict.ok(!/\bid\b/i.test(cht.replace(/srcKey/g, '')), `cht 不得再述 id: ${cht}`)
+            assert.strict.ok(!/omit ids|不帶 id/.test(eng + cht), '不得再請來源端「不帶 id」')
+            assert.strict.ok(eng.includes('{from}') && eng.includes('{n}') && cht.includes('{from}') && cht.includes('{n}'), '佔位符 {from}／{n} 仍在')
+        })
     })
 
 

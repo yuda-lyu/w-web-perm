@@ -758,7 +758,7 @@ describe('unit-syncCore (外部匯入依 srcKey 差異同步, perm-run03, R-IMPO
             assert.strictEqual(bySrc(env, 'users', 'appX', 'b').cgrups, J({ G1: OR }), 'email 非對應鍵 → 保留')
         })
 
-        it('SC-K4 mappingBy=id(預設): 對應鍵不是 email／name, 同 srcKey 改 email／name 缺鍵 → 保留(身分是 srcKey)  [待裁示: users mappingBy=id 重定義見報告]', async function() {
+        it('SC-K4 mappingBy=id(預設): 對應鍵不是 email／name, 同 srcKey 改 email／name 缺鍵 → 保留(身分是 srcKey; 登入識別即 srcKey, 見 SC-L*)', async function() {
             let env = createEnv({
                 seed: (s) => {
                     s.users.push(xu('id-xa', 'a', 'ua', 'a@x.example.com', { cgrups: J({ G1: OR }) }))
@@ -768,6 +768,134 @@ describe('unit-syncCore (外部匯入依 srcKey 差異同步, perm-run03, R-IMPO
             assert.strictEqual(r.ok, true, JSON.stringify(r.v))
             assert.strictEqual(bySrc(env, 'users', 'appX', 'a').cgrups, J({ G1: OR }))
             assert.strictEqual(skipLogs(env).length, 0)
+        })
+    })
+
+
+    describe('users 登入識別撞值(mappingBy=id, O1: 外部列對 srcKey、後台列對 id; perm-run04, R-MAPKEY-04)', function() {
+
+        //規格(dspec/外部匯入之定義與機制.md 第 9 節末): mappingBy='id' 時外部列以 srcKey、後台列(from 空)以 id 對應外部 token 之使用者 id; 外部列 srcKey 與後台列 id 相同即撞值,
+        //匯入批次整批拒收(零寫入、固定錯誤鍵 loginIdCollision)。有效列才參與(登入只匹配 isActive='y'); mappingBy 為 email／name 時不檢查。
+        let ADM = 'id-u1' //預設種子之後台使用者 id(from '')
+        let noPii = (env, ...vals) => vals.forEach((s) => assert.ok(!JSON.stringify(env.logs).includes(s), `log 不得含值 ${s}`))
+
+        it('SC-L1 批次 srcKey 等於有效後台列之 id → loginIdCollision、整批拒收、零寫入  [R-MAPKEY-04]', async function() {
+            let env = createEnv()
+            await assertRejected(env, 'users', 'appX', [U(ADM, 'ux')], 'loginIdCollision')
+            assert.strictEqual(env.logs.find((l) => l.event === 'syncAndReplaceTabs-error').msg, 'loginIdCollision')
+        })
+
+        it('SC-L2 多列批次中只有一列撞值 → 整批拒收, 其餘列也不寫入(not 部分成功)', async function() {
+            let env = createEnv()
+            await assertRejected(env, 'users', 'appX', [U('ok-1', 'u-ok1'), U('ok-2', 'u-ok2'), U(ADM, 'ux'), U('ok-3', 'u-ok3')], 'loginIdCollision')
+        })
+
+        it('SC-L3 邊界: srcKey 等於他來源外部列的 id 或 srcKey 不在匯入端拒收(規格只定外部 srcKey 對後台 id; 外部列的 id 不是登入識別, 他來源同 srcKey 於登入時多筆拒絕)', async function() {
+            let env = createEnv()
+            let r = await sync(env, 'users', 'appX', [U('id-u2', 'ua'), U('o-u2', 'ub')]) //'id-u2' 為他來源外部列的內部 id; 'o-u2' 為其 srcKey
+            assert.strictEqual(r.ok, true, JSON.stringify(r.v))
+            assert.deepStrictEqual(r.v, { nAdd: 2, nUpdate: 0, nDel: 0, nSame: 0 })
+        })
+
+        it('SC-L4 停用列不參與: 批次列停用、或後台列停用 → 可匯入; 其後把該列改為有效(轉有效造成同時匹配兩筆)→ 拒收且庫內維持上次結果  [登入只匹配有效列]', async function() {
+            let env = createEnv()
+            let r = await sync(env, 'users', 'appX', [U(ADM, 'ux', { isActive: 'n' })])
+            assert.strictEqual(r.ok, true, `批次列停用應可匯入: ${JSON.stringify(r.v)}`)
+            let before = snapAll(env)
+            let c0 = cntAll(env)
+            let r1 = await sync(env, 'users', 'appX', [U(ADM, 'ux', { isActive: 'y' })]) //停用改有效
+            assert.deepStrictEqual([r1.ok, r1.v], [false, 'loginIdCollision'])
+            assertSnapEq(env, before, '被拒時四表須逐位元維持上次結果')
+            assert.strictEqual(cntAll(env), c0, '被拒時不得有任何寫入呼叫')
+
+            let env2 = createEnv({ seed: (s) => { s.users.find((x) => x.id === 'id-u1').isActive = 'n' } })
+            let r2 = await sync(env2, 'users', 'appX', [U(ADM, 'ux')])
+            assert.strictEqual(r2.ok, true, `後台列停用時批次列(有效)應可匯入: ${JSON.stringify(r2.v)}`)
+        })
+
+        it('SC-L5 mappingBy 為 email／name 時不檢查(不變): srcKey 等於後台列 id 可匯入', async function() {
+            for (let mode of ['email', 'name']) {
+                let env = createEnv({ mappingBy: mode })
+                let r = await sync(env, 'users', 'appX', [U(ADM, 'ux')])
+                assert.strictEqual(r.ok, true, `mappingBy=${mode}: ${JSON.stringify(r.v)}`)
+            }
+        })
+
+        it('SC-L6 一次性遷移不受影響: 舊外部列(無 srcKey)與批次 srcKey＝其 id 視為同一列(nUpdate=1); 舊列 id 不可能等於後台列 id(主鍵唯一), 故無撞值', async function() {
+            let env = createEnv({
+                seed: (s) => { s.users.push({ ...ds.users.funNew(), ...AUDIT, id: 'old-1', order: 3, name: 'old', email: 'old@x.example.com', description: 'legacy', from: 'appX', cgrups: '{}', isAdmin: 'n', isActive: 'y' }) },
+            })
+            let r = await sync(env, 'users', 'appX', [U('old-1', 'old', { email: 'old@x.example.com', description: 'legacy' })])
+            assert.strictEqual(r.ok, true, JSON.stringify(r.v))
+            assert.deepStrictEqual(r.v, { nAdd: 0, nUpdate: 1, nDel: 0, nSame: 0 })
+            assert.strictEqual(bySrc(env, 'users', 'appX', 'old-1').id, 'old-1', 'id 不變')
+        })
+
+        it('SC-L7 其他表不受影響: grups／pemis／targets 的 srcKey 等於後台列 id 之判定不屬本規則(groups／pemis 可匯入; targets 另有 idTaken)', async function() {
+            let env = createEnv()
+            let r = await sync(env, 'grups', 'appX', [G('id-g1', 'GX')])
+            assert.strictEqual(r.ok, true, `grups: ${JSON.stringify(r.v)}`)
+            let r2 = await sync(env, 'pemis', 'appX', [P('id-p1', 'PX')])
+            assert.strictEqual(r2.ok, true, `pemis: ${JSON.stringify(r2.v)}`)
+        })
+
+        it('SC-L8 修正 srcKey 後可再匯入, 且重送為 nSame(拒收不留黏性狀態)', async function() {
+            let env = createEnv()
+            await assertRejected(env, 'users', 'appX', [U(ADM, 'ux')], 'loginIdCollision')
+            let r = await sync(env, 'users', 'appX', [U('ux-guid', 'ux')])
+            assert.strictEqual(r.ok, true, JSON.stringify(r.v))
+            assert.deepStrictEqual(r.v, { nAdd: 1, nUpdate: 0, nDel: 0, nSame: 0 })
+            let r2 = await sync(env, 'users', 'appX', [U('ux-guid', 'ux')])
+            assert.deepStrictEqual(r2.v, { nAdd: 0, nUpdate: 0, nDel: 0, nSame: 1 })
+        })
+
+        it('SC-L9 srLog: syncAndReplaceTabs-error 帶固定 msg、reason、from、列索引, 不記 srcKey／id 之值', async function() {
+            let env = createEnv()
+            await sync(env, 'users', 'appX', [U('SENS-OK', 'u-ok'), U(ADM, 'SENS-NAME')])
+            let lg = env.logs.find((l) => l.event === 'syncAndReplaceTabs-error')
+            assert.ok(lg)
+            assert.strictEqual(lg.msg, 'loginIdCollision')
+            assert.strictEqual(lg.keyTable, 'users')
+            assert.strictEqual(lg.from, 'appX')
+            assert.strictEqual(lg.row, 1, '列索引為批次內第 2 列')
+            assert.ok(typeof lg.reason === 'string' && lg.reason !== '')
+            noPii(env, ADM, 'SENS-OK', 'SENS-NAME')
+        })
+
+        it('SC-L10 歷史撞值(旁路寫庫: 後台列與同來源外部列 srcKey 相同, 皆有效)時, 該來源任何批次只要含該 srcKey 即拒收(與 email 對應鍵同口徑: 批次列全部參與); 不含該列之批次不受影響', async function() {
+            let env = createEnv({
+                seed: (s) => {
+                    s.users.push({ ...ds.users.funNew(), ...AUDIT, id: 'sys-h1', order: 3, name: 'hist', email: 'hist@x.example.com', description: 'd-h', from: 'appX', srcKey: ADM, cgrups: '{}', isAdmin: 'n', isActive: 'y' })
+                },
+            })
+            await assertRejected(env, 'users', 'appX', [U(ADM, 'hist', { email: 'hist@x.example.com', description: 'd-h' })], 'loginIdCollision')
+            let r = await sync(env, 'users', 'appX', [U('other-guid', 'someone')]) //批次不含 ADM: 通過(該歷史列依差異同步被刪除)
+            assert.strictEqual(r.ok, true, JSON.stringify(r.v))
+            assert.deepStrictEqual(r.v, { nAdd: 1, nUpdate: 0, nDel: 1, nSame: 0 })
+        })
+    })
+
+
+    describe('撞值與其他拒收並存時之檢查優先序(外審 sol#6; spec 守門順序: 批內檢查 → 讀庫 → 跨來源 → 撞值 → 依 srcKey 配對〔srcKeyConflict〕)', function() {
+        let ADM = 'id-u1'
+
+        it('SC-L11 先到先拒: 批內 id／srcKey 檢查先於撞值; 撞值先於庫內 srcKey 配對異常(srcKeyConflict); 每種皆零寫入', async function() {
+            //(a) 批次帶 id → idNotAllowed(最先)
+            let env = createEnv()
+            await assertRejected(env, 'users', 'appX', [{ ...U(ADM, 'ux'), id: 'x' }], 'idNotAllowed')
+            //(b) 批內 srcKey 重複(其中一列撞值)→ srcKeyDuplicate
+            await assertRejected(env, 'users', 'appX', [U(ADM, 'ux'), U(ADM, 'uy', { email: 'uy@e.com' })], 'srcKeyDuplicate')
+            //(c) 庫內同來源 srcKey 重複(資料異常)＋本批含撞值之 srcKey → 先回 loginIdCollision(撞值檢查位於配對之前)
+            let env2 = createEnv({
+                seed: (s) => {
+                    for (let k = 1; k <= 2; k++) {
+                        s.users.push({ ...ds.users.funNew(), ...AUDIT, id: `sys-d${k}`, order: 10 + k, name: `dd${k}`, email: `dd${k}@x.example.com`, description: 'dup', from: 'appX', srcKey: 'old', cgrups: '{}', isAdmin: 'n', isActive: 'y' })
+                    }
+                },
+            })
+            await assertRejected(env2, 'users', 'appX', [U(ADM, 'ux')], 'loginIdCollision')
+            //(d) 同一份庫內異常、本批不含撞值 → 仍是 srcKeyConflict(撞值檢查不吞掉原有拒收)
+            await assertRejected(env2, 'users', 'appX', [U('new-1', 'un')], 'srcKeyConflict')
         })
     })
 

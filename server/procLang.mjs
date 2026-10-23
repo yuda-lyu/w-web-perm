@@ -315,7 +315,7 @@ let kpLang = {
     //@@UI1-KEYS
     //F-23／F-26 清單頁(標的／權限／群組／使用者)之外部列與外部同步提示(R-PRINCIPLE-00 原則 3「收嚴＋提示」、原則 5; R-EXT-OWN-01; ADR-037; src/js/externalUi.mjs、src/js/getAddImpact.mjs):
     //  externalRowLocked 外部列首欄鎖頭圖示之 tooltip({from} 為來源); externalRowsNotice／externalRowsNoticeTarget 清單上方提示({n} 為外部列數; 標的無指派欄故另一鍵);
-    //  syncWarnIdRenumber 外部同步疑似 id 重編之警示({from} 來源、{n} 筆數); externalRowDelBlocked 勾選含外部列而被略過之提示({n}); nameUsedByExternal 後台列與外部列撞名之儲存前提示({name}、{from});
+    //  syncWarnIdRenumber 外部同步疑似來源鍵(srcKey)重編之警示({from} 來源、{n} 筆數; 口徑：同名異 srcKey, perm-run04 起文案同此口徑); externalRowDelBlocked 勾選含外部列而被略過之提示({n}); nameUsedByExternal 後台列與外部列撞名之儲存前提示({name}、{from});
     //  confirmAddRefs* 新增撞「懸空名」(仍被啟用中之引用指向、查無實體)之確認: {list} 新名稱(至多 5 個)、{n} 受影響之引用端數、{m} 其中以 AND 引用者(標的之 crules 項目無 mode, 無 AND 句)
     externalRowLocked: {
         eng: `Synchronized from external source "{from}". Read-only here.`,
@@ -329,9 +329,9 @@ let kpLang = {
         eng: `{n} row(s) are synchronized from an external source. They are read-only and cannot be deleted here.`,
         cht: `有 {n} 筆資料由外部來源同步，於此為唯讀且不可刪除。`,
     },
-    syncWarnIdRenumber: {
-        eng: `The external source "{from}" appears to have renumbered ids ({n} item(s) now carry a name that previously belonged to an item with a different id). Each synchronization removes the old items and cleans up the references to them, which may erase the assignments made here. Please ask the source to keep ids stable or to omit ids.`,
-        cht: `外部來源「{from}」疑似重編 id（有 {n} 筆項目的名稱，先前屬於不同 id 之項目）。每次同步會移除舊項目並連帶清理其引用，可能抹掉在此做的指派。請來源端保持 id 穩定或不帶 id。`,
+    syncWarnIdRenumber: { //perm-run04 起口徑為「同名異來源鍵(srcKey)」(外部匯入依 srcKey 差異同步, 外部端不得送 id); 鍵名沿用以免動前端接線
+        eng: `The external source "{from}" appears to have renumbered its source keys ({n} item(s) now carry a name that previously belonged to an item with a different source key). Each synchronization removes the old items and cleans up the references to them, which may erase the assignments made here. Please ask the source to keep the srcKey of each item stable.`,
+        cht: `外部來源「{from}」疑似重編來源鍵（有 {n} 筆項目的名稱，先前屬於不同來源鍵之項目）。每次同步會移除舊項目並連帶清理其引用，可能抹掉在此做的指派。請來源端保持來源鍵（srcKey）穩定。`,
     },
     externalRowDelBlocked: {
         eng: `{n} selected row(s) are synchronized from an external source and cannot be deleted here. They were skipped.`,
@@ -480,7 +480,8 @@ let kpLang = {
     //perm-run03 範圍二(外部匯入改依來源鍵 srcKey 差異同步; dspec/外部匯入之定義與機制.md 第 9 節):
     //  srcKeyInvalid 批次內有列缺 srcKey、srcKey 為空或非字串(含長度／字元不合) → 整批拒收、零寫入; srcKeyDuplicate 同批 srcKey 重複 → 整批拒收;
     //  idNotAllowed 批次內有列帶 id(內部主鍵由本系統產生, 外部不得指定) → 整批拒收; srcKeyConflict 同 from 庫內有重複 srcKey(資料異常), 或同一 srcKey 被兩個庫內列主張(一個已有 srcKey、一個以 id 主張)而無法唯一配對 → 整批拒收、零寫入並提示人工處置(以 g_purgeFrom.mjs 清源後重匯入);
-    //  users 之登入對應(mappingBy='id' 與 srcKey 之關係)見規則帳本 R-IMPORT-01 規則 6(待裁示, 本輪未改)
+    //  loginIdCollision(perm-run04, 規則帳本 R-MAPKEY-04; 規格第 9 節末 O1): mappingBy='id' 時外部列以 srcKey、後台列以 id 對應外部 token 之使用者 id; 有效外部列之 srcKey 等於有效後台列之 id 即撞值(登入會同時匹配兩筆),
+    //    匯入批次(整批拒收、零寫入)與後台存檔(整次拒收、零變更)皆回此鍵, 登入時命中多筆另回 ambiguousUserFromPerm; 固定訊息, 不回顯 srcKey 與 id
     srcKeyInvalid: {
         eng: `Invalid srcKey: every row must carry a non-empty string srcKey`,
         cht: `來源鍵 srcKey 無效：每列都須帶非空字串之 srcKey`,
@@ -496,6 +497,10 @@ let kpLang = {
     srcKeyConflict: {
         eng: `The existing data of this source cannot be matched uniquely by srcKey. Nothing was changed. Please contact the administrator`,
         cht: `此來源之既有資料無法依 srcKey 唯一配對。資料未變更，請聯絡管理員處置`,
+    },
+    loginIdCollision: {
+        eng: `Nothing was changed: the id of an active administrator-managed user is the same as the srcKey of an active user synchronized from an external source, so a login by id would match both users. Please give one of them a different value`,
+        cht: `資料未變更：有效的後台使用者之 id 與有效的外部同步使用者之 srcKey 相同，依 id 登入時會同時符合兩位使用者。請將其中一個改為不同的值`,
     },
     cannotGetUserId: {
         eng: `Cannot get the user id`,

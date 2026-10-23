@@ -8,7 +8,7 @@ import ds from '../src/schema/index.mjs'
 import validateRowsBeforeWrite, { maxIdBytes } from './validateRows.mjs'
 import planRefChanges, { REF_OF, diffRefTargets } from '../src/js/refCascade.mjs'
 import { SERVER_FIELDS } from '../src/js/externalRows.mjs'
-import { findDupIndex, findKeyOtherFrom, withTabLocks, mapKeyOf, checkMapKeyBatch } from './keyCheck.mjs'
+import { findDupIndex, findKeyOtherFrom, withTabLocks, mapKeyOf, checkMapKeyBatch, findLoginIdClash } from './keyCheck.mjs'
 import { checkCascadePlan, writeWithCascade } from './cascadeWrite.mjs'
 import { markHasKey, keepAssignOnMissing, keepAssignByEntity, countSrcKeyRenumber } from './syncKeep.mjs'
 import { toOutKey, isRowObj } from './procCore.mjs'
@@ -208,6 +208,16 @@ function syncCore({ woItems, procOrm, lockTabs, srLog, mappingBy = 'id', cascade
                 if (kOther >= 0) {
                     logErr('invalidRows', { reason: (keyTable === 'users') ? 'mapKeyOtherFrom' : 'nameOtherFrom', from, row: kOther, field: keyOther })
                     return Promise.reject('invalidRows')
+                }
+            }
+
+            //users 登入識別撞值(mappingBy 為 'id' 時; perm-run04, 規則帳本 R-MAPKEY-04, 規格第 9 節末 O1): 外部列以 srcKey、後台列以 id 對應外部 token 之使用者 id, 本批有效列之 srcKey 等於某有效後台列(from 空)之 id,
+            //登入將同時匹配兩筆 → 整批拒收 loginIdCollision(收嚴＋提示; 零寫入). 本批列皆視為被觸及(同 R-MAPKEY-01: 批次全列參與); 停用列不參與; 固定訊息、log 不記 srcKey／id 之值
+            if (keyTable === 'users' && mapKeyOf(mappingBy) === null) {
+                let kClash = findLoginIdClash([...others, ...rows], (r, k) => k >= others.length)
+                if (kClash >= 0) {
+                    logErr('loginIdCollision', { reason: 'srcKeyIsAdminId', from, row: kClash - others.length, field: 'srcKey' })
+                    return Promise.reject('loginIdCollision')
                 }
             }
 

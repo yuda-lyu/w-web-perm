@@ -6,7 +6,7 @@
 
 | 規則 | 所在分冊 |
 |---|---|
-| R-NAME-UNIQ-01／02／03、R-MAPKEY-01／02、R-REF-CASCADE-01、R-IMPORT-01 | 本冊 `rulebook_sync.md` |
+| R-NAME-UNIQ-01／02／03、R-MAPKEY-01／02／04、R-REF-CASCADE-01、R-IMPORT-01 | 本冊 `rulebook_sync.md` |
 | R-WRITE-LOCK-01／02(表鎖取鎖階層) | `rulebook_sync_lock.md` |
 | R-EXT-OWN-01(外部列守門)、R-SHIP-TOOLS-01(離線維運工具出貨) | `rulebook_sync_external.md` |
 | R-BASELINE-01(載入基準)、R-DRAFT-KEEP-01(草稿保留)、R-RELOAD-GUARD-01(程式端重載旗標) | `rulebook_sync_baseline.md` |
@@ -62,6 +62,64 @@
 - 判準: 已套(兩個反查站點); 刻意不套(`procCore` 整表讀取).
 - 測試: `unit-keyCheck` KC-PU-*(0／1／2／3 筆, 不取首筆)、SITE-KC-005(`getTokenUser` 與 `getGenUserByKV` 皆呼叫 `pickUniqueUser`, 不得再有 `get(userFind, 0` 取首筆); `api-mapKey` MK-010／011(真後端: 同步時 `mappingBy='id'` 允許之重複 email, 切換為 `email` 後登入 `ambiguousUserFromPerm`、資料通道 `permission denied`; 移除重複後登入恢復).
 
+### R-MAPKEY-04 users 登入對應 `mappingBy='id'`: 外部列對 `srcKey`、後台列對 `id`, 撞值於匯入／後台存檔／登入三處皆拒(O1; perm-run04, 2026-10-24; ADR-038 Update)
+
+來源: 規格 `C:\opensrcOper\dspec\外部匯入之定義與機制.md` 第 9 節末(主控 2026-10-24 對 perm-run03 待裁示 1 採 O1; 不採「新增 `mappingBy='srcKey'`」〔O3〕, 因升版後以 `id` 模式部署者新匯入之使用者將靜默無法登入); 上位 R-PRINCIPLE-00 原則 3(衝突收嚴＋提示)、4(所有入口一致).
+
+軸: 入口(外部匯入／後台存檔／登入) × 列形狀(後台列〔from 空〕有效／停用、外部列〔from 非空〕有效／停用、遷移前舊外部列〔無 srcKey〕、他 from 外部列同 srcKey) × 被觸及者(批次列／新增或停用改啟用之後台列／歷史既有未觸及) × `mappingBy`(`id`〔含省略與不合法值〕／`email`／`name`).
+
+- **規則**:
+  1. **登入識別值** `keyCheck.loginIdOf(row)`: 後台列(from 空)＝`id`; 外部列(from 非空)＝`srcKey`(其 `id` 是本系統配發之內部主鍵,**不是登入識別**); 遷移前之舊外部列(無 `srcKey`)暫以 `id`(同升版前,首次匯入補上 `srcKey` 後即改以 `srcKey`; 否則升版後至首次推送前所有舊外部使用者無法登入). 判斷**僅對 `mappingBy` 為 `id`**(含省略與不合法值); `email`／`name` 不變(從不看 `srcKey`).
+  2. **登入查找** `keyCheck.findLoginUsers(woItems.users, mappingBy, vSelf)`(`getTokenUser` 唯一呼叫點): `id` 模式以兩次帶條件之 `select`(`{id, isActive:'y'}`、`{srcKey, isActive:'y'}`,不做全表讀取)合併去重後以 `loginIdOf` 複判,結果一律經 `pickUniqueUser`——恰 1 筆登入、0 筆 `cannotGetUserFromPerm`、**多於 1 筆 `ambiguousUserFromPerm`(不取首筆)**; ORM 讀取失敗原樣拋出. 登入回的是 perm 內之列(`id` 為內部 id),`getUserIdByToken`／稽核欄位／`requireAdmin` 皆用該內部 id.
+  3. **撞值** `keyCheck.findLoginIdClash(rowsAfter, isTouched)`: 有效(`isActive='y'`)外部列之 `srcKey` 等於有效後台列之 `id`. 只有有效列參與(登入只匹配有效列); 只擋「被本次觸及」者. **匯入批次**(`syncCore.mjs`,於配對／寫入之前,表鎖內新鮮讀取之「他 from 之列＋本批」上判斷,本批列皆視為被觸及,同 R-MAPKEY-01 批次全列參與): 撞值 → 整批 `loginIdCollision`、零寫入,srLog `syncAndReplaceTabs-error`(reason `srcKeyIsAdminId`、`from`、`row`、`field:'srcKey'`). **後台存檔**(`procCore.updateTabItems`,位於**外部列守門〔`checkExternalWrite`〕與基準檢查之後、寫入前驗證〔`validateRowsBeforeWrite`〕之前**——不改變 perm-run03 既有拒收之優先序: 例如 `saveNewRowExists`、`saveExternalRowChanged`、`saveBaselineRequired` 皆先於撞值檢查; `guardWrite` 表鎖內): 被觸及＝新增之列、庫內為停用而送入為有效之列、或**登入識別(類別〔後台／外部〕＋值〔`loginIdOf`〕)與庫內不同之列**(外審 sol#2: `lockExternalRows` 為假時後台可改 `from`,外部列改為後台列即換了登入識別而可能撞到他列; 外部列守門啟用時 `from`／`srcKey` 不可改,由 `checkExternalWrite` 另拒); 撞值 → 整次 `loginIdCollision`、零變更,srLog `updateTabItems-ckKey-error`(`key:'id'`、reason `adminIdIsSrcKey`、`row`). **歷史既有(未被觸及)撞值不擋**(否則已有歷史資料之庫無法在後台修復; 同 R-MAPKEY-03): 原樣送回、`pickKeysOnly` 群組指派、刪除其中一列皆可存. 兩處 log 皆不記 `id`／`srcKey` 之值.
+  4. **不在匯入端拒收**: 他來源外部列彼此同 `srcKey`(`srcKey` 僅在 `from` 內唯一,README 已載; 規格只定外部 `srcKey` 對後台 `id`)、批次 `srcKey` 等於他來源外部列之內部 `id`(內部 id 不是登入識別)、遷移前舊外部列之 `id`(其 `id` 與後台列 `id` 因主鍵唯一不可能相同). 前者於登入時命中多筆即拒絕(規則 2).
+  5. 固定錯誤鍵 `loginIdCollision`(`procLang.mjs`,eng／cht,不含佔位符、不回顯值); 前端不知 `mappingBy`(伺服端選項),後台存檔被拒時以伺服端回的鍵經 `showCheckYes` 顯示.
+- **輸入空間表(36 格,逐格對應測試; 外審 sol 補 33～36)**:
+
+| # | 入口 | 情境(對向列〔既有〕／被觸及列) | 結果 | 測試 |
+|---|---|---|---|---|
+| 1 | 匯入 | 批次列有效 srcKey＝有效後台列 id | 拒 `loginIdCollision`、零寫入 | SC-L1、MI-005 |
+| 2 | 匯入 | 批次列停用 srcKey＝有效後台列 id | 過 | SC-L4 |
+| 3 | 匯入 | 批次列有效 srcKey＝停用後台列 id | 過 | SC-L4(後半) |
+| 4 | 匯入 | 同列由停用重送為有效(後台列有效) | 拒、庫內維持上次結果 | SC-L4 |
+| 5 | 匯入 | `mappingBy` 為 email／name,srcKey＝後台 id | 過(不變) | SC-L5、MI-008 |
+| 6 | 匯入 | srcKey＝他來源外部列之內部 id 或其 srcKey | 過(登入時 2 筆才拒) | SC-L3 |
+| 7 | 匯入 | 遷移(舊外部列,srcKey＝舊 id) | 過、nUpdate=1、id 不變 | SC-L6、MI-003 |
+| 8 | 匯入 | 歷史撞值存在,批次含該 srcKey | 拒(批次全列參與)；不含該列之批次過(該歷史列依差異同步刪除) | SC-L10 |
+| 9 | 匯入 | 其他表(grups／pemis)srcKey＝後台 id | 不適用、過 | SC-L7 |
+| 10 | 匯入 | 多列批次僅一列撞值 | 整批拒、其餘列亦不寫 | SC-L2、MI-005 |
+| 11 | 後台存檔 | 新增有效後台列 id＝有效外部列 srcKey | 拒、零變更 | UL-001、MI-006 |
+| 12 | 後台存檔 | 新增停用後台列 id＝有效外部列 srcKey | 過 | UL-003 |
+| 13 | 後台存檔 | 後台停用列改啟用,id＝有效外部列 srcKey | 拒 | UL-004 |
+| 14 | 後台存檔 | 同上但外部列停用 | 過 | UL-004、MI-009 |
+| 15 | 後台存檔 | 新增有效後台列 id＝停用外部列 srcKey | 過 | UL-005 |
+| 16 | 後台存檔 | 歷史撞值原樣送回／群組指派／刪其一 | 過(可修復) | UL-006、MI-007 |
+| 17 | 後台存檔 | 歷史撞值存在,另新增撞另一外部列 | 拒(不被歷史遮蔽) | UL-007 |
+| 18 | 後台存檔 | `mappingBy` 為 email／name | 過(不變) | UL-002 |
+| 19 | 後台存檔 | 多列僅一列撞值 | 整次拒、零寫入 | UL-008 |
+| 20 | 後台存檔 | 新增列缺 id(ORM 補隨機主鍵) | 過(無從比對) | UL-010 |
+| 21 | 登入 | 後台列 id＝token id | 1 筆、登入 | LI-010、MI-004 |
+| 22 | 登入 | 外部列 srcKey＝token id | 1 筆、登入(回內部 id 之列) | LI-011、MI-001 |
+| 23 | 登入 | 外部列內部 id＝token id、srcKey 不同 | 0 筆 `cannotGetUserFromPerm` | LI-011、MI-002 |
+| 24 | 登入 | 遷移後外部列(srcKey＝id) | 1 筆(去重) | LI-012、MI-003 |
+| 25 | 登入 | 遷移前舊外部列(無 srcKey) | 暫以 id、1 筆 | LI-013、MI-003 |
+| 26 | 登入 | 停用列 | 0 筆 | LI-014、MI-009 |
+| 27 | 登入 | 後台 id 與外部 srcKey 同時符合(歷史資料) | 2 筆 `ambiguousUserFromPerm` | LI-015、MI-007 |
+| 28 | 登入 | 兩來源外部列同 srcKey | 2 筆 `ambiguousUserFromPerm` | LI-016 |
+| 29 | 登入 | 外部列內部 id＝另一外部列 srcKey | 只符合 srcKey 那列 | LI-017 |
+| 30 | 登入 | `mappingBy` 為 email／name | 不變(以該欄位;與 srcKey 無關) | LI-018、MI-008 |
+| 31 | 登入 | `mappingBy` 不合法值 | 視同 id | LI-019 |
+| 32 | 登入 | ORM 讀取失敗(第一次或第二次查詢) | 原樣拋出(不吞成 0 筆或採信第一次) | LI-020、LI-020b、LI-021(條件含 isActive) |
+| 33 | 後台存檔 | `lockExternalRows` 為假,外部列改 `from` 為空使登入識別由 srcKey 變為 id 而撞他來源有效外部列 srcKey | 拒 `loginIdCollision`、零變更(含 srcKey 恰等於 id 而只有類別改變者); 識別改變而無撞值、歷史撞值原樣送回／無關欄位修改／刪其一 → 過 | UL-012、UL-013、UL-014、UL-015 |
+| 34 | 匯入／後台／登入 | 精確比對: `srcKey`／`id` 前後空白、大小寫不同; `isActive` 為 `'Y'`／`true`／`1`／`''`／缺漏 | 不撞、不匹配(只有 `'y'` 參與; 值原樣 `===`) | LI-020c、LI-038 |
+| 35 | 匯入 | 撞值與其他拒收並存 | 先到先拒: `idNotAllowed` → `srcKeyInvalid` → `srcKeyDuplicate` → …名稱／對應鍵 → 讀庫 → 跨來源 → **`loginIdCollision`** → 依 `srcKey` 配對(`srcKeyConflict`);庫內異常且本批無撞值者仍回 `srcKeyConflict` | SC-L11 |
+| 36 | 登入 | 兩來源外部列同 `srcKey` 且僅一列有效(設計限制) | 登入到該有效列(與 email／name 對應鍵同口徑,部署須確保 token 使用者 id 跨來源唯一); 兩列皆有效 → 2 筆拒 | LI-016、LI-016b |
+
+- **站點全集(盤點指令)**: `git grep -nE "findLoginUsers|findLoginIdClash|loginIdOf" -- server`(`keyCheck.mjs` 定義; `WWebPerm.mjs:getTokenUser`、`syncCore.mjs:syncAndReplaceTabs`、`procCore.mjs:updateTabItems` 各一呼叫點); `git grep -n "woItems.users.select(" -- server` 須只剩 `getGenUserByKV`(以內部 id 反查,恆 ≤ 1 筆)——可執行版 `unit-keyCheck` SITE-KC-004、`unit-loginId` SITE-LI-001～004. 其他以 `mappingBy` 取 users 之處(`procCore`／`syncCore` 之 email／name 檢查、`nameDupReport` 離線工具)不屬登入識別,不變.
+- **判準**: 已套(三個入口); 刻意不套(`email`／`name` 模式; 停用列; 歷史未觸及; 他來源外部列同 `srcKey`〔登入時拒〕).
+- **測試**: `unit-loginId`(純函數 LI-001～038＋LI-016b／020b／020c＋SITE-LI)、`unit-procCore-loginId`(UL-001～015)、`unit-syncCore` SC-L1～L11、`api-mapKeyId`(真後端 MI-001～010)、`unit-keyCheck` SITE-KC-004; 變異驗證見報告與 `spec/evidence/perm-run04/mutation-results.md`.
+- **已知限制**: ①他來源外部列彼此同 `srcKey` 不在匯入端拒收,登入時才拒(`ambiguousUserFromPerm`),與 README「`srcKey` 僅在 `from` 內唯一」一致; ②離線稽核工具 `nameDupReport` 之 `--mapping-by id` 仍只報告 id 缺漏(未列 `srcKey`／`id` 撞值); ③舊外部列(無 `srcKey`)暫以 `id` 登入是過渡規則,首次匯入補上 `srcKey` 後失效.
+
 ## 引用連帶:改名級聯與刪除連帶清理(2026-10-22 run06, ADR-036; 來源: 使用者 2026-10-21「刪除須連帶清理引用」裁示、主控定案 F-07、`R-PRINCIPLE-00` 原則 6、適用表 m／n)
 
 ### R-REF-CASCADE-01 引用要跟著改: 群組／權限改名與群組／權限／標的刪除, 於同一次寫入內連帶更新／清理引用(m、n)
@@ -102,8 +160,8 @@
   9. **寫入中途失敗**(規格第 5 節 6):預檢攔下可預見之失敗;寫入順序刪除 → 新增 → 修改(同後台整表寫入,procOrm 帶 `mustExist`);任一步失敗 → 引用端由 `writeWithCascade` 還原,**本表由 `writeMain` 之 undo 以鎖內讀取之舊列還原**(新增者以 `delAll({ id: { $in } })` 刪除、被刪者與被改者以 `save(整列, { merge: false })` 寫回;逐步冪等,不論做到哪一步皆可無條件全做),還原成功重新拋出原錯誤(對外 `saveWriteFail`,srLog `syncAndReplaceTabs-restored`);**還原亦失敗** → `saveWriteFail`＋srLog `syncAndReplaceTabs-restore-error`(只記表名／來源／筆數),人工處置;**引用端補償失敗**(`writeWithCascade` 之 `saveCascadePartial`)於同步端點亦對外固定轉為 `saveWriteFail`(外審 sol#3;引用端懸空仍由 srLog `refCascade-restore-error` 供稽核,`unit-syncCore` SC-I12-cascadeUndoFail).
   10. **後台列(`from` 為空)與他 `from` 之列永不被觸及**;後台對外部列受 Lv1 守門(R-EXT-OWN-01),`srcKey` 為鎖定欄:後台新增帶值之列、改既有列之 `srcKey` → `saveFromNotAllowed`(後台列)／`saveExternalRowChanged`(外部列),reason `addSrcKey`／`srcKeyChanged`,**不論 `lockExternalRows`**(`src/js/externalRows.mjs:checkExternalWrite`);四表寫入契約 `fields` 含 `srcKey`(外部補上或改變使持舊畫面者存檔被拒);清單頁複製列重置 `srcKey`(同 `from`).
   11. **srcKey 重編警示**(原「同名異 id 重編偵測」之評估結果:**不移除,判定口徑改為 srcKey**):同一 `from` 同批內出現「同名異 srcKey」(新來源鍵列與將被刪除列同名)→ srLog warn `syncAndReplaceTabs-srcKeyRenumber`(只記表名／來源／筆數),並登錄 `getWebInfor().syncWarns`(`countSrcKeyRenumber`;理由:外部來源重編來源鍵＝刪舊增新,引用每次被連帶清理而抹掉後台指派);同 `srcKey` 改名是改名級聯,不警示.**已移除**:`buildSyncRowsNew`(`server/cascadeWrite.mjs`;專供舊同步之「未帶 id 依名稱對應」規劃)、`countIdRenumber`、同步端之 `idOtherFrom` 檢查(targets 以 `idTaken` 取代).`fillIdlessIds` 仍供**後台**整表寫入(API 直打缺 id 之列)使用,不刪(R-REF-CASCADE-01 規則 5).
-  12. **users 之登入對應 `mappingBy='id'`(規格第 9 節末):本輪未實作,列待裁示**(主責 agent 依任務書範圍二第 6 點:兩個以上方案皆可行而取捨涉及部署方行為,停下).方案:O1 外部列對 `srcKey`、後台列對 `id`,撞值收嚴(登入撞多筆既有即拒 `ambiguousUserFromPerm`,另須批次與後台存檔兩入口拒撞值);O2 只對 `srcKey`(後台建立之管理員須改用 email／name 對應);O3 新增 `mappingBy` 值 `'srcKey'`、`'id'` 維持只對 perm `id`;O4 不改.**現況**:遷移後既有外部使用者 `id` 不變仍可登入;**升版後新匯入之外部使用者**其 `id` 為系統配的值,`mappingBy='id'` 下對不到外部 token 之 `id`,無法登入;`mappingBy` 為 `email`／`name` 者不受影響.
+  12. **users 之登入對應 `mappingBy='id'`(規格第 9 節末):已於 perm-run04 實作,採 O1**(主控 2026-10-24 對 perm-run03 待裁示 1 之決定):外部列對 `srcKey`、後台列對 `id`,撞值於匯入批次、後台存檔、登入三處皆拒——見 **R-MAPKEY-04**(規則、32 格輸入空間表、站點與測試).〔原載(perm-run03):本輪未實作,列待裁示 O1～O4;升版後新匯入之外部使用者其 `id` 為系統配的值而無法以 `mappingBy='id'` 登入——**原載不成立**,現以其 `srcKey` 登入.〕
 - **刪除防護**:本條為預期功能;外部端輔助 `provideTabs` 不是死碼,不得以「無引用」刪除(opensrcOper 帳本 G8).
-- **狀態:已做**(除第 12 點待裁示).
+- **狀態:已做**(第 12 點於 perm-run04 完成,R-MAPKEY-04).
 - **驗收**(規格第 10 節 I1～I15):`test/unit-syncCore.test.mjs`(64 案:SC-I1…SC-I15、SC-W1 警示、SC-R1～5 形狀與記錄;I14〔無權限權杖、未列 keyTable〕屬路由層,由 `api-syncAndReplaceTabs` 承擔);真後端 `api-syncAndReplaceTabs`、`api-externalRows`、`api-mapKey`、`api-refCascade`;e2e 夾具經 `test/tools/e2eExt.mjs:syncRows`(`id` 標籤改送 `srcKey`).
 - **盤點**:`git grep -nE "srcKey" -- server`(`syncCore.mjs` 配對與驗證、`externalRows` 守門、`provideTabs` 白名單);`git grep -n "delAll({ from" -- server` 須 0 筆(2026-10-23 實得見報告);`git grep -nE "buildSyncRowsNew|countIdRenumber" -- server src` 須 0 筆.
