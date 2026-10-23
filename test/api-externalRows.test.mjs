@@ -16,11 +16,15 @@
 //     回 saveStale(提示重新載入), 不回 saveExternalRowChanged／saveFromNotAllowed; 基準新鮮而仍違規者由守門拒收; 無基準而改外部列指派欄仍 saveBaselineRequired。
 //  S6 未帶基準: 後台列維持舊行為(成功); 但修改外部列之指派欄無基準 → saveBaselineRequired。
 //  S7 kpFunExt 只採納用戶端 opt.baseline, 不採納 pickKeysOnly、lockExternalRows 等其他鍵。
-//  S8 外部同步 users 列缺 cgrups 鍵 → 保留庫內同 from 對應列之值(含鍵〔含空字串〕則以外部為準; 無 id 者在 mappingBy 為 email／name 時依該欄位須恰命中 1 筆; 新使用者缺鍵為 '');
-//     〔run08〕grups 列缺 cpemis 鍵、pemis 列缺 crules 鍵比照保留(三者同為後台可寫之指派欄; 主控依原則 3、5 定案): 實體身分依 id(無 id 者依名稱恰 1 筆; id 對不到＝新實體 '');
-//     同 id 改名: cascadeRename 預設 true → 保留(EX-021c); cascadeRename=false(引用不跟著改)→ 不保留並記 warn identityConflict(EX-021d, F 區); 含鍵者以外部為準。
-//  S9 外部同步同一 from 同批「同名異 id」(grups／pemis)→ srLog warn syncAndReplaceTabs-idRenumber(只含表名、來源、筆數, 不含名稱／id 值)並登錄 getWebInfor().syncWarns
+//  S8 外部同步 users 列缺 cgrups 鍵 → 保留庫內同 from 同一 srcKey 列之值(含鍵〔含空字串〕則以外部為準; 新 srcKey〔含沿用舊列 email／name 者〕缺鍵為 '');
+//     〔run08〕grups 列缺 cpemis 鍵、pemis 列缺 crules 鍵比照保留(三者同為後台可寫之指派欄; 主控依原則 3、5 定案): 實體身分依 srcKey(perm-run03 起;
+//     原『依 id、無 id 者依名稱／email／name 對應』隨外部不再送 id 而不復存在; 同名異 srcKey＝刪舊增新＝新實體 '');
+//     同 srcKey 改名: cascadeRename 預設 true → 保留(EX-021c); cascadeRename=false(引用不跟著改)→ 不保留並記 warn identityConflict(EX-021d, F 區); 含鍵者以外部為準。
+//  S9 外部同步同一 from 同批「同名異 srcKey」(疑似來源鍵重編; grups／pemis)→ srLog warn syncAndReplaceTabs-srcKeyRenumber(只含表名、來源、筆數, 不含名稱／srcKey 值)並登錄 getWebInfor().syncWarns
 //     [{keyTable, from, n, time}]; 之後同(表, from)之同步已無此情形即清除。
+//  S11 〔perm-run03〕來源鍵 srcKey 為身分欄(與 from 同): 外部列之 srcKey 後台不可改(saveExternalRowChanged)、後台列不可帶入 srcKey、後台不可新增帶 srcKey 之列(saveFromNotAllowed); 不論 lockExternalRows(EX-004c／EX-045)。
+//  〔perm-run03 夾具原則〕外部匯入改依 srcKey 差異同步(server/syncCore.mjs): 夾具列以 srcKey(標籤)識別、不送 id, 外部列之內部 id 由伺服端產生(targets 例外: id＝srcKey), 經 mustSync 後登錄 srcKey→id(rid／ext)供案例查詢;
+//     差異同步下「內容相同之重送」為 nSame(零寫入), 不改寫外部列——需要「外部同步改寫了外部列」者(EX-005 c4、EX-009)改以外部僅更新 order 數值(名次不變)造出。
 //  S10 後台列之引用端改寫不受守門: 後台群組／權限／標的改名或刪除時連帶改寫引用它之外部列(users.cgrups／grups.cpemis／pemis.crules); 外部群組被後台改名／刪除則拒。
 //
 //輸入空間(軸 × 格; 〔已測〕＝本檔有案例, 〔未測〕＝列明理由):
@@ -31,8 +35,8 @@
 //   × 基準 { 不帶〔已測〕, 正確〔已測〕, 過期〔已測: 他人改該列／外部同步改內容／開框後他人新增再刪／復活〕, 格式不合〔已測: 19 種, 含 perm-run01 新增之舊版指紋／h1 壞格式／重複 id〕, 空陣列〔已測〕 }
 //   × lockExternalRows { 預設 'y'〔A 區〕, 'n'〔D 區: 舊行為迴歸, 含 from 非字串仍拒〕 }
 //  基準 × 後台列修改(EX-006b)、基準 × 新增列(原樣帶回／刪除／復活, EX-007b); 指派欄 × 基準(EX-005)。
-//  外部同步 × 缺 cgrups 鍵(EX-020〔id 對應〕、B 區 mappingBy=email／C 區 mappingBy=name〔無 id 依該欄位、須恰命中 1 筆、新使用者〕)、grups.cpemis／pemis.crules 缺鍵(run08: EX-021〔id 對應、含鍵、新實體、他分區、log〕／021b〔無 id 依名稱〕／021c〔改名, cascadeRename 預設〕／021d〔F 區 cascadeRename=false 不保留＋warn〕)、
-//  同名異 id 警告(EX-022／023); kpFunExt opt 過濾(EX-013); 引用端改寫(EX-014)。
+//  外部同步 × 缺 cgrups 鍵(EX-020〔srcKey 配對〕、B 區 mappingBy=email／C 區 mappingBy=name〔身分仍依 srcKey, 不依 email／name; 新 srcKey 沿用舊列 email／name 者不繼承〕)、grups.cpemis／pemis.crules 缺鍵(run08: EX-021〔srcKey 配對、含鍵、新實體、他分區、log〕／021b〔同名異 srcKey＝新實體〕／021c〔改名, cascadeRename 預設〕／021d〔F 區 cascadeRename=false 不保留＋warn〕)、
+//  同名異 srcKey 警告(EX-022／023); kpFunExt opt 過濾(EX-013); 引用端改寫(EX-014); srcKey 身分欄鎖定(EX-004c／EX-045)。
 //  〔run07 APIb 增量〕草稿過期 × 外部列守門之次序與 C-1(S5b), 四表各一:
 //   × 開框後外部同步 { 改外部列內容〔EX-050〕, 撤銷外部列指派欄〔EX-050b; 舊草稿不得還原授權〕, 移除外部列〔EX-051〕 } × 使用者動作 { 只改後台列〔EX-050／051〕, 外部列另被改／刪／改 from／同批新增非空 from〔EX-054〕 } × 基準 { 舊〔saveStale〕, 無〔守門／saveBaselineRequired〕, 新〔守門／成功〕 }
 //   × 基準新鮮 { 改外部列身分欄／刪／改 from〔EX-052〕, 新增非空 from／非字串 from／複製外部列〔EX-055〕, 正常新增 from ''〔EX-055 對照〕 }
@@ -71,23 +75,23 @@ const T = {
     pemis: { fn: 'updatePemis', assign: 'crules', lock: ['name', 'description'] },
     targets: { fn: 'updateTargets', assign: null, lock: ['description'] },
 }
-//外部夾具(經同步灌入 F; order 取大值, 以便與後台列 1…n 區分)
+//外部夾具(經同步灌入 F; order 取大值, 以便與後台列 1…n 區分)。perm-run03: 外部只送 srcKey(來源鍵; 此處為夾具標籤), 不送 id; 內部 id 由伺服端產生(targets 例外: id＝srcKey), 以 ext()／rid() 查
 const FX = {
     users: [
-        { id: 'id-ex-u1', order: 70, name: 'exU1', email: 'ex-u1@ext.example.com', description: 'ex u1', cgrups: '{}', isAdmin: 'n', isActive: 'y' },
-        { id: 'id-ex-u2', order: 80, name: 'exU2', email: 'ex-u2@ext.example.com', description: 'ex u2', cgrups: '{}', isAdmin: 'n', isActive: 'y' },
+        { srcKey: 'sk-ex-u1', order: 70, name: 'exU1', email: 'ex-u1@ext.example.com', description: 'ex u1', cgrups: '{}', isAdmin: 'n', isActive: 'y' },
+        { srcKey: 'sk-ex-u2', order: 80, name: 'exU2', email: 'ex-u2@ext.example.com', description: 'ex u2', cgrups: '{}', isAdmin: 'n', isActive: 'y' },
     ],
     grups: [
-        { id: 'id-ex-g1', order: 70, name: 'exG1', description: 'ex g1', cpemis: '{}' },
-        { id: 'id-ex-g2', order: 80, name: 'exG2', description: 'ex g2', cpemis: '{}' },
+        { srcKey: 'sk-ex-g1', order: 70, name: 'exG1', description: 'ex g1', cpemis: '{}' },
+        { srcKey: 'sk-ex-g2', order: 80, name: 'exG2', description: 'ex g2', cpemis: '{}' },
     ],
     pemis: [
-        { id: 'id-ex-p1', order: 70, name: 'exP1', description: 'ex p1', crules: '{}' },
-        { id: 'id-ex-p2', order: 80, name: 'exP2', description: 'ex p2', crules: '{}' },
+        { srcKey: 'sk-ex-p1', order: 70, name: 'exP1', description: 'ex p1', crules: '{}' },
+        { srcKey: 'sk-ex-p2', order: 80, name: 'exP2', description: 'ex p2', crules: '{}' },
     ],
     targets: [
-        { id: '專案EX/頁1/區塊A', order: 70, description: 'ex t1' },
-        { id: '專案EX/頁1/區塊B', order: 80, description: 'ex t2' },
+        { srcKey: '專案EX/頁1/區塊A', order: 70, description: 'ex t1' },
+        { srcKey: '專案EX/頁1/區塊B', order: 80, description: 'ex t2' },
     ],
 }
 //指派欄之新值(兩組)
@@ -129,7 +133,26 @@ let rowOf = async (kt, id) => (await selectAll(kt)).find((r) => r.id === id)
 let omit = (o, ks) => Object.fromEntries(Object.entries(o).filter(([k]) => !ks.includes(k)))
 let patch = (rows, id, o) => rows.map((r) => (r.id === id ? { ...r, ...o } : r))
 let baselineOf = (kt, rows) => makeBaseline(rows, kt) //測試端依表名算正確基準(perm-run01: 原 makeBaseline(rows, ds[kt].keys) 改傳表名字串)
-let ext = (kt, k = 0) => FX[kt][k].id //外部夾具列之主鍵
+
+//外部列之內部 id(perm-run03): 由伺服端產生(targets 例外: id＝srcKey), 夾具以 srcKey(標籤)識別。經 mustSync 後登錄 (表, from, srcKey)→id, 供 ext()／rid() 同步查詢;
+//  登錄只增不刪(列被同步移除後仍可據舊 id 驗證「已不存在」), freshState／restoreBase 時清空(外部列被重置後 id 隨之改變)
+let RID = new Map()
+let ridKey = (kt, from, srcKey) => `${kt}\u0000${from}\u0000${srcKey}`
+let refreshRid = async (kt) => {
+    for (let r of await selectAll(kt)) {
+        if (typeof r.srcKey === 'string' && r.srcKey !== '' && typeof r.from === 'string' && r.from !== '') {
+            RID.set(ridKey(kt, r.from, r.srcKey), r.id)
+        }
+    }
+}
+let rid = (kt, srcKey, from = F) => {
+    let v = RID.get(ridKey(kt, from, srcKey))
+    A.ok(typeof v === 'string', `找不到 ${kt} 外部列(from=${from}, srcKey=${srcKey})之內部 id(夾具尚未經 mustSync 建立?)`)
+    return v
+}
+let ext = (kt, k = 0) => rid(kt, FX[kt][k].srcKey) //外部夾具列之內部 id
+//fxRows: 外部夾具列之複本; mut 為 { 夾具索引: 覆寫欄位 }(以索引指定第幾筆夾具列, 不依 id 比對)
+let fxRows = (kt, mut = {}) => clone(FX[kt]).map((r, k) => (mut[k] === undefined ? r : { ...r, ...mut[k] }))
 //新增列(from 預設 ''; targets 之 id 為路徑)
 let nid = (kt, tag) => (kt === 'targets' ? `專案EX/新增/${tag}` : `id-ex-new-${tag}`)
 let newRow = (kt, tag, o = {}) => {
@@ -170,6 +193,7 @@ let postSync = async (kt, body, token = TOKEN_APP) => {
 let mustSync = async (kt, body) => {
     let r = await postSync(kt, body)
     A.equal(r.state, 'success', `同步 ${kt} 應成功，實得: ${JSON.stringify(r)}`)
+    await refreshRid(kt) //登錄新外部列之內部 id(srcKey→id)
     return r
 }
 
@@ -232,6 +256,7 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
 
     //restoreBase: 移除外部列夾具(purgeExternalRows, 測試框架之重置)後以管理者寫入 RPC 把四表還原為 base seed(後台列)
     let restoreBase = async () => {
+        RID.clear() //外部列將被移除重建, 內部 id 隨之改變
         await restoreTables(BASE)
         await purgeExternalRows(['targets'], { keepIds: { targets: BASE.targets.map((r) => r.id) } })
         let r = await callRpc('updateTargets', [clone(BASE.targets)], TOKEN_ADMIN)
@@ -283,16 +308,17 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
             for (let kt of KTS) {
                 let rs = await selectAll(kt)
                 A.ok(rs.length > 0 && rs.every((r) => r.from === ''), `${kt} 基準種子之 from 應全為 ''(run07 起 peter／mary／john 由 teamA 改 '')`)
-                //鎖定欄預期(獨立於實作)＋id／from／order／指派欄／伺服器管理欄 = schema 全部欄位; schema 日後增欄須於此決定其屬性(鎖定或指派)
-                let exp = [...T[kt].lock, 'id', 'from', 'order', ...SERVER, ...(T[kt].assign ? [T[kt].assign] : [])].sort()
-                A.deepEqual([...ds[kt].keys].sort(), exp, `${kt} schema 欄位須等於預期之鎖定欄＋id／from／order／指派欄／伺服器管理欄`)
+                //鎖定欄預期(獨立於實作)＋id／from／srcKey／order／指派欄／伺服器管理欄 = schema 全部欄位; schema 日後增欄須於此決定其屬性(鎖定或指派)
+                //  srcKey(perm-run03): 外部匯入之來源鍵, 身分欄(與 from 同; 後台不可改, 見 EX-004c／EX-045), 故不列入 T.lock(其變更之斷言有專屬案例)
+                let exp = [...T[kt].lock, 'id', 'from', 'srcKey', 'order', ...SERVER, ...(T[kt].assign ? [T[kt].assign] : [])].sort()
+                A.deepEqual([...ds[kt].keys].sort(), exp, `${kt} schema 欄位須等於預期之鎖定欄＋id／from／srcKey／order／指派欄／伺服器管理欄`)
             }
             for (let key of ['saveFromNotAllowed', 'saveExternalRowChanged', 'saveStale', 'saveBaselineRequired']) {
                 checkLangKey(key)
             }
             let infor = await getInfor()
             A.equal(infor.lockExternalRows, 'y', 'getWebInfor.lockExternalRows 預設應為 y')
-            A.deepEqual(infor.syncWarns, [], '無同名異 id 同步時 syncWarns 應為空陣列')
+            A.deepEqual(infor.syncWarns, [], '無同名異 srcKey 同步時 syncWarns 應為空陣列')
         })
 
 
@@ -379,6 +405,28 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
             }
         })
 
+        //〔perm-run03 S11〕來源鍵 srcKey 為身分欄(與 from 同): 只由外部匯入端點寫入, 後台不可改外部列之值、不可對後台列帶入值、不可新增帶值之列(缺欄／null／'' 同一空值)
+        for (let kt of KTS) {
+            it(`EX-004c 來源鍵 srcKey 為身分欄(${kt}): 改外部列之 srcKey(改值／清空; 有無基準皆然)→saveExternalRowChanged; 後台列帶入 srcKey、新增 from '' 而帶 srcKey 之列→saveFromNotAllowed; 零寫入; 原樣送回外部列之 srcKey 則成功`, async function() {
+                await freshState()
+                let id = ext(kt, 0)
+                let rows = await rowsOf(kt)
+                let B = baselineOf(kt, rows)
+                let cur = rows.find((r) => r.id === id)
+                A.equal(cur.srcKey, FX[kt][0].srcKey, `前提: ${kt} 外部列庫內 srcKey 為夾具標籤`)
+                for (let v of ['sk-changed', '']) {
+                    await expectReject(`${kt} 外部列 srcKey→${JSON.stringify(v)}(無基準)`, kt, patch(rows, id, { srcKey: v }), 'saveExternalRowChanged')
+                    await expectReject(`${kt} 外部列 srcKey→${JSON.stringify(v)}(基準新鮮)`, kt, patch(rows, id, { srcKey: v }), 'saveExternalRowChanged', { baseline: B })
+                }
+                await expectReject(`${kt} 後台列帶入 srcKey`, kt, patch(rows, BO[kt], { srcKey: 'sk-forged' }), 'saveFromNotAllowed')
+                await expectReject(`${kt} 後台列帶入 srcKey(基準新鮮)`, kt, patch(rows, BO[kt], { srcKey: 'sk-forged' }), 'saveFromNotAllowed', { baseline: B })
+                await expectReject(`${kt} 新增 from '' 而帶 srcKey`, kt, [...rows, newRow(kt, 'sk1', { srcKey: 'sk-forged' })], 'saveFromNotAllowed')
+                //對照: 外部列之 srcKey 原樣送回(後台列另有合法編修)→成功, srcKey 不變
+                await mustWrite(`${kt} 外部列 srcKey 原樣送回＋後台列編修`, kt, patch(rows, BO[kt], { description: 'sk-keep-edit' }), { baseline: B })
+                A.equal((await rowOf(kt, id)).srcKey, FX[kt][0].srcKey, `${kt} 外部列 srcKey 不變`)
+            })
+        }
+
 
         // ---------- 改外部列之指派欄 × 基準 ----------
 
@@ -423,17 +471,18 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 //(c3) 過期: 外部同步改了該外部列之內容(description)後, 持舊基準 → saveStale
                 rows = await rowsOf(kt)
                 let B2 = baselineOf(kt, rows)
-                await mustSync(kt, { from: F, rows: clone(FX[kt]).map((r) => (r.id === id ? { ...r, description: `${r.description} resync` } : r)) })
+                await mustSync(kt, { from: F, rows: fxRows(kt, { 0: { description: `${FX[kt][0].description} resync` } }) })
                 await expectReject(`${kt} 持過期基準(外部同步已改內容)`, kt, mk(await rowsOf(kt), AV[kt][2]), 'saveStale', { baseline: B2 })
 
-                //(c4) 外部同步重寫(內容未變)不使基準作廢: 指紋排除 order 與伺服器管理欄
+                //(c4) 外部同步改寫外部列(內容指紋未變)不使基準作廢: 指紋排除 order 與伺服器管理欄
+                //  perm-run03: 差異同步下「內容相同之重送」為 nSame(零寫入), 不會改寫外部列; 故由外部僅更新該列 order 數值(名次不變)造出「列被外部同步改寫(更新者／更新時間異動)而內容指紋不變」
                 rows = await rowsOf(kt)
                 let B3 = baselineOf(kt, rows)
-                let tc0 = (await rowOf(kt, id)).timeCreate
+                let tu0 = (await rowOf(kt, id)).timeUpdate
                 await sleep(30)
-                await mustSync(kt, { from: F, rows: clone(FX[kt]).map((r) => (r.id === id ? { ...r, description: `${r.description} resync` } : r)) })
-                A.notEqual((await rowOf(kt, id)).timeCreate, tc0, '前提: 外部同步已重寫(建立時間更新)')
-                await mustWrite(`${kt} 持舊基準(外部同步僅重寫、內容未變)`, kt, mk(await rowsOf(kt), AV[kt][2]), { baseline: B3 })
+                await mustSync(kt, { from: F, rows: fxRows(kt, { 0: { description: `${FX[kt][0].description} resync`, order: FX[kt][0].order + 1 } }) })
+                A.notEqual((await rowOf(kt, id)).timeUpdate, tu0, '前提: 外部同步已改寫該列(更新時間更新)')
+                await mustWrite(`${kt} 持舊基準(外部同步僅改寫 order、內容指紋未變)`, kt, mk(await rowsOf(kt), AV[kt][2]), { baseline: B3 })
                 A.equal((await rowOf(kt, id))[af], AV[kt][2], `${kt} 指派欄新值應落地`)
             })
         }
@@ -617,12 +666,12 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
             it(`EX-050 開框後外部同步改了外部列內容, 使用者以正確舊基準只改後台列(${kt}): saveStale(log 原因 rowChanged、無外部列守門之 error)、零寫入; 無基準之舊客戶端同樣送入則 saveExternalRowChanged; 重新載入(新基準)後存檔成功且不覆蓋外部之新內容`, async function() {
                 //規格句: S5b(ii)——草稿已過期(外部同步於開啟後改了外部列內容)而使用者只編修後台列時回 saveStale, 不回 saveExternalRowChanged
                 let Y = BO[kt]
-                let id = ext(kt, 0)
                 await freshState()
+                let id = ext(kt, 0) //外部列之內部 id 由伺服端產生, 須在 freshState 建夾具之後取
                 let R0 = await rowsOf(kt) //草稿所依據之列
                 let B0 = baselineOf(kt, R0)
                 let descOld = R0.find((r) => r.id === id).description
-                await mustSync(kt, { from: F, rows: clone(FX[kt]).map((r) => (r.id === id ? { ...r, description: `${r.description} resynced` } : r)) })
+                await mustSync(kt, { from: F, rows: fxRows(kt, { 0: { description: `${FX[kt][0].description} resynced` } }) })
                 let descNew = (await rowOf(kt, id)).description
                 A.notEqual(descNew, descOld, '前提: 外部同步已改外部列內容')
                 let draft = patch(R0, Y, { description: 'bo-edit-on-stale' })
@@ -641,9 +690,9 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
             it(`EX-050b 外部同步撤銷了外部列之指派欄(${kt}.${T[kt].assign}), 舊草稿(持撤銷前之基準與指派)只改後台列: saveStale、庫內指派維持撤銷後之值(舊快照不得還原外部已撤銷之授權); 無基準者 saveBaselineRequired`, async function() {
                 //規格句: 設計摘要 3(F-26 外審 B.2)——舊快照不得還原外部已撤銷之授權; S5b(ii) 過期回 saveStale
                 let af = T[kt].assign
-                let id = ext(kt, 0)
                 let Y = BO[kt]
                 await freshState()
+                let id = ext(kt, 0) //外部列之內部 id 由伺服端產生, 須在 freshState 建夾具之後取
                 let R0 = await rowsOf(kt)
                 await mustWrite(`${kt} 後台指派外部列`, kt, patch(R0, id, { [af]: AV[kt][0] }), { baseline: baselineOf(kt, R0) })
                 let R1 = await rowsOf(kt) //草稿所依據之列(外部列已被指派 V0)
@@ -713,7 +762,7 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 let id = ext(kt, 0)
                 let R0 = await rowsOf(kt)
                 let B0 = baselineOf(kt, R0)
-                await mustSync(kt, { from: F, rows: clone(FX[kt]).map((r) => (r.id === id ? { ...r, description: `${r.description} resynced` } : r)) })
+                await mustSync(kt, { from: F, rows: fxRows(kt, { 0: { description: `${FX[kt][0].description} resynced` } }) })
                 let cur0 = R0.find((r) => r.id === id)
                 let f0 = T[kt].lock[0]
                 //舊草稿: 外部列 id 之內容為舊(與庫內不同), 再疊加各種違規
@@ -879,7 +928,7 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
 
         // ---------- 複製 ----------
 
-        it('EX-008 複製外部列(新主鍵與不衝突之名稱／email, from 繼承 F, 標為 _isNew): saveFromNotAllowed、零寫入; 前端複製後重置 from 為 \'\' 者成功', async function() {
+        it('EX-008 複製外部列(新主鍵與不衝突之名稱／email, from 繼承 F, 標為 _isNew): saveFromNotAllowed、零寫入; 前端複製後重置 from 為 \'\'(且清空繼承之 srcKey)者成功; 只重置 from 而仍繼承 srcKey 者 saveFromNotAllowed', async function() {
             await freshState()
             for (let kt of KTS) {
                 let rows = await rowsOf(kt)
@@ -892,7 +941,9 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                     cp.name = `${src.name}-copy`
                 }
                 await expectReject(`${kt} 複製外部列(from 繼承)`, kt, [...rows, cp], 'saveFromNotAllowed')
-                await mustWrite(`${kt} 複製外部列並重置 from`, kt, [...rows, { ...cp, from: '' }])
+                //perm-run03: 來源鍵 srcKey 與 from 同為身分欄, 複製列須一併清空繼承之 srcKey(前端複製動作即設 r.srcKey = ''), 只重置 from 者仍帶外部列之來源鍵 → 後台不可新增帶 srcKey 之列
+                await expectReject(`${kt} 複製外部列只重置 from(仍繼承 srcKey)`, kt, [...rows, { ...cp, from: '' }], 'saveFromNotAllowed')
+                await mustWrite(`${kt} 複製外部列並重置 from 與 srcKey`, kt, [...rows, { ...cp, from: '', srcKey: '' }])
                 let got = (await selectAll(kt)).find((r) => r.id === nid(kt, 'cp'))
                 A.ok(got, `${kt} 複製列應落地`)
                 A.equal(got.from, '', `${kt} 複製列為後台列`)
@@ -903,18 +954,21 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
 
         // ---------- 舊審計欄 ----------
 
-        it('EX-009 僅送回外部列之舊審計欄(建立者／時間／更新者／更新時間; 外部同步重寫之後以舊快照存檔): 成功(視為無變更), 外部列之審計欄不回退為舊值; 四表', async function() {
+        it('EX-009 僅送回外部列之舊審計欄(更新者／更新時間; 外部同步改寫外部列之後以舊快照存檔): 成功(視為無變更), 外部列之審計欄與 order 不回退為舊值; 四表', async function() {
             for (let kt of KTS) {
                 for (let withBaseline of [false, true]) {
                     let tag = `${kt}${withBaseline ? '(有基準)' : '(無基準)'}`
                     await freshState()
                     let snapOld = await rowsOf(kt) //舊快照(含外部列之舊審計欄)
                     await sleep(30)
-                    await mustSync(kt, { from: F, rows: clone(FX[kt]) }) //外部同步重寫(內容不變)
+                    //perm-run03: 差異同步下「內容相同之重送」為 nSame(零寫入), 不會改寫外部列(原 delAll＋insert 之整批重寫已不存在); 故由外部僅更新兩筆外部列之 order 數值(名次不變、內容不變)
+                    //  造出「外部同步改寫了外部列, 持舊快照者之審計欄(更新時間)較舊」: order 由外部擁有、不入內容指紋; 建立者／建立時間於修改時保留, 異動的是更新者／更新時間
+                    await mustSync(kt, { from: F, rows: fxRows(kt, { 0: { order: FX[kt][0].order + 1 }, 1: { order: FX[kt][1].order + 1 } }) })
                     let extNew = await extOf(kt)
                     let oldExt = snapOld.filter((r) => r.from === F).sort(byId)
-                    A.notEqual(extNew[0].timeCreate, oldExt[0].timeCreate, `前提(${tag}): 外部列之建立時間已因重寫而更新`)
-                    A.deepEqual(extNew.map((r) => omit(r, SERVER)), oldExt.map((r) => omit(r, SERVER)), `前提(${tag}): 外部列內容(扣除審計欄)未變`)
+                    A.notEqual(extNew[0].timeUpdate, oldExt[0].timeUpdate, `前提(${tag}): 外部列之更新時間已因外部同步改寫而更新`)
+                    A.ok(extNew.every((r, i) => r.order !== oldExt[i].order), `前提(${tag}): 外部列 order 數值已由外部更新`)
+                    A.deepEqual(extNew.map((r) => omit(r, [...SERVER, 'order'])), oldExt.map((r) => omit(r, [...SERVER, 'order'])), `前提(${tag}): 外部列內容(扣除審計欄與 order)未變`)
 
                     //舊快照＋後台列編修 → 成功(外部列僅審計欄不同, 視為無變更, 不需基準; 有基準時指紋排除審計欄, 依舊快照算之基準仍有效)
                     await mustWrite(`${tag} 舊審計欄之外部列＋後台列編修`, kt, patch(snapOld, BO[kt], { description: 'audit-edit' }), withBaseline ? { baseline: baselineOf(kt, snapOld) } : undefined)
@@ -1054,7 +1108,8 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
 
         it('EX-015 srLog: 外部列守門與基準之拒絕各記 err key 與原因(只記鍵、原因、筆數、來源名稱; 不記列主鍵／名稱／email／欄位值)', async function() {
             await freshState()
-            let secrets = ['id-ex-u1', 'exU1', 'ex-u1@ext.example.com', 'LOGSECRET-VALUE', 'lg1@new.example.com', 'n-lg1']
+            //perm-run03: 列識別有兩種(內部 id 由伺服端產生、來源鍵 srcKey), 兩者皆不得入 log
+            let secrets = [FX.users[0].srcKey, ext('users', 0), 'exU1', 'ex-u1@ext.example.com', 'LOGSECRET-VALUE', 'lg1@new.example.com', 'n-lg1']
             let rows = await rowsOf('users')
             let u1 = ext('users', 0)
             let isEv = (ev, reason) => (l) => l.event === ev && l.reason === reason
@@ -1094,26 +1149,29 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
 
         // ---------- 外部同步 ----------
 
-        it('EX-020 外部同步 users: payload 缺 cgrups 鍵→保留庫內值(含後台已指派者; 依 id 對應; 名稱等其他欄位以外部為準); 帶鍵(含空字串)→以外部為準; 新使用者缺鍵→\'\'', async function() {
+        it('EX-020 外部同步 users: payload 缺 cgrups 鍵→保留庫內值(含後台已指派者; 依 srcKey 配對; 名稱等其他欄位以外部為準); 帶鍵(含空字串)→以外部為準; 新使用者缺鍵→\'\'', async function() {
             await freshState()
             const F2 = 'appKeep'
             const V = AV.users
-            let u = (id, name, o = {}) => ({ id, order: 0, name, email: `${id}@keep.example.com`, description: 'keep', isAdmin: 'n', isActive: 'y', ...o })
+            let u = (srcKey, name, o = {}) => ({ srcKey, order: 0, name, email: `${srcKey}@keep.example.com`, description: 'keep', isAdmin: 'n', isActive: 'y', ...o })
+            let idOf = (srcKey) => rid('users', srcKey, F2) //外部使用者之內部 id(伺服端產生), 經 mustSync 登錄
             //預置: 兩位外部使用者(cgrups '{}'), 由後台以正確基準指派 V0／V1; 後台列(from '')與他分區外部列(F)不應受影響
-            await mustSync('users', { from: F2, rows: [u('id-kp-1', 'kp1', { cgrups: '{}' }), u('id-kp-2', 'kp2', { cgrups: '{}' })] })
+            await mustSync('users', { from: F2, rows: [u('sk-kp-1', 'kp1', { cgrups: '{}' }), u('sk-kp-2', 'kp2', { cgrups: '{}' })] })
             let rows = await rowsOf('users')
-            await mustWrite('後台指派 cgrups', 'users', patch(patch(rows, 'id-kp-1', { cgrups: V[0] }), 'id-kp-2', { cgrups: V[1] }), { baseline: baselineOf('users', rows) })
-            A.equal((await rowOf('users', 'id-kp-1')).cgrups, V[0], '前提: 後台已指派')
+            await mustWrite('後台指派 cgrups', 'users', patch(patch(rows, idOf('sk-kp-1'), { cgrups: V[0] }), idOf('sk-kp-2'), { cgrups: V[1] }), { baseline: baselineOf('users', rows) })
+            A.equal((await rowOf('users', idOf('sk-kp-1'))).cgrups, V[0], '前提: 後台已指派')
             let othersBefore = JSON.stringify((await selectAll('users')).filter((r) => r.from !== F2).sort(byId))
 
-            //(1) 再同步一次且不帶 cgrups 鍵(含改名)＋新使用者缺鍵 → 保留庫內值; 新使用者為 ''
+            //(1) 再同步一次且不帶 cgrups 鍵(含改名)＋新使用者缺鍵 → 保留庫內值(同 srcKey 配對, id 不變); 新使用者為 ''
+            let id1 = idOf('sk-kp-1')
             let mark = await markSrLog()
-            await mustSync('users', { from: F2, rows: [u('id-kp-1', 'kp1-renamed'), u('id-kp-2', 'kp2'), u('id-kp-3', 'kp3')] })
-            let got = Object.fromEntries((await extOf('users', F2)).map((r) => [r.id, r]))
-            A.equal(got['id-kp-1'].cgrups, V[0], '(1) id-kp-1 缺鍵→保留 V0')
-            A.equal(got['id-kp-1'].name, 'kp1-renamed', '(1) 其他欄位以外部為準')
-            A.equal(got['id-kp-2'].cgrups, V[1], '(1) id-kp-2 缺鍵→保留 V1')
-            A.equal(got['id-kp-3'].cgrups, '', '(1) 新使用者缺鍵→\'\'')
+            await mustSync('users', { from: F2, rows: [u('sk-kp-1', 'kp1-renamed'), u('sk-kp-2', 'kp2'), u('sk-kp-3', 'kp3')] })
+            let got = Object.fromEntries((await extOf('users', F2)).map((r) => [r.srcKey, r]))
+            A.equal(got['sk-kp-1'].id, id1, '(1) 同 srcKey 修改, 內部 id 不變')
+            A.equal(got['sk-kp-1'].cgrups, V[0], '(1) sk-kp-1 缺鍵→保留 V0')
+            A.equal(got['sk-kp-1'].name, 'kp1-renamed', '(1) 其他欄位以外部為準')
+            A.equal(got['sk-kp-2'].cgrups, V[1], '(1) sk-kp-2 缺鍵→保留 V1')
+            A.equal(got['sk-kp-3'].cgrups, '', '(1) 新使用者缺鍵→\'\'')
             A.equal(JSON.stringify((await selectAll('users')).filter((r) => r.from !== F2).sort(byId)), othersBefore, '(1) 他分區(後台列、F 外部列)逐位元不變')
             let lines = await waitLines(mark, (l) => l.event === 'syncAndReplaceTabs-keepAssign', 'keepAssign log')
             let ka = lines.find((l) => l.event === 'syncAndReplaceTabs-keepAssign')
@@ -1121,22 +1179,22 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
             A.ok(!ka._raw.includes('kp1') && !ka._raw.includes('@keep.example.com') && !ka._raw.includes(V[0]), '(1) keepAssign log 不得含使用者名稱／email／授權值')
 
             //(2) 帶 cgrups 鍵 → 以外部為準(含空字串、含 '{}'、含新值); 同批混合(kp-1 缺鍵、kp-2 帶鍵)
-            await mustSync('users', { from: F2, rows: [u('id-kp-1', 'kp1-renamed'), u('id-kp-2', 'kp2', { cgrups: '' }), u('id-kp-3', 'kp3', { cgrups: V[2] })] })
-            got = Object.fromEntries((await extOf('users', F2)).map((r) => [r.id, r]))
-            A.equal(got['id-kp-1'].cgrups, V[0], '(2) 同批缺鍵者仍保留 V0')
-            A.equal(got['id-kp-2'].cgrups, '', '(2) 帶鍵(空字串)→以外部為準')
-            A.equal(got['id-kp-3'].cgrups, V[2], '(2) 帶鍵(新值)→以外部為準')
-            await mustSync('users', { from: F2, rows: [u('id-kp-1', 'kp1-renamed', { cgrups: '{}' })] })
-            A.equal((await rowOf('users', 'id-kp-1')).cgrups, '{}', '(2) 帶鍵(\'{}\')→以外部為準')
+            await mustSync('users', { from: F2, rows: [u('sk-kp-1', 'kp1-renamed'), u('sk-kp-2', 'kp2', { cgrups: '' }), u('sk-kp-3', 'kp3', { cgrups: V[2] })] })
+            got = Object.fromEntries((await extOf('users', F2)).map((r) => [r.srcKey, r]))
+            A.equal(got['sk-kp-1'].cgrups, V[0], '(2) 同批缺鍵者仍保留 V0')
+            A.equal(got['sk-kp-2'].cgrups, '', '(2) 帶鍵(空字串)→以外部為準')
+            A.equal(got['sk-kp-3'].cgrups, V[2], '(2) 帶鍵(新值)→以外部為準')
+            await mustSync('users', { from: F2, rows: [u('sk-kp-1', 'kp1-renamed', { cgrups: '{}' })] })
+            A.equal((await rowOf('users', id1)).cgrups, '{}', '(2) 帶鍵(\'{}\')→以外部為準')
 
-            //(3) 以 id 對應: 缺鍵但 id 改變(無法對應)→ \'\'(視為新使用者)
-            await mustWrite('後台再指派', 'users', patch(await rowsOf('users'), 'id-kp-1', { cgrups: V[0] }), { baseline: baselineOf('users', await rowsOf('users')) })
-            await mustSync('users', { from: F2, rows: [u('id-kp-1x', 'kp1-renamed')] })
-            A.equal((await rowOf('users', 'id-kp-1x')).cgrups, '', '(3) 缺鍵且 id 無法對應(預設 mappingBy=id, 不依 email)→\'\'')
-            A.equal(await rowOf('users', 'id-kp-1'), undefined, '(3) 舊 id 已隨分區取代移除')
+            //(3) 以 srcKey 配對: 缺鍵但 srcKey 改變(無法配對)→ ''(視為新使用者; 舊列依差異同步刪除, 不依 email／名稱繼承指派)
+            await mustWrite('後台再指派', 'users', patch(await rowsOf('users'), id1, { cgrups: V[0] }), { baseline: baselineOf('users', await rowsOf('users')) })
+            await mustSync('users', { from: F2, rows: [u('sk-kp-1x', 'kp1-renamed')] })
+            A.equal((await rowOf('users', idOf('sk-kp-1x'))).cgrups, '', '(3) 缺鍵且 srcKey 無法配對(預設 mappingBy=id, 不依 email)→\'\'')
+            A.equal(await rowOf('users', id1), undefined, '(3) 舊列(舊 srcKey)已隨差異同步刪除')
         })
 
-        it('EX-021 外部同步 grups／pemis 缺 cpemis／crules 鍵 → 保留庫內值(比照 users.cgrups; 實體身分依 id; 其他欄位以外部為準); 含鍵(含空字串)以外部為準; 新實體缺鍵為 \'\'; 他分區不變; info log 只記表名／來源／欄位／筆數', async function() {
+        it('EX-021 外部同步 grups／pemis 缺 cpemis／crules 鍵 → 保留庫內值(比照 users.cgrups; 實體身分依 srcKey; 其他欄位以外部為準); 含鍵(含空字串)以外部為準; 新實體缺鍵為 \'\'; 他分區不變; info log 只記表名／來源／欄位／筆數', async function() {
             await freshState()
             for (let kt of ['grups', 'pemis']) {
                 let af = T[kt].assign
@@ -1147,52 +1205,60 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 let othersBefore = JSON.stringify((await selectAll(kt)).filter((r) => r.from !== F).sort(byId))
                 let noKey = (x) => omit(x, [af])
                 let fx = clone(FX[kt])
-                let idNew = `id-ex-keep-${kt}`
+                let srcNew = `sk-ex-keep-${kt}`
+                let id0 = ext(kt, 0)
 
-                //(1) 缺鍵: 兩既有實體(第一列同批改描述)＋新實體 → 既有者保留、其他欄位以外部為準; 新實體為 ''
+                //(1) 缺鍵: 兩既有實體(第一列同批改描述)＋新實體 → 既有者保留(同 srcKey 配對, id 不變)、其他欄位以外部為準; 新實體為 ''
                 let mark = await markSrLog()
-                await mustSync(kt, { from: F, rows: [noKey({ ...fx[0], description: 'ext-desc-changed' }), noKey(fx[1]), noKey({ id: idNew, order: 90, name: `exNew-${kt}`, description: 'new' })] })
-                let got = Object.fromEntries((await extOf(kt)).map((r) => [r.id, r]))
-                A.equal(got[ext(kt, 0)][af], AV[kt][0], `(1) ${kt} 缺 ${af} 鍵 → 保留後台指派 0`)
-                A.equal(got[ext(kt, 0)].description, 'ext-desc-changed', `(1) ${kt} 其他欄位以外部為準`)
-                A.equal(got[ext(kt, 1)][af], AV[kt][1], `(1) ${kt} 缺鍵 → 保留後台指派 1`)
-                A.equal(got[idNew][af], '', `(1) ${kt} 新實體缺鍵 → ''`)
+                await mustSync(kt, { from: F, rows: [noKey({ ...fx[0], description: 'ext-desc-changed' }), noKey(fx[1]), noKey({ srcKey: srcNew, order: 90, name: `exNew-${kt}`, description: 'new' })] })
+                let got = Object.fromEntries((await extOf(kt)).map((r) => [r.srcKey, r]))
+                A.equal(got[fx[0].srcKey].id, id0, `(1) ${kt} 同 srcKey 修改, 內部 id 不變`)
+                A.equal(got[fx[0].srcKey][af], AV[kt][0], `(1) ${kt} 缺 ${af} 鍵 → 保留後台指派 0`)
+                A.equal(got[fx[0].srcKey].description, 'ext-desc-changed', `(1) ${kt} 其他欄位以外部為準`)
+                A.equal(got[fx[1].srcKey][af], AV[kt][1], `(1) ${kt} 缺鍵 → 保留後台指派 1`)
+                A.equal(got[srcNew][af], '', `(1) ${kt} 新實體缺鍵 → ''`)
                 A.equal(JSON.stringify((await selectAll(kt)).filter((r) => r.from !== F).sort(byId)), othersBefore, `(1) ${kt} 他分區(後台列)逐位元不變`)
                 let lines = await waitLines(mark, (l) => l.event === 'syncAndReplaceTabs-keepAssign' && l.keyTable === kt, `${kt} keepAssign log`)
                 let ka = lines.find((l) => l.event === 'syncAndReplaceTabs-keepAssign' && l.keyTable === kt)
                 A.deepEqual({ keyTable: ka.keyTable, from: ka.from, field: ka.field, n: ka.n }, { keyTable: kt, from: F, field: af, n: 2 }, `(1) ${kt} keepAssign log 只記表名／來源／欄位／筆數(實得 ${ka._raw})`)
-                noLeakLine(ka, [fx[0].id, fx[0].name, 'ext-desc-changed', AV[kt][0], AV[kt][1]], `(1) ${kt} keepAssign log(列主鍵／名稱／描述／授權值)`)
+                noLeakLine(ka, [fx[0].srcKey, id0, fx[0].name, 'ext-desc-changed', AV[kt][0], AV[kt][1]], `(1) ${kt} keepAssign log(列主鍵／來源鍵／名稱／描述／授權值)`)
                 A.ok(!lines.some((l) => l.event === 'syncAndReplaceTabs-keepAssign-skip' && l.keyTable === kt), `(1) ${kt} 全數保留成功, 不得有 keepAssign-skip warn`)
 
                 //(2) 含鍵 → 以外部為準(空字串／新值), 同批缺鍵者仍保留
-                await mustSync(kt, { from: F, rows: [{ ...fx[0], [af]: '' }, noKey(fx[1]), { id: idNew, order: 90, name: `exNew-${kt}`, description: 'new', [af]: AV[kt][2] }] })
-                got = Object.fromEntries((await extOf(kt)).map((r) => [r.id, r]))
-                A.equal(got[ext(kt, 0)][af], '', `(2) ${kt} 含鍵(空字串) → 以外部為準`)
-                A.equal(got[ext(kt, 1)][af], AV[kt][1], `(2) ${kt} 同批缺鍵者仍保留`)
-                A.equal(got[idNew][af], AV[kt][2], `(2) ${kt} 含鍵(新值) → 以外部為準`)
+                await mustSync(kt, { from: F, rows: [{ ...fx[0], [af]: '' }, noKey(fx[1]), { srcKey: srcNew, order: 90, name: `exNew-${kt}`, description: 'new', [af]: AV[kt][2] }] })
+                got = Object.fromEntries((await extOf(kt)).map((r) => [r.srcKey, r]))
+                A.equal(got[fx[0].srcKey][af], '', `(2) ${kt} 含鍵(空字串) → 以外部為準`)
+                A.equal(got[fx[1].srcKey][af], AV[kt][1], `(2) ${kt} 同批缺鍵者仍保留`)
+                A.equal(got[srcNew][af], AV[kt][2], `(2) ${kt} 含鍵(新值) → 以外部為準`)
 
-                //(3) id 對不到(換 id → 視為新實體)缺鍵 → ''
-                await mustSync(kt, { from: F, rows: [noKey({ ...fx[1], id: `${fx[1].id}-x` })] })
-                A.equal((await extOf(kt))[0][af], '', `(3) ${kt} 缺鍵但 id 對不到 → ''`)
+                //(3) srcKey 對不到(換 srcKey → 視為新實體; 舊列依差異同步刪除)缺鍵 → ''
+                await mustSync(kt, { from: F, rows: [noKey({ ...fx[1], srcKey: `${fx[1].srcKey}-x` })] })
+                A.equal((await extOf(kt))[0][af], '', `(3) ${kt} 缺鍵但 srcKey 對不到 → ''`)
             }
         })
 
-        it('EX-021b 外部同步 grups／pemis 缺鍵且無 id 之列: 依名稱對應庫內同 from 恰 1 筆 → 保留(寫入時 ORM 補隨機主鍵, 主鍵會變); 名稱對不到 → \'\'', async function() {
+        //perm-run03: 原 EX-021b『缺鍵且無 id 之列依名稱對應庫內同 from 恰 1 筆 → 保留』已不存在——外部不再送 id(送 id 整批 idNotAllowed, 見 api-syncAndReplaceTabs API-sync-030), 身分只有 srcKey, 不依名稱對應;
+        //  對應之新規則: 同名而 srcKey 不同＝刪舊增新＝新實體, 缺鍵 → ''(不依名稱繼承舊列之後台指派; 原則 6 新實體不繼承), 舊列被刪; 同 srcKey 者照常保留
+        it('EX-021b 外部同步 grups／pemis 同名異 srcKey(來源鍵重編)且缺鍵: 視為新實體 → \'\'(不依名稱繼承舊列之後台指派), 舊列(舊 srcKey)被刪; 同 srcKey 之另一列缺鍵 → 保留', async function() {
             await freshState()
             for (let kt of ['grups', 'pemis']) {
                 let af = T[kt].assign
                 let rows = await rowsOf(kt)
                 await mustWrite(`${kt} 後台指派`, kt, patch(rows, ext(kt, 0), { [af]: AV[kt][0] }), { baseline: baselineOf(kt, rows) })
-                await mustSync(kt, { from: F, rows: [{ order: 70, name: FX[kt][0].name, description: 'idless' }, { order: 80, name: FX[kt][1].name, description: 'idless' }, { order: 90, name: `exIdless-${kt}`, description: 'idless' }] })
-                let got = Object.fromEntries((await extOf(kt)).map((r) => [r.name, r]))
-                A.notEqual(got[FX[kt][0].name].id, ext(kt, 0), `${kt} 前提: 無 id 之列由 ORM 補隨機主鍵(確實走無 id 路徑)`)
-                A.equal(got[FX[kt][0].name][af], AV[kt][0], `${kt} 無 id、名稱對到 1 筆 → 保留後台指派`)
-                A.equal(got[FX[kt][1].name][af], FX[kt][1][af], `${kt} 無 id、名稱對到 1 筆, 庫內為夾具原值 → 保留原值`)
-                A.equal(got[`exIdless-${kt}`][af], '', `${kt} 無 id、名稱對不到 → ''`)
+                let oldId = ext(kt, 0)
+                let srcRenum = `sk-ex-renum-${kt}`
+                await mustSync(kt, { from: F, rows: [omit({ ...FX[kt][0], srcKey: srcRenum }, [af]), omit(FX[kt][1], [af])] })
+                let got = Object.fromEntries((await extOf(kt)).map((r) => [r.srcKey, r]))
+                A.deepEqual(Object.keys(got).sort(), [srcRenum, FX[kt][1].srcKey].sort(), `${kt} 舊 srcKey 之列已刪、新 srcKey 之列已增`)
+                A.equal(await rowOf(kt, oldId), undefined, `${kt} 舊列(舊 srcKey)已刪除`)
+                A.notEqual(got[srcRenum].id, oldId, `${kt} 同名異 srcKey 之列為新實體(新 id)`)
+                A.equal(got[srcRenum].name, FX[kt][0].name, `${kt} 名稱沿用`)
+                A.equal(got[srcRenum][af], '', `${kt} 同名異 srcKey、缺鍵 → '' (不依名稱繼承舊列之後台指派)`)
+                A.equal(got[FX[kt][1].srcKey][af], FX[kt][1][af], `${kt} 同 srcKey 之另一列缺鍵 → 保留庫內值(夾具原值)`)
             }
         })
 
-        it('EX-021c 外部同步 grups／pemis 同 id 改名且缺鍵(cascadeRename 預設 true): 保留(同一實體), 且引用它的後台使用者／群組之引用同時被級聯改寫為新名(保留的指派與引用一起跟著走, 授權仍連到同一實體)', async function() {
+        it('EX-021c 外部同步 grups／pemis 同 srcKey 改名且缺鍵(cascadeRename 預設 true): 保留(同一實體, id 不變), 且引用它的後台使用者／群組之引用同時被級聯改寫為新名(保留的指派與引用一起跟著走, 授權仍連到同一實體)', async function() {
             await freshState()
             //引用端: grups 被後台使用者(BO.users)的 cgrups 引用; pemis 被後台群組(BO.grups)的 cpemis 引用
             const HOLD = { grups: { kt: 'users', id: BO.users, field: 'cgrups' }, pemis: { kt: 'grups', id: BO.grups, field: 'cpemis' } }
@@ -1209,67 +1275,68 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 await mustSync(kt, { from: F, rows: [omit({ ...FX[kt][0], name: `${oldName}-renamed` }, [af]), omit(FX[kt][1], [af])] })
                 let g = await rowOf(kt, ext(kt, 0))
                 A.equal(g.name, `${oldName}-renamed`, `${kt} 改名以外部為準`)
-                A.equal(g[af], AV[kt][0], `${kt} 同 id 改名缺鍵 → 保留後台指派`)
+                A.equal(g[af], AV[kt][0], `${kt} 同 srcKey 改名缺鍵 → 保留後台指派`)
                 A.deepEqual(Object.keys(JSON.parse((await rowOf(h.kt, h.id))[h.field])), [`${oldName}-renamed`], `${kt} 引用端之引用已級聯改寫為新名(保留的指派與引用一起跟著走)`)
                 let lines = await waitLines(mark, (l) => l.event === 'syncAndReplaceTabs-keepAssign' && l.keyTable === kt, `${kt} keepAssign log`)
                 A.ok(!lines.some((l) => l.event === 'syncAndReplaceTabs-keepAssign-skip' && l.keyTable === kt), `${kt} 保留成功, 不得有 keepAssign-skip warn`)
             }
         })
 
-        it('EX-022 外部同步 grups／pemis 同一 from 同批同名異 id: srLog warn syncAndReplaceTabs-idRenumber(只含表名、來源、筆數; 不含名稱／id)、getWebInfor.syncWarns 登錄; 之後同步已無此情形即清除(兩表各自登錄、互不影響)', async function() {
+        //perm-run03: 原『同名異 id』之 id 重編偵測，判定口徑隨差異同步改為『同名異 srcKey』(疑似外部來源鍵重編: 如目錄重建後 GUID 全換 → 每列等於刪舊增新、引用每次被清、後台指派被抹掉); 事件名 syncAndReplaceTabs-idRenumber → syncAndReplaceTabs-srcKeyRenumber
+        it('EX-022 外部同步 grups／pemis 同一 from 同批同名異 srcKey: srLog warn syncAndReplaceTabs-srcKeyRenumber(只含表名、來源、筆數; 不含名稱／srcKey)、getWebInfor.syncWarns 登錄; 之後同步已無此情形即清除(兩表各自登錄、互不影響)', async function() {
             await freshState()
             const F3 = 'appRenum'
-            let mk = (kt, id, name) => (kt === 'grups' ? { id, order: 0, name, description: 'rn', cpemis: '{}' } : { id, order: 0, name, description: 'rn', crules: '{}' })
+            let mk = (kt, srcKey, name) => (kt === 'grups' ? { srcKey, order: 0, name, description: 'rn', cpemis: '{}' } : { srcKey, order: 0, name, description: 'rn', crules: '{}' })
             for (let kt of ['grups', 'pemis']) {
-                await mustSync(kt, { from: F3, rows: [mk(kt, `id-rn-${kt}-1`, `rnA-${kt}`), mk(kt, `id-rn-${kt}-2`, `rnB-${kt}`)] })
+                await mustSync(kt, { from: F3, rows: [mk(kt, `sk-rn-${kt}-1`, `rnA-${kt}`), mk(kt, `sk-rn-${kt}-2`, `rnB-${kt}`)] })
             }
-            A.deepEqual((await getInfor()).syncWarns, [], '前提: 首次同步(庫內無同名異 id)不登錄')
+            A.deepEqual((await getInfor()).syncWarns, [], '前提: 首次同步(庫內無同名異 srcKey)不登錄')
 
-            //grups 發生 id 重編: 同名 rnA 換新 id、舊 id 不在本批
+            //grups 發生 srcKey 重編: 同名 rnA 換新 srcKey、舊 srcKey 不在本批
             let mark = await markSrLog()
-            await mustSync('grups', { from: F3, rows: [mk('grups', 'id-rn-grups-3', 'rnA-grups'), mk('grups', 'id-rn-grups-2', 'rnB-grups')] })
+            await mustSync('grups', { from: F3, rows: [mk('grups', 'sk-rn-grups-3', 'rnA-grups'), mk('grups', 'sk-rn-grups-2', 'rnB-grups')] })
             let warns = (await getInfor()).syncWarns
             A.equal(warns.length, 1, `grups 重編後應登錄 1 筆，實得 ${JSON.stringify(warns)}`)
             A.deepEqual({ keyTable: warns[0].keyTable, from: warns[0].from, n: warns[0].n }, { keyTable: 'grups', from: F3, n: 1 }, '登錄之表名／來源／筆數')
             A.ok(typeof warns[0].time === 'string' && !Number.isNaN(Date.parse(warns[0].time)), `登錄之 time 應為可解析之時間字串，實得 ${warns[0].time}`)
             A.deepEqual(Object.keys(warns[0]).sort(), ['from', 'keyTable', 'n', 'time'], '登錄只含表名、來源、筆數、時間(不含個資)')
-            let lines = await waitLines(mark, (l) => l.event === 'syncAndReplaceTabs-idRenumber', 'idRenumber log')
-            let w = lines.filter((l) => l.event === 'syncAndReplaceTabs-idRenumber')
+            let lines = await waitLines(mark, (l) => l.event === 'syncAndReplaceTabs-srcKeyRenumber', 'srcKeyRenumber log')
+            let w = lines.filter((l) => l.event === 'syncAndReplaceTabs-srcKeyRenumber')
             A.equal(w.length, 1, '應記 1 筆 warn')
             A.equal(w[0].level, 40, '事件層級應為 warn(40)')
             A.deepEqual({ keyTable: w[0].keyTable, from: w[0].from, n: w[0].n }, { keyTable: 'grups', from: F3, n: 1 }, 'warn log 之表名／來源／筆數')
-            for (let s of ['rnA', 'rnB', 'id-rn-']) {
-                A.ok(!w[0]._raw.includes(s), `warn log 不得含名稱／id 值「${s}」: ${w[0]._raw}`)
+            for (let s of ['rnA', 'rnB', 'sk-rn-']) {
+                A.ok(!w[0]._raw.includes(s), `warn log 不得含名稱／srcKey 值「${s}」: ${w[0]._raw}`)
             }
 
             //pemis 亦發生: 兩表各一筆登錄
-            await mustSync('pemis', { from: F3, rows: [mk('pemis', 'id-rn-pemis-3', 'rnA-pemis'), mk('pemis', 'id-rn-pemis-2', 'rnB-pemis')] })
+            await mustSync('pemis', { from: F3, rows: [mk('pemis', 'sk-rn-pemis-3', 'rnA-pemis'), mk('pemis', 'sk-rn-pemis-2', 'rnB-pemis')] })
             warns = (await getInfor()).syncWarns
             A.deepEqual(warns.map((x) => `${x.keyTable}:${x.from}:${x.n}`).sort(), [`grups:${F3}:1`, `pemis:${F3}:1`], 'grups 與 pemis 各登錄 1 筆')
 
-            //下一次 grups 同步已無此情形(同 id 同名重送) → 清除 grups 之登錄, pemis 之登錄仍在
-            await mustSync('grups', { from: F3, rows: [mk('grups', 'id-rn-grups-3', 'rnA-grups'), mk('grups', 'id-rn-grups-2', 'rnB-grups')] })
+            //下一次 grups 同步已無此情形(同 srcKey 同名重送) → 清除 grups 之登錄, pemis 之登錄仍在
+            await mustSync('grups', { from: F3, rows: [mk('grups', 'sk-rn-grups-3', 'rnA-grups'), mk('grups', 'sk-rn-grups-2', 'rnB-grups')] })
             warns = (await getInfor()).syncWarns
             A.deepEqual(warns.map((x) => `${x.keyTable}:${x.from}:${x.n}`), [`pemis:${F3}:1`], 'grups 之登錄應被清除, pemis 之登錄仍在')
-            await mustSync('pemis', { from: F3, rows: [mk('pemis', 'id-rn-pemis-3', 'rnA-pemis'), mk('pemis', 'id-rn-pemis-2', 'rnB-pemis')] })
+            await mustSync('pemis', { from: F3, rows: [mk('pemis', 'sk-rn-pemis-3', 'rnA-pemis'), mk('pemis', 'sk-rn-pemis-2', 'rnB-pemis')] })
             A.deepEqual((await getInfor()).syncWarns, [], '兩表皆已無此情形後 syncWarns 應為空')
         })
 
-        it('EX-023 外部同步 grups 不屬同名異 id 之情形不登錄: 同 id 改名、新增新名新 id、只刪除、users／targets 同步', async function() {
+        it('EX-023 外部同步 grups 不屬同名異 srcKey 之情形不登錄: 同 srcKey 改名、新增新名新 srcKey、只刪除、users／targets 同步', async function() {
             await freshState()
             const F4 = 'appRenum2'
-            let g = (id, name) => ({ id, order: 0, name, description: 'rn', cpemis: '{}' })
-            await mustSync('grups', { from: F4, rows: [g('id-r2-1', 'r2A'), g('id-r2-2', 'r2B')] })
-            await mustSync('grups', { from: F4, rows: [g('id-r2-1', 'r2A-renamed'), g('id-r2-2', 'r2B')] }) //同 id 改名
-            A.deepEqual((await getInfor()).syncWarns, [], '同 id 改名不登錄')
-            await mustSync('grups', { from: F4, rows: [g('id-r2-1', 'r2A-renamed'), g('id-r2-3', 'r2C')] }) //id-r2-2 被刪、新名新 id
-            A.deepEqual((await getInfor()).syncWarns, [], '刪除舊列＋新增新名新 id 不登錄(名稱不同)')
-            await mustSync('grups', { from: F4, rows: [g('id-r2-1', 'r2A-renamed')] }) //只刪除
+            let g = (srcKey, name) => ({ srcKey, order: 0, name, description: 'rn', cpemis: '{}' })
+            await mustSync('grups', { from: F4, rows: [g('sk-r2-1', 'r2A'), g('sk-r2-2', 'r2B')] })
+            await mustSync('grups', { from: F4, rows: [g('sk-r2-1', 'r2A-renamed'), g('sk-r2-2', 'r2B')] }) //同 srcKey 改名
+            A.deepEqual((await getInfor()).syncWarns, [], '同 srcKey 改名不登錄')
+            await mustSync('grups', { from: F4, rows: [g('sk-r2-1', 'r2A-renamed'), g('sk-r2-3', 'r2C')] }) //sk-r2-2 被刪、新名新 srcKey
+            A.deepEqual((await getInfor()).syncWarns, [], '刪除舊列＋新增新名新 srcKey 不登錄(名稱不同)')
+            await mustSync('grups', { from: F4, rows: [g('sk-r2-1', 'r2A-renamed')] }) //只刪除
             A.deepEqual((await getInfor()).syncWarns, [], '只刪除不登錄')
-            //users／targets 同步(同名異 id 不適用)
-            await mustSync('users', { from: F4, rows: [{ id: 'id-r2-u1', order: 0, name: 'same', email: 'r2u1@e.com', cgrups: '{}', isAdmin: 'n', isActive: 'y' }] })
-            await mustSync('users', { from: F4, rows: [{ id: 'id-r2-u2', order: 0, name: 'same', email: 'r2u2@e.com', cgrups: '{}', isAdmin: 'n', isActive: 'y' }] })
-            A.deepEqual((await getInfor()).syncWarns, [], 'users 之 name 可重複, 同名異 id 不登錄')
+            //users／targets 同步(同名異 srcKey 不適用)
+            await mustSync('users', { from: F4, rows: [{ srcKey: 'sk-r2-u1', order: 0, name: 'same', email: 'r2u1@e.com', cgrups: '{}', isAdmin: 'n', isActive: 'y' }] })
+            await mustSync('users', { from: F4, rows: [{ srcKey: 'sk-r2-u2', order: 0, name: 'same', email: 'r2u2@e.com', cgrups: '{}', isAdmin: 'n', isActive: 'y' }] })
+            A.deepEqual((await getInfor()).syncWarns, [], 'users 之 name 可重複, 同名異 srcKey 不登錄')
         })
 
     })
@@ -1288,41 +1355,54 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
             await restartBackend('./settings.json')
         })
 
-        it('EX-030 缺 cgrups 鍵且無 id: 依 email 對應庫內同 from 恰 1 筆者→保留; 對不到(新 email)→\'\'; 對到 2 筆(同 email 之啟用與停用列)→不保留(\'\'); 有 id 者依 id', async function() {
+        //perm-run03: 原 EX-030『缺 cgrups 鍵且無 id: 依 email 對應庫內同 from 恰 1 筆 → 保留; 有 id 但 email(對應鍵)已變 → 不保留並記 mapKeyConflict warn; 同 email 命中 2 筆 → 不保留』隨『外部不再送 id』而改為依 srcKey 認列:
+        //  無 id 路徑(依 email 對到舊列)不復存在; 但『對應鍵(email)被改 → 不保留並記 warn』之收嚴保留(外審 sol#1: 登入以 email 找使用者, 保留指派會使新 email 之持有者取得原擁有者之授權——換主移轉)——
+        //  mappingBy=email 下: 同 srcKey 同 email 缺鍵 → 保留; 同 srcKey 但 email 被外部改變 → ''(不保留並記 keepAssign-skip warn, reason identityConflict); 新 srcKey(含沿用舊列 email 者)→ ''(不依 email 繼承), 舊列刪除
+        it('EX-030 缺 cgrups 鍵(mappingBy=email): 身分依 srcKey 配對, 不依 email——同 srcKey 同 email 缺鍵→保留; 同 srcKey 但 email(登入對應鍵)被外部改變→\'\'並記 keepAssign-skip warn; 新 srcKey(含沿用舊列 email 者)→\'\'; 舊列(含同 email 之啟用與停用列)依差異同步刪除', async function() {
             await freshState()
             const F2 = 'appKeepE'
             const V = AV.users
             let u = (o) => ({ order: 0, description: 'ke', isAdmin: 'n', isActive: 'y', ...o })
             await mustSync('users', { from: F2, rows: [
-                u({ id: 'id-ke-1', name: 'ke1', email: 'ke1@keep.example.com', cgrups: '{}' }),
-                u({ id: 'id-ke-2', name: 'ke2', email: 'ke2@keep.example.com', cgrups: '{}' }),
-                u({ id: 'id-ke-3', name: 'ke3a', email: 'ke3@keep.example.com', cgrups: '{}' }), //與 ke-4 同 email: 一啟用一停用
-                u({ id: 'id-ke-4', name: 'ke3b', email: 'ke3@keep.example.com', cgrups: '{}', isActive: 'n' }),
+                u({ srcKey: 'sk-ke-1', name: 'ke1', email: 'ke1@keep.example.com', cgrups: '{}' }),
+                u({ srcKey: 'sk-ke-2', name: 'ke2', email: 'ke2@keep.example.com', cgrups: '{}' }),
+                u({ srcKey: 'sk-ke-3', name: 'ke3a', email: 'ke3@keep.example.com', cgrups: '{}' }), //與 ke-4 同 email: 一啟用一停用
+                u({ srcKey: 'sk-ke-4', name: 'ke3b', email: 'ke3@keep.example.com', cgrups: '{}', isActive: 'n' }),
             ] })
+            let idOf = (srcKey) => rid('users', srcKey, F2)
             let rows = await rowsOf('users')
-            await mustWrite('後台指派', 'users', patch(patch(patch(rows, 'id-ke-1', { cgrups: V[0] }), 'id-ke-2', { cgrups: V[1] }), 'id-ke-3', { cgrups: V[2] }), { baseline: baselineOf('users', rows) })
+            await mustWrite('後台指派', 'users', patch(patch(patch(rows, idOf('sk-ke-1'), { cgrups: V[0] }), idOf('sk-ke-2'), { cgrups: V[1] }), idOf('sk-ke-3'), { cgrups: V[2] }), { baseline: baselineOf('users', rows) })
+            let id1 = idOf('sk-ke-1')
+            let id2 = idOf('sk-ke-2')
 
-            //無 id、缺 cgrups 鍵: ke1(對到 1 筆→保留)、新 email(→'')、ke3(對到 2 筆→不保留); ke2 帶 id 依 id(保留)
+            //全部缺 cgrups 鍵: ke1(同 srcKey 同 email→保留, 內容全同＝nSame)、ke2(同 srcKey、email 被外部改→不保留='', 計入修改)、新 srcKey 新 email(→'')、
+            //  新 srcKey 沿用舊 ke-3 之 email(→'', 不依 email 繼承 V2; 舊 ke-3／ke-4 不在批次而刪除)
             let mark = await markSrLog()
-            await mustSync('users', { from: F2, rows: [
-                u({ name: 'ke1-new', email: 'ke1@keep.example.com' }),
-                u({ id: 'id-ke-2', name: 'ke2', email: 'ke2-changed@keep.example.com' }),
-                u({ name: 'ke-new', email: 'ke-new@keep.example.com' }),
-                u({ name: 'ke3-new', email: 'ke3@keep.example.com' }),
+            let r = await mustSync('users', { from: F2, rows: [
+                u({ srcKey: 'sk-ke-1', name: 'ke1', email: 'ke1@keep.example.com' }),
+                u({ srcKey: 'sk-ke-2', name: 'ke2', email: 'ke2-changed@keep.example.com' }),
+                u({ srcKey: 'sk-ke-new', name: 'ke-new', email: 'ke-new@keep.example.com' }),
+                u({ srcKey: 'sk-ke-5', name: 'ke3-new', email: 'ke3@keep.example.com' }),
             ] })
-            let got = await extOf('users', F2)
-            let by = (email) => got.find((r) => r.email === email)
-            A.equal(by('ke1@keep.example.com').cgrups, V[0], '無 id 依 email 恰命中 1 筆→保留')
-            A.equal(by('ke2-changed@keep.example.com').cgrups, '', '有 id 但 email(mappingBy 對應鍵)已變→不保留、清空(run07 外審 R3: id 指向的登入身分與對應鍵矛盾, 不自動移轉指派; 同一 id 對應鍵不變者依 id 保留見 mappingBy=id 各案)')
-            A.equal(by('ke-new@keep.example.com').cgrups, '', '新 email→\'\'')
-            A.equal(by('ke3@keep.example.com').cgrups, '', '同 email 命中 2 筆(啟用＋停用)→不保留(須恰命中 1 筆)')
+            A.deepEqual(r.msg, { nAdd: 2, nUpdate: 1, nDel: 2, nSame: 1 }, '計數: 新增 2(sk-ke-new、sk-ke-5)、修改 1(sk-ke-2 改 email)、刪除 2(舊 ke-3、ke-4)、不變 1(sk-ke-1)')
+            let got = Object.fromEntries((await extOf('users', F2)).map((x) => [x.srcKey, x]))
+            A.deepEqual(Object.keys(got).sort(), ['sk-ke-1', 'sk-ke-2', 'sk-ke-5', 'sk-ke-new'], '存續者為批次四列')
+            A.equal(got['sk-ke-1'].id, id1, 'sk-ke-1 內部 id 不變')
+            A.equal(got['sk-ke-1'].cgrups, V[0], '同 srcKey 缺鍵→保留')
+            A.equal(got['sk-ke-2'].id, id2, 'sk-ke-2 內部 id 不變')
+            A.equal(got['sk-ke-2'].cgrups, '', '同 srcKey、email(mappingBy 對應鍵)被外部改變、缺鍵→不保留(登入以 email 找使用者, 保留會使新 email 之持有者取得原擁有者之授權)')
+            A.equal(got['sk-ke-2'].email, 'ke2-changed@keep.example.com', 'email 以外部為準')
+            A.equal(got['sk-ke-new'].cgrups, '', '新 srcKey 新 email→\'\'')
+            A.equal(got['sk-ke-5'].cgrups, '', '新 srcKey 沿用舊列 email→\'\'(不依 email 繼承舊列之指派)')
 
-            //收嚴須附提示(run08 外審 sol #3): 對應鍵矛盾(ke2: id 指向之 email 已變)與命中多筆(ke3: 無從判定歸屬)各計 1, 合併記一筆 warn(只記表名／來源／欄位／筆數／原因, 不含 email)
+            //keepAssign info 記 n=1(ke1), keepAssign-skip warn 記 n=1 reason identityConflict(ke2; 收嚴須附提示), 皆不含個資值
             let lines = await waitLines(mark, (l) => l.event === 'syncAndReplaceTabs-keepAssign-skip', 'keepAssign-skip log')
-            let w = lines.filter((l) => l.event === 'syncAndReplaceTabs-keepAssign-skip')
-            A.equal(w.length, 1, '應記 1 筆 warn')
-            A.deepEqual({ level: w[0].level, keyTable: w[0].keyTable, from: w[0].from, field: w[0].field, n: w[0].n, reason: w[0].reason }, { level: 40, keyTable: 'users', from: F2, field: 'cgrups', n: 2, reason: 'mapKeyConflict' }, `warn 之層級／表名／來源／欄位／筆數／原因(實得 ${w[0]._raw})`)
-            noLeakLine(w[0], ['keep.example.com', 'ke1', 'ke2', 'ke3'], 'warn(email／名稱)')
+            let ka = lines.find((l) => l.event === 'syncAndReplaceTabs-keepAssign')
+            A.deepEqual({ keyTable: ka.keyTable, from: ka.from, field: ka.field, n: ka.n }, { keyTable: 'users', from: F2, field: 'cgrups', n: 1 }, `keepAssign log(實得 ${ka._raw})`)
+            let sk = lines.find((l) => l.event === 'syncAndReplaceTabs-keepAssign-skip')
+            A.deepEqual({ keyTable: sk.keyTable, from: sk.from, field: sk.field, n: sk.n, reason: sk.reason }, { keyTable: 'users', from: F2, field: 'cgrups', n: 1, reason: 'identityConflict' }, `keepAssign-skip log(實得 ${sk._raw})`)
+            noLeakLine(ka, ['keep.example.com', 'ke1', 'ke2', 'ke3'], 'keepAssign log(email／名稱)')
+            noLeakLine(sk, ['keep.example.com', 'ke1', 'ke2', 'ke3'], 'keepAssign-skip log(email／名稱)')
         })
 
     })
@@ -1341,30 +1421,36 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
             await restartBackend('./settings.json')
         })
 
-        it('EX-031 缺 cgrups 鍵且無 id: 依 name 對應庫內同 from 恰 1 筆者→保留; 新 name→\'\'; 對到 2 筆(同 name 之啟用與停用列)→不保留', async function() {
+        //perm-run03: 原 EX-031『缺鍵且無 id: 依 name 對應庫內同 from 恰 1 筆 → 保留; 對到 2 筆 → 不保留』隨外部不再送 id 而不復存在(理由見 EX-030); 改為對應之新規則——
+        //  mappingBy=name 下缺鍵保留之身分是 srcKey: 同 srcKey 同 name(email 非對應鍵, 被外部改變)→保留; 新 srcKey 沿用舊列 name→''(不依 name 繼承), 舊列刪除; 同 srcKey 但 name(對應鍵)被改→不保留(見 EX-030 同理與 unit-syncCore SC-K*)
+        it('EX-031 缺 cgrups 鍵(mappingBy=name): 身分依 srcKey 配對, 不依 name——同 srcKey 缺鍵→保留(email 以外部為準); 新 srcKey→\'\'; 新 srcKey 沿用舊列 name→\'\'(不依 name 繼承), 舊列(含同 name 之啟用與停用列)依差異同步刪除', async function() {
             await freshState()
             const F2 = 'appKeepN'
             const V = AV.users
             let u = (o) => ({ order: 0, description: 'kn', isAdmin: 'n', isActive: 'y', cgrups: '{}', ...o })
             await mustSync('users', { from: F2, rows: [
-                u({ id: 'id-kn-1', name: 'kn1', email: 'kn1@keep.example.com' }),
-                u({ id: 'id-kn-2', name: 'kn2', email: 'kn2a@keep.example.com' }), //與 kn-3 同 name: 一啟用一停用
-                u({ id: 'id-kn-3', name: 'kn2', email: 'kn2b@keep.example.com', isActive: 'n' }),
+                u({ srcKey: 'sk-kn-1', name: 'kn1', email: 'kn1@keep.example.com' }),
+                u({ srcKey: 'sk-kn-2', name: 'kn2', email: 'kn2a@keep.example.com' }), //與 kn-3 同 name: 一啟用一停用
+                u({ srcKey: 'sk-kn-3', name: 'kn2', email: 'kn2b@keep.example.com', isActive: 'n' }),
             ] })
+            let idOf = (srcKey) => rid('users', srcKey, F2)
             let rows = await rowsOf('users')
-            await mustWrite('後台指派', 'users', patch(patch(rows, 'id-kn-1', { cgrups: V[0] }), 'id-kn-2', { cgrups: V[1] }), { baseline: baselineOf('users', rows) })
+            await mustWrite('後台指派', 'users', patch(patch(rows, idOf('sk-kn-1'), { cgrups: V[0] }), idOf('sk-kn-2'), { cgrups: V[1] }), { baseline: baselineOf('users', rows) })
+            let id1 = idOf('sk-kn-1')
             let noKey = omit(u({}), ['cgrups']) //不帶 cgrups 鍵
-            await mustSync('users', { from: F2, rows: [
-                { ...noKey, name: 'kn1', email: 'kn1-changed@keep.example.com' },
-                { ...noKey, name: 'kn-new', email: 'kn-new@keep.example.com' },
-                { ...noKey, name: 'kn2', email: 'kn2c@keep.example.com' },
+            let r = await mustSync('users', { from: F2, rows: [
+                { ...noKey, srcKey: 'sk-kn-1', name: 'kn1', email: 'kn1-changed@keep.example.com' },
+                { ...noKey, srcKey: 'sk-kn-new', name: 'kn-new', email: 'kn-new@keep.example.com' },
+                { ...noKey, srcKey: 'sk-kn-5', name: 'kn2', email: 'kn2c@keep.example.com' }, //新 srcKey、沿用舊 kn-2 之 name
             ] })
-            let got = await extOf('users', F2)
-            let by = (name) => got.find((r) => r.name === name)
-            A.equal(by('kn1').cgrups, V[0], '無 id 依 name 恰命中 1 筆→保留(email 以外部為準)')
-            A.equal(by('kn1').email, 'kn1-changed@keep.example.com')
-            A.equal(by('kn-new').cgrups, '', '新 name→\'\'')
-            A.equal(by('kn2').cgrups, '', '同 name 命中 2 筆(啟用＋停用)→不保留')
+            A.deepEqual(r.msg, { nAdd: 2, nUpdate: 1, nDel: 2, nSame: 0 }, '計數: 新增 2、修改 1(sk-kn-1 改 email)、刪除 2(舊 kn-2、kn-3)')
+            let got = Object.fromEntries((await extOf('users', F2)).map((x) => [x.srcKey, x]))
+            A.deepEqual(Object.keys(got).sort(), ['sk-kn-1', 'sk-kn-5', 'sk-kn-new'], '存續者為批次三列')
+            A.equal(got['sk-kn-1'].id, id1, 'sk-kn-1 內部 id 不變')
+            A.equal(got['sk-kn-1'].cgrups, V[0], '同 srcKey 缺鍵→保留')
+            A.equal(got['sk-kn-1'].email, 'kn1-changed@keep.example.com', 'email 以外部為準')
+            A.equal(got['sk-kn-new'].cgrups, '', '新 srcKey→\'\'')
+            A.equal(got['sk-kn-5'].cgrups, '', '新 srcKey 沿用舊列 name→\'\'(不依 name 繼承舊列之指派)')
         })
 
     })
@@ -1467,6 +1553,17 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
             }
         })
 
+        //〔perm-run03 S11〕srcKey 為身分欄, 不受 lockExternalRows 影響(同 from 型別檢查之「不論 lockExternalRows」): n 模式下仍不可改外部列之 srcKey、不可對後台列帶入 srcKey、不可新增帶 srcKey 之列
+        it('EX-045 n 模式下 srcKey 仍為身分欄: 改外部列 srcKey→saveExternalRowChanged; 後台列帶入 srcKey、新增 from \'\' 而帶 srcKey 之列→saveFromNotAllowed; 零寫入', async function() {
+            await freshState()
+            for (let kt of KTS) {
+                let rows = await rowsOf(kt)
+                await expectReject(`${kt} n 模式改外部列 srcKey`, kt, patch(rows, ext(kt, 0), { srcKey: 'sk-changed' }), 'saveExternalRowChanged')
+                await expectReject(`${kt} n 模式後台列帶入 srcKey`, kt, patch(rows, BO[kt], { srcKey: 'sk-forged' }), 'saveFromNotAllowed')
+                await expectReject(`${kt} n 模式新增帶 srcKey 之列`, kt, [...rows, newRow(kt, 'sk3', { srcKey: 'sk-forged' })], 'saveFromNotAllowed')
+            }
+        })
+
     })
 
 
@@ -1508,7 +1605,7 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
             await restartBackend('./settings.json')
         })
 
-        it('EX-021d 引用不跟著改(cascadeRename=false)時, 同 id 改名且缺鍵 → 不保留(名稱即授權身分, 不把舊名指派移轉給新名)並記 warn(keepAssign-skip, reason identityConflict; 只記表名／來源／欄位／筆數); 同名重送 → 保留', async function() {
+        it('EX-021d 引用不跟著改(cascadeRename=false)時, 同 srcKey 改名且缺鍵 → 不保留(名稱即授權身分, 不把舊名指派移轉給新名)並記 warn(keepAssign-skip, reason identityConflict; 只記表名／來源／欄位／筆數); 同名重送 → 保留', async function() {
             A.equal((await getInfor()).cascadeRename, false, '前提: cascadeRename 為 false')
             await freshState()
             for (let kt of ['grups', 'pemis']) {
@@ -1520,14 +1617,14 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 let g0 = await rowOf(kt, ext(kt, 0))
                 let g1 = await rowOf(kt, ext(kt, 1))
                 A.equal(g0.name, `${FX[kt][0].name}-renamed`, `${kt} 改名以外部為準(不連帶)`)
-                A.equal(g0[af], '', `${kt} 同 id 改名且引用不跟著改 → 不保留(收嚴)`)
+                A.equal(g0[af], '', `${kt} 同 srcKey 改名且引用不跟著改 → 不保留(收嚴)`)
                 A.equal(g1[af], AV[kt][1], `${kt} 名稱相同者 → 保留`)
                 let lines = await waitLines(mark, (l) => l.event === 'syncAndReplaceTabs-keepAssign-skip' && l.keyTable === kt, `${kt} keepAssign-skip log`)
                 let w = lines.filter((l) => l.event === 'syncAndReplaceTabs-keepAssign-skip' && l.keyTable === kt)
                 A.equal(w.length, 1, `${kt} 應記 1 筆 warn`)
                 A.equal(w[0].level, 40, `${kt} 事件層級應為 warn(40)`)
                 A.deepEqual({ keyTable: w[0].keyTable, from: w[0].from, field: w[0].field, n: w[0].n, reason: w[0].reason }, { keyTable: kt, from: F, field: af, n: 1, reason: 'identityConflict' }, `${kt} warn 之表名／來源／欄位／筆數／原因(實得 ${w[0]._raw})`)
-                noLeakLine(w[0], [FX[kt][0].id, FX[kt][0].name, 'renamed', AV[kt][0], AV[kt][1]], `${kt} warn(列主鍵／名稱／授權值)`)
+                noLeakLine(w[0], [FX[kt][0].srcKey, ext(kt, 0), FX[kt][0].name, 'renamed', AV[kt][0], AV[kt][1]], `${kt} warn(來源鍵／列主鍵／名稱／授權值)`)
                 let info = lines.find((l) => l.event === 'syncAndReplaceTabs-keepAssign' && l.keyTable === kt)
                 A.ok(info && info.n === 1 && info.field === af, `${kt} 名稱相同之另一列保留 → info log n=1，實得 ${info && info._raw}`)
             }

@@ -92,20 +92,35 @@ export async function tOf(page, key) {
 
 //—— 夾具: 經外部同步端點(真 /syncAndReplaceTabs; app token; 以 from 為界全量取代該分區) ——
 
+//perm-run03（外部匯入改依來源鍵 srcKey 差異同步, R-IMPORT-01）：同步端點不收 id（送 id 整批拒收 idNotAllowed），每列須帶 srcKey。
+//  為使既有夾具寫法（mkU('ren-ext', …)、mkG('del-ge', …) 以 id 當夾具標籤）不必逐案改寫，本函式把夾具列之 `id` 標籤改送為 `srcKey`（列已自帶 srcKey 者不動），並丟掉 id；
+//  外部列之真實 id 由伺服端產生（targets 例外：id＝srcKey），其後以 rowOf／hasRow／idOfSrc 依 srcKey（夾具標籤）找列。回傳伺服端結果 { nAdd, nUpdate, nDel, nSame }。
+//  本函式為「以 from 為界的差異同步」：同一分區再送一批 → 依 srcKey 新增／修改／刪除／不變（不再整批取代）。
 export async function syncRows(kt, rows, from) {
     const url = `${apiBaseUrl}/syncAndReplaceTabs?keyTable=${kt}&token=${encodeURIComponent(TOKEN_APP)}`
-    const res = await (await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify({ from, rows: rows.map((v) => ({ ...v, from })) }) })).json()
+    const body = rows.map((v) => {
+        const { id, ...rest } = v
+        return { ...rest, srcKey: (typeof v.srcKey === 'string' && v.srcKey !== '') ? v.srcKey : id, from }
+    })
+    const res = await (await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify({ from, rows: body }) })).json()
     assert.ok(res.state === 'success', `夾具 ${kt}(${from}) 同步應成功, 實得 ${JSON.stringify(res)}`)
+    return res.msg
 }
 
-//清除某(表, 來源)之外部同步警示(syncWarns 為伺服端記憶體登錄, 最近一次同步無「同名異 id」即清除): 以庫內該分區現有各列原樣再同步一次(同 id 同名, 無重編), 供案例收尾——
+//idOfSrc: 夾具標籤（srcKey）→ 庫內真實 id（外部列之 id 由伺服端產生; targets 之 id 即 srcKey）；找不到回 null
+export async function idOfSrc(kt, srcKey) {
+    const r = (await selectAllRows(kt)).find((v) => v.srcKey === srcKey)
+    return r ? r.id : null
+}
+
+//清除某(表, 來源)之外部同步警示(syncWarns 為伺服端記憶體登錄, 最近一次同步無「同名異 srcKey」即清除): 以庫內該分區現有各列原樣再同步一次(同 srcKey 同名, 無重編), 供案例收尾——
 //  警示殘留會使後續案例之清單頁多一條橫幅而改變版面; 無該分區之列則不動作。只適用 grups／pemis(users／targets 無偵測)
 export async function clearSyncWarn(kt, from) {
     const rows = (await selectAllRows(kt)).filter((r) => r.from === from)
     if (rows.length === 0) {
         return
     }
-    const SRV = ['from', 'userId', 'timeCreate', 'userIdUpdate', 'timeUpdate']
+    const SRV = ['id', 'from', 'userId', 'timeCreate', 'userIdUpdate', 'timeUpdate']
     await syncRows(kt, rows.map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => !SRV.includes(k)))), from)
 }
 
@@ -120,13 +135,14 @@ export async function snapTables(kts = ['users', 'grups', 'pemis']) {
     }
     return out
 }
+//rowOf／hasRow: 以 id 找列; 外部列夾具之標籤是 srcKey（perm-run03: 外部列 id 由伺服端產生）, 故 id 找不到時再以 srcKey 找（後台列 srcKey 恆空, 不會誤中）
 export function rowOf(rows, id) {
-    const r = rows.find((v) => v.id === id)
+    const r = rows.find((v) => v.id === id) || rows.find((v) => v.srcKey === id)
     assert.ok(r, `應有 ${id}`)
     return r
 }
 export function hasRow(rows, id) {
-    return rows.some((v) => v.id === id)
+    return rows.some((v) => v.id === id || v.srcKey === id)
 }
 
 //檔級收尾對稱: capture() 於 before 擷取三表現況(須為 pristine base seed 且無外部列), restore() 於每案 afterCase 與 after 還原並回驗筆數

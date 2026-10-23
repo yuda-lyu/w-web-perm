@@ -117,6 +117,12 @@ describe('unit-maskLog-sites', function() {
         assert.strict.deepEqual(bad, [], `未經遮罩之權杖 console 站點 ${bad.length} 處:\n${bad.join('\n')}`)
     })
 
+    //server/syncCore.mjs(perm-run03: 外部匯入核心自 WWebPerm.mjs 移出; 無 console 呼叫, 日後新增者須遮罩權杖類引數; 同 SITE-001 判準)
+    it('SITE-001b-syncCore-console-token-args-masked', function() {
+        let bad = scanConsoleTokenArgs(path.join(projRoot, 'server', 'syncCore.mjs'), 'code')
+        assert.strict.deepEqual(bad, [], `未經遮罩之權杖 console 站點 ${bad.length} 處:\n${bad.join('\n')}`)
+    })
+
     //參考部署 srv.mjs(修正前 getUserByToken 之 'invalid token' 印出權杖值)
     it('SITE-002-srv-console-token-args-masked', function() {
         let bad = scanConsoleTokenArgs(path.join(projRoot, 'srv.mjs'), 'code')

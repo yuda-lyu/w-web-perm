@@ -29,6 +29,10 @@ let settings = {
         name: '來源', //供外部批次變更使用
         type: 'STRING',
     },
+    srcKey: {
+        name: '來源鍵', //外部匯入(syncAndReplaceTabs)依其差異同步之識別: 外部自訂、同一來源(from)內唯一且穩定; 後台列(from 為空)恆為空, 後台不可改(身分欄, 與 from 同; perm-run03, R-IMPORT-01). targets 之 id 即標的名稱, 外部匯入時 id＝srcKey
+        type: 'STRING',
+    },
     userId: {
         name: '創建使用者主鍵',
         type: 'STRING',

@@ -1,6 +1,6 @@
 //外部同步缺指派欄鍵保留(grups.cpemis／pemis.crules)純函數單元測試(run08; 主控依 R-PRINCIPLE-00 原則 3、5 定案; 規則帳本 R-EXT-OWN-01; ADR-037 決定 11 之修訂)
 //
-//受測: server/syncKeep.mjs: keepAssignByEntity(grups 列缺 cpemis 鍵、pemis 列缺 crules 鍵者保留庫內同一 from 同一實體之值); 站點接線 server/WWebPerm.mjs:syncAndReplaceTabs(靜態斷言).
+//受測: server/syncKeep.mjs: keepAssignByEntity(grups 列缺 cpemis 鍵、pemis 列缺 crules 鍵者保留庫內同一 from 同一實體之值); 站點接線 server/syncCore.mjs:syncAndReplaceTabs(靜態斷言).
 //
 //規格句(期望由下列規則推導, 不抄實作):
 //  KE-S1 三個指派欄(users.cgrups／grups.cpemis／pemis.crules)同為後台可寫(Lv1): 外部同步 payload 之列「缺該鍵」時保留庫內值, 「含該鍵」(含 ''／undefined／null)則以外部為準(原則 5);
@@ -13,8 +13,8 @@
 //  KE-S4 庫內該列無此欄位(自有屬性)時不保留; 保留值須通過 isKeepable(站點傳入與外部寫入同一套 validateRowsBeforeWrite), 為假者不保留並計入 nSkip(列原樣、不補鍵);
 //        isKeepable 只對「已對應到庫內列、庫內有該欄位、本批缺鍵」之值呼叫(含鍵／對不到／矛盾者不呼叫).
 //  KE-S5 回傳 { rows, nKeep, nSkip, nConflict }: rows 為新陣列(不改輸入; 被保留之列為複本, 其餘同一參考)、次序與輸入相同; 非物件元素原樣通過; hasKey 只有嚴格 true 才視為含鍵.
-//  KE-S6 站點(WWebPerm.mjs): keyAssign 對應 users→cgrups／grups→cpemis／pemis→crules(targets 無); isKeepable 以 validateRowsBeforeWrite([{ id: 'keep', [keyAssign]: val }]) 判定;
-//        呼叫位於 delAll 之前; 記錄事件 field 為 keyAssign, nConflict 之 reason: users 'mapKeyConflict'、grups／pemis 'identityConflict'(只記表名／來源／欄位／筆數／原因, 不含值).
+//  KE-S6 站點(server/syncCore.mjs〔perm-run03 自 WWebPerm.mjs 搬出〕): KEY_ASSIGN 對應 users→cgrups／grups→cpemis／pemis→crules(targets 無); isKeepable 以 validateRowsBeforeWrite([{ id: 'keep', [keyAssign]: val }]) 判定;
+//        呼叫位於第一個 ORM 寫入之前; 記錄事件 field 為 keyAssign, nConflict 之 reason 恆為 'identityConflict'〔perm-run03: 身分依 srcKey 配對, keepAssignOnMissing 以 mappingBy 固定 'id' 呼叫, users 之 'mapKeyConflict' 不再發生〕(只記表名／來源／欄位／筆數／原因, 不含值).
 //
 //輸入空間表(軸 × 格數; 格數於檔尾 KE-999 以計數器核對):
 //  keepAssignByEntity   指派欄鍵{cpemis(grups 列),crules(pemis 列)} 2 ＋ hasKey{true 之值 EXT／''／undefined／null 4; 非 true 之缺項／false／0／'true'／null 5} 9 ＋ id 軸{有限數字對到、id 不在庫內 2;
@@ -323,29 +323,33 @@ describe('unit-syncKeepEntity (外部同步缺 cpemis／crules 鍵保留, run08)
     // 站點靜態斷言(整合層; 真後端行為由 API 層另測)
     describe('站點(靜態)', function() {
 
-        let code = () => sourceLines(path.join(projRoot, 'server/WWebPerm.mjs'), 'code').map((l) => l.text).join('\n')
+        //perm-run03: 外部同步搬到 server/syncCore.mjs(syncCore() 閉包內之 syncAndReplaceTabs); 保留指派之接線隨之: 指派欄表為模組層 KEY_ASSIGN、庫內來源為 sameFrom(以 srcKey 配對後同一 from 之列)、
+        //被保留者之 id 為「配對到之庫內 id／新配之 id」(rowsKeep), mappingBy 固定 'id' 故 users 不再有 mapKeyConflict, nConflict 之 reason 恆為 identityConflict
+        let code = () => sourceLines(path.join(projRoot, 'server/syncCore.mjs'), 'code').map((l) => l.text).join('\n')
 
-        it('SITE-KE-001 syncAndReplaceTabs: keyAssign 對應 users→cgrups／grups→cpemis／pemis→crules(其餘 null); markHasKey 以 keyAssign 記錄; grups／pemis 走 keepAssignByEntity 並傳入 key、cascadeRename、isKeepable; isKeepable 以 validateRowsBeforeWrite 判定; 呼叫位於 delAll 之前; 結果回寫 rows', function() {
+        it('SITE-KE-001 syncAndReplaceTabs: KEY_ASSIGN 對應 users→cgrups／grups→cpemis／pemis→crules(其餘 null); keyAssign 取自 KEY_ASSIGN[keyTable]; markHasKey 以 keyAssign 記錄(於缺鍵補 \'\' 之前, 對 rowsIn); grups／pemis 走 keepAssignByEntity 並傳入 key、cascadeRename、isKeepable; isKeepable 以 validateRowsBeforeWrite 判定; 呼叫位於第一個 ORM 寫入之前; 結果回寫 rowsKeep', function() {
             let c = code()
-            assert.strict.ok(c.includes(`let keyAssign = (keyTable === 'users') ? 'cgrups' : ((keyTable === 'grups') ? 'cpemis' : ((keyTable === 'pemis') ? 'crules' : null))`), 'keyAssign 對應')
-            assert.strict.ok(c.includes('markHasKey(rows, keyAssign)'), 'markHasKey 以 keyAssign 記錄')
+            assert.strict.ok(c.includes(`let KEY_ASSIGN = { users: 'cgrups', grups: 'cpemis', pemis: 'crules', targets: null }`), 'KEY_ASSIGN 對應')
+            assert.strict.ok(c.includes(`let keyAssign = KEY_ASSIGN[keyTable]`), 'keyAssign 取自 KEY_ASSIGN')
+            assert.strict.ok(c.includes('markHasKey(rowsIn, keyAssign)'), 'markHasKey 以 keyAssign 記錄(對 ltdtmapping 補鍵之前的 rowsIn)')
+            assert.strict.ok(c.indexOf('markHasKey(rowsIn, keyAssign)') < c.indexOf('ltdtmapping('), 'markHasKey 須在 ltdtmapping 補鍵之前')
             assert.strict.ok(c.includes(`let isKeepable = (val) => validateRowsBeforeWrite([{ id: 'keep', [keyAssign]: val }]) === null`), 'isKeepable 須以 validateRowsBeforeWrite 判定')
             let m = /keepAssignByEntity\(\{([^\n]*)\}\)/.exec(c.slice(c.indexOf('let kr = ')))
             assert.strict.ok(m, '找不到 keepAssignByEntity({...}) 呼叫')
-            for (let s of ['key: keyAssign', 'cascadeRename', 'isKeepable', 'rowsOldSameFrom: rsSame', 'hasKey: hasAssign']) {
+            for (let s of ['key: keyAssign', 'cascadeRename', 'isKeepable', 'rowsOldSameFrom: sameFrom', 'hasKey: hasAssign', 'rows: rowsKeep']) {
                 assert.strict.ok(m[1].includes(s), `keepAssignByEntity 須傳入 ${s}: ${m[1]}`)
             }
             let iKeep = c.indexOf('keepAssignByEntity({')
-            let iDelAll = c.indexOf('.delAll({ from })')
-            assert.strict.ok(iKeep > 0 && iDelAll > 0 && iKeep < iDelAll, 'keepAssignByEntity 須位於 delAll 之前')
-            assert.strict.ok(/rows = kr\.rows/.test(c), '保留結果須回寫 rows')
+            let iWrite = c.search(/\.(insert|save|del|delAll|mix)\(|\bprocOrm\(/)
+            assert.strict.ok(iKeep > 0 && iWrite > 0 && iKeep < iWrite, 'keepAssignByEntity 須位於第一個 ORM 寫入呼叫之前')
+            assert.strict.ok(/rowsKeep = kr\.rows/.test(c), '保留結果須回寫 rowsKeep')
         })
 
-        it('SITE-KE-002 記錄事件之 field 為 keyAssign(不再寫死 cgrups); nConflict 之 reason: users mapKeyConflict、grups／pemis identityConflict; 只帶表名／來源／欄位／筆數／原因(不含值)', function() {
+        it('SITE-KE-002 記錄事件之 field 為 keyAssign(不再寫死 cgrups); nConflict 之 reason 恆為 identityConflict(mappingBy 固定 id, users 不再有 mapKeyConflict); 只帶表名／來源／欄位／筆數／原因(不含值)', function() {
             let c = code()
             assert.strict.ok(/if \(kr\.nKeep > 0\) \{\s*srLog\.info\(\{ event: 'syncAndReplaceTabs-keepAssign', keyTable, from, field: keyAssign, n: kr\.nKeep \}\)\s*\}/.test(c), 'info 事件')
             assert.strict.ok(/if \(kr\.nSkip > 0\) \{\s*srLog\.warn\(\{ event: 'syncAndReplaceTabs-keepAssign-skip', keyTable, from, field: keyAssign, n: kr\.nSkip, reason: 'notKeepable' \}\)\s*\}/.test(c), 'notKeepable warn')
-            assert.strict.ok(/if \(kr\.nConflict > 0\) \{\s*srLog\.warn\(\{ event: 'syncAndReplaceTabs-keepAssign-skip', keyTable, from, field: keyAssign, n: kr\.nConflict, reason: \(keyTable === 'users'\) \? 'mapKeyConflict' : 'identityConflict' \}\)/.test(c), 'conflict warn')
+            assert.strict.ok(/if \(kr\.nConflict > 0\) \{\s*srLog\.warn\(\{ event: 'syncAndReplaceTabs-keepAssign-skip', keyTable, from, field: keyAssign, n: kr\.nConflict, reason: 'identityConflict' \}\)/.test(c), 'conflict warn')
         })
 
     })

@@ -99,7 +99,11 @@ export function mkTable(rows0 = [], fail = {}) {
             cnt.delAll++
             let n = 0
             for (let [id, v] of [...kp.entries()]) {
-                let hit = !(find && typeof find === 'object') || Object.keys(find).every((k) => v[k] === find[k])
+                //條件同 select: 欄位值相等, 或 { $in: [...] }(w-orm-lmdb 之 delAll 支援; test/tools/api-setup.mjs purgeExternalRows 以真後端庫同法使用)
+                let hit = !(find && typeof find === 'object') || Object.keys(find).every((k) => {
+                    let c = find[k]
+                    return (c !== null && typeof c === 'object' && Array.isArray(c.$in)) ? c.$in.indexOf(v[k]) >= 0 : v[k] === c
+                })
                 if (hit) {
                     kp.delete(id)
                     n++

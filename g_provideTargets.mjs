@@ -47,7 +47,7 @@ async function provide() {
             order: k + 1000, //使能排序至最後, 不穿插至原測試數據
             description: `${key}的說明`,
         })
-        v.id = key
+        v.srcKey = key //外部自訂之來源鍵; targets 之 id 即標的名稱, 外部匯入時由 srcKey 衍生(id＝srcKey), 外部不得送出 id(R-IMPORT-01、provideTabs 不送 id)
         return v
     })
     console.log('rs', rs)

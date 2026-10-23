@@ -1,6 +1,6 @@
 //寫入前驗證之判準(規則帳本 R-ORM-01; spec/設計要點與取捨.md ADR-026)
 //
-//受測: server/validateRows.mjs 之 validateRowsBeforeWrite(單一職責之純函數; procCore.updateTabItems 與 WWebPerm.syncAndReplaceTabs 於第一個破壞步驟前呼叫).
+//受測: server/validateRows.mjs 之 validateRowsBeforeWrite(單一職責之純函數; procCore.updateTabItems 與 syncCore.syncAndReplaceTabs〔外部匯入, 原在 WWebPerm.mjs〕於第一個破壞步驟前呼叫).
 //VR-0xx: 判準全表(主鍵型別／長度／批內重複、rowsIdOnly 只參與重複判定、任一字串欄位之標記、非字串欄位不驗、回傳第一個違規).
 //VR-EQ-001: 與上游等價——同一語料經真 procOrm(w-serv-orm getMapOrm → getProc, 真 adjustData / clearXSS)寫入, 「本判準拒絕」⇔「上游會拒絕或改寫」.
 //  判準複製自上游之前提: 全樹只有一份 wsemi(VR-EQ-002 以 npm ls 守護); 語料取 clearXSS 之邊界(白名單標籤、< 後接字母／數字／空白、註解、實體).
@@ -282,7 +282,8 @@ describe('unit-validateRows (寫入前驗證之判準, ADR-026)', function() {
         assert.strict.deepEqual(validateRowsBeforeWrite([{ id: { x: 1 }, description: { v: 1 } }]), { reason: 'idInvalid', k: 0, field: 'id' })
     })
 
-    //站點不變式: server 內「寫入 ORM」的呼叫只在 procCore.mjs 與 WWebPerm.mjs 兩檔, 且各檔皆在第一個寫入之前呼叫 validateRowsBeforeWrite.
+    //站點不變式: server 內「寫入 ORM」的呼叫只在 procCore.mjs(後台整表寫入)、syncCore.mjs(外部匯入 syncAndReplaceTabs; perm-run03 自 WWebPerm.mjs 搬出)與 cascadeWrite.mjs(引用端寫入與補償)三檔,
+    //且各檔皆在第一個寫入之前呼叫 validateRowsBeforeWrite; WWebPerm.mjs 只經 syncCore() 注入 procOrm／woItems, 自身不得再有任何寫入呼叫(出現即紅: 外部匯入之驗證只能有 syncCore.mjs 一處).
     //寫入呼叫之判別放寬為: 任何 .insert(／.save(／.del(／.delAll(／.mix( 或 procOrm( 呼叫(不限參數名與字面方法名; 外審 sol#10);
     //資料通道 dataChannel.mjs 之 procOrm 為泛用轉呼叫且只放行 select(ADR-026, 由 unit-dataChannel 守護), 排除在掃描外
     let writeRe = /\.(insert|save|del|delAll|mix)\(|\bprocOrm\(/
@@ -292,7 +293,7 @@ describe('unit-validateRows (寫入前驗證之判準, ADR-026)', function() {
         return iWrite < 0 ? null : { validateFirst: iValidate >= 0 && iValidate < iWrite, no: lines[iWrite].no }
     }
 
-    it('SITE-NS-001 寫入站點全集: 後端執行期僅 procCore.mjs、WWebPerm.mjs 與 cascadeWrite.mjs(引用連帶之引用端寫入與補償, ADR-036), 皆在第一個寫入呼叫之前呼叫 validateRowsBeforeWrite; 另登記離線維運工具 tools/authRefsClean.mjs、tools/fromTools.mjs(不要求驗證)', function() {
+    it('SITE-NS-001 寫入站點全集: 後端執行期僅 procCore.mjs、syncCore.mjs(外部匯入, perm-run03 自 WWebPerm.mjs 搬出)與 cascadeWrite.mjs(引用連帶之引用端寫入與補償, ADR-036), 皆在第一個寫入呼叫之前呼叫 validateRowsBeforeWrite; WWebPerm.mjs 不再是寫入站點; 另登記離線維運工具 tools/authRefsClean.mjs、tools/fromTools.mjs(不要求驗證)', function() {
         let fdServer = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'server')
         let found = {}
         let walk = (dir, rel) => { //遞迴(含 server/staLogs 等子目錄)
@@ -312,8 +313,8 @@ describe('unit-validateRows (寫入前驗證之判準, ADR-026)', function() {
         //tools/: run08 自 test/tools 搬入 server/tools 之離線維運工具核心(R-SHIP-TOOLS-01; 後端須先停止, 自有備份與寫後回驗, 見 README Upgrade steps), 不是後端執行期之寫入站點,
         //不要求 validateRowsBeforeWrite; 仍須逐一登記(新增任何寫 ORM 之檔案即紅), 以維持「寫入站點全集」之意義
         const OFFLINE_TOOLS = ['tools/authRefsClean.mjs', 'tools/fromTools.mjs']
-        assert.strict.deepEqual(Object.keys(found).sort(), ['WWebPerm.mjs', 'cascadeWrite.mjs', 'procCore.mjs', ...OFFLINE_TOOLS], `寫入站點檔案: ${JSON.stringify(found)}`)
-        assert.strict.ok(found['WWebPerm.mjs'].validateFirst && found['procCore.mjs'].validateFirst && found['cascadeWrite.mjs'].validateFirst, `須在第一個寫入之前驗證: ${JSON.stringify(found)}`)
+        assert.strict.deepEqual(Object.keys(found).sort(), ['cascadeWrite.mjs', 'procCore.mjs', 'syncCore.mjs', ...OFFLINE_TOOLS], `寫入站點檔案: ${JSON.stringify(found)}`)
+        assert.strict.ok(found['syncCore.mjs'].validateFirst && found['procCore.mjs'].validateFirst && found['cascadeWrite.mjs'].validateFirst, `須在第一個寫入之前驗證: ${JSON.stringify(found)}`)
         //資料通道只放行 select(寫入方法不得出現在其放行清單)
         let dc = sourceLines(path.join(fdServer, 'dataChannel.mjs'), 'code').map((l) => l.text).join('\n')
         assert.strict.ok(!/'(insert|save|del|delAll|mix)'/.test(dc), 'dataChannel.mjs 不得放行寫入方法')

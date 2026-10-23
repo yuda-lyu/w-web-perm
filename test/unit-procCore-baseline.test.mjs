@@ -45,6 +45,7 @@ import cloneDeep from 'lodash-es/cloneDeep.js'
 import cacheSt from 'wsemi/src/cacheSt.mjs'
 import ds from '../src/schema/index.mjs'
 import proc, { pickClientOpt } from '../server/procCore.mjs'
+import { autoDecl } from './tools/declHelper.mjs'
 import createLockSave from '../server/lockSave.mjs'
 import { makeBaseline } from '../src/js/rowDigest.mjs'
 import { mkTable, mkCore, mkSrLog } from './tools/unitOrm.mjs'
@@ -162,7 +163,7 @@ function createEnv(opt = {}) {
         calls.push(args)
         return core.procOrm(...args)
     } : core.procOrm
-    let pc = proc(woItems, procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst), ...(opt.proc || {}) })
+    let pc = autoDecl(proc(woItems, procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst), ...(opt.proc || {}) }), woItems)
     let env = { seed, woItems, logs, cst, core, pc, calls }
     envs.push(env)
     return env

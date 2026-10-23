@@ -3,7 +3,7 @@
 //cleanup 由 e2e-setup.mjs 的 mocha root after hook 自動觸發，本檔不寫 after(cleanup)。
 
 import assert from 'assert'
-import { startApi, apiBaseUrl, TOKEN_APP, TOKEN_BAD, urlGetPermUserInfor, urlSync, SEED, cleanExternalFixtures } from './tools/api-setup.mjs'
+import { startApi, apiBaseUrl, TOKEN_APP, TOKEN_BAD, urlGetPermUserInfor, urlSync, SEED, cleanExternalFixtures, selectAllRows } from './tools/api-setup.mjs'
 import getPermUserInfor from '../src/getPermUserInfor.mjs'
 
 
@@ -158,6 +158,7 @@ describe('api-getPermUserInfor', function() {
     //R-OBJ-ITER-01（規則帳本「迭代使用端傳入之物件」）：cgrups／cpemis／crules 為使用者或外部應用寫入之 JSON 字串，解析後之物件含數字 length 鍵時，
     //修正前 getUserRules 以 lodash each 當陣列樣迭代而略過真實鍵（群組、權限、規則被靜默評估為無權限）；length 極大時使每次權限查詢空轉或耗盡記憶體（毒化資料持久）。
     //本案經真後端：外部應用以 syncAndReplaceTabs 寫入一組含 length 鍵之資料，再以 getPermUserInfor 查詢該使用者之有效權限。
+    //  perm-run03(R-IMPORT-01): 同步端點不收 id、每列須帶 srcKey; 使用者之 id 由伺服端產生, 故依 srcKey 讀回真實 id 再查詢。
     //巨大 length 之單元案例見 unit-getUserRules UNIT-OI-007（子行程，避免修前使後端空轉或崩潰）。
     describe('length 鍵於 JSON 字串欄位（R-OBJ-ITER-01）', function() {
         const F = 'appTest-oi'
@@ -177,14 +178,17 @@ describe('api-getPermUserInfor', function() {
         it('API-getPermUserInfor-007-length-key-in-json-strings：三層 JSON 字串皆含 length 鍵 → 群組名稱與標的權限仍正確', async function() {
             this.timeout(60000)
             let OR = '{"mode":"OR","isActive":"y"}'
-            let r1 = await postSync('pemis', [{ id: 'id-oi-p1', order: 0, name: 'oiPemi', description: '', from: F, crules: `{"length":0,"${TARGET}":"y"}` }])
+            let r1 = await postSync('pemis', [{ srcKey: 'sk-oi-p1', order: 0, name: 'oiPemi', description: '', from: F, crules: `{"length":0,"${TARGET}":"y"}` }])
             assert.strict.equal(r1.state, 'success', `pemis 預置應成功: ${JSON.stringify(r1)}`)
-            let r2 = await postSync('grups', [{ id: 'id-oi-g1', order: 0, name: 'oiGrup', description: '', from: F, cpemis: `{"length":1,"oiPemi":${OR}}` }])
+            let r2 = await postSync('grups', [{ srcKey: 'sk-oi-g1', order: 0, name: 'oiGrup', description: '', from: F, cpemis: `{"length":1,"oiPemi":${OR}}` }])
             assert.strict.equal(r2.state, 'success', `grups 預置應成功: ${JSON.stringify(r2)}`)
-            let r3 = await postSync('users', [{ id: 'id-oi-u1', order: 0, name: 'oiUser', email: 'oi@appTest.com', description: '', from: F, cgrups: `{"length":2,"oiGrup":${OR}}`, isAdmin: 'n', isActive: 'y' }])
+            let r3 = await postSync('users', [{ srcKey: 'sk-oi-u1', order: 0, name: 'oiUser', email: 'oi@appTest.com', description: '', from: F, cgrups: `{"length":2,"oiGrup":${OR}}`, isAdmin: 'n', isActive: 'y' }])
             assert.strict.equal(r3.state, 'success', `users 預置應成功: ${JSON.stringify(r3)}`)
 
-            let ur = await getPermUserInfor(urlGetPermUserInfor, TOKEN_APP, 'id-oi-u1')
+            //使用者之 id 由伺服端產生: 依 srcKey 讀回
+            let uOi = (await selectAllRows('users')).find((v) => v.srcKey === 'sk-oi-u1')
+            assert.strict.ok(uOi && typeof uOi.id === 'string' && uOi.id !== '', '依 srcKey 應讀回外部使用者列')
+            let ur = await getPermUserInfor(urlGetPermUserInfor, TOKEN_APP, uOi.id)
             assert.strict.equal(ur.user.grupsNames, 'oiGrup', 'cgrups 含 length 鍵時群組仍應被辨識（修正前為空字串）')
             let rule = ur.rules.find((v) => v.name === TARGET)
             assert.strict.ok(rule, `rules 應含標的 ${TARGET}`)
@@ -195,6 +199,7 @@ describe('api-getPermUserInfor', function() {
     //R-AUTH-PATH-01（規則帳本；外審 sol#5，主控 run01 複審裁示 1）：標的 id 是資料不是路徑。
     //修正前實測（單元層 getUserRules）：crules 只授權 apQ 時，標的 apQ.0、apQ[0] 經 lodash get 的字串索引得 y、apQ.length 得數字 1；未授權之 toString 取到繼承函數。
     //本案經真後端：外部應用以 syncAndReplaceTabs 寫入一組標的／權限／群組／使用者，再以 getPermUserInfor 查有效權限。
+    //  perm-run03(R-IMPORT-01): 每列帶 srcKey、不帶 id; 標的之 id＝srcKey(含 . 或 [ 或原型鍵名者如實成為標的 id), 使用者 id 依 srcKey 讀回。
     describe('標的 id 含 . 或 [ 、或為原型鍵名（R-AUTH-PATH-01）', function() {
         const F = 'appTest-ap'
         const IDS = ['apQ', 'apQ.0', 'apQ[0]', 'apQ.length', 'apR', 'apR.exact', 'constructor', 'toString']
@@ -213,16 +218,19 @@ describe('api-getPermUserInfor', function() {
         it('API-getPermUserInfor-008-target-id-not-a-path：只授權 apQ 與精確鍵 apR.exact → apQ.0／apQ[0]／apQ.length／constructor／toString 皆 n，精確鍵為 y', async function() {
             this.timeout(60000)
             let OR = '{"mode":"OR","isActive":"y"}'
-            let r0 = await postSync('targets', IDS.map((id, k) => ({ id, order: k, description: '', from: F })))
+            let r0 = await postSync('targets', IDS.map((id, k) => ({ srcKey: id, order: k, description: '', from: F })))
             assert.strict.equal(r0.state, 'success', `targets 預置應成功: ${JSON.stringify(r0)}`)
-            let r1 = await postSync('pemis', [{ id: 'id-ap-p1', order: 0, name: 'apPemi', description: '', from: F, crules: '{"apQ":"y","apR.exact":"y"}' }])
+            assert.strict.deepEqual((await selectAllRows('targets')).filter((v) => v.from === F).map((v) => v.id).sort(), [...IDS].sort(), 'targets 之 id 即 srcKey(標的名稱)')
+            let r1 = await postSync('pemis', [{ srcKey: 'sk-ap-p1', order: 0, name: 'apPemi', description: '', from: F, crules: '{"apQ":"y","apR.exact":"y"}' }])
             assert.strict.equal(r1.state, 'success', `pemis 預置應成功: ${JSON.stringify(r1)}`)
-            let r2 = await postSync('grups', [{ id: 'id-ap-g1', order: 0, name: 'apGrup', description: '', from: F, cpemis: `{"apPemi":${OR}}` }])
+            let r2 = await postSync('grups', [{ srcKey: 'sk-ap-g1', order: 0, name: 'apGrup', description: '', from: F, cpemis: `{"apPemi":${OR}}` }])
             assert.strict.equal(r2.state, 'success', `grups 預置應成功: ${JSON.stringify(r2)}`)
-            let r3 = await postSync('users', [{ id: 'id-ap-u1', order: 0, name: 'apUser', email: 'ap@appTest.com', description: '', from: F, cgrups: `{"apGrup":${OR}}`, isAdmin: 'n', isActive: 'y' }])
+            let r3 = await postSync('users', [{ srcKey: 'sk-ap-u1', order: 0, name: 'apUser', email: 'ap@appTest.com', description: '', from: F, cgrups: `{"apGrup":${OR}}`, isAdmin: 'n', isActive: 'y' }])
             assert.strict.equal(r3.state, 'success', `users 預置應成功: ${JSON.stringify(r3)}`)
 
-            let ur = await getPermUserInfor(urlGetPermUserInfor, TOKEN_APP, 'id-ap-u1')
+            let uAp = (await selectAllRows('users')).find((v) => v.srcKey === 'sk-ap-u1')
+            assert.strict.ok(uAp && typeof uAp.id === 'string' && uAp.id !== '', '依 srcKey 應讀回外部使用者列')
+            let ur = await getPermUserInfor(urlGetPermUserInfor, TOKEN_APP, uAp.id)
             assert.strict.equal(ur.user.grupsNames, 'apGrup')
             let by = new Map(ur.rules.map((v) => [v.name, v.isActive]))
             assert.strict.equal(by.get('apQ'), 'y', '被授權之標的')

@@ -73,7 +73,7 @@
   2. **改寫**(`rewriteRefs`): 只動命中之項目; 物件形式仍物件、陣列形式仍陣列(不互轉, 免有損), 值內 `mode`／`isActive`／額外欄位原樣; **未命中者同一字串原樣回傳**(保留註解與排版), 命中者 `JSON.stringify` 重新編碼; 壞 JSON／空字串／純量視為空容器不動(同伺服端 `cvStrToArr` 容錯). 刪除不論 `isActive` 皆移除該項.
   3. **拒絕(收嚴＋提示, 整次拒存、四表零變更, 固定語系鍵)**: `renameCascadeDupGroup`(被改名者屬歷史同名組且該名稱仍被某引用端引用〔含停用項〕——級聯會把原綁「各筆交集」之引用轉給被改名者, 外審 A.1; 無人引用則不擋, 為歷史同名之清理路徑)、`renameCascadeNameInUse`(新名無任何舊實體而仍被**啟用中**引用〔懸空名〕,Q4; 停用之懸空引用不擋, 但容器內相撞見下)、`renameCascadeConflict`(某容器內新名與另一個未被改走／刪除之既有項目相撞,含停用項)、`renameCascadeUnsupported`(命中而須改寫之容器含無法安全重新編碼之內容——JSON5 之 Infinity／NaN 數值經 `JSON.stringify` 會變 null, 作為 `crules` 規則名時改指別的規則 'null' 而改變授權〔外審 sol R2〕; 刪除連帶清理與稽核工具同: 稽核工具列入 `unsafe` 須人工處理). **新增**同名撞懸空名**不拒**(外部先指派、後於後台定義同名群組為合法流程; 引用於定義後生效為預期, 頁面已有 c 之懸空警告圖示).
   4. **失敗回復(外審 A.2; 依原則決定, 見 ADR-036)**: 引用端先寫、主體後寫; 預檢(含引用端改寫列之 `validateRowsBeforeWrite`)於任何寫入之前. 任一步例外 → 以**寫入前整列補償還原引用端**(`server/cascadeWrite.mjs:writeWithCascade`, 以 holdersOld 之整列經 `woItems[引用端].save(pre, { merge: false })` 覆寫〔w-orm-lmdb 選項,其他後端退回合併〕, 使歷史列原無 `userIdUpdate`／`timeUpdate` 者亦逐位元還原〔外審 sol R4〕)後重新拋出原錯誤(**引用端寫入階段之錯誤原文先把 `id[…]` 遮罩為 `id[*]` 才拋出**, 外層 srLog 不得記引用端 id〔外審 sol R5〕); 補償亦失敗 → `saveCascadePartial`＋srLog `refCascade-restore-error`, 以稽核工具處置. **不採「重存即自癒」**(互換／鏈式／批內新增三形狀不成立, 外審 A.2); 重新操作從還原後之一致狀態開始. 主體 `del → insert → save` 之部分寫入為既有 ADR-013 限制, 補償不還原主體(測試如實釘住). 行程於引用端寫入後、主體寫入前崩潰不在補償範圍(記憶體內無日誌), 以稽核工具處置.
-  5. **未帶 id 之列與外部同步**(同一 `from` 內): `src/js/refCascade.mjs:fillIdlessIds` 為未帶 id 之列(`grups`／`pemis`; ORM 每次補隨機主鍵,即舊列刪、新列增)補規劃用 id——**依名稱對應** pool 中 id 未被本批帶用之既有列(同名即同一實體,不算刪除再新增; 同名多列依序對應; 名稱不同視為新實體; 規劃用,不改寫入之列),否則 API 直打缺 id 之整表會清空全部引用. 後台整表寫入以該表全部既有列為 pool(`procCore.updateTabItems`), 外部同步以**同一 `from` 之既有列**為 pool(`server/cascadeWrite.mjs:buildSyncRowsNew` 另保留他 `from` 之列原樣). 帶 id 者依 id: 同 id 異名＝改名級聯; 舊 id 不在本批＝刪除並清理. 外部應用只收固定鍵 `invalidRows`／`htmlMarkupNotAllowed`(R-ORM-02), 動態原因入 srLog `reason`. 帶 id 而 id 於外部端不穩定者(每次同步重編流水號)會被判為「舊 id 刪除＋新 id 新增」而清理引用——依使用者「依同一來源內之穩定 id 判定」裁示, 部署須知列於 README Upgrade Notes.
+  5. **未帶 id 之列(後台整表寫入)與外部同步**(2026-10-23 perm-run03 改寫;〔原載〕外部同步亦依名稱對應未帶 id 之列、`buildSyncRowsNew`、「帶 id 而 id 於外部端不穩定者被判為刪舊增新」——**原載不成立於外部同步**:外部匯入改依 `srcKey` 差異同步,送 `id` 整批拒收、`srcKey` 必填,已無「未帶 id 之列」,見 R-IMPORT-01):`src/js/refCascade.mjs:fillIdlessIds` 為**後台整表寫入**中未帶 id 之列(`grups`／`pemis`;API 直打缺 id 之列,ORM 每次補隨機主鍵,即舊列刪、新列增)補規劃用 id——**依名稱對應** pool 中 id 未被本批帶用之既有列(同名即同一實體,不算刪除再新增;同名多列依序對應;名稱不同視為新實體;規劃用,不改寫入之列),否則 API 直打缺 id 之整表會清空全部引用;後台整表寫入以該表全部既有列為 pool(`procCore.updateTabItems`).帶 id 者依 id:同 id 異名＝改名級聯;舊 id 不在本批＝刪除並清理.**外部同步**(`server/syncCore.mjs`)的身分是 `srcKey`:同 `srcKey` 改名＝改名級聯(`id` 不變)、`srcKey` 消失＝刪除並清理、名稱同而 `srcKey` 不同＝刪舊增新(新實體不繼承引用);「寫入後整表」由 syncCore 以配對結果直接組出(他 from 之列＋同 from 存續者含修改後＋新增者),不經 `fillIdlessIds`.外部應用只收固定鍵 `invalidRows`／`htmlMarkupNotAllowed`(R-ORM-02),動態原因入 srLog `reason`.
   6. **指派欄屬後台(Q8)**: 級聯可改寫 `from` 為外部之 users 列之 `cgrups`(F-23 Lv1 指派欄後台可寫); 預覽確認框警示「其中 N 位來源為外部應用,下次外部同步時可能被外部資料覆寫」. 寫入以操作者記為更新者(`userIdUpdate`／`timeUpdate`).
   7. **opt**: `opt.cascadeRename`(預設 `true`, `false` 關閉改名級聯及其拒絕; 刪除連帶清理不受此設定影響, 使用者裁示刪除即移除其效果).
   8. **log**: 成功 `refCascade-done`(`keyTable`／`holder`／`nRename`／`nDelName`／`nHolders`／`nRenameHolders`／`nDelHolders`／`nExternal`, **不記個資值與引用端 id**); 預檢被拒 `updateTabItems-refCascade-error`／`syncAndReplaceTabs-error`(帶 `reason`); 補償 `refCascade-restored`(warn)／`refCascade-restore-error`.
@@ -84,43 +84,26 @@
 - **測試**: `unit-refCascade`(純函數: 邊界／語意不變式〔以真 `getUserRules` 比對改名前後授權逐位相等〕／變異)、`unit-procCore-refCascade`(伺服端: 改名、刪除、拒絕零變更、逐故障點補償、鎖)、`unit-refAudit`(稽核與清理工具)、`api-refCascade`(真後端: 後台與外部同步)、e2e(語意斷言, 不產標準圖): `e2e-array-form` AF-026～027、AF-036～042, `e2e-targets` E2E-012～013, `e2e-grups`／`e2e-pemis`／`e2e-targets` 之 E2E-005 與 targets E2E-011 依新確認框改流程(刪除連帶清理會遺留給後續案例, 三檔每案前另還原引用端表 users／grups／pemis; 共用輔助見 `test/tools/e2e-setup.mjs` 之 `answerConfirm`／`expectConfirmBox`／`saveConfirmYesAndWaitModal`／`resetDbTables` 等); 變異驗證結果見報告. **儲存後 rowsChange 保護**: 刪除連帶清理使一次儲存更新兩張表, store 先後推播兩次重建清單, `markDataReload` 之 1ms 窗口可能短於 ag-grid 渲染而使儲存鈕殘留(E2E-005-3 間歇失配, run06 e2e 子代理發現), 故群組頁／權限頁於儲存成功至成功訊息框關閉後 300ms 以 `postSaving` 排除 rowsChange. **站點不變式之登記**(新增讀取／寫入站點須同步登記, 否則即紅): `unit-cvKpToObj` SITE-AD-001 登記 `src/js/refCascade.mjs`、`src/js/refAudit.mjs` 各一處 `JSON5.parse`(解碼後依 `cvKpToArr` 同一名稱規則走訪); `unit-authMerge` SITE-AM-003 登記 `src/js/refAudit.mjs`(mode 比對僅 `getEffMode(m) === 'OR'`); `unit-validateRows` SITE-NS-001 登記 `server/cascadeWrite.mjs` 為第三個寫入站點(`checkCascadePlan` 之 `validateRowsBeforeWrite` 先於其寫入呼叫, `writeWithCascade` 另防禦性再驗一次); `unit-keyCheck` SITE-KC-007／`unit-procCore-usersKey` SITE-UK-001 見 R-WRITE-LOCK-02.
 - **已知限制**: ①標的 id 改名無級聯(階段 2); ②外部同步「未帶 id 且改名」無從偵測為改名(視為刪除＋新增,清理舊名引用); ③補償不還原主體部分寫入; ④外部 users 列被級聯後, 外部下次同步若不含該 `cgrups`(或含舊名)會覆蓋(F-23 下一輪處理 payload 缺鍵保留後台指派)〔**run07 更新**: payload 缺 `cgrups` 鍵者現保留庫內值(`server/syncKeep.mjs:keepAssignOnMissing`, R-EXT-OWN-01), 含鍵(含舊名)者仍覆蓋〕; ⑤引用端 `users` 之 `userIdUpdate`／`timeUpdate` 變為操作者(稽核可追蹤, 清單「最後更新」會變); ⑥刪除確認框為**預覽語意**: `nRefs` 只算「本次刪除」, 歷史同名分次未儲存刪除、或 `cascadeRename:false` 下有未儲存改名時最後一次刪除可能少計/不警示(儲存時伺服端仍正確清理; 外審 sol 增量 D3, 未修); ⑦`postSaving` 窗口(儲存成功至成功框關閉後 300ms)內使用者的編輯提交會被 rowsChange 排除(人為幾乎不可能, D4); ⑧`rewriteRefs` 重編碼會把 `-0` 變 `0`(授權算法不依賴, D5); ⑨w-serv-orm 自身於寫入失敗時 `console.log` 失敗列 id／錯誤原文(套件既有行為, 非 srLog; D2, 建議向 w-serv-orm 提 issue); ⑩編輯器對限制項(mode 缺/非法)重選 AND 視為未改而寫回原值, 無法由編輯器轉為合法 AND(第三格放寬之代價, minimax R2).
 
-## 外部匯入(原則 11;2026-10-22 主控依使用者裁示寫入)
+## 外部匯入(原則 11;2026-10-22 主控依使用者裁示寫入;2026-10-23 perm-run03 落實 `srcKey` 差異同步,使用者裁示不提供呼叫端相容)
 
-### R-IMPORT-01 外部匯入:本系統只提供匯入管道,依外部自訂之來源鍵差異同步
+### R-IMPORT-01 外部匯入:本系統只提供匯入管道,依外部自訂之來源鍵 `srcKey` 差異同步
 
-- **規格(真理源)**:`C:\opensrcOper\dspec\外部匯入之定義與機制.md`;上位原則 `C:\opensrcOper\sgud\proc\process_principle.md` 第 11 條.
+- **規格(真理源)**:`C:\opensrcOper\dspec\外部匯入之定義與機制.md`(第 3～10 節);上位原則 `C:\opensrcOper\sgud\proc\process_principle.md` 第 11 條.
+- **站點(單一擁有者)**:`server/syncCore.mjs`(`syncCore({ woItems, procOrm, lockTabs, srLog, mappingBy, cascadeRename })` → `{ syncAndReplaceTabs, getSyncWarns }`).`server/WWebPerm.mjs` 只組裝並由 `POST /syncAndReplaceTabs` 呼叫(原內嵌於 WWebPerm 閉包之實作已移出,以便注入 ORM 替身單元測試).外部端輔助 `server/provideTabs.mjs`(`ks_*` 欄位白名單:`srcKey` 取代 `id`,**不送 id**).
 - **規則**:
-  - 入口 `POST /syncAndReplaceTabs?keyTable=&token=`.
-    - 可匯入之表:targets、pemis、grups、users.
-    - app 權杖須具 `syncAndReplaceTabs` 權限.
-  - 本文 `{ from, rows }`,`rows`＝該 `from` 之完整清單.
-    - 每列帶外部自訂之來源鍵 `srcKey`,於 `from` 內唯一且穩定.
-    - 內部 `id` 由本系統產生.
-  - 於表鎖內(R-WRITE-LOCK-01/02)以 `srcKey` 比對庫內該 `from`:
-    - 新增:配新 `id`.
-    - 刪除:引用連帶(R-REF-CASCADE-01).
-    - 修改:保留 `id`;改名之引用跟著改.
-    - 不變:不寫.
-    - 不再 `delAll`＋`insert`.
-  - **欄位歸屬**:
-    - 外部可選:指派欄 `users.cgrups`、`grups.cpemis`、`pemis.crules`.沿用 F-23、`syncKeep.mjs`:有帶鍵才寫,缺鍵保留.
-    - 外部擁有:其餘外部提供之欄位.
-    - 本系統擁有:系統欄位.
-  - **整批驗證**:
-    - 既有驗證保留,移入整批驗證:R-SYNC-01、R-NAME-UNIQ-01、R-MAPKEY-01、R-SYNC-NAME-01.
-    - 缺/空/重複 `srcKey`、觸及他 `from`、空批次 → 拒收、零寫入.
-  - **改用 `srcKey` 後之連帶**:
-    - 「同名異 id 之重編偵測」與「未帶 id 依名稱對應」失去必要,屆時評估移除.
-    - users 之 `mappingBy='id'` 登入對應改對 `srcKey`(待設計).
-  - 回 `{ nAdd, nUpdate, nDel, nSame }`.
-  - **相容**(主控建議,待使用者確認):
-    - 現行 major 以 `id` 代替 `srcKey`.
-    - 兩者皆無者沿用現行並記警告.
-    - 下一 major `srcKey` 必填.
-- **刪除防護**:本條為預期功能;未完成之匯入程式與外部端輔助 `provideTabs` 不是死碼,不得以「無引用」刪除(opensrcOper 帳本 G8).
-- **狀態:部分**.
-  - 已有:入口、權杖、表鎖、整批驗證、引用連帶、失敗補償.
-  - **未做**:`srcKey` 差異同步.現為 `delAll({ from })`＋insert(`server/WWebPerm.mjs` 約 866-867),未帶 id 者每次換新 id.
-  - 排程:perm 改用 w-serv-orm 共用核心之輪.
-- **驗收**:規格第 10 節 I1–I14.
-- 盤點:`git grep -nE "srcKey|delAll\(\{ from" -- server`(完成後 `srcKey` 有比對、`delAll({ from` 0 筆).
+  1. 入口 `POST /syncAndReplaceTabs?keyTable=&token=`;可匯入之表 targets、pemis、grups、users;app 權杖須具 `syncAndReplaceTabs` 權限(`getAndVerifyAppUser`);本文 `{ from, rows }`,`rows`＝該 `from` 之完整清單.回傳 `{ nAdd, nUpdate, nDel, nSame }`.
+  2. **`srcKey` 即刻必填,不提供呼叫端相容**(使用者 2026-10-23):任一列缺、空白、非字串、UTF-8 > 1978 B、含會被 `clearXSS` 改寫之標記 → `srcKeyInvalid`;同批重複(精確 `===`)→ `srcKeyDuplicate`;**任一列帶 `id` 鍵(含空值)→ `idNotAllowed`**,先於 srcKey 檢查(仍送 id 多為舊呼叫方式);空批次 → `invalidRows`;皆整批拒收、零寫入.
+  3. 於表鎖內(R-WRITE-LOCK-01/02)**新鮮讀取庫內全表**(一次),依 `srcKey` 配對該 `from` 之庫內列,分四類:新增(配新 `id`,`genIDSeq` 且不撞庫內任何 id)、修改(保留 `id`)、刪除(庫有批次無)、不變(零寫入).**不再 `delAll({ from })`＋insert**.
+  4. **`targets` 例外**:其 `id` 即標的名稱(被 `pemis.crules` 以名稱引用),無法由系統配隨機 `id`;外部不送 `id`,新增時 **`id＝srcKey`**;該 `id` 已被庫內任何其他列(他來源或後台列)占用 → 整批 `invalidRows`(reason `idTaken`;免 `insert` 對既有主鍵靜默略過).因 `id＝srcKey`,標的「改名」只能是刪舊增新(R-REF-CASCADE-01 已知限制①不變).〔此為規格(dspec 第 9 節「外部送 id 整批拒收」)對 targets 之缺口,主責 agent 依原則 1／4 擇最小改動,列報告備查.〕
+  5. **欄位歸屬**(規格第 4 節):外部擁有＝批次提供之欄位(`order`、`name`、`description`、`email`、`isAdmin`、`isActive` 等;缺鍵視為空值;`order` 屬外部,後台儲存不重編);外部可選＝指派欄 `users.cgrups`／`grups.cpemis`／`pemis.crules`(沿用 F-23、`server/syncKeep.mjs`:有帶鍵才寫,缺鍵保留庫內值;**users 另依實際 `mappingBy` 驗登入對應鍵矛盾**〔外審 sol#1〕:`mappingBy` 為 `email`／`name` 時,同 `srcKey` 之對應鍵值被改成別值、或新值為庫內同 `from` 別列所持有,保留指派會使該登入值取得原擁有者之授權〔兩人互換 email 即可移轉,增權〕,一律不保留〔`cgrups` 維持空〕並記 warn `syncAndReplaceTabs-keepAssign-skip`〔reason `identityConflict`,不含個資值〕;`mappingBy='id'` 不檢查.測試 `unit-syncCore` SC-K1～K4、`api-externalRows` EX-030／031〕);本系統擁有＝伺服器管理欄 `userId`／`timeCreate`／`userIdUpdate`／`timeUpdate`(一律不採批次值,新增列為匯入者與現在時間,修改列保留建立者／建立時間、更新者記匯入者).`id`、`srcKey`、`from` 為身分欄.比較以 `eqV`(缺欄／null／'' 同一空值,純量以字串形式比)為準,使冪等不受 ORM 型別轉換影響.
+  6. **整批驗證**(任一不過 → 整批拒收、零寫入;保留並移入 `syncCore`):R-SYNC-NAME-01(grups／pemis 名稱非空字串)、R-NAME-UNIQ-01(批內與他 from／後台列不得同名)、R-MAPKEY-01(users `mappingBy` 為 email／name 時 active 列之對應鍵非空且批內／跨來源唯一)、R-ORM-01(寫入前驗證:標記、純量)、R-SYNC-01 之 targets 版(見 4).
+  7. **引用連帶**(R-REF-CASCADE-01):以「寫入後整表」(他 from 之列＋同 from 存續者含修改後＋新增者)與寫入前整表比對——同 `id` 異名＝改名級聯(同 `srcKey` 改名即此)、舊 `id` 不在寫入後整表＝刪除而連帶清理;預檢(`checkCascadePlan`)於任何寫入之前.**名稱相同而 `srcKey` 不同＝刪舊增新,新實體不繼承引用**(原則 6).
+  8. **一次性資料遷移**(非呼叫端相容,規格第 9 節):庫內既有外部列無 `srcKey`(舊同步寫入)者,首次匯入時批次 `srcKey` 等於其 `id` 者視為同一列,於鎖內補上 `srcKey`(計入 `nUpdate`,`id` 不變);其後只認 `srcKey`;對不上者依差異同步刪舊增新(引用連帶清理).庫內同 `from` 有重複 `srcKey`,或同一 `srcKey` 被兩個庫內列主張(一個已有 `srcKey`、一個以 `id` 主張)→ 無法唯一配對,整批 `srcKeyConflict`,以 `g_purgeFrom.mjs` 清源後重匯入.兩種庫內資料異常皆**不看本批是否含該鍵**一律拒收(外審 sol#2;`unit-syncCore` SC-I15-claimTwice／-claimTwice-unrelated／-dupInDb).
+  9. **寫入中途失敗**(規格第 5 節 6):預檢攔下可預見之失敗;寫入順序刪除 → 新增 → 修改(同後台整表寫入,procOrm 帶 `mustExist`);任一步失敗 → 引用端由 `writeWithCascade` 還原,**本表由 `writeMain` 之 undo 以鎖內讀取之舊列還原**(新增者以 `delAll({ id: { $in } })` 刪除、被刪者與被改者以 `save(整列, { merge: false })` 寫回;逐步冪等,不論做到哪一步皆可無條件全做),還原成功重新拋出原錯誤(對外 `saveWriteFail`,srLog `syncAndReplaceTabs-restored`);**還原亦失敗** → `saveWriteFail`＋srLog `syncAndReplaceTabs-restore-error`(只記表名／來源／筆數),人工處置;**引用端補償失敗**(`writeWithCascade` 之 `saveCascadePartial`)於同步端點亦對外固定轉為 `saveWriteFail`(外審 sol#3;引用端懸空仍由 srLog `refCascade-restore-error` 供稽核,`unit-syncCore` SC-I12-cascadeUndoFail).
+  10. **後台列(`from` 為空)與他 `from` 之列永不被觸及**;後台對外部列受 Lv1 守門(R-EXT-OWN-01),`srcKey` 為鎖定欄:後台新增帶值之列、改既有列之 `srcKey` → `saveFromNotAllowed`(後台列)／`saveExternalRowChanged`(外部列),reason `addSrcKey`／`srcKeyChanged`,**不論 `lockExternalRows`**(`src/js/externalRows.mjs:checkExternalWrite`);四表寫入契約 `fields` 含 `srcKey`(外部補上或改變使持舊畫面者存檔被拒);清單頁複製列重置 `srcKey`(同 `from`).
+  11. **srcKey 重編警示**(原「同名異 id 重編偵測」之評估結果:**不移除,判定口徑改為 srcKey**):同一 `from` 同批內出現「同名異 srcKey」(新來源鍵列與將被刪除列同名)→ srLog warn `syncAndReplaceTabs-srcKeyRenumber`(只記表名／來源／筆數),並登錄 `getWebInfor().syncWarns`(`countSrcKeyRenumber`;理由:外部來源重編來源鍵＝刪舊增新,引用每次被連帶清理而抹掉後台指派);同 `srcKey` 改名是改名級聯,不警示.**已移除**:`buildSyncRowsNew`(`server/cascadeWrite.mjs`;專供舊同步之「未帶 id 依名稱對應」規劃)、`countIdRenumber`、同步端之 `idOtherFrom` 檢查(targets 以 `idTaken` 取代).`fillIdlessIds` 仍供**後台**整表寫入(API 直打缺 id 之列)使用,不刪(R-REF-CASCADE-01 規則 5).
+  12. **users 之登入對應 `mappingBy='id'`(規格第 9 節末):本輪未實作,列待裁示**(主責 agent 依任務書範圍二第 6 點:兩個以上方案皆可行而取捨涉及部署方行為,停下).方案:O1 外部列對 `srcKey`、後台列對 `id`,撞值收嚴(登入撞多筆既有即拒 `ambiguousUserFromPerm`,另須批次與後台存檔兩入口拒撞值);O2 只對 `srcKey`(後台建立之管理員須改用 email／name 對應);O3 新增 `mappingBy` 值 `'srcKey'`、`'id'` 維持只對 perm `id`;O4 不改.**現況**:遷移後既有外部使用者 `id` 不變仍可登入;**升版後新匯入之外部使用者**其 `id` 為系統配的值,`mappingBy='id'` 下對不到外部 token 之 `id`,無法登入;`mappingBy` 為 `email`／`name` 者不受影響.
+- **刪除防護**:本條為預期功能;外部端輔助 `provideTabs` 不是死碼,不得以「無引用」刪除(opensrcOper 帳本 G8).
+- **狀態:已做**(除第 12 點待裁示).
+- **驗收**(規格第 10 節 I1～I15):`test/unit-syncCore.test.mjs`(64 案:SC-I1…SC-I15、SC-W1 警示、SC-R1～5 形狀與記錄;I14〔無權限權杖、未列 keyTable〕屬路由層,由 `api-syncAndReplaceTabs` 承擔);真後端 `api-syncAndReplaceTabs`、`api-externalRows`、`api-mapKey`、`api-refCascade`;e2e 夾具經 `test/tools/e2eExt.mjs:syncRows`(`id` 標籤改送 `srcKey`).
+- **盤點**:`git grep -nE "srcKey" -- server`(`syncCore.mjs` 配對與驗證、`externalRows` 守門、`provideTabs` 白名單);`git grep -n "delAll({ from" -- server` 須 0 筆(2026-10-23 實得見報告);`git grep -nE "buildSyncRowsNew|countIdRenumber" -- server src` 須 0 筆.

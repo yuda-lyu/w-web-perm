@@ -24,6 +24,7 @@ import u8arr2obj from 'wsemi/src/u8arr2obj.mjs'
 import { startServersOnce, cleanup, apiBaseUrl } from './e2e-setup.mjs'
 import { assertPristineSeed } from './baseSeed.mjs'
 import { markAfterSentinel, readLinesAfter } from './srLogMark.mjs'
+import { buildDecl } from './declHelper.mjs'
 
 export { startServersOnce, cleanup, apiBaseUrl }
 
@@ -38,6 +39,8 @@ export async function startApi() {
 export const TOKEN_ADMIN = 'sys'                       // → id-for-admin（client 使用者，過 verifyClientUser）
 export const TOKEN_APP = '{token-for-application}'     // → id-for-application（app 使用者，過 verifyAppUser；不在 perm users 表）
 export const TOKEN_PETER = '{token-for-peter}'         // → id-for-peter（在表、有效、isAdmin='n' → verifyClientUser 拒）
+export const TOKEN_ADMIN2 = '{token-for-admin2}'       // → id-for-admin2（perm-run03 範圍三：第二位管理員；其 perm users 列由測試自建／停用，過 verifyClientUser 需該列 isAdmin='y'）
+export const TOKEN_MEMBER = '{token-for-member}'       // → id-for-member（perm-run03 範圍四：perm users 列〔測試自建〕isAdmin='n'，但 srv.mjs 之 verifyClientUser 放行 → 通過連線閘之非管理員）
 export const TOKEN_BAD = 'nope-invalid'               // → getUserByToken 回 {} → 守門 reject
 export const TOKEN_REJECT = '{token-for-reject}' // → getUserByToken reject 上游原文(含合成秘密)；W 契約視同查無
 export const TOKEN_VERIFY_THROW = '{token-for-verify-throw}' // → verifyClientUser / verifyAppUser 拋錯；W 契約視同無權限
@@ -78,7 +81,25 @@ export async function getWoItems() {
 //  spec/設計要點與取捨.md ADR-017 Update）三檔原各有一份近似實作，逐呼叫點核對回傳形狀後確認斷言不受影響，
 //  已直接改 import 本函式；api-updateUsers-forGrups 因原呼叫慣例省略第 3 參（依賴預設 TOKEN_ADMIN，本函式
 //  token 為必填）故於該檔內以薄封裝補回預設值，不改本函式行為。
+//  perm-run03 範圍一（宣告強制必帶）：直打 updateUsers／updateGrups／updatePemis 者，未帶 refs／subject 時自動附上「合規客戶端」宣告（同清單頁 buildRefDecl，讀送出當下之庫內資料；見 test/tools/declHelper.mjs），
+//    使各案例的意圖不變（測各自的規則，不是宣告本身）；要測「未附宣告被拒」請傳 opt.noDecl:true。更新函式的第 3 參以後與 args[1] 之其餘鍵（baseline、returnRows）原樣保留。
+const AUTO_DECL = { updateUsers: 'users', updateGrups: 'grups', updatePemis: 'pemis' }
 export async function callRpc(funcName, args, token, opt = {}) {
+    if (Object.prototype.hasOwnProperty.call(AUTO_DECL, funcName) && opt.noDecl !== true && Array.isArray(args) && Array.isArray(args[0])) {
+        const o2 = (args[1] !== null && typeof args[1] === 'object') ? args[1] : {}
+        if (o2.refs === undefined && o2.subject === undefined) {
+            const decl = await buildDecl(AUTO_DECL[funcName], args[0], async (t) => {
+                const r = await callRpcRaw(`${t}.select`, [], TOKEN_ADMIN)
+                return (r.ok && Array.isArray(r.output)) ? r.output : null
+            })
+            if (decl !== null) {
+                args = [args[0], { ...o2, refs: decl }, ...args.slice(2)]
+            }
+        }
+    }
+    return await callRpcRaw(funcName, args, token, opt)
+}
+async function callRpcRaw(funcName, args, token, opt = {}) {
     const sysToken = ('sysToken' in opt) ? opt.sysToken : token
     const payload = { func: funcName, input: { __sysInputArgs__: args, __sysToken__: sysToken } }
     const r = await fetch(`${apiBaseUrl}/api/main`, {

@@ -27,6 +27,7 @@ import cloneDeep from 'lodash-es/cloneDeep.js'
 import cacheSt from 'wsemi/src/cacheSt.mjs'
 import ds from '../src/schema/index.mjs'
 import proc from '../server/procCore.mjs'
+import { autoDecl } from './tools/declHelper.mjs'
 import createLockSave from '../server/lockSave.mjs'
 import { checkUsersWrite } from '../server/keyCheck.mjs'
 import { mkTable, mkCore, mkSrLog } from './tools/unitOrm.mjs'
@@ -345,7 +346,7 @@ describe('unit-procCore-usersKey (後台整表寫入 users 之 email／對應鍵
         if (mappingBy !== OMIT) {
             opt.mappingBy = mappingBy
         }
-        let pc = proc(woItems, core.procOrm, opt)
+        let pc = autoDecl(proc(woItems, core.procOrm, opt), woItems)
         let env = { seed, woItems, logs, cst, core, pc }
         envs.push(env)
         return env

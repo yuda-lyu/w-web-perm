@@ -36,6 +36,7 @@ import {
 } from './e2eLib.mjs'
 import { runSeedChild } from './seedChild.mjs'
 import { assertPristineSeed } from './baseSeed.mjs'
+import { buildDecl } from './declHelper.mjs'
 
 //REGEN 診斷閘門守則（全域技能 role-coder-for-test-e2e references/pixel-mismatch-diagnosis.md §6）：
 //診斷 env（E2E_BARE / E2E_DIAG）生效時絕不可寫入正式 baseline，防止把診斷態誤凍結為標準圖（getE2eMode 於此拋錯）。
@@ -893,14 +894,20 @@ export async function restoreDbOnce(key, seed) {
         await b.close().catch(() => {})
     }
 }
+//updateWithDecl（perm-run03 範圍一，宣告強制必帶）：在 throwaway page 以 $fapi.updateXxx 送整表，改變引用者像清單頁一樣附被引用實體身分宣告 opt.refs
+//  （declHelper.buildDecl：同清單頁 buildRefDecl 之無 picks 路徑，讀送出當下之庫內資料）；targets 無授權引用欄，不附。test setup 層、非 act。
+export async function updateWithDecl(p, key, seed) {
+    const fname = 'update' + key[0].toUpperCase() + key.slice(1)
+    const decl = await buildDecl(key, seed, async (t) => await p.evaluate(async (tt) => await window.$vo.$fapi[tt].select(), t))
+    await p.evaluate(({ f, s, o }) => window.$vo.$fapi[f](s, o), { f: fname, s: seed, o: decl === null ? undefined : { refs: decl } })
+}
 //在獨立 throwaway page 還原 DB（diff：刪多餘/補缺漏），關閉後再開 case page。
 //不可在 case page 上 reset：updateXxx 的 late 廣播(recvData)會在 clickAdd 後到、觸發 changeParams 重算
 //把已新增列洗掉（曾導致 typeIntoCell 改到既有列）。test setup 層、非 act。
 export async function resetDb(browser, key, seed) {
     if (!seed || seed.length === 0) throw new Error('resetDb: BASE_SEED 為空，拒絕還原（避免清空 DB）')
-    const fname = 'update' + key[0].toUpperCase() + key.slice(1)
     const p = await openApp(browser)
-    await p.evaluate(({ f, s }) => window.$vo.$fapi[f](s), { f: fname, s: seed })
+    await updateWithDecl(p, key, seed)
     await p.waitForFunction(({ k, n }) => (window.$vo.$store.state[k] || []).length === n, { k: key, n: seed.length }, { timeout: 15000 })
     await p.waitForTimeout(800)
     await p.context().close()
@@ -916,8 +923,7 @@ export async function resetDbTables(browser, items) {
     }
     const p = await openApp(browser)
     for (const { key, seed } of items) {
-        const fname = 'update' + key[0].toUpperCase() + key.slice(1)
-        await p.evaluate(({ f, s }) => window.$vo.$fapi[f](s), { f: fname, s: seed })
+        await updateWithDecl(p, key, seed)
         await p.waitForFunction(({ k, n }) => (window.$vo.$store.state[k] || []).length === n, { k: key, n: seed.length }, { timeout: 15000 })
     }
     await p.waitForTimeout(800)

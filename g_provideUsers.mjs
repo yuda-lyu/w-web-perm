@@ -56,7 +56,7 @@ async function provide() {
             cgrups,
             isAdmin,
         })
-        v.id = `id-for-${name}`
+        v.srcKey = `id-for-${name}` //外部自訂之來源鍵(同一來源內唯一且穩定); 內部主鍵 id 由本系統產生, 外部不得送出 id(R-IMPORT-01、provideTabs 不送 id)
         // if (name === 'john') {
         //     v.email = `${v.email};john@test.com`
         // }

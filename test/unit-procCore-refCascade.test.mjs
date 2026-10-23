@@ -10,7 +10,7 @@
 //  P4 失敗回復(引用端先寫、主體後寫; 任一步例外 → 以寫入前原值補償還原引用端, 逐位元含 userIdUpdate／timeUpdate; 補償亦失敗 → saveCascadePartial＋srLog refCascade-restore-error;
 //     互換／鏈式／批內新增三形狀於補償後重送同一份資料須成功且結果正確; 主體 del → insert → save 之部分寫入為 ADR-013 既有限制, 補償不還原主體, 測試如實釘住); 成功時 srLog refCascade-done 計數正確且不含引用端 id 與個資.
 //  P5 鎖(R-WRITE-LOCK-02; perm-run01 起鎖管理器為 w-serv-orm 實例之 withTabLocks／guardWrite, R-LOCK-CORE-01): 單一取鎖函數 keyCheck.withTabLocks(lockTabs, …), 階層 targets < pemis < grups < users 與輸入順序無關、去重、held 守門、失敗釋放、相反次序不死結; 分段取鎖(無改名／刪除不取引用端鎖; 有才取); 並行 updateGrups ∥ updateUsers ∥ updatePemis ∥ updateTargets 多輪隨機交錯不死結且終態等價於某一依序執行;
-//     站點不變式: procCore.mjs 與 WWebPerm.mjs 不得自建鎖(pmKeyMutex／kmx( 皆不得出現; 取表鎖只經 keyCheck.withTabLocks 或 w-serv-orm 的 guardWrite／withTabLocks), 取引用端表鎖處須帶 held 參數 [keyTable].
+//     站點不變式: procCore.mjs、syncCore.mjs(外部匯入, perm-run03 自 WWebPerm.mjs 搬出)與 WWebPerm.mjs 不得自建鎖(pmKeyMutex／kmx( 皆不得出現; 取表鎖只經 keyCheck.withTabLocks 或 w-serv-orm 的 guardWrite／withTabLocks), 取引用端表鎖處須帶 held 參數 [keyTable].
 //  P6 updateUsers: users 為引用鏈末端(引用端 = 無), 整表寫入(含 pickKeysOnly)不觸發任何級聯、不取其他表鎖、不寫其他表.
 //
 //受測: server/procCore.mjs 之 updateGrups／updatePemis／updateTargets／updateUsers(kpFunExt 之實際入口, 內走 updateTabItems)、server/cascadeWrite.mjs、server/keyCheck.mjs 之 withTabLocks.
@@ -27,13 +27,14 @@ import cacheSt from 'wsemi/src/cacheSt.mjs'
 import clearXSS from 'wsemi/src/clearXSS.mjs'
 import ds from '../src/schema/index.mjs'
 import proc from '../server/procCore.mjs'
+import { autoDecl, buildDecl } from './tools/declHelper.mjs'
 import createLockSave from '../server/lockSave.mjs'
 import { withTabLocks } from '../server/keyCheck.mjs'
-import { checkCascadePlan, writeWithCascade, buildSyncRowsNew } from '../server/cascadeWrite.mjs'
+import { checkCascadePlan, writeWithCascade } from '../server/cascadeWrite.mjs'
 import planRefChanges, { fillIdlessIds } from '../src/js/refCascade.mjs'
 import { getUserRules } from '../src/plugins/mShare.mjs'
 import { mkTable, mkCore, mkSrLog } from './tools/unitOrm.mjs'
-import { stripLineComment, takeParen } from './tools/srcScan.mjs'
+import { stripLineComment, takeParen, sourceLines } from './tools/srcScan.mjs'
 
 
 const projRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -146,7 +147,7 @@ function createEnv(opt = {}) {
     let cst = cacheSt()
     let core = mkCore(ds, woItems) //perm-run01: 原 mkProcOrm(ds, woItems)＋kmx: pmKeyMutex() 改 mkCore
     let lock = opt.lockOf ? opt.lockOf(core) : core.lock
-    let pc = proc(woItems, core.procOrm, { srLog, ...lock, lockSave: createLockSave(cst), ...(opt.proc || {}) })
+    let pc = autoDecl(proc(woItems, core.procOrm, { srLog, ...lock, lockSave: createLockSave(cst), ...(opt.proc || {}) }), woItems)
     let env = { seed, woItems, logs, cst, core, pc }
     envs.push(env)
     return env
@@ -1027,17 +1028,25 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
             assert.strict.deepEqual(parseOf(env2.woItems, 'grups', 'id-g1', 'cpemis'), { P1: OR, P2: OR })
         })
 
-        it('RW-221i 取鎖軌跡: 整表缺 id 且名稱不變 → 無須改寫引用端, 只取本表鎖(grups); 缺 id 改名(視為刪除)→ 再取引用端鎖(grups → users)', async function() {
+        it('RW-221i 取鎖軌跡: 整表缺 id 且名稱不變 → 無須改寫引用端(不取 users 鎖), 只取被引用表宣告驗證鎖(pemis)與本表鎖(grups); 缺 id 改名(視為刪除)→ 再取引用端鎖(pemis → grups → users)', async function() {
             //perm-run01: 原注入假 kmx 記 acq 鍵 tabWriteKey(表), 改以 traceLock 包裝真鎖(記 acq 表名; 本表經 guardWrite、引用端經 withTabLocks 皆記)
+            //perm-run03: 缺 id 之列為新增列(API 直打)而帶有 cpemis 引用 → 「新增列帶引用」屬改變引用, 須附身分宣告(合規客戶端 autoDecl 自動附); 帶宣告者先取被引用表(pemis)鎖並新鮮讀取驗證(R-REF-IDENTITY-01、R-WRITE-LOCK-02:
+            //被引用者階層低、先取), 故軌跡首位多一把 pemis; 本案原意(名稱不變無須再取引用端 users 鎖; 缺 id 改名才取)不變
             let acq = (log) => log.filter((x) => x.startsWith('acq ')).map((x) => x.slice(4))
             let t1 = traceLock()
             let env = createEnv({ lockOf: t1.wrap })
             assert.strict.deepEqual(await run(env.pc, 'grups', noId(await rowsOf(env.woItems, 'grups'))), OKR)
-            assert.strict.deepEqual(acq(t1.log), ['grups'])
+            assert.strict.deepEqual(acq(t1.log), ['pemis', 'grups'])
             let t2 = traceLock()
             let env2 = createEnv({ lockOf: t2.wrap })
             assert.strict.deepEqual(await run(env2.pc, 'grups', noId(edit(await rowsOf(env2.woItems, 'grups'), 'id-g1', { name: 'G1y' }))), OKR)
-            assert.strict.deepEqual(acq(t2.log), ['grups', 'users'])
+            assert.strict.deepEqual(acq(t2.log), ['pemis', 'grups', 'users'])
+            //未附宣告(__noDecl)之同一份缺 id 整表 → 新增列帶引用而無宣告, 整次拒收 saveIdentityRequired(行為見 unit-procCore-identity; 此處只對照: 拒收發生於被引用表鎖之前, 不取任何鎖)
+            let t3 = traceLock()
+            let env3 = createEnv({ lockOf: t3.wrap })
+            assert.strict.deepEqual(await run(env3.pc, 'grups', noId(await rowsOf(env3.woItems, 'grups')), { __noDecl: true }), ERR('saveIdentityRequired'))
+            assert.strict.deepEqual(acq(t3.log), ['grups'], '無宣告者不取被引用表鎖(無從驗證即拒收, 不讀被引用表); 於本表鎖內判定並零寫入')
+            assert.strict.equal(writesAll(env3.woItems), 0)
         })
 
         it('RW-220 crules 之物件值形式與陣列形式: 刪標的 T1 → 物件形式移除 T1 鍵(值物件之他鍵不動)、陣列形式移除該元素且仍為陣列', async function() {
@@ -2290,38 +2299,59 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
                 return a
             }
 
+            //perm-run03(被引用實體身分宣告強制必帶): 本段各操作攜帶「過時之整表」(自種子建構, 同 last-writer-wins 之前提), 其改變引用之部分須附宣告——
+            //宣告如同真客戶端: 於「載入時」(種子狀態)對種子的被引用表一次算定(declOps), 之後不隨他人寫入更新. 他人先到的寫入使被引用實體消失／改名／被取代時, 過時宣告於鎖內被
+            //saveRefChanged／saveIdentityRequired 拒收(零寫入, 這是新協定的預期結果, 不是缺陷); 故不再斷言「全部成功」, 改斷言:
+            //  ①不死結 ②每個被拒的操作其拒收鍵屬宣告類(saveRefChanged／saveIdentityRequired) ③「各操作之結果＋終態」等價於某一依序執行(依序執行同樣使用同一份靜態宣告, 結果含拒收)——無遺失更新、無半套之級聯.
+            //  鎖以兩階段持有至操作結束(被引用表→本表→引用端, 階層取鎖), 故各操作對可序列化; 此為本段原意(原斷言「等價於某一依序執行」)在新協定下的原樣保留.
+            const DECL_KEYS = ['saveRefChanged', 'saveIdentityRequired']
+            //declOps: 為各操作以種子狀態算定靜態宣告 opt(targets 無授權引用欄, 不附; 其餘三表恆明確帶 refs〔含空陣列〕, 使依序／並行兩邊使用完全相同之宣告, 不受 autoDecl 於呼叫當下讀到之他人寫入影響)
+            let declOps = async (ops, seedFn = seedAllBackend) => {
+                let env0 = createEnv({ seed: seedFn() })
+                let sel = async (t) => JSON.parse(env0.woItems[t].snapshot())
+                for (let o of ops) {
+                    let refs = await buildDecl(o.table, o.rows, sel)
+                    o.opt = refs === null ? undefined : { refs }
+                }
+                return ops
+            }
+
             let baselineCache = new Map()
-            //baselineOf: 該情境之所有依序執行(各排列)之 { results, view } 集合; 並回傳是否各排列皆全部成功
+            //baselineOf: 該情境之所有依序執行(各排列)之 { results, view } 集合; nAllOk 為各排列中「全部成功」者之數(防空洞用)
             let baselineOf = async (sc, ids) => {
                 let key = JSON.stringify([sc, ids])
                 if (baselineCache.has(key)) {
                     return baselineCache.get(key)
                 }
-                let ops = buildOps(sc).filter((o) => ids.includes(o.name))
+                let ops = await declOps(buildOps(sc).filter((o) => ids.includes(o.name)))
                 let set = new Set()
                 let views = new Set()
+                let nAllOk = 0
                 for (let perm of permutations(ops.map((o) => o.name))) {
                     let env = createEnv({ seed: seedAllBackend() })
                     let results = {}
                     for (let nm of perm) {
                         let o = ops.find((x) => x.name === nm)
-                        results[nm] = await run(env.pc, o.table, cloneDeep(o.rows), undefined, o.userId)
+                        results[nm] = await run(env.pc, o.table, cloneDeep(o.rows), o.opt, o.userId)
                     }
                     let view = await viewOf(env.woItems)
                     let rs = ops.map((o) => results[o.name])
-                    assert.strict.ok(rs.every((r) => r.ok), `依序執行(${perm})應全部成功: ${JSON.stringify(rs)}`)
+                    assert.strict.ok(rs.every((r) => r.ok || DECL_KEYS.includes(r.v)), `依序執行(${perm})之拒收鍵應屬宣告類: ${JSON.stringify(rs)}`)
+                    if (rs.every((r) => r.ok)) {
+                        nAllOk++
+                    }
                     set.add(`${JSON.stringify(rs)}|${view}`)
                     views.add(view)
                     env.cst.clear()
                 }
-                let b = { set, nViews: views.size }
+                let b = { set, nViews: views.size, nAllOk, nPerm: set.size }
                 baselineCache.set(key, b)
                 return b
             }
 
             let concurrentRound = async (sc, ids, seedNo) => {
                 let rand = mulberry32(seedNo)
-                let ops = buildOps(sc).filter((o) => ids.includes(o.name))
+                let ops = await declOps(buildOps(sc).filter((o) => ids.includes(o.name)))
                 let env = createEnv({ seed: seedAllBackend() })
                 for (let k of TABLE_KEYS) {
                     fuzzTable(env.woItems[k], rand)
@@ -2330,7 +2360,7 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
                 let rs = []
                 let ps = order.map((i) => (async () => {
                     await jitter(rand)
-                    rs[i] = await run(env.pc, ops[i].table, cloneDeep(ops[i].rows), undefined, ops[i].userId)
+                    rs[i] = await run(env.pc, ops[i].table, cloneDeep(ops[i].rows), ops[i].opt, ops[i].userId)
                 })())
                 await withTimeout(Promise.all(ps), 10000, `情境 ${JSON.stringify(sc)} 種子 ${seedNo}`)
                 let view = await viewOf(env.woItems)
@@ -2338,21 +2368,27 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
                 return { rs, view }
             }
 
-            it('RW-540 updateGrups ∥ updateUsers ∥ updatePemis ∥ updateTargets(含改名／刪除)隨機交錯 60 輪(12 情境 × 5): 全部於 10 秒內完成(不死結)且全部成功、終態與各操作之結果等價於某一依序執行(無遺失更新、無半套之級聯)', async function() {
+            it('RW-540 updateGrups ∥ updateUsers ∥ updatePemis ∥ updateTargets(含改名／刪除)隨機交錯 60 輪(12 情境 × 5): 全部於 10 秒內完成(不死結)、被拒者其拒收鍵屬宣告類、終態與各操作之結果等價於某一依序執行(無遺失更新、無半套之級聯)', async function() {
                 let nViewsBySc = []
+                let nAllOkRounds = 0
                 for (let round = 0; round < 60; round++) {
                     let sc = SCEN[round % SCEN.length]
                     let ids = ['G', 'U', 'P', 'T']
                     let b = await baselineOf(sc, ids)
                     let { rs, view } = await concurrentRound(sc, ids, 1000 + round)
-                    assert.strict.ok(rs.every((r) => r.ok), `第 ${round} 輪(情境 ${JSON.stringify(sc)}, 種子 ${1000 + round})應全部成功: ${JSON.stringify(rs)}`)
-                    assert.strict.ok(b.set.has(`${JSON.stringify(rs)}|${view}`), `第 ${round} 輪(情境 ${JSON.stringify(sc)}, 種子 ${1000 + round})終態不等價於任何依序執行(遺失更新或半套級聯)\n實得 ${view}`)
+                    assert.strict.ok(rs.every((r) => r.ok || DECL_KEYS.includes(r.v)), `第 ${round} 輪(情境 ${JSON.stringify(sc)}, 種子 ${1000 + round})之拒收鍵應屬宣告類: ${JSON.stringify(rs)}`)
+                    assert.strict.ok(b.set.has(`${JSON.stringify(rs)}|${view}`), `第 ${round} 輪(情境 ${JSON.stringify(sc)}, 種子 ${1000 + round})終態不等價於任何依序執行(遺失更新或半套級聯)\n實得 ${JSON.stringify(rs)}|${view}`)
+                    if (rs.every((r) => r.ok)) {
+                        nAllOkRounds++
+                    }
                     if (round < SCEN.length) {
                         nViewsBySc.push(b.nViews)
                     }
                 }
                 //防空洞: 依序執行之終態因次序而異者(各情境之相異終態數 > 1)須占多數, 比對才具鑑別力
                 assert.strict.ok(nViewsBySc.filter((n) => n > 1).length >= 8, `相異終態 > 1 之情境數不足: ${nViewsBySc}`)
+                //防空洞: 全部成功之輪次須占一定比例(否則「宣告類拒收」吞掉全部操作, 並行寫入路徑未被實際走完)
+                assert.strict.ok(nAllOkRounds >= 20, `全部成功之輪次過少(${nAllOkRounds}/60): 過時宣告之拒收過度吞掉並行寫入`)
             })
 
             it('RW-541 同一表之多操作者並行(updateGrups ×3: 改名／互換／刪除, 各自過時之整表)40 輪 → 不死結, 終態等價於某一依序執行', async function() {
@@ -2364,14 +2400,16 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
                         { name: 'C', table: 'grups', userId: 'id-opC', rows: cloneDeep(drop(s.grups, 'id-g2')) },
                     ]
                 }
-                let ops = mk()
+                //perm-run03: 三個操作者攜帶各自過時之整表與「載入時(種子狀態)算定之靜態宣告」(同 RW-540 之 declOps); 先到者使後到者之宣告過時 → 後到者依 saveRefChanged／saveIdentityRequired 拒收(零寫入),
+                //依序執行與並行同樣使用同一份宣告, 故「各操作之結果＋終態」仍須等價於某一依序執行(結果含拒收)
+                let ops = await declOps(mk(), seedRows)
                 let set = new Set()
                 for (let perm of permutations(['A', 'B', 'C'])) {
                     let env = createEnv()
                     let results = {}
                     for (let nm of perm) {
                         let o = ops.find((x) => x.name === nm)
-                        results[nm] = await run(env.pc, o.table, cloneDeep(o.rows), undefined, o.userId)
+                        results[nm] = await run(env.pc, o.table, cloneDeep(o.rows), o.opt, o.userId)
                     }
                     let rs = ops.map((o) => results[o.name])
                     set.add(`${JSON.stringify(rs)}|${await viewOf(env.woItems)}`)
@@ -2388,8 +2426,9 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
                     let order = shuffle([0, 1, 2], rand)
                     await withTimeout(Promise.all(order.map((i) => (async () => {
                         await jitter(rand)
-                        rs[i] = await run(env.pc, ops[i].table, cloneDeep(ops[i].rows), undefined, ops[i].userId)
+                        rs[i] = await run(env.pc, ops[i].table, cloneDeep(ops[i].rows), ops[i].opt, ops[i].userId)
                     })())), 10000, `同表並行 種子 ${2000 + round}`)
+                    assert.strict.ok(rs.every((r) => r.ok || DECL_KEYS.includes(r.v)), `同表並行第 ${round} 輪之拒收鍵應屬宣告類: ${JSON.stringify(rs)}`)
                     let view = await viewOf(env.woItems)
                     env.cst.clear()
                     assert.strict.ok(set.has(`${JSON.stringify(rs)}|${view}`), `同表並行第 ${round} 輪(種子 ${2000 + round})終態不等價於任何依序執行: ${JSON.stringify(rs)}`)
@@ -2424,9 +2463,9 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
             //perm-run01: 原 RW-550「不得直接 kmx( 取鎖」改為「不得自建鎖(pmKeyMutex／kmx( 皆不得出現; 取表鎖只經 keyCheck.withTabLocks 或 w-serv-orm 的 guardWrite／withTabLocks)」;
             //原 RW-551「withTabLocks( 恰兩處, 外層 withTabLocks(kmx, [keyTable], …)、內層 withTabLocks(kmx, [holder], …, [keyTable])」, 新碼:
             //  procCore.mjs: 本表鎖由 guardWrite({ tables: [keyTable], … }) 承擔(w-serv-orm 內部取鎖, 不再有外層 withTabLocks( 呼叫), 故僅內層一處 keyCheck.withTabLocks(lockTabs, [holder], …, [keyTable]);
-            //  WWebPerm.mjs: 外部同步外層 withTabLocks(lockTabs, [keyTable], …)、內層 withTabLocks(lockTabs, [holder], …, [keyTable]) 共兩處.
+            //  外部同步外層 withTabLocks(lockTabs, [keyTable], …)、內層 withTabLocks(lockTabs, [holder], …, [keyTable]) 共兩處——perm-run03 起在 server/syncCore.mjs(原 WWebPerm.mjs; WWebPerm.mjs 只把同一個 lockTabs 交給 syncCore, 自身不取鎖).
             //  兩檔之內層(引用端表鎖)皆須帶 held 參數 [keyTable](階層守門, 防巢狀同鍵／反向).
-            for (let rel of ['server/procCore.mjs', 'server/WWebPerm.mjs']) {
+            for (let rel of ['server/procCore.mjs', 'server/syncCore.mjs', 'server/WWebPerm.mjs']) {
                 it(`RW-550 ${rel}: 不得自建鎖(pmKeyMutex／kmx( 皆不得出現; 取表鎖只經 keyCheck.withTabLocks 或 w-serv-orm 的 guardWrite／withTabLocks, 否則可能違反階層而死結)`, function() {
                     let code = readCode(rel)
                     assert.strict.equal((code.match(/\bkmx\(/g) || []).length, 0, 'kmx( 不得出現')
@@ -2452,26 +2491,32 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
                 assert.strict.ok(code.indexOf('guardWrite({') < code.indexOf('withTabLocks(lockTabs, [holder]'), '引用端鎖須在 guardWrite 之後(write 回呼內)')
             })
 
-            it('RW-551b server/WWebPerm.mjs: 全部 withTabLocks( 呼叫恰兩處——先取本表 [keyTable], 內層取引用端表 [holder] 時帶 held 參數 [keyTable](階層守門, 防巢狀同鍵／反向)', function() {
-                let calls = withTabLocksCalls(readCode('server/WWebPerm.mjs'))
-                assert.strict.equal(calls.length, 2, 'WWebPerm.mjs 之 withTabLocks( 呼叫數')
+            it('RW-551b server/syncCore.mjs(外部匯入; perm-run03 自 WWebPerm.mjs 搬出): 全部 withTabLocks( 呼叫恰兩處——先取本表 [keyTable], 內層取引用端表 [holder] 時帶 held 參數 [keyTable](階層守門, 防巢狀同鍵／反向); WWebPerm.mjs 自身不取鎖(0 處)', function() {
+                //去註解與 JSDoc 後之可執行碼(JSDoc 內說明文字含 withTabLocks( 字樣不計)
+                let pure = (rel) => sourceLines(path.join(projRoot, rel), 'code').map((l) => l.text).join('\n')
+                let calls = withTabLocksCalls(pure('server/syncCore.mjs'))
+                assert.strict.equal(calls.length, 2, 'syncCore.mjs 之 withTabLocks( 呼叫數')
                 let outer = calls.filter((a) => /^\s*lockTabs,\s*\[keyTable\]\s*,/.test(a))
                 let inner = calls.filter((a) => /^\s*lockTabs,\s*\[holder\]\s*,/.test(a))
                 assert.strict.equal(outer.length, 1, '外層取本表鎖 withTabLocks(lockTabs, [keyTable], …)')
                 assert.strict.equal(inner.length, 1, '內層取引用端表鎖 withTabLocks(lockTabs, [holder], …)')
                 assert.strict.ok(/,\s*\[keyTable\]\s*$/.test(inner[0]), '內層須帶 held 參數 [keyTable]')
+                assert.strict.equal(withTabLocksCalls(pure('server/WWebPerm.mjs')).length, 0, 'WWebPerm.mjs 自身不取鎖(外部同步已搬出)')
             })
 
-            it('RW-551c procCore.mjs 與 WWebPerm.mjs 之鎖來源: 皆取自注入之 w-serv-orm 實例(procCore 收 withTabLocks／guardWrite 注入; WWebPerm 取 WServOrm 回傳物件之 withTabLocks／guardWrite), 不自行建構', function() {
+            it('RW-551c procCore.mjs／syncCore.mjs 與 WWebPerm.mjs 之鎖來源: 皆取自注入之 w-serv-orm 實例(procCore 收 withTabLocks／guardWrite 注入; syncCore 收 lockTabs 注入; WWebPerm 取 WServOrm 回傳物件之 withTabLocks／guardWrite 並交給兩者), 不自行建構', function() {
                 let pcCode = readCode('server/procCore.mjs')
                 assert.strict.ok(/function proc\(woItems, procOrm, \{[^}]*\bwithTabLocks: lockTabs\b[^}]*\bguardWrite\b[^}]*\}\)/.test(pcCode), 'proc 須收 withTabLocks(別名 lockTabs)／guardWrite 注入')
+                let scCode = readCode('server/syncCore.mjs')
+                assert.strict.ok(/function syncCore\(\{[^}]*\blockTabs\b[^}]*\}\)/.test(scCode), 'syncCore 須收 lockTabs 注入')
                 let wpCode = readCode('server/WWebPerm.mjs')
                 assert.strict.ok(/let lockTabs = wp\.withTabLocks/.test(wpCode) && /let guardWrite = wp\.guardWrite/.test(wpCode), 'WWebPerm 之鎖取自 WServOrm 回傳物件')
-                assert.strict.ok(/procCore\(woItems,\s*procOrm,\s*\{[^}]*\bwithTabLocks: lockTabs\b[^}]*\bguardWrite\b[^}]*\}\)/.test(wpCode), 'WWebPerm 須把同一組 withTabLocks／guardWrite 注入 procCore(與外部同步共鎖)')
+                assert.strict.ok(/procCore\(woItems,\s*procOrm,\s*\{[^}]*\bwithTabLocks: lockTabs\b[^}]*\bguardWrite\b[^}]*\}\)/.test(wpCode), 'WWebPerm 須把同一組 withTabLocks／guardWrite 注入 procCore(與外部匯入共鎖)')
+                assert.strict.ok(/syncCore\(\{[^}]*\blockTabs\b[^}]*\}\)/.test(wpCode), 'WWebPerm 須把同一個 lockTabs 注入 syncCore(與後台整表寫入共鎖)')
             })
 
             it('RW-552 引用端表之取得只經 REF_OF[keyTable].holder(單一對照表), 不另寫死表名', function() {
-                for (let rel of ['server/procCore.mjs', 'server/WWebPerm.mjs']) {
+                for (let rel of ['server/procCore.mjs', 'server/syncCore.mjs']) {
                     let code = readCode(rel)
                     assert.strict.ok(/let holder = REF_OF\[keyTable\]\.holder/.test(code), `${rel} 之 holder 取自 REF_OF`)
                 }
@@ -2524,133 +2569,120 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
             assert.strict.ok(!logs.some((l) => /refCascade/.test(l.event)))
         })
 
-        it('RW-603 users 寫入時不取其他表鎖: 同時持有 targets／pemis／grups 三把鎖, updateUsers(整表與 pickKeysOnly)皆不被擋', async function() {
+        it('RW-603 users 寫入時不取其他表鎖(無改變引用者): 同時持有 targets／pemis／grups 三把鎖, updateUsers 整表寫入(無改變 cgrups)不被擋; 改變 cgrups 之 pickKeysOnly 僅多取被引用表 grups 之宣告驗證鎖(perm-run03), 持有 targets／pemis 時不被擋、持有 grups 時被擋至釋放後才完成', async function() {
+            //holdTabs: 對真鎖管理器以表名持有若干把鎖直到 release()
+            let holdTabs = (core, tabs) => {
+                let release = null
+                let gate = new Promise((resolve) => {
+                    release = resolve
+                })
+                let helds = tabs.map((t) => core.withTabLocks([t], () => gate)) //perm-run01: 原 env.kmx(tabWriteKey(t), …) 改對真鎖管理器以表名取鎖
+                return { release: () => release(), done: () => Promise.all(helds) }
+            }
             let env = createEnv()
-            let release = null
-            let gate = new Promise((resolve) => {
-                release = resolve
-            })
-            let helds = ['targets', 'pemis', 'grups'].map((t) => env.core.withTabLocks([t], () => gate)) //perm-run01: 原 env.kmx(tabWriteKey(t), …) 改對真鎖管理器以表名取鎖
+            let h1 = holdTabs(env.core, ['targets', 'pemis', 'grups'])
             try {
                 let r1 = await withTimeout(run(env.pc, 'users', edit(await rowsOf(env.woItems, 'users'), 'id-u1', { description: 'x' })), 5000, 'updateUsers 持他表鎖')
                 assert.strict.deepEqual(r1, OKR)
-                //run07 U1 修正: 原改外部列 id-u2(appX)之 cgrups, 無基準即拒收 saveBaselineRequired(外部列指派欄須附載入基準, R-EXT-OWN-01/R-BASELINE-01); 本案述語為取鎖階層, 與外部列無關, 改以後台列 id-u4 驗 pickKeysOnly 路徑(斷言未放寬)
-                let r2 = await withTimeout(run(env.pc, 'users', edit(await rowsOf(env.woItems, 'users'), 'id-u4', { cgrups: J({ G1: OR }) }), { pickKeysOnly: ['cgrups'] }, 'id-admin2'), 5000, 'updateUsers(pickKeysOnly) 持他表鎖')
+            }
+            finally {
+                h1.release()
+                await h1.done()
+            }
+            //perm-run03: 改變 cgrups 的存檔須附被引用實體身分宣告, 帶宣告者在本表鎖之外層取被引用表(grups)鎖並新鮮讀取驗證(R-REF-IDENTITY-01); 與 targets／pemis 無關(引用鏈末端 users 不經級聯, 不取其他表鎖)
+            //run07 U1 修正: 原改外部列 id-u2(appX)之 cgrups, 無基準即拒收 saveBaselineRequired(外部列指派欄須附載入基準, R-EXT-OWN-01/R-BASELINE-01); 本案述語為取鎖階層, 與外部列無關, 改以後台列 id-u4 驗 pickKeysOnly 路徑(斷言未放寬)
+            let env2 = createEnv()
+            let h2 = holdTabs(env2.core, ['targets', 'pemis'])
+            try {
+                let r2 = await withTimeout(run(env2.pc, 'users', edit(await rowsOf(env2.woItems, 'users'), 'id-u4', { cgrups: J({ G1: OR }) }), { pickKeysOnly: ['cgrups'] }, 'id-admin2'), 5000, 'updateUsers(pickKeysOnly) 持 targets／pemis 鎖')
                 assert.strict.deepEqual(r2, OKR)
             }
             finally {
-                release()
-                await Promise.all(helds)
+                h2.release()
+                await h2.done()
             }
+            //持有 grups(被引用表)時被擋: 宣告驗證須在 grups 表鎖內新鮮讀取, 釋放後才完成, 期間 users 零寫入
+            let env3 = createEnv()
+            let h3 = holdTabs(env3.core, ['grups'])
+            let done3 = false
+            let p3 = run(env3.pc, 'users', edit(await rowsOf(env3.woItems, 'users'), 'id-u4', { cgrups: J({ G1: OR }) }), { pickKeysOnly: ['cgrups'] }, 'id-admin2').then((r) => {
+                done3 = true
+                return r
+            })
+            await flush(40)
+            assert.strict.equal(done3, false, '持有 grups 期間 updateUsers(改變 cgrups)不得完成')
+            assert.strict.equal(writesAll(env3.woItems), 0, '持鎖期間任何表不得被寫')
+            h3.release()
+            await h3.done()
+            assert.strict.deepEqual(await withTimeout(p3, 5000, '釋放後應完成'), OKR)
+            assert.strict.equal(env3.woItems.users.get('id-u4').cgrups, J({ G1: OR }))
         })
 
-        it('RW-604 users 之取鎖軌跡僅 users 一把(整表與 pickKeysOnly 皆然), 與是否刪除／改名使用者無關', async function() {
+        it('RW-604 users 之取鎖軌跡: 無改變引用之整表寫入僅 users 一把; 改變 cgrups 之 pickKeysOnly 為被引用表 grups(宣告驗證, 外層)→ users(perm-run03), 與是否刪除／改名使用者無關', async function() {
             //perm-run01: 原注入假 kmx 記鍵 tabWriteKey('users'), 改 traceLock 包裝真鎖, 記表名 'users'(本表鎖經 guardWrite; users 無引用端故不經 withTabLocks)
             let tr = traceLock()
             let log = tr.log
             let env = createEnv({ lockOf: tr.wrap })
             await run(env.pc, 'users', drop(edit(await rowsOf(env.woItems, 'users'), 'id-u1', { name: 'renamed' }), 'id-u5'))
-            //run07 U1 修正: 原改外部列 id-u2 之 cgrups(無基準 → 被 saveBaselineRequired 拒收而本案未檢回傳值, 取鎖軌跡仍為一把而掩蓋了該次其實未成功); 改以後台列 id-u4 並斷言成功, 使「pickKeysOnly 路徑取一把鎖」確實走完寫入
+            //run07 U1 修正: 原改外部列 id-u2 之 cgrups(無基準 → 被 saveBaselineRequired 拒收而本案未檢回傳值, 取鎖軌跡仍為一把而掩蓋了該次其實未成功); 改以後台列 id-u4 並斷言成功, 使「pickKeysOnly 路徑」確實走完寫入
+            //perm-run03: pickKeysOnly 改了 cgrups(新增啟用引用 G1)→ 須附宣告 → 先取被引用表 grups 鎖(外層, 階層較低)再取本表 users; 釋放次序反向
             assert.strict.deepEqual(await run(env.pc, 'users', edit(await rowsOf(env.woItems, 'users'), 'id-u4', { cgrups: J({ G1: OR }) }), { pickKeysOnly: ['cgrups'] }, 'id-admin2'), OKR)
-            assert.strict.deepEqual(log, ['acq users', 'rel users', 'acq users', 'rel users'], '兩次寫入(整表、pickKeysOnly)各只取 users 一把鎖、各自釋放')
+            assert.strict.deepEqual(log, ['acq users', 'rel users', 'acq grups', 'acq users', 'rel users', 'rel grups'], '整表寫入(無改變引用)只取 users 一把; pickKeysOnly(改變 cgrups)為 grups → users, 各自釋放')
         })
 
     })
 
     // =====================================================================
-    // 族 7: cascadeWrite 純函數／介面單元(buildSyncRowsNew、checkCascadePlan、writeWithCascade; RW-7xx)
+    // 族 7: cascadeWrite 純函數／介面單元(checkCascadePlan、writeWithCascade; RW-7xx)
     // =====================================================================
     describe('族 7 cascadeWrite 單元', function() {
 
-        describe('buildSyncRowsNew(外部同步之寫入後整表, 供規劃)', function() {
+        //perm-run03: 原 describe「buildSyncRowsNew(外部同步之寫入後整表, 供規劃)」之 RW-701～707(測 buildSyncRowsNew 本身: 他 from 置前、未帶 id 依名稱沿用同 from 既有列之 id、新名為 __new__<k>、有限數字 id、歷史同名一對一、已帶用 id 不重複佔用、
+        //targets 無名稱對應、非物件忽略／不改輸入)隨 buildSyncRowsNew 刪除而刪除(外部匯入改依 srcKey 差異同步, 不再有「未帶 id 依名稱對應」; 新行為由 unit-syncCore 覆蓋); RW-708～710 為「寫入後整表 → planRefChanges」之串接斷言,
+        //保留其斷言, 夾具改為直接構造外部匯入寫入後之整表(＝他 from 之列原樣 ＋ 同 from 存續者〔沿用庫內 id, 含改名〕＋ 新增者〔配新 id〕), 其中 RW-708／710 之「未帶 id」前提改為 srcKey 語意(見各案)
+        describe('外部匯入寫入後整表 → planRefChanges 串接(R-IMPORT-01、R-REF-CASCADE-01)', function() {
 
-            let old = () => [
-                { id: 'id-a', name: 'a', from: '' },
-                { id: 'id-b', name: 'b', from: 'appX' },
-                { id: 'id-c', name: 'c', from: 'appX' },
-                { id: 'id-d', name: 'd', from: 'appY' },
-            ]
-
-            it('RW-701 他 from 之既有列原樣置前; 同 from 既有列未出現於本批者不在整表內(＝被刪除); 未帶 id 且同名者沿用同 from 既有列之 id; 新名為 __new__<k>', function() {
-                let r = buildSyncRowsNew('grups', old(), [{ name: 'b', from: 'appX' }, { name: 'z', from: 'appX' }], 'appX')
-                assert.strict.deepEqual(r, [
-                    { id: 'id-a', name: 'a', from: '' },
-                    { id: 'id-d', name: 'd', from: 'appY' },
-                    { name: 'b', from: 'appX', id: 'id-b' },
-                    { name: 'z', from: 'appX', id: '__new__1' },
-                ])
-            })
-
-            it('RW-702 本批帶 id 者以其 id 為身分(同 id 異名＝改名)', function() {
-                let r = buildSyncRowsNew('grups', old(), [{ id: 'id-b', name: 'b2', from: 'appX' }], 'appX')
-                assert.strict.deepEqual(r.slice(2), [{ id: 'id-b', name: 'b2', from: 'appX' }])
-                assert.strict.equal(r.length, 3)
-            })
-
-            it('RW-703 有限數字 id 取其字串形式; 空字串 id 與非有限數字(NaN／Infinity)視為未帶 id(依名稱對應)', function() {
-                let r = buildSyncRowsNew('grups', old(), [{ id: 7, name: 'n7', from: 'appX' }, { id: '', name: 'c', from: 'appX' }, { id: Infinity, name: 'b', from: 'appX' }, { id: NaN, name: 'q', from: 'appX' }], 'appX')
-                assert.strict.deepEqual(r.slice(2).map((v) => v.id), ['7', 'id-c', 'id-b', '__new__3'])
-            })
-
-            it('RW-704 同 from 同名多筆(歷史同名)依既有列順序一對一對應, 多出者為新實體', function() {
-                let o = [{ id: 'd1', name: 'dup', from: 'appX' }, { id: 'd2', name: 'dup', from: 'appX' }]
-                let r = buildSyncRowsNew('pemis', o, [{ name: 'dup', from: 'appX' }, { name: 'dup', from: 'appX' }, { name: 'dup', from: 'appX' }], 'appX')
-                assert.strict.deepEqual(r.map((v) => v.id), ['d1', 'd2', '__new__2'])
-            })
-
-            it('RW-705 本批已帶用之 id 不被名稱對應重複佔用', function() {
-                let o = [{ id: 'x1', name: 'x', from: 'appX' }]
-                let r = buildSyncRowsNew('grups', o, [{ id: 'x1', name: 'x', from: 'appX' }, { name: 'x', from: 'appX' }], 'appX')
-                assert.strict.deepEqual(r.map((v) => v.id), ['x1', '__new__1'])
-            })
-
-            it('RW-706 targets 無名稱對應(id 即名稱): 未帶 id 者一律為新實體 __new__<k>', function() {
-                let r = buildSyncRowsNew('targets', [{ id: 't1', name: 'n', from: 'appX' }], [{ name: 'n', from: 'appX' }], 'appX')
-                assert.strict.deepEqual(r.map((v) => v.id), ['__new__0'])
-            })
-
-            it('RW-707 既有列含非物件(null／數字／字串)不拋、忽略; 輸入之 rowsOld 與 rows 不被修改', function() {
-                let o = [null, 5, 'x', ...old()]
-                let rows = [{ name: 'b', from: 'appX' }]
-                let o0 = cloneDeep(o)
-                let rows0 = cloneDeep(rows)
-                let r = buildSyncRowsNew('grups', o, rows, 'appX')
-                assert.strict.deepEqual(r.map((v) => v.id), ['id-a', 'id-d', 'id-b'])
-                assert.strict.deepEqual(o, o0)
-                assert.strict.deepEqual(rows, rows0)
-            })
-
-            //與 planRefChanges 串接: 外部同步之「同名重送」不算刪除再新增(否則每次同步皆清空引用)
+            //與 planRefChanges 串接: 外部匯入之「同批重送」不算刪除再新增(否則每次同步皆清空引用)
             let plan = (rowsNew) => planRefChanges({
                 keyTable: 'grups',
-                rowsOld: [{ id: 'g1', name: 'A', from: 'appX' }, { id: 'g2', name: 'B', from: 'appX' }, { id: 'g3', name: 'C', from: '' }],
+                rowsOld: oldG(),
                 rowsNew,
                 holdersOld: [{ id: 'u1', cgrups: J({ A: OR, B: OR, C: OR }), from: '' }],
             })
-            let oldG = () => [{ id: 'g1', name: 'A', from: 'appX' }, { id: 'g2', name: 'B', from: 'appX' }, { id: 'g3', name: 'C', from: '' }]
+            //庫內: 兩列為外部匯入之列(from appX, 帶 srcKey), 一列為後台列(from '')
+            let oldG = () => [{ id: 'g1', name: 'A', from: 'appX', srcKey: 'sk-A' }, { id: 'g2', name: 'B', from: 'appX', srcKey: 'sk-B' }, { id: 'g3', name: 'C', from: '' }]
 
-            it('RW-708 串接規劃: 同一來源同名重送(未帶 id)→ 無改名無刪除、不改寫任何引用', function() {
-                let p = plan(buildSyncRowsNew('grups', oldG(), [{ name: 'A', from: 'appX' }, { name: 'B', from: 'appX' }], 'appX'))
+            it('RW-708 串接規劃: 同一來源同批重送(srcKey 同、名稱同 → 沿用庫內 id, 寫入後整表＝寫入前整表)→ 無改名無刪除、不改寫任何引用', function() {
+                let o = oldG()
+                let p = plan([o[2], o[0], o[1]])
                 assert.strict.deepEqual([p.err, p.renames, p.delNames, p.changes], [null, [], [], []])
             })
 
-            it('RW-709 串接規劃: 帶 id 同 id 異名＝改名(引用隨之改名); 舊 id 不在本批＝刪除(引用被清)', function() {
-                let p = plan(buildSyncRowsNew('grups', oldG(), [{ id: 'g1', name: 'A2', from: 'appX' }], 'appX'))
+            it('RW-709 串接規劃: 同 srcKey(沿用 id)異名＝改名(引用隨之改名); 庫有而批次無(srcKey 不在本批)＝刪除(引用被清)', function() {
+                let o = oldG()
+                let p = plan([o[2], { id: 'g1', name: 'A2', from: 'appX', srcKey: 'sk-A' }]) //g2(B)不在本批 → 刪除
                 assert.strict.deepEqual(p.renames, [{ id: 'g1', from: 'A', to: 'A2' }])
                 assert.strict.deepEqual(p.delNames, ['B'])
                 assert.strict.deepEqual(JSON.parse(p.changes[0].after), { A2: OR, C: OR })
             })
 
-            it('RW-710 串接規劃 [已知限制②]: 未帶 id 且改名無從偵測為改名——視為舊名刪除＋新名新增(舊名引用被清, 新名不繼承)', function() {
-                let p = plan(buildSyncRowsNew('grups', oldG(), [{ name: 'A', from: 'appX' }, { name: 'B2', from: 'appX' }], 'appX'))
+            it('RW-710 串接規劃 [srcKey 重編]: 名稱不變而 srcKey 改變 ＝ 刪舊增新(新 id)——舊名引用被清、同名新實體不繼承; 名稱改變且 srcKey 亦改變同形(B→B2 以新 srcKey 送入)', function() {
+                let o = oldG()
+                //B2 以新 srcKey 送入(B 的 sk-B 不在本批 → 刪除 B; B2 新增, 配新 id)
+                let p = plan([o[2], o[0], { id: 'sync-id-1', name: 'B2', from: 'appX', srcKey: 'sk-B2' }])
                 assert.strict.deepEqual(p.renames, [])
                 assert.strict.deepEqual(p.delNames, ['B'])
                 assert.strict.deepEqual(JSON.parse(p.changes[0].after), { A: OR, C: OR })
+                //名稱不變、srcKey 變(B 以 sk-B-new 送入): 舊 B(g2)被刪、新 B(新 id)新增, 不繼承引用
+                let p2 = plan([o[2], o[0], { id: 'sync-id-2', name: 'B', from: 'appX', srcKey: 'sk-B-new' }])
+                assert.strict.deepEqual(p2.renames, [])
+                assert.strict.deepEqual(p2.delNames, ['B'])
+                assert.strict.deepEqual(JSON.parse(p2.changes[0].after), { A: OR, C: OR }, '同名新實體不接管舊 B 之引用(原則 6)')
             })
 
         })
 
-        describe('fillIdlessIds(未帶 id 之列依名稱對應既有列; 後台整表寫入以全表為 pool, 外部同步以同 from 之既有列為 pool)', function() {
+        describe('fillIdlessIds(未帶 id 之列依名稱對應既有列; 後台整表寫入〔API 直打缺 id 之列〕以全表為 pool; perm-run03 起外部匯入不再使用)', function() {
 
             let pool = () => [
                 { id: 'id-a', name: 'a' },
@@ -2696,15 +2728,12 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
                 assert.strict.doesNotThrow(() => fillIdlessIds('grups', pool(), [null, 5]))
             })
 
-            it('RW-736 buildSyncRowsNew 之 pool 只含「同一 from」之既有列: 他 from 之同名列不被缺 id 之本批列對應(否則外部同步會接管他來源之實體 id)', function() {
-                let o = [{ id: 'id-a', name: 'a', from: '' }, { id: 'id-b', name: 'b', from: 'appX' }]
-                let r = buildSyncRowsNew('grups', o, [{ name: 'a', from: 'appX' }, { name: 'b', from: 'appX' }], 'appX')
-                assert.strict.deepEqual(r.map((v) => v.id), ['id-a', '__new__0', 'id-b'], '他 from 之 a 原樣置前; 本批之 a 為新實體(__new__0), b 對應同 from 之 id-b')
-            })
+            //perm-run03: 原 RW-736「buildSyncRowsNew 之 pool 只含同一 from 之既有列: 他 from 之同名列不被缺 id 之本批列對應(否則外部同步會接管他來源之實體 id)」隨 buildSyncRowsNew 刪除而刪除——
+            //  該行為不復存在(外部匯入不再「未帶 id 依名稱對應」); 其保護目的(外部匯入不得接管他 from／後台列之實體)改由 syncCore 依 srcKey 只配對同 from 之列、名稱撞他 from 或後台列整批 invalidRows 承擔(unit-syncCore 覆蓋)
 
         })
 
-        describe('R1 規劃用新實體 id 須避開既有主鍵(rowsAvoid: 外部同步之他 from 列)', function() {
+        describe('R1 規劃用新實體 id 須避開既有主鍵(fillIdlessIds 第 4 參數 rowsAvoid; 原供外部同步之他 from 列, perm-run03 起無正式呼叫端, 契約本身仍驗)', function() {
 
             it('RW-737 fillIdlessIds: 新實體之規劃 id 避開 rowsPool、rowsAvoid 與本批已帶之 id, 且彼此不重複', function() {
                 let r = fillIdlessIds('grups', [{ id: '__new__1', name: 'p' }], [{ name: 'N1' }, { name: 'N2' }, { id: '__new__2', name: 'g' }], [{ id: '__new__0', name: 'A', from: 'other' }])
@@ -2716,11 +2745,11 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
                 assert.strict.deepEqual(fillIdlessIds('grups', [], [{ name: 'N' }], [null, 5, { id: 9 }, { id: '__new__0' }]).map((v) => v.id), ['__new__1'])
             })
 
-            it('RW-738 buildSyncRowsNew: 他 from 已有 id __new__0 之列, 本 from 推未帶 id 之新列 → 規劃整表無重複 id、他 from 列原樣; 規劃不把他 from 之 A 判成改名為新列(A→New)', function() {
+            it('RW-738 寫入後整表(perm-run03 改寫自 buildSyncRowsNew 版): 他 from 已有 id 形似規劃 id 之列(__new__0), 本 from 新增一列(配新 id)→ 整表無重複 id、他 from 列原樣; 規劃不把他 from 之 A 判成改名為新列(A→New)', function() {
                 let old = [{ id: '__new__0', name: 'A', from: 'other' }]
                 let old0 = cloneDeep(old)
-                let r = buildSyncRowsNew('grups', old, [{ name: 'New', from: 'appX' }], 'appX')
-                assert.strict.deepEqual(r.map((v) => v.id), ['__new__0', '__new__1'])
+                let r = [old[0], { id: 'sync-id-1', name: 'New', from: 'appX', srcKey: 'sk-New' }] //外部匯入寫入後整表: 他 from 原樣＋新增者(新 id)
+                assert.strict.deepEqual(r.map((v) => v.id), ['__new__0', 'sync-id-1'])
                 assert.strict.deepEqual(r[0], old0[0], '他 from 列原樣')
                 assert.strict.equal(new Set(r.map((v) => v.id)).size, r.length, '規劃整表無重複 id')
                 let p = planRefChanges({ keyTable: 'grups', rowsOld: old, rowsNew: r, holdersOld: [{ id: 'u1', cgrups: J({ A: OR }), from: '' }] })

@@ -6,8 +6,10 @@ import fetchJson from '../src/fetchJson.mjs'
 
 
 //kpKs
+//perm-run03 起外部匯入依來源鍵 srcKey 差異同步(R-IMPORT-01、dspec/外部匯入之定義與機制.md): 每列須帶外部自訂之 srcKey(同一 from 內唯一且穩定), **不得送出 id**(內部主鍵由本系統產生, 送 id 整批拒收 idNotAllowed);
+//targets 之 id 即標的名稱, 外部匯入時由 srcKey 衍生(id＝srcKey), 故 targets 亦只送 srcKey
 let ks_targets = [
-    'id',
+    'srcKey',
     'order', //order大部分由外部給予, 得要開啟
     'description',
     'from',
@@ -17,7 +19,7 @@ let ks_targets = [
     // 'timeUpdate',
 ]
 let ks_pemis = [
-    'id',
+    'srcKey',
     'order', //order大部分由外部給予, 得要開啟
     'name',
     'description',
@@ -29,7 +31,7 @@ let ks_pemis = [
     // 'timeUpdate',
 ]
 let ks_grups = [
-    'id',
+    'srcKey',
     'order', //order大部分由外部給予, 得要開啟
     'name',
     'description',
@@ -41,7 +43,7 @@ let ks_grups = [
     // 'timeUpdate',
 ]
 let ks_users = [
-    'id',
+    'srcKey',
     'order', //order大部分由外部給予, 得要開啟
     'name',
     'email',

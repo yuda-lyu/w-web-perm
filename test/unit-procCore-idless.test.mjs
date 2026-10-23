@@ -27,6 +27,7 @@ import cloneDeep from 'lodash-es/cloneDeep.js'
 import cacheSt from 'wsemi/src/cacheSt.mjs'
 import ds from '../src/schema/index.mjs'
 import proc from '../server/procCore.mjs'
+import { autoDecl } from './tools/declHelper.mjs'
 import createLockSave from '../server/lockSave.mjs'
 import { makeBaseline } from '../src/js/rowDigest.mjs'
 import { mkTable, mkCore, mkSrLog } from './tools/unitOrm.mjs'
@@ -99,7 +100,7 @@ describe('unit-procCore-idless (後台整表寫入缺 id 之列視為新增, run
         let cst = cacheSt()
         //perm-run01: 原 kmx = pmKeyMutex() ＋ mkProcOrm 改為 mkCore(真 WServOrm 之 procOrm／withTabLocks／guardWrite, 展開 core.lock)
         let core = mkCore(ds, woItems)
-        let pc = proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst), ...(opt.proc || {}) })
+        let pc = autoDecl(proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst), ...(opt.proc || {}) }), woItems)
         let env = { seed, woItems, logs, cst, pc }
         envs.push(env)
         return env

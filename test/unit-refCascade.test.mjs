@@ -23,7 +23,8 @@
 //      (JSON.stringify 會把非有限數值編成 null, 作為 crules 規則名時改指規則 'null' 而改變授權); 未命中者(不須重編碼)不受影響(同一字串、unsafe:false);
 //      planRefChanges 遇 unsafe → err:'renameCascadeUnsupported', changes 為空且四個計數歸零(同 conflict)
 //  D10 (外審 R6) planRefChanges: 同批兩個改名映射到同一新名(plan.renames 內有兩筆 to 相同)→ err:'renameCascadeConflict'、changes 為空、四計數歸零, 於解碼引用端之前判定(不論引用端有無引用者); 互換／鏈式／循環置換之 to 皆互異不誤拒; cascadeRename:false 時 renames 為空不拒
-//  D9  (外審 R1) fillIdlessIds 第 4 參數 rowsAvoid(預設 []): 規劃 id 須避開 rowsPool、rowsAvoid 與本批已帶 id 之全部主鍵(新實體連續避撞); 外部同步 buildSyncRowsNew 把他 from 之列傳為 rowsAvoid, 他來源之列與其引用不得因規劃 id 撞號而被誤判為改名
+//  D9  (外審 R1) fillIdlessIds 第 4 參數 rowsAvoid(預設 []): 規劃 id 須避開 rowsPool、rowsAvoid 與本批已帶 id 之全部主鍵(新實體連續避撞); 原由外部同步 buildSyncRowsNew 把他 from 之列傳為 rowsAvoid, 使他來源之列與其引用不得因規劃 id 撞號而被誤判為改名——
+//      perm-run03 起外部匯入依 srcKey 差異同步, 寫入後整表之各列皆帶明確 id(配對者沿用庫內 id、新增者配新 id), buildSyncRowsNew 已刪除; fillIdlessIds 第 4 參數 rowsAvoid 的契約本身仍由 RC-609 直接驗證, RC-610 改驗「帶明確 id 之寫入後整表」不誤判改名／刪除
 //
 //【測試的組成】
 //  RC-1xx  rewriteRefs      單一授權字串之改寫(物件／陣列形式; 改名、刪除、同批互換／鏈式／刪＋改; 未命中同一字串; 壞輸入; 原型鍵名; 屬性鍵轉型; conflict; rule 陣列索引名元素具名化)
@@ -43,7 +44,6 @@ import JSON5 from 'json5'
 import planRefChangesDefault, { REF_OF, rewriteRefs, diffRefTargets, planRefChanges, fillIdlessIds } from '../src/js/refCascade.mjs'
 import getPropKey from '../src/js/getPropKey.mjs'
 import { getUserRules } from '../src/plugins/mShare.mjs'
-import { buildSyncRowsNew } from '../server/cascadeWrite.mjs'
 import procLang from '../server/procLang.mjs'
 import { sourceLines, blankStrings } from './tools/srcScan.mjs'
 
@@ -2275,16 +2275,21 @@ describe('unit-refCascade (引用連帶純函數: 改名級聯與刪除清理, R
             assert.deepStrictEqual(defs.map((h) => h.file), ['src/js/refCascade.mjs', 'src/js/refCascade.mjs', 'src/js/refCascade.mjs', 'src/js/refCascade.mjs'], `定義站點:\n  ${fmt(defs)}`)
         })
 
-        it('RC-502 server 端引用規劃之呼叫站點限於 procCore.mjs／WWebPerm.mjs／cascadeWrite.mjs, 且匯入 refCascade 者亦限於此三檔', function() {
-            let allowed = new Set(['server/procCore.mjs', 'server/WWebPerm.mjs', 'server/cascadeWrite.mjs'])
+        it('RC-502 server 端引用規劃之呼叫站點限於 procCore.mjs(後台整表寫入)／syncCore.mjs(外部匯入; perm-run03 自 WWebPerm.mjs 搬出), 且匯入 refCascade 者亦限於此二檔', function() {
+            //perm-run03: 原白名單 procCore.mjs／WWebPerm.mjs／cascadeWrite.mjs 之後二者已不再呼叫(外部同步搬到 syncCore.mjs; cascadeWrite.mjs 之 buildSyncRowsNew 刪除, 其餘只做寫入編排與補償, 不規劃)
+            let allowed = new Set(['server/procCore.mjs', 'server/syncCore.mjs'])
             let calls = scan(SERVER, /\b(rewriteRefs|planRefChanges|diffRefTargets|fillIdlessIds)\b/)
             let bad = calls.filter((h) => !allowed.has(h.file))
             assert.strictEqual(bad.length, 0, `白名單外之呼叫站點:\n  ${fmt(bad)}`)
             let imps = scan(SERVER, /from\s+['"][^'"]*refCascade(\.mjs)?['"]/, true)
             let bad2 = imps.filter((h) => !allowed.has(h.file))
             assert.strictEqual(bad2.length, 0, `白名單外之匯入站點:\n  ${fmt(bad2)}`)
-            //靈敏度: 掃描確實抓得到既有站點(非空轉)
+            //靈敏度: 掃描確實抓得到既有站點(非空轉), 且白名單內兩檔皆確有呼叫與匯入(過期即應自白名單移除)
             assert.ok(calls.length >= 2, `server 端應至少有 planRefChanges 之呼叫站點, 實得 ${calls.length}`)
+            for (let f of allowed) {
+                assert.ok(calls.some((h) => h.file === f), `${f} 應有引用規劃之呼叫`)
+                assert.ok(imps.some((h) => h.file === f), `${f} 應匯入 refCascade`)
+            }
         })
 
         it('RC-503 server 端不得自行解析／序列化授權欄位: 無 JSON5 匯入; 無同一行同時出現 cgrups／cpemis／crules 與 JSON.parse／JSON.stringify／JSON5; 無直接賦值授權欄位', function() {
@@ -2324,11 +2329,12 @@ describe('unit-refCascade (引用連帶純函數: 改名級聯與刪除清理, R
             assert.deepStrictEqual(imps, ['./getPropKey.mjs', 'json5', 'wsemi/src/iseobj.mjs'])
         })
 
-        it('RC-506 規劃用 id 之命名(__new__ 前綴)只在 refCascade.mjs(單一擁有者: server／其他 src 不得自行為未帶 id 之列補 id), 且 server 端寫入路徑確有呼叫 fillIdlessIds', function() {
+        it('RC-506 規劃用 id 之命名(__new__ 前綴)只在 refCascade.mjs(單一擁有者: server／其他 src 不得自行為未帶 id 之列補 id), 且後台整表寫入路徑(procCore.mjs)確有呼叫 fillIdlessIds; 外部匯入(syncCore.mjs)不呼叫(perm-run03: 每列依 srcKey 配對、皆帶明確 id, 不再「未帶 id 依名稱對應」)', function() {
             let hits = scan([...SRC, ...SERVER], /__new__/, true).filter((h) => h.file !== 'src/js/refCascade.mjs')
             assert.strictEqual(hits.length, 0, `refCascade.mjs 以外出現規劃 id 前綴:\n  ${fmt(hits)}`)
             let uses = scan(SERVER, /\bfillIdlessIds\s*\(/).map((h) => h.file)
-            assert.ok(uses.includes('server/procCore.mjs') && uses.includes('server/cascadeWrite.mjs'), `server 端寫入路徑應呼叫 fillIdlessIds: ${js(uses)}`)
+            assert.ok(uses.includes('server/procCore.mjs'), `server 端後台寫入路徑應呼叫 fillIdlessIds: ${js(uses)}`)
+            assert.ok(!uses.includes('server/syncCore.mjs') && !uses.includes('server/cascadeWrite.mjs') && !uses.includes('server/WWebPerm.mjs'), `外部匯入與寫入編排不得呼叫 fillIdlessIds: ${js(uses)}`)
         })
     })
 
@@ -2539,35 +2545,43 @@ describe('unit-refCascade (引用連帶純函數: 改名級聯與刪除清理, R
             assert.strictEqual(js(occ), js([0, 1, 2, 3, 4, 5, 6].map((n) => ({ id: `__new__${n}`, name: `occ${n}`, from: 'other' }))))
         })
 
-        it('RC-610 buildSyncRowsNew＋planRefChanges 端到端(D9; 外審 R1 之原缺陷): 他 from 之 A(id 恰為 __new__0)被使用者引用, 同步 from:"app" 推未帶 id 之新群組 New → plan.renames／delNames 為空, 他來源之 A 與其引用逐字不動', function() {
+        //RC-610 之前身為「buildSyncRowsNew＋planRefChanges 端到端(D9; 外審 R1 之原缺陷)」: 外部同步未帶 id 之列依名稱規劃 id 時, 規劃 id 不得與他 from 之主鍵撞號而誤判改名.
+        //perm-run03 起外部匯入改依 srcKey 差異同步(syncCore.mjs): 寫入後整表 ＝ 他 from 之列原樣 ＋ 同 from 存續者(配對者沿用庫內 id, 含改名) ＋ 新增者(配新 id; 皆為明確 id, 無「規劃 id」),
+        //buildSyncRowsNew 已刪除(其「未帶 id 依名稱對應」行為不復存在, 新行為由 unit-syncCore 覆蓋); 本案保留其對 planRefChanges 之斷言(他來源之列與引用不被誤動), 夾具改為直接構造寫入後整表
+        it('RC-610 寫入後整表(他 from 原樣＋存續者＋新增者帶明確 id)＋planRefChanges 端到端(perm-run03 改寫自 buildSyncRowsNew 版 D9): 他 from 之 A(id 形似規劃 id __new__0)被使用者引用, 同步 from:"app" 新增群組 New → plan.renames／delNames 為空, 他來源之 A 與其引用逐字不動; 存續／新增／刪除／改名／同名新 id 各情境', function() {
             let rowsOld = [{ id: '__new__0', name: 'A', cpemis: '{}', from: 'ext' }]
             let refStr = '/*keep*/ { \'A\': { mode: \'OR\', isActive: \'y\', }, } '
             let holders = [U('u1', refStr, { from: 'ext2' })]
             let snap = js([rowsOld, holders])
-            let rowsNew = buildSyncRowsNew('grups', rowsOld, [{ name: 'New', cpemis: '{}', from: 'app' }], 'app')
-            assert.strictEqual(rowsNew.length, 2)
-            assert.deepStrictEqual(rowsNew[0], rowsOld[0], '他 from 之列原樣')
-            assert.notStrictEqual(rowsNew[1].id, '__new__0', '新實體之規劃 id 避開他 from 之主鍵')
+            //外部匯入 from:"app" 新增 New(srcKey 新 → 配新 id), 他 from 之 A 原樣
+            let rowsNew = [rowsOld[0], { id: 'sync-id-1', name: 'New', cpemis: '{}', from: 'app', srcKey: 'k-new' }]
             let p = planRefChanges({ keyTable: 'grups', rowsOld, rowsNew, holdersOld: holders })
             assert.deepStrictEqual([p.err, p.renames, p.delNames, p.changes, p.nHolders], [null, [], [], [], 0], '不得把新群組誤判為 A→New 改名')
             assert.strictEqual(holders[0].cgrups, refStr, '他來源之引用逐字不動')
             assert.strictEqual(js([rowsOld, holders]), snap, '輸入不被改動')
-            //進一步: 本批含同 from 之既有列(依名稱對應)與多個新實體, 他 from 之列占用 __new__0 ~ __new__3
+            //進一步: 同 from 之存續者(同 srcKey → 沿用庫內 id gK)與多個新增者, 他 from 之列 id 形似 __new__0 ~ __new__3
             let ext = [0, 1, 2, 3].map((n) => ({ id: `__new__${n}`, name: `E${n}`, cpemis: '{}', from: 'ext' }))
-            let old2 = [...ext, { id: 'gK', name: 'K', cpemis: '{}', from: 'app' }]
+            let old2 = [...ext, { id: 'gK', name: 'K', cpemis: '{}', from: 'app', srcKey: 'sk-K' }]
             let hs = [U('u1', objStr([['E0', OR], ['E3', AND], ['K', OR]]))]
-            let batch = [{ name: 'K', from: 'app' }, { name: 'N1', from: 'app' }, { name: 'N2', from: 'app' }]
-            let rn2 = buildSyncRowsNew('grups', old2, batch, 'app')
-            let newIds = rn2.slice(4).map((r) => r.id)
-            assert.strictEqual(newIds[0], 'gK', '同 from 同名之列依名稱對應')
+            let rn2 = [...ext, { id: 'gK', name: 'K', cpemis: '{}', from: 'app', srcKey: 'sk-K' }, { id: 'sync-id-2', name: 'N1', from: 'app', srcKey: 'sk-N1' }, { id: 'sync-id-3', name: 'N2', from: 'app', srcKey: 'sk-N2' }]
             assert.ok(new Set(rn2.map((r) => r.id)).size === rn2.length, `整表主鍵重複: ${js(rn2.map((r) => r.id))}`)
             let p2 = planRefChanges({ keyTable: 'grups', rowsOld: old2, rowsNew: rn2, holdersOld: hs })
-            assert.deepStrictEqual([p2.err, p2.renames, p2.delNames, p2.changes], [null, [], [], []], '名稱不變(K)＋新增(N1、N2): 他來源之 E0～E3 與引用不動')
-            //本批不再含 K: 只清理 K 之引用, E0、E3 之引用不動
-            let rn3 = buildSyncRowsNew('grups', old2, [{ name: 'N1', from: 'app' }], 'app')
+            assert.deepStrictEqual([p2.err, p2.renames, p2.delNames, p2.changes], [null, [], [], []], '名稱不變(K, 同 srcKey 沿用 id)＋新增(N1、N2): 他來源之 E0～E3 與引用不動')
+            //本批不再含 K(srcKey sk-K 消失 → 刪除): 只清理 K 之引用, E0、E3 之引用不動
+            let rn3 = [...ext, { id: 'sync-id-2', name: 'N1', from: 'app', srcKey: 'sk-N1' }]
             let p3 = planRefChanges({ keyTable: 'grups', rowsOld: old2, rowsNew: rn3, holdersOld: hs })
             assert.deepStrictEqual([p3.err, p3.renames, p3.delNames], [null, [], ['K']])
             assert.deepStrictEqual(pairsOf(p3.changes[0].after), [['E0', OR], ['E3', AND]])
+            //同 srcKey 不同名稱 ＝ 改名(id 不變): 引用跟著改, 他來源之 E0～E3 之引用不動
+            let rn4 = [...ext, { id: 'gK', name: 'K2', cpemis: '{}', from: 'app', srcKey: 'sk-K' }]
+            let p4 = planRefChanges({ keyTable: 'grups', rowsOld: old2, rowsNew: rn4, holdersOld: hs })
+            assert.deepStrictEqual([p4.err, p4.renames, p4.delNames], [null, [{ id: 'gK', from: 'K', to: 'K2' }], []])
+            assert.deepStrictEqual(pairsOf(p4.changes[0].after), [['E0', OR], ['E3', AND], ['K2', OR]])
+            //名稱不變、srcKey 不同 ＝ 刪舊增新(新 id): 舊 K 之引用被清理, 同名新實體不接管(原則 6)
+            let rn5 = [...ext, { id: 'sync-id-9', name: 'K', cpemis: '{}', from: 'app', srcKey: 'sk-K-new' }]
+            let p5 = planRefChanges({ keyTable: 'grups', rowsOld: old2, rowsNew: rn5, holdersOld: hs })
+            assert.deepStrictEqual([p5.err, p5.renames, p5.delNames], [null, [], ['K']])
+            assert.deepStrictEqual(pairsOf(p5.changes[0].after), [['E0', OR], ['E3', AND]], '同名新實體不繼承引用')
         })
     })
 })

@@ -1,6 +1,9 @@
 //伺服端強制之「被引用實體身分」檢查單元測試(perm-run02 範圍一; 使用者 2026-10-23 裁示「正反關聯與主體身份檢查, 應該是前後端都要做」; 規則帳本草案 R-SUBJECT-ID-01 規則 4〔改為伺服端強制〕、R-REF-IDENTITY-01〔正向引用身分〕、R-LOCK-CORE-01、R-WRITE-LOCK-02; R-PRINCIPLE-00 原則 3、4、6)
+//perm-run03 範圍一(使用者 2026-10-23 裁示「這本來就該強制必帶吧? 要不然怎麼確認與驗證調用者身份?」; R-REF-IDENTITY-01 規則 7、R-SUBJECT-ID-01 規則 5): 宣告改為強制必帶——存檔改變了引用(新增或移除啟用之引用項、新增列帶引用)而未附 refs／subject → saveIdentityRequired; 「移除引用」亦須宣告。
+//  perm-run02 之「未帶者維持名稱引用原行為」相容已取消, 本檔對應案例(IDN-207 之移除舊引用、IDN-301、IDN-404 之首次存檔、IDN-501 對照)已依新語意改寫, 並新增 IDN-215～219、IDN-22x 逐軸矩陣。
 //
 //受測: server/procCore.mjs 之 updateUsers／updateGrups／updatePemis／updateTargets(kpFunExt 之實際入口, 內走 updateTabItems)與 pickClientOpt; 純函數判準 src/js/refIdentity.mjs（逐函數見 unit-refIdentity）。
+//本檔刻意不用 test/tools/declHelper.mjs 之 autoDecl 包裝——它測的就是宣告本身（缺、空、漏報、多報、不符、格式）。
 //  依賴一律真實——w-serv-orm 實例(test/tools/unitOrm.mjs 之 mkCore: 真 WServOrm 包住替身資料表 mkTable, 取得真 procOrm／withTabLocks／guardWrite)、server/lockSave.mjs＋wsemi cacheSt、src/js/rowDigest.mjs＋w-serv-orm baseline、
 //  server/keyCheck.mjs 之 withTabLocks、server/cascadeWrite.mjs; 僅資料表以記憶體替身取代 w-orm-lmdb, 不起服務(沿用 unit-procCore-baseline 之 mkCore／替身表做法與 UB-7 人為延遲手法、unit-procCore-refCascade 之 traceLock 取鎖軌跡與 RW-540 隨機交錯手法)。
 //斷言原則: 預期值獨立於實作——「拒收語系鍵」「寫了什麼」「零寫入」一律以替身資料表快照(snapshot)與呼叫計數(cnt／instrument)驗證, 預期之鍵／原因／筆數手寫於各格; 並行格以「序列等價」（先手算兩種依序執行之合法終態）驗證.
@@ -8,10 +11,13 @@
 //規格句(本檔所翻譯者; 每條 assertion 之註解標明所對應之 [代號]; 出處: 使用者 2026-10-23 裁示、server/procCore.mjs updateTabItems 註解、server/procLang.mjs 語系鍵說明、規則帳本草案):
 //  [I-FMT]    opt.subject／opt.refs 給了(非 undefined／null)但格式不合, 或該表無授權引用欄(targets) → reject saveIdentityFormat, 於任何讀寫(含取鎖)之前, 零寫入; srLog updateTabItems-identity-error { msg: saveIdentityFormat, reason: format, n: 0 }; 不降級為不帶
 //  [I-SUBJ]   反向主體(users 表之主體為 grups、grups 表之主體為 pemis): 於被引用(主體)表鎖內新鮮讀取後驗證, 判準即 checkSubject; 非 ok → reject saveSubjectChanged(reason gone／renamed／taken)、零寫入; 刪除後同名重建〔id 不同〕且 saved:true → gone
-//  [I-REF]    正向引用(users.cgrups→grups、grups.cpemis→pemis、pemis.crules→targets): 本次寫入新增之啟用引用名稱須全部宣告(refIncomplete), 且每個宣告名稱於新鮮讀取之被引用表所對應 id 陣列須與宣告相同(refChanged) → 否則 reject saveRefChanged、零寫入;
-//             只改 mode／新增停用項／未變更之舊引用／移除引用者不須宣告
+//  [I-REF]    正向引用(users.cgrups→grups、grups.cpemis→pemis、pemis.crules→targets): 本次寫入改變之啟用引用名稱〔新增＋移除; perm-run03〕須全部宣告(refIncomplete), 且每個宣告名稱於新鮮讀取之被引用表所對應 id 陣列須與宣告相同(refChanged) → 否則 reject saveRefChanged、零寫入;
+//             只改 mode／新增停用項／移除停用項／未變更之舊引用／只改名／整列刪除者不須宣告(不改變啟用引用)
+//  [I-REQ]    perm-run03 必帶: 本次寫入改變了啟用引用(新增、移除、停用、停用改啟用、新增列帶引用、複製列帶引用; 名稱以集合計, 同名跨列只算一個)而 opt 未附 refs 與 subject(無第 3 參、{}、兩者 null／undefined、僅 baseline) → reject saveIdentityRequired(reason identityRequired, n＝改變之名稱數)、零寫入、不讀被引用表、不取其鎖(判定在本表鎖內的 write, 故本表鎖有取)
+//  [I-RM]     perm-run03 移除亦須宣告: 被移除（或被停用）之啟用引用項, 其名稱在被引用表鎖內新鮮讀取所對應之 id 陣列須與宣告相同——宣告與新鮮讀取一致 → 成功; 被移除名稱之實體已被刪後同名重建(id 不同) → saveRefChanged; 懸空引用(查無實體)被移除且宣告 ids＝[] → 成功; 漏報 → refIncomplete
+//  [I-SUBJ-SCOPE] perm-run03: opt.subject 只涵蓋其主體名稱(subject.name; 該名稱之新增或移除皆算已宣告); 另有其他名稱被改而未以 refs 宣告 → saveRefChanged／refIncomplete
 //  [I-TGT-ID] targets 之 id 即名稱, 身分定義即 id: 檢查涵蓋「已被刪除」, 刪除後同 id 重建依定義是同一實體 → 成功(R-REF-IDENTITY-01 規則 5, 設計事實)
-//  [I-COMPAT] 未帶 subject／refs(undefined／null)＝舊行為: 不驗身分、不取被引用表鎖、不讀被引用表、不擴權(結果與修正前同, 含被引用實體已被替換者亦照舊成功寫入——外部應用相容)
+//  [I-COMPAT] 不改變啟用引用之存檔(只改名／其他欄／mode／整列刪除／新增或移除停用項)與 targets(無授權引用欄)不需宣告: 不驗身分、不取被引用表鎖、不讀被引用表、不擴權（perm-run02 之「改變引用而未帶亦照舊成功」已取消, 見 [I-REQ]）
 //  [I-ORDER]  次序: 列格式 → 基準格式 → 身分宣告格式(以上皆在取鎖與占位之前) → 取鎖 → 被引用表新鮮讀取並驗 subject → 基準比對(saveStale) → … → 驗 refs(restoreServerFields 之後、checkExternalWrite 之前); 故 subject 被取代優先於 saveStale, refs 不符在 saveStale 之後
 //  [I-LOCK]   取鎖階層: 被引用表鎖在外層、本表鎖在內層(targets → pemis → grups → users); 驗證用之被引用表讀取與本表寫入在同一段持鎖期間(原則 4: 檢查與寫入同一把鎖), 其間被引用表不被任何入口改動; 拒收與失敗皆釋放鎖
 //  [I-LOG]    srLog 只記 { keyTable, userId, msg, reason, n }, 不含名稱／id 值(個資); 被拒時另有集中 errLog(<FN>-error)記 err key
@@ -20,11 +26,13 @@
 //
 //輸入空間表(軸 × 格; 引用端 H ＝ users／grups／pemis 三表, 被引用表依序為 grups／pemis／targets; 案數為 mocha 實測, 見回報):
 //  IDN-1xx 反向主體 [H ∈ users, grups] × 主體狀態 {原封不動, 刪除, 改名, 刪後同名重建, 開框時未儲存而現有同名他實體〔taken〕, 開框時未儲存且無同名〔沿用既有行為〕, 歷史同名多筆但 id 相符} ＋ 格式不合 {16 種} × H 2 ＋ targets 帶 subject／refs ＋ pemis 帶 subject
-//  IDN-2xx 正向 refs [H ∈ users, grups, pemis] × {宣告相符, 實體刪除, 刪後同名〔pemis 為同 id〕重建, 另增同名, 懸空→出現, 漏報〔部分／全漏〕, 只改 mode／停用項／移除／舊引用實體被替換不須宣告, 停用改啟用, 多報相符／不符, 不符＋漏報同時, 格式不合 18 種, subject＋refs 合用, 前端函數鏈}
-//  IDN-3xx 相容 [H 3] × 不帶宣告之 7 種形式 {無第 3 參, {}, subject:null, refs:null, 兩者皆 null, 兩者 undefined, 僅 baseline} ＋ 不讀被引用表／不取其鎖
+//  IDN-2xx 正向 refs [H ∈ users, grups, pemis] × {宣告相符, 實體刪除, 刪後同名〔pemis 為同 id〕重建, 另增同名, 懸空→出現, 漏報〔部分／全漏〕, 只改 mode／停用項／移除停用項／舊引用實體被替換不須宣告, 停用改啟用, 多報相符／不符, 不符＋漏報同時, 格式不合 18 種, subject＋refs 合用, 前端函數鏈}
+//  IDN-215～219 perm-run03 移除與反向對話框 [H 3 或 2] × {移除引用〔宣告相符／漏報／不符／被移除名稱之實體刪後同名重建／懸空被移除宣告 []／懸空被移除宣告舊 id／懸空被移除而現已出現同名〕, 停用既有項, 同名跨列搬移與多列同名, 前端函數鏈〔移除〕, subject 路徑〔移除主體名稱／停用主體／另改他名未宣告／另改他名以 refs 宣告／主體被取代而本次無變更〕}
+//  IDN-22x 逐軸矩陣 [H 3] × 變更型別 K 16 {新增啟用引用, 移除引用〔刪項〕, 停用既有項, 重新啟用, 新增列帶引用, 複製列帶引用, mode 變更, 僅改名, 整列刪除, 同時新增＋移除, 純量簡寫新增／移除, 陣列形式新增／移除, 移除停用項, 新增停用項} × 宣告狀態 D 12 {無第 3 參, 兩者 null, 僅 baseline, 空陣列, 完整, 漏報新增〔僅宣告移除〕, 漏報移除〔僅宣告新增〕, 多報相符, 多報不符, ids 不符, ids 空陣列, 格式不合} ＝ 576 格, 每格預期手寫於 EXPECT 表
+//  IDN-3xx 必帶 [H 3] × 改變引用且不帶宣告之 7 種形式 → saveIdentityRequired ＋ 不改變引用之 7 種形式 → 成功 ＋ 次序(基準過期先於必帶)；皆不讀被引用表／不取其鎖
 //  IDN-4xx 次序 {subject 先於基準比對〔H 2〕, refs 在基準之後〔H 3〕, 基準格式先於身分格式, 身分格式先於占位, 列格式先於身分格式}
-//  IDN-5xx 鎖 {取鎖軌跡 H 3 × {成功,拒收,無宣告對照}, 連帶改名之階層, 被引用表只讀一次, 拒收後釋放, V14 人為延遲併發 5 組 × 2 方向, 四表隨機併發 60 輪}
-//  IDN-6xx 靜態與介面 {pickClientOpt, 站點計數與次序, 語系鍵}
+//  IDN-5xx 鎖 {取鎖軌跡 H 3 × {成功,拒收,無宣告改變引用拒收,無宣告不改變引用成功}, 連帶改名之階層, 被引用表只讀一次, 拒收後釋放, V14 人為延遲併發 5 組 × 2 方向, 四表隨機併發 60 輪}
+//  IDN-6xx 靜態與介面 {pickClientOpt, 站點計數與次序, 語系鍵〔含 saveIdentityRequired〕}
 //未測(刻意): 前端元件如何組宣告（見元件與 e2e）、真後端 RPC（見 api-identity）、外部同步入口對被引用表之改動（本檔以替身表直接改動模擬「他人」, 並行格以 updateGrups／updatePemis／updateTargets 真入口模擬）.
 //跑法: node C:/opensrcOper/tools/quiet-run.mjs --name idn -- node node_modules/mocha/bin/mocha.js --no-parallel test/unit-procCore-identity.test.mjs --timeout 180000 --exit
 import assert from 'assert'
@@ -94,6 +102,9 @@ function withTimeout(p, ms, label) {
 
 //authOf: 手建授權字串; items: [[名稱, 'y'|'n']]; users.cgrups／grups.cpemis 為 { 名稱: { mode, isActive } }, pemis.crules 為 { 標的: 'y'|'n' }
 let authOf = (h, items) => J(Object.fromEntries(items.map(([n, a]) => [n, h === 'pemis' ? a : { mode: 'OR', isActive: a }])))
+//altOf: 另一種合法表示形式(users.cgrups／grups.cpemis 之純量簡寫 { 名稱: 'y' }; pemis.crules 之物件形式 { 標的: { isActive } }); arrOf: 陣列形式 [{ name, isActive }]
+let altOf = (h, items) => J(Object.fromEntries(items.map(([n, a]) => [n, h === 'pemis' ? { isActive: a } : a])))
+let arrOf = (items) => J(items.map(([n, a]) => ({ name: n, isActive: a })))
 
 
 // =====================================================================
@@ -301,17 +312,26 @@ let declOf = (h, ...ks) => ks.map((k) => ({ name: entName(h, k), ids: [entId(h, 
 
 //expectIdentityReject: 被拒——回指定語系鍵、四表逐位元不變、四表 cnt 不增(零寫入)、srLog 記 identity-error 一筆(只含 level／event／keyTable／userId／msg／reason／n)、集中 errLog 記 err key、無 stale-error、srLog 不含名稱／id 值
 //  opt.zeroIO 為真: 另斷言在任何讀寫之前拒收(四表 select／insert／save／del／delAll 皆為 0)
+//  opt.refUntouched 為真(perm-run03 [I-REQ]): 另斷言被引用表(HOLD[h].ref)完全未被讀寫（無宣告者不讀被引用表）
+//  opt.trace 為 { t, want }: 另斷言取鎖軌跡（traceLock 記錄）逐項等於 want
 async function expectIdentityReject(env, h, rows, optClient, key, reason, n, ext = {}) {
     let { woItems, logs, pc, seed } = env
-    let calls = ext.zeroIO ? instrument(woItems) : null
+    let calls = (ext.zeroIO || ext.refUntouched) ? instrument(woItems) : null
     let snap0 = snapAll(woItems)
     let cnt0 = cntAll(woItems)
     let r = await run(pc, h, rows, optClient)
     A.deepEqual(r, { ok: false, v: key })
     A.equal(snapAll(woItems), snap0, '[I-SUBJ][I-REF] 被拒時四表須逐位元不變(零寫入)')
     A.equal(cntAll(woItems), cnt0, '被拒時不得有任何寫入呼叫')
-    if (calls) {
+    if (ext.zeroIO) {
         A.equal(sumCalls(calls), 0, `[I-FMT] 須在任何讀寫之前拒收, 實得 ${J(calls)}`)
+    }
+    if (ext.refUntouched) {
+        let c = calls[HOLD[h].ref]
+        A.equal(c.select + c.insert + c.save + c.del + c.delAll, 0, `[I-REQ] 被引用表 ${HOLD[h].ref} 不得被讀寫, 實得 ${J(c)}`)
+    }
+    if (ext.trace) {
+        A.deepEqual(ext.trace.t.log, ext.trace.want, '[I-REQ][I-LOCK] 取鎖軌跡')
     }
     let ev = identityLogs(logs)
     A.equal(ev.length, 1, `srLog ${EVT} 應恰一筆`)
@@ -328,11 +348,38 @@ async function expectIdentityReject(env, h, rows, optClient, key, reason, n, ext
     return r
 }
 
+//expectRequired(perm-run03 [I-REQ]): 改變引用而未附宣告 → saveIdentityRequired／identityRequired(n＝改變之名稱數)、零寫入、被引用表完全未被讀寫
+let expectRequired = (env, h, rows, optClient, n, ext = {}) => expectIdentityReject(env, h, rows, optClient, 'saveIdentityRequired', 'identityRequired', n, { refUntouched: true, ...ext })
+
 //expectOk: 成功——回 saveTabItemsSuccess、無 identity-error
 async function expectOk(env, h, rows, optClient) {
     let r = await run(env.pc, h, rows, optClient)
     A.deepEqual(r, { ok: true, v: OKS })
     A.equal(identityLogs(env.logs).length, 0, '成功時不得記 identity-error')
+    return r
+}
+
+//mkNewRow: 模擬清單頁 addItem 之引用端新列（稽核欄位為佔位字、transient _isNew）; auth 為其授權欄字串
+function mkNewRow(h, auth, tag = 'NEW') {
+    let r = { ...ds[h].funNew(), userId: PH, timeCreate: PH, userIdUpdate: PH, timeUpdate: PH, _isNew: true, from: '', description: `new-row-${tag}`, [HOLD[h].field]: auth }
+    if (h === 'users') {
+        r.name = `newbie${tag}`
+        r.email = `newbie${tag}@example.com`
+        r.isAdmin = 'n'
+        r.isActive = 'y'
+    }
+    else {
+        r.name = h === 'grups' ? `權限群組${tag}` : `權限${tag}`
+    }
+    return r
+}
+//mkCopyRow: 模擬清單頁 copyItem 之複製列（取庫內第 k 列複本, 換新 id／唯一名稱／唯一 email, 標 _isNew, 授權欄原樣帶過來）
+function mkCopyRow(rows, h, k, tag = 'CPY') {
+    let r = { ...cloneDeep(rows[k]), id: `id-copy-${h}-${tag}`, _isNew: true, userId: PH, timeCreate: PH, userIdUpdate: PH, timeUpdate: PH }
+    r.name = `${r.name}-${tag}`
+    if (h === 'users') {
+        r.email = `${tag}-${r.email}`
+    }
     return r
 }
 
@@ -561,21 +608,24 @@ describe('unit-procCore-identity (伺服端強制之被引用實體身分: subje
                 await expectIdentityReject(env2, h, add12(loadRows(env2.woItems, h)), { refs: [] }, 'saveRefChanged', 'refIncomplete', 2) //[I-REF] 空宣告 → 漏報兩個
             })
 
-            it(`IDN-207 [${h}→${ref}] 不須宣告: 只改 mode／新增停用項／移除引用／舊引用之實體已被替換而引用未變 → 成功（refs: []）`, async function() {
+            it(`IDN-207 [${h}→${ref}] 不須宣告: 只改 mode／新增停用項／移除停用項／舊引用之實體已被替換而引用未變 → 成功（refs: []; perm-run03: 原「移除舊引用」案已改列 IDN-215，移除啟用引用現須宣告）`, async function() {
                 //第 1 列（mary／M2／P2）舊值引用第 1 個實體（啟用）
                 let n1 = entName(h, 1)
                 let modeOnly = h === 'pemis' ? J({ [n1]: { isActive: 'y', note: 'x' } }) : J({ [n1]: { mode: 'AND', isActive: 'y' } })
                 let cases = [
                     ['只改 mode（仍啟用, 舊引用）', modeOnly, 1],
                     ['新增停用項（不授權）', authOf(h, [[n1, 'y'], [n2, 'n']]), 1],
-                    ['移除舊引用', '{}', 1],
                 ]
                 for (let [title, str, row] of cases) {
                     let env = createEnv()
                     let rows = loadRows(env.woItems, h)
-                    await expectOk(env, h, editHolder(rows, h, str, row), { refs: [] }) //[I-REF] 無新增啟用引用 → 免宣告
+                    await expectOk(env, h, editHolder(rows, h, str, row), { refs: [] }) //[I-REF] 啟用引用未變 → 免宣告
                     A.equal(env.woItems[h].get(IDS[h][row])[f], str, `${title}: 已寫入`)
                 }
+                //移除停用項: 種子第 2 列含停用項 n2, 本次移除之——啟用引用不變（停用項不授權, 移除它不是移除引用）→ 免宣告
+                let envOff = createEnv({ seedEdit: (seed) => { seed[h][2][f] = authOf(h, [[n2, 'n']]) } })
+                await expectOk(envOff, h, editHolder(loadRows(envOff.woItems, h), h, '{}', 2), { refs: [] }) //[I-REF][I-COMPAT]
+                A.equal(envOff.woItems[h].get(IDS[h][2])[f], '{}', '移除停用項: 已寫入')
                 //舊引用之實體已被替換／刪除，但該列引用字串未變更（已持久之關係）→ 不驗
                 let env = createEnv()
                 let rows = loadRows(env.woItems, h)
@@ -729,13 +779,326 @@ describe('unit-procCore-identity (伺服端強制之被引用實體身分: subje
                 await expectIdentityReject(env2, h, b2.sent, { refs: decl2 }, 'saveRefChanged', 'refChanged', 1)
             })
         }
+
+        // ----- perm-run03: 移除引用亦須宣告(IDN-215～219; [I-RM][I-REQ]) -----
+        for (let h of H3) {
+            let ref = HOLD[h].ref
+            let f = HOLD[h].field
+            let n0 = entName(h, 0)
+            let n1 = entName(h, 1)
+            let n2 = entName(h, 2)
+            let rm1 = (rows) => editHolder(rows, h, '{}', 1) //第 1 列（mary／M2／P2）移除其唯一啟用引用 n1
+
+            it(`IDN-215 [${h}→${ref}] 移除引用: 宣告與鎖內新鮮讀取一致 → 成功（被引用表只讀不寫）; 無宣告 → saveIdentityRequired(n 1, 只取本表鎖, 不碰被引用表); 空宣告／漏報 → refIncomplete; ids 不符（亂 id／空陣列而實體仍在）→ refChanged; 被拒皆零寫入`, async function() {
+                let env = createEnv()
+                let { woItems } = env
+                let snapRef = woItems[ref].snapshot()
+                await expectOk(env, h, rm1(loadRows(woItems, h)), { refs: declOf(h, 1) }) //[I-RM] 宣告相符
+                A.equal(woItems[h].get(IDS[h][1])[f], '{}', '引用已移除')
+                A.equal(woItems[ref].snapshot(), snapRef, '被引用表只讀不寫')
+                //無宣告
+                let t = traceLock()
+                let env2 = createEnv({ lockOf: t.wrap })
+                await expectRequired(env2, h, rm1(loadRows(env2.woItems, h)), undefined, 1, { trace: { t, want: [`acq ${h}`, `rel ${h}`] } }) //[I-REQ] 移除亦須宣告
+                //空宣告
+                let env3 = createEnv()
+                await expectIdentityReject(env3, h, rm1(loadRows(env3.woItems, h)), { refs: [] }, 'saveRefChanged', 'refIncomplete', 1) //[I-RM] 漏報
+                //漏報: 同時移除第 0、1 兩列之引用, 僅宣告其一
+                let env4 = createEnv()
+                let both = editHolder(rm1(loadRows(env4.woItems, h)), h, '{}', 0)
+                await expectIdentityReject(env4, h, both, { refs: declOf(h, 1) }, 'saveRefChanged', 'refIncomplete', 1)
+                let env4b = createEnv()
+                await expectOk(env4b, h, editHolder(rm1(loadRows(env4b.woItems, h)), h, '{}', 0), { refs: declOf(h, 0, 1) }) //兩個皆宣告 → 成功
+                A.deepEqual([authAt(env4b.woItems, h, 0), authAt(env4b.woItems, h, 1)], [{}, {}])
+                //ids 不符
+                let env5 = createEnv()
+                await expectIdentityReject(env5, h, rm1(loadRows(env5.woItems, h)), { refs: [{ name: n1, ids: ['ghost'] }] }, 'saveRefChanged', 'refChanged', 1)
+                let env6 = createEnv()
+                await expectIdentityReject(env6, h, rm1(loadRows(env6.woItems, h)), { refs: [{ name: n1, ids: [] }] }, 'saveRefChanged', 'refChanged', 1) //宣告查無而實體仍在
+            })
+
+            it(`IDN-216 [${h}→${ref}] 移除引用而被移除名稱之實體已${h === 'pemis' ? '被刪除 → saveRefChanged; 刪除後以同 id 重建依定義是同一實體 → 成功' : '被刪後同名重建(id 不同)／另增同名 → saveRefChanged'}; 零寫入（移除不得套到被同名新實體取代之位置）`, async function() {
+                let env = createEnv()
+                let rows = loadRows(env.woItems, h) //使用者開框時所見
+                await (h === 'pemis' ? delEnt(env.woItems, h, 1) : replaceEnt(env.woItems, h, 1))
+                await expectIdentityReject(env, h, rm1(rows), { refs: declOf(h, 1) }, 'saveRefChanged', 'refChanged', 1, { extras: [{ id: `${entId(h, 1)}-NEW`, name: n1 }] }) //[I-RM] 實體已被刪（後同名重建）
+                if (h !== 'pemis') {
+                    let env2 = createEnv()
+                    let rows2 = loadRows(env2.woItems, h)
+                    await addEnt(env2.woItems, h, 1, `${entId(h, 1)}-DUP`) //原實體仍在, 另增同名 → 同名對應兩個 id
+                    await expectIdentityReject(env2, h, rm1(rows2), { refs: declOf(h, 1) }, 'saveRefChanged', 'refChanged', 1)
+                }
+                else {
+                    let env2 = createEnv()
+                    let rows2 = loadRows(env2.woItems, h)
+                    await replaceEnt(env2.woItems, h, 1) //targets 刪後同 id 重建
+                    await expectOk(env2, h, rm1(rows2), { refs: declOf(h, 1) }) //[I-TGT-ID][I-RM] 同一實體
+                    A.equal(env2.woItems[h].get(IDS[h][1])[f], '{}')
+                }
+            })
+
+            it(`IDN-217 [${h}→${ref}] 懸空引用（被引用實體已不存在）被移除: 宣告 ids [] → 成功; 宣告舊 id → saveRefChanged; 宣告 [] 但現已出現同名實體 → saveRefChanged; 無宣告 → saveIdentityRequired`, async function() {
+                let mk = async () => {
+                    let env = createEnv()
+                    await delEnt(env.woItems, h, 1) //第 1 列之引用 n1 成為懸空
+                    return env
+                }
+                let env = await mk()
+                await expectOk(env, h, rm1(loadRows(env.woItems, h)), { refs: [{ name: n1, ids: [] }] }) //[I-RM] 懸空被移除, 宣告 [] 且仍查無
+                A.equal(env.woItems[h].get(IDS[h][1])[f], '{}')
+                let env2 = await mk()
+                await expectIdentityReject(env2, h, rm1(loadRows(env2.woItems, h)), { refs: declOf(h, 1) }, 'saveRefChanged', 'refChanged', 1) //使用者所見有實體（舊 id）而現已查無
+                let env3 = await mk()
+                let rows3 = loadRows(env3.woItems, h)
+                await addEnt(env3.woItems, h, 1, h === 'pemis' ? entId(h, 1) : `${entId(h, 1)}-LATE`) //送出前該名稱被他人建立
+                await expectIdentityReject(env3, h, rm1(rows3), { refs: [{ name: n1, ids: [] }] }, 'saveRefChanged', 'refChanged', 1)
+                let env4 = await mk()
+                await expectRequired(env4, h, rm1(loadRows(env4.woItems, h)), undefined, 1) //[I-REQ] 懸空亦不例外: 移除仍須宣告
+            })
+
+            it(`IDN-218 [${h}→${ref}] 名稱以集合計: 同名在一列移除、另一列新增（搬移）只算 1 個名稱; 兩列各新增同一名稱只算 1 個 → 無宣告 n 為 1, 宣告該名稱一次即成功`, async function() {
+                //搬移: 第 1 列移除 n1、第 2 列新增 n1
+                let move = (rows) => editHolder(editHolder(rows, h, '{}', 1), h, authOf(h, [[n1, 'y']]), 2)
+                let env = createEnv()
+                await expectRequired(env, h, move(loadRows(env.woItems, h)), undefined, 1) //[I-REQ] 一個名稱
+                let env2 = createEnv()
+                await expectOk(env2, h, move(loadRows(env2.woItems, h)), { refs: declOf(h, 1) })
+                A.deepEqual(authAt(env2.woItems, h, 1), {})
+                A.deepEqual(Object.keys(authAt(env2.woItems, h, 2)), [n1])
+                //兩列各新增 n0（第 1 列在原有 n1 之外加 n0; 第 2 列新增 n0; 第 0 列原已有 n0 不算）
+                let dup = (rows) => editHolder(editHolder(rows, h, authOf(h, [[n1, 'y'], [n0, 'y']]), 1), h, authOf(h, [[n0, 'y']]), 2)
+                let env3 = createEnv()
+                await expectRequired(env3, h, dup(loadRows(env3.woItems, h)), undefined, 1)
+                let env4 = createEnv()
+                await expectOk(env4, h, dup(loadRows(env4.woItems, h)), { refs: declOf(h, 0) })
+                let env5 = createEnv()
+                await expectIdentityReject(env5, h, dup(loadRows(env5.woItems, h)), { refs: [] }, 'saveRefChanged', 'refIncomplete', 1)
+            })
+
+            it(`IDN-219 [${h}→${ref}] 前端函數鏈（移除: snapRefIds → recordPicks → buildRefDecl）: 移除後無人動 → 成功; 開框後、送出前被引用實體被${h === 'pemis' ? '刪除' : '刪後同名重建'} → saveRefChanged（宣告取開框當時, 不取送出當下）`, async function() {
+                let build = (env) => {
+                    let rows = loadRows(env.woItems, h)
+                    let snap = snapRefIds(h, rowsSorted(env.woItems, ref)) //使用者開啟編輯器當下之被引用表
+                    let picks = recordPicks({ keyTable: h, strOld: rows[1][f], strNew: '{}', snap, picks: new Map() }) //編輯器取消勾選 n1 後回填
+                    return { rows, sent: rm1(rows), picks }
+                }
+                let env = createEnv()
+                let b1 = build(env)
+                let decl1 = buildRefDecl({ keyTable: h, rowsNew: b1.sent, rowsOld: b1.rows, picks: b1.picks, refRows: rowsSorted(env.woItems, ref) })
+                A.deepEqual(decl1, [{ name: n1, ids: [entId(h, 1)] }], '前提: 宣告含被移除之名稱, ids 為開框當時之 id')
+                await expectOk(env, h, b1.sent, { refs: decl1 }) //[I-RM]
+                let env2 = createEnv()
+                let b2 = build(env2)
+                await (h === 'pemis' ? delEnt(env2.woItems, h, 1) : replaceEnt(env2.woItems, h, 1))
+                let decl2 = buildRefDecl({ keyTable: h, rowsNew: b2.sent, rowsOld: b2.rows, picks: b2.picks, refRows: rowsSorted(env2.woItems, ref) })
+                A.deepEqual(decl2, decl1, '前提: 有選取記錄者宣告不隨送出當下之被引用表改變')
+                await expectIdentityReject(env2, h, b2.sent, { refs: decl2 }, 'saveRefChanged', 'refChanged', 1)
+            })
+        }
+
+        // ----- perm-run03: 反向對話框 subject 路徑之範圍（IDN-220～222; [I-SUBJ-SCOPE]）-----
+        for (let h of H2) {
+            let ref = HOLD[h].ref
+            let n0 = entName(h, 0)
+            let n1 = entName(h, 1)
+            let n2 = entName(h, 2)
+            let subj = (k) => ({ id: entId(h, k), name: entName(h, k), saved: true })
+
+            it(`IDN-220 [${h}] subject 涵蓋主體名稱之「移除」與「停用」: 反向對話框取消勾選主體（移除其引用／停用其引用）→ 成功; 無 subject 且無 refs → saveIdentityRequired`, async function() {
+                let env = createEnv()
+                await expectOk(env, h, editHolder(loadRows(env.woItems, h), h, '{}', 1), { subject: subj(1) }) //[I-SUBJ-SCOPE] 移除主體名稱
+                A.deepEqual(authAt(env.woItems, h, 1), {})
+                let env2 = createEnv()
+                await expectOk(env2, h, editHolder(loadRows(env2.woItems, h), h, authOf(h, [[n1, 'n']]), 1), { subject: subj(1) }) //停用主體名稱
+                A.deepEqual(authAt(env2.woItems, h, 1), JSON.parse(authOf(h, [[n1, 'n']])))
+                let env3 = createEnv()
+                await expectRequired(env3, h, editHolder(loadRows(env3.woItems, h), h, '{}', 1), undefined, 1) //對照: 不帶 subject 亦無 refs
+            })
+
+            it(`IDN-221 [${h}] subject 只涵蓋其主體名稱: 另有其他名稱被改（新增或移除）而未宣告 → saveRefChanged／refIncomplete; 以 refs 補宣告 → 成功; 主體名稱本次未出現而他名被改 → refIncomplete`, async function() {
+                //主體 n2 加入第 2 列，同時第 2 列另加 n0（新增他名）
+                let addOther = (rows) => editHolder(rows, h, authOf(h, [[n2, 'y'], [n0, 'y']]), 2)
+                let env = createEnv()
+                await expectIdentityReject(env, h, addOther(loadRows(env.woItems, h)), { subject: subj(2) }, 'saveRefChanged', 'refIncomplete', 1) //[I-SUBJ-SCOPE] 他名未宣告
+                let env2 = createEnv()
+                await expectOk(env2, h, addOther(loadRows(env2.woItems, h)), { subject: subj(2), refs: declOf(h, 0) }) //subject＋refs 合用
+                A.deepEqual(Object.keys(authAt(env2.woItems, h, 2)).sort(), [n0, n2].sort())
+                //主體 n2 沒有出現在本次改動中，另新增他名 n0 → 主體不能替他名背書
+                let env3 = createEnv()
+                await expectIdentityReject(env3, h, editHolder(loadRows(env3.woItems, h), h, authOf(h, [[n0, 'y']]), 2), { subject: subj(2) }, 'saveRefChanged', 'refIncomplete', 1)
+                //移除他名: 主體 n1 取消勾選（第 1 列移除）同時第 0 列移除 n0 → n0 未宣告
+                let env4 = createEnv()
+                let rmBoth = editHolder(editHolder(loadRows(env4.woItems, h), h, '{}', 1), h, '{}', 0)
+                await expectIdentityReject(env4, h, rmBoth, { subject: subj(1) }, 'saveRefChanged', 'refIncomplete', 1)
+                let env5 = createEnv()
+                await expectOk(env5, h, editHolder(editHolder(loadRows(env5.woItems, h), h, '{}', 1), h, '{}', 0), { subject: subj(1), refs: declOf(h, 0) })
+                A.deepEqual(authAt(env5.woItems, h, 0), {})
+                A.deepEqual(authAt(env5.woItems, h, 1), {})
+            })
+
+            it(`IDN-222 [${h}] subject 給了而本次不改變引用（只改說明）→ 成功; 主體已被取代 → 仍 saveSubjectChanged（主體驗證不因無變更而略過）`, async function() {
+                let touch = (rows) => rows.map((r, k) => (k === 2 ? { ...r, description: 'only-desc' } : r))
+                let env = createEnv()
+                await expectOk(env, h, touch(loadRows(env.woItems, h)), { subject: subj(2) })
+                A.equal(env.woItems[h].get(IDS[h][2]).description, 'only-desc')
+                let env2 = createEnv()
+                let rows2 = loadRows(env2.woItems, h)
+                await replaceEnt(env2.woItems, h, 2)
+                await expectIdentityReject(env2, h, touch(rows2), { subject: subj(2) }, 'saveSubjectChanged', 'gone', 1, { extras: [{ id: `${entId(h, 2)}-NEW`, name: n2 }] })
+            })
+        }
     })
 
 
     // =================================================================
-    // IDN-3xx 相容（不擴權）
+    // IDN-22x 逐軸矩陣(perm-run03): 引用端表 H(3) × 變更型別 K(16) × 宣告狀態 D(12) ＝ 576 格, 每格預期手寫於 EXPECT 表
     // =================================================================
-    describe('IDN-3 相容: 未帶 subject／refs（或為 null）＝修正前行為', function() {
+    describe('IDN-22 逐軸矩陣: 變更型別 × 宣告狀態', function() {
+        //K: 變更型別. adds／rms: 本型別所改變之啟用引用名稱數所對應的被引用實體序（名稱 entName(h, k)）; seed(seed, h): 建表前改種子; send(rows, h): 由使用者所見之列組出送出之整表; verify(woItems, h): 成功後庫內終態
+        //預設種子: 第 0、1 列各以 OR 啟用引用第 0、1 個實體, 第 2 列授權欄為 '{}'
+        let setAt = (h, row, str) => (rows) => editHolder(rows, h, str, row)
+        let authIs = (h, row, str) => (w) => A.deepEqual(JSON.parse(w[h].get(IDS[h][row])[HOLD[h].field]), JSON.parse(str), `第 ${row} 列授權欄`)
+        let modeStr = (h) => (h === 'pemis' ? J({ [entName(h, 1)]: { isActive: 'y', note: 'x' } }) : J({ [entName(h, 1)]: { mode: 'AND', isActive: 'y' } }))
+        let n1Of = (h) => entName(h, 1)
+        let n2Of = (h) => entName(h, 2)
+        const KINDS = [
+            { id: 'add', title: '新增啟用引用', adds: [2], rms: [], send: (rows, h) => setAt(h, 2, authOf(h, [[n2Of(h), 'y']]))(rows), verify: (w, h) => authIs(h, 2, authOf(h, [[n2Of(h), 'y']]))(w) },
+            { id: 'rm', title: '移除引用（刪項）', adds: [], rms: [1], send: (rows, h) => setAt(h, 1, '{}')(rows), verify: (w, h) => authIs(h, 1, '{}')(w) },
+            { id: 'disable', title: '停用既有項（y→n）', adds: [], rms: [1], send: (rows, h) => setAt(h, 1, authOf(h, [[n1Of(h), 'n']]))(rows), verify: (w, h) => authIs(h, 1, authOf(h, [[n1Of(h), 'n']]))(w) },
+            { id: 'reenable', title: '重新啟用（種子為停用項 n→y）', adds: [2], rms: [], seed: (seed, h) => { seed[h][2][HOLD[h].field] = authOf(h, [[n2Of(h), 'n']]) }, send: (rows, h) => setAt(h, 2, authOf(h, [[n2Of(h), 'y']]))(rows), verify: (w, h) => authIs(h, 2, authOf(h, [[n2Of(h), 'y']]))(w) },
+            {
+                id: 'newRow', title: '新增列帶引用', adds: [2], rms: [], send: (rows, h) => [...rows, mkNewRow(h, authOf(h, [[n2Of(h), 'y']]))],
+                verify: (w, h) => {
+                    let rs = JSON.parse(w[h].snapshot())
+                    A.equal(rs.length, 4, '新增列已寫入')
+                    A.deepEqual(rs.filter((r) => r.description === 'new-row-NEW').map((r) => JSON.parse(r[HOLD[h].field])), [JSON.parse(authOf(h, [[n2Of(h), 'y']]))])
+                },
+            },
+            {
+                id: 'copyRow', title: '複製列帶引用（複製第 1 列, 原列不動）', adds: [1], rms: [], send: (rows, h) => [...rows, mkCopyRow(rows, h, 1)],
+                verify: (w, h) => {
+                    A.equal(w[h].size(), 4, '複製列已寫入')
+                    A.deepEqual(JSON.parse(w[h].get(`id-copy-${h}-CPY`)[HOLD[h].field]), JSON.parse(authOf(h, [[n1Of(h), 'y']])), '複製列帶有原列之引用')
+                    authIs(h, 1, authOf(h, [[n1Of(h), 'y']]))(w)
+                },
+            },
+            { id: 'mode', title: 'mode 變更（仍啟用）', adds: [], rms: [], send: (rows, h) => setAt(h, 1, modeStr(h))(rows), verify: (w, h) => authIs(h, 1, modeStr(h))(w) },
+            { id: 'rename', title: '僅改名（引用端列名稱）', adds: [], rms: [], send: (rows, h) => rows.map((r, k) => (k === 1 ? { ...r, name: `${NAMES[h][1]}-改` } : r)), verify: (w, h) => A.equal(w[h].get(IDS[h][1]).name, `${NAMES[h][1]}-改`) },
+            { id: 'delRow', title: '整列刪除（刪引用端之列）', adds: [], rms: [], send: (rows) => rows.filter((r, k) => k !== 1), verify: (w, h) => A.deepEqual([w[h].has(IDS[h][1]), w[h].size()], [false, 2]) },
+            { id: 'double', title: '同時新增＋移除', adds: [2], rms: [1], send: (rows, h) => setAt(h, 1, '{}')(setAt(h, 2, authOf(h, [[n2Of(h), 'y']]))(rows)), verify: (w, h) => { authIs(h, 1, '{}')(w); authIs(h, 2, authOf(h, [[n2Of(h), 'y']]))(w) } },
+            { id: 'scalarAdd', title: '純量簡寫／物件形式新增（另一種表示形式）', adds: [2], rms: [], send: (rows, h) => setAt(h, 2, altOf(h, [[n2Of(h), 'y']]))(rows), verify: (w, h) => authIs(h, 2, altOf(h, [[n2Of(h), 'y']]))(w) },
+            { id: 'scalarRm', title: '純量簡寫／物件形式移除（種子即該形式）', adds: [], rms: [1], seed: (seed, h) => { seed[h][1][HOLD[h].field] = altOf(h, [[n1Of(h), 'y']]) }, send: (rows, h) => setAt(h, 1, '{}')(rows), verify: (w, h) => authIs(h, 1, '{}')(w) },
+            { id: 'arrAdd', title: '陣列形式新增', adds: [2], rms: [], send: (rows, h) => setAt(h, 2, arrOf([[n2Of(h), 'y']]))(rows), verify: (w, h) => authIs(h, 2, arrOf([[n2Of(h), 'y']]))(w) },
+            { id: 'arrRm', title: '陣列形式移除（種子即陣列形式）', adds: [], rms: [1], seed: (seed, h) => { seed[h][1][HOLD[h].field] = arrOf([[n1Of(h), 'y']]) }, send: (rows, h) => setAt(h, 1, '[]')(rows), verify: (w, h) => authIs(h, 1, '[]')(w) },
+            { id: 'rmOff', title: '移除停用項（啟用引用不變）', adds: [], rms: [], seed: (seed, h) => { seed[h][2][HOLD[h].field] = authOf(h, [[n2Of(h), 'n']]) }, send: (rows, h) => setAt(h, 2, '{}')(rows), verify: (w, h) => authIs(h, 2, '{}')(w) },
+            { id: 'addOff', title: '新增停用項（不授權）', adds: [], rms: [], send: (rows, h) => setAt(h, 2, authOf(h, [[n2Of(h), 'n']]))(rows), verify: (w, h) => authIs(h, 2, authOf(h, [[n2Of(h), 'n']]))(w) },
+        ]
+
+        //D: 宣告狀態. opt(h, K, rows) 組第 3 參; want(a, r) 回預期——'ok' 或 [語系鍵, reason, n]（a／r: 本型別新增／移除之名稱數）; ext 為 expectIdentityReject 之附加斷言
+        //  預期表（手算, 不由被測函數推得）:
+        //    無宣告三式（無第 3 參／兩者 null／僅 baseline）: 有改變(a+r>0) → saveIdentityRequired(n＝a+r)、被引用表不讀不寫; 無改變 → 成功
+        //    空陣列: 有改變 → refIncomplete(n＝a+r); 無改變 → 成功
+        //    完整: 成功
+        //    漏報新增（僅宣告移除之名稱）: 未宣告者為新增之名稱 → 有新增(a>0) → refIncomplete(n＝a); 無新增 → 成功
+        //    漏報移除（僅宣告新增之名稱）: 未宣告者為移除之名稱 → 有移除(r>0) → refIncomplete(n＝r); 無移除 → 成功
+        //    多報相符（另宣告未改變且相符之第 0 個實體）: 成功; 多報不符: refChanged(n 1); ids 不符／ids 空陣列（實體皆存在）: 每個被改變之名稱不符 → refChanged(n＝a+r), 無改變時宣告為空 → 成功; 格式不合: saveIdentityFormat(n 0), 任何讀寫之前
+        const REQ = (a, r) => (a + r > 0 ? ['saveIdentityRequired', 'identityRequired', a + r] : 'ok')
+        const names = (h, K, which) => (which === 'adds' ? K.adds : (which === 'rms' ? K.rms : [...K.adds, ...K.rms]))
+        const DECLS = [
+            { id: 'none', title: '無第 3 參', opt: () => undefined, want: REQ, ext: { refUntouched: true } },
+            { id: 'nullBoth', title: 'subject:null＋refs:null', opt: () => ({ subject: null, refs: null }), want: REQ, ext: { refUntouched: true } },
+            { id: 'baselineOnly', title: '僅 baseline（舊客戶端形狀）', opt: (h, K, rows) => ({ baseline: makeBaseline(rows, h) }), want: REQ, ext: { refUntouched: true } },
+            { id: 'empty', title: '空陣列 refs', opt: () => ({ refs: [] }), want: (a, r) => (a + r > 0 ? ['saveRefChanged', 'refIncomplete', a + r] : 'ok') },
+            { id: 'full', title: '完整宣告', opt: (h, K) => ({ refs: declOf(h, ...names(h, K, 'all')) }), want: () => 'ok' },
+            { id: 'onlyAdds', title: '漏報移除（僅宣告新增者）', opt: (h, K) => ({ refs: declOf(h, ...names(h, K, 'adds')) }), want: (a, r) => (r > 0 ? ['saveRefChanged', 'refIncomplete', r] : 'ok') },
+            { id: 'onlyRms', title: '漏報新增（僅宣告移除者）', opt: (h, K) => ({ refs: declOf(h, ...names(h, K, 'rms')) }), want: (a, r) => (a > 0 ? ['saveRefChanged', 'refIncomplete', a] : 'ok') },
+            { id: 'extraOk', title: '多報相符', opt: (h, K) => ({ refs: declOf(h, 0, ...names(h, K, 'all')) }), want: () => 'ok' },
+            { id: 'extraBad', title: '多報不符', opt: (h, K) => ({ refs: [...declOf(h, ...names(h, K, 'all')), { name: entName(h, 0), ids: ['ghost'] }] }), want: () => ['saveRefChanged', 'refChanged', 1] },
+            { id: 'idsBad', title: 'ids 不符（亂 id）', opt: (h, K) => ({ refs: names(h, K, 'all').map((k) => ({ name: entName(h, k), ids: ['ghost'] })) }), want: (a, r) => (a + r > 0 ? ['saveRefChanged', 'refChanged', a + r] : 'ok') },
+            { id: 'idsEmpty', title: 'ids 空陣列（實體仍在）', opt: (h, K) => ({ refs: names(h, K, 'all').map((k) => ({ name: entName(h, k), ids: [] })) }), want: (a, r) => (a + r > 0 ? ['saveRefChanged', 'refChanged', a + r] : 'ok') },
+            { id: 'fmt', title: '格式不合', opt: () => ({ refs: 'x' }), want: () => ['saveIdentityFormat', 'format', 0], ext: { zeroIO: true } },
+        ]
+
+        let runCell = async (h, K, D) => {
+            let env = createEnv({ seedEdit: K.seed ? (seed) => K.seed(seed, h) : undefined })
+            let rows = loadRows(env.woItems, h)
+            let sent = K.send(rows, h)
+            let a = K.adds.length
+            let r = K.rms.length
+            let want = D.want(a, r)
+            let opt = D.opt(h, K, rows)
+            try {
+                if (want === 'ok') {
+                    await expectOk(env, h, sent, opt)
+                    K.verify(env.woItems, h)
+                }
+                else {
+                    await expectIdentityReject(env, h, sent, opt, want[0], want[1], want[2], D.ext || {})
+                }
+            }
+            catch (err) {
+                err.message = `[格 ${h} × ${K.id}（${K.title}）× ${D.id}（${D.title}）, 預期 ${J(want)}] ${err.message}`
+                throw err
+            }
+            finally {
+                env.cst.clear()
+            }
+        }
+
+        for (let h of H3) {
+            for (let K of KINDS) {
+                it(`IDN-220m [${h}→${HOLD[h].ref}] 變更型別「${K.title}」（改變 ${K.adds.length + K.rms.length} 個名稱）× 12 種宣告狀態: 各格預期見 EXPECT 表`, async function() {
+                    for (let D of DECLS) {
+                        await runCell(h, K, D)
+                    }
+                })
+            }
+        }
+
+        it('IDN-229 矩陣格數統計（防表被悄悄縮減）: 3 引用端表 × 16 變更型別 × 12 宣告狀態 ＝ 576 格; 預期分佈 通過 246／saveIdentityRequired 99／refIncomplete 69／refChanged 114／saveIdentityFormat 48', function() {
+            let tally = { ok: 0, saveIdentityRequired: 0, refIncomplete: 0, refChanged: 0, saveIdentityFormat: 0 }
+            let n = 0
+            for (let h of H3) {
+                for (let K of KINDS) {
+                    for (let D of DECLS) {
+                        let w = D.want(K.adds.length, K.rms.length)
+                        n++
+                        if (w === 'ok') {
+                            tally.ok++
+                        }
+                        else if (w[0] === 'saveIdentityRequired') {
+                            tally.saveIdentityRequired++
+                        }
+                        else if (w[1] === 'refIncomplete') {
+                            tally.refIncomplete++
+                        }
+                        else if (w[1] === 'refChanged') {
+                            tally.refChanged++
+                        }
+                        else if (w[0] === 'saveIdentityFormat') {
+                            tally.saveIdentityFormat++
+                        }
+                    }
+                }
+            }
+            A.equal(KINDS.length, 16)
+            A.equal(DECLS.length, 12)
+            A.equal(n, 576)
+            A.deepEqual(tally, { ok: 246, saveIdentityRequired: 99, refIncomplete: 69, refChanged: 114, saveIdentityFormat: 48 })
+            //變更型別之名稱數（手算）: 有改變者 11 型（adds 6、rms 4、雙向 1）、無改變者 5 型
+            A.equal(KINDS.filter((K) => K.adds.length + K.rms.length > 0).length, 11)
+            A.equal(KINDS.filter((K) => K.adds.length > 0 && K.rms.length === 0).length, 6)
+            A.equal(KINDS.filter((K) => K.adds.length === 0 && K.rms.length > 0).length, 4)
+            A.equal(KINDS.filter((K) => K.adds.length > 0 && K.rms.length > 0).length, 1)
+        })
+    })
+
+
+    // =================================================================
+    // IDN-3xx 必帶（perm-run03; 原 perm-run02「相容」案已改寫）
+    //   改變引用而未帶 subject／refs（含各種「看似未帶」形式）→ saveIdentityRequired; 不改變引用 → 不需宣告; 皆不讀被引用表、不取其鎖（不擴權）
+    // =================================================================
+    describe('IDN-3 必帶: 改變引用而未帶 subject／refs → saveIdentityRequired; 不改變引用 → 不需宣告', function() {
         const VARIANTS = [
             ['無第 3 參', () => undefined],
             ['空物件 {}', () => ({})],
@@ -748,7 +1111,28 @@ describe('unit-procCore-identity (伺服端強制之被引用實體身分: subje
         for (let h of H3) {
             let ref = HOLD[h].ref
             let n2 = entName(h, 2)
-            it(`IDN-301 [${h}→${ref}] 被引用實體已被替換/刪除(${h === 'pemis' ? '標的已刪' : '刪後同名重建'}), 不帶宣告 7 種形式 → 一律照舊成功寫入; 不讀被引用表、不寫被引用表、不取其鎖; 7 種形式之終態逐位相同（外部應用相容）`, async function() {
+            it(`IDN-301 [${h}→${ref}] 改變引用（新增啟用引用）且不帶宣告 7 種形式 × 被引用實體${h === 'pemis' ? '已被刪除' : '已被刪後同名重建'} → 一律 saveIdentityRequired／identityRequired(n 1), 零寫入; 被引用表完全不讀不寫、不取其鎖（只取本表鎖）; 7 種形式之終態逐位相同（＝初始, 不再靜默接管同名新實體）`, async function() {
+                let views = []
+                for (let [title, mk] of VARIANTS) {
+                    let t = traceLock()
+                    let env = createEnv({ lockOf: t.wrap })
+                    let { woItems } = env
+                    let rows = loadRows(woItems, h)
+                    await (h === 'pemis' ? delEnt(woItems, h, 2) : replaceEnt(woItems, h, 2)) //他人於我編輯期間替換被引用實體
+                    let sent = editHolder(rows, h, authOf(h, [[n2, 'y']]))
+                    await expectRequired(env, h, sent, mk(env, h), 1, { trace: { t, want: [`acq ${h}`, `rel ${h}`] }, extras: [{ id: `${entId(h, 2)}-NEW`, name: n2 }] }) //[I-REQ] perm-run02 此處為「照舊成功寫入、授權指向同名新實體」, perm-run03 取消該相容
+                    A.deepEqual(authAt(woItems, h), {}, `${title}: 授權未寫入`)
+                    views.push(await viewOf(woItems))
+                    env.cst.clear()
+                }
+                for (let v of views) {
+                    A.equal(v, views[0], '各形式之終態（去墻鐘時間欄位）須逐位相同')
+                }
+            })
+        }
+        for (let h of H3) {
+            let ref = HOLD[h].ref
+            it(`IDN-303 [${h}→${ref}] 不改變引用的存檔（只改說明）× 不帶宣告 7 種形式 × 被引用實體${h === 'pemis' ? '已被刪除' : '已被刪後同名重建'} → 一律成功; 不讀被引用表、不寫被引用表、不取其鎖; 7 種形式之終態逐位相同（[I-COMPAT] 不改變引用不需宣告）`, async function() {
                 let views = []
                 for (let [title, mk] of VARIANTS) {
                     let t = traceLock()
@@ -757,8 +1141,8 @@ describe('unit-procCore-identity (伺服端強制之被引用實體身分: subje
                     let rows = loadRows(woItems, h)
                     await (h === 'pemis' ? delEnt(woItems, h, 2) : replaceEnt(woItems, h, 2)) //他人於我編輯期間替換被引用實體
                     let calls = instrument(woItems)
-                    await expectOk(env, h, editHolder(rows, h, authOf(h, [[n2, 'y']])), mk(env, h)) //[I-COMPAT] 修正前: 名稱引用、不驗身分
-                    A.deepEqual(Object.keys(authAt(woItems, h)), [n2], `${title}: 授權已寫入（指向同名新實體——此為外部應用相容行為: 未宣告身分者維持名稱引用語意）`)
+                    await expectOk(env, h, rows.map((r, k) => (k === 2 ? { ...r, description: 'only-desc' } : r)), mk(env, h)) //[I-COMPAT] 只改說明, 啟用引用不變
+                    A.equal(woItems[h].get(IDS[h][2]).description, 'only-desc', `${title}: 已寫入`)
                     A.equal(calls[ref].select, 0, `${title}: [I-COMPAT] 不讀被引用表`)
                     A.equal(calls[ref].insert + calls[ref].save + calls[ref].del + calls[ref].delAll, 0)
                     A.deepEqual(t.log, [`acq ${h}`, `rel ${h}`], `${title}: [I-COMPAT] 只取本表鎖, 不取被引用表鎖`)
@@ -771,7 +1155,7 @@ describe('unit-procCore-identity (伺服端強制之被引用實體身分: subje
                 }
             })
         }
-        it('IDN-302 不擴權: 不帶宣告時既有拒收照舊——持舊基準被拒 saveStale（不因缺宣告而放行或改變錯誤鍵）', async function() {
+        it('IDN-302 次序: 基準比對先於必帶檢查——持舊基準且改變引用而未帶宣告 → saveStale（無 identity-error）; 對照: 基準新鮮 → saveIdentityRequired（既有拒收不因缺宣告而放行或改變錯誤鍵）', async function() {
             for (let h of H3) {
                 let env = createEnv()
                 let rows = loadRows(env.woItems, h)
@@ -779,9 +1163,13 @@ describe('unit-procCore-identity (伺服端強制之被引用實體身分: subje
                 await env.woItems[h].save([{ id: IDS[h][0], description: 'by-other' }])
                 let snap0 = snapAll(env.woItems)
                 let r = await run(env.pc, h, editHolder(rows, h, authOf(h, [[entName(h, 2), 'y']])), { baseline: bl, subject: null, refs: null })
-                A.deepEqual(r, { ok: false, v: 'saveStale' }) //[I-COMPAT]
+                A.deepEqual(r, { ok: false, v: 'saveStale' }) //[I-ORDER] 基準先於必帶
                 A.equal(snapAll(env.woItems), snap0)
                 A.equal(identityLogs(env.logs).length, 0)
+                A.equal(staleLogs(env.logs).length, 1)
+                let env2 = createEnv()
+                let rows2 = loadRows(env2.woItems, h)
+                await expectRequired(env2, h, editHolder(rows2, h, authOf(h, [[entName(h, 2), 'y']])), { baseline: makeBaseline(rows2, h) }, 1) //基準新鮮, 僅缺宣告
                 env.cst.clear()
             }
         })
@@ -864,7 +1252,8 @@ describe('unit-procCore-identity (伺服端強制之被引用實體身分: subje
                     release = resolve
                 })
                 let held = core.withTabLocks([h], () => gate) //他人持有本表鎖, 使本操作者之第 1 次存檔卡在 guardWrite（已占位）
-                let p1 = run(pc, h, editHolder(rows, h, authOf(h, [[entName(h, 2), 'y']])), undefined, 'op-same')
+                //perm-run03: 第 1 次存檔新增引用, 須附宣告（原不帶宣告, 不帶即 saveIdentityRequired）; 其卡在表鎖時尚未驗宣告, 釋放後才成功
+                let p1 = run(pc, h, editHolder(rows, h, authOf(h, [[entName(h, 2), 'y']])), { refs: declOf(h, 2) }, 'op-same')
                 await flush()
                 await sleep(30)
                 let goodOpt = h === 'pemis' ? { refs: declOf(h, 2) } : { subject: { id: entId(h, 2), name: entName(h, 2), saved: true } }
@@ -927,11 +1316,14 @@ describe('unit-procCore-identity (伺服端強制之被引用實體身分: subje
                     A.deepEqual(t.log, [`acq ${ref}`, `acq ${h}`, `rel ${h}`, `rel ${ref}`], '[I-LOCK] refs 於本表鎖內（write 內）驗證')
                 }
             })
-            it(`IDN-501 [${h}] 對照: 不帶宣告只取本表鎖 [${h}]`, async function() {
+            it(`IDN-501 [${h}] 對照（perm-run03）: 不帶宣告且不改變引用（只改說明）→ 成功, 只取本表鎖 [${h}]; 不帶宣告而改變引用 → saveIdentityRequired, 判定在本表鎖內的 write（log 為 acq ${h}／rel ${h}）、不取被引用表鎖 ${ref}、被引用表不讀不寫`, async function() {
                 let t = traceLock()
                 let env = createEnv({ lockOf: t.wrap })
-                await expectOk(env, h, add2(loadRows(env.woItems, h)), undefined)
+                await expectOk(env, h, loadRows(env.woItems, h).map((r, k) => (k === 2 ? { ...r, description: 'only-desc' } : r)), undefined)
                 A.deepEqual(t.log, [`acq ${h}`, `rel ${h}`]) //[I-COMPAT]
+                let t2 = traceLock()
+                let env2 = createEnv({ lockOf: t2.wrap })
+                await expectRequired(env2, h, add2(loadRows(env2.woItems, h)), undefined, 1, { trace: { t: t2, want: [`acq ${h}`, `rel ${h}`] } }) //[I-REQ][I-LOCK]
             })
 
             it(`IDN-502 [${h}] 被拒或格式不合之後, 鎖與占位皆釋放: 同一操作者立即再存成功（5 秒內）`, async function() {
@@ -1341,9 +1733,9 @@ describe('unit-procCore-identity (伺服端強制之被引用實體身分: subje
             }
         })
 
-        it('IDN-608 語系鍵: saveSubjectChanged／saveRefChanged／saveIdentityFormat 於 eng 與 cht 皆有非空固定訊息（不含 {name} 等變數）; 經 errLog 對外原樣輸出（非 saveWriteFail）', function() {
+        it('IDN-608 語系鍵: saveSubjectChanged／saveRefChanged／saveIdentityFormat／saveIdentityRequired(perm-run03) 於 eng 與 cht 皆有非空固定訊息（不含 {name} 等變數）; 經 errLog 對外原樣輸出（非 saveWriteFail）', function() {
             let lang = procLang({})
-            for (let k of ['saveSubjectChanged', 'saveRefChanged', 'saveIdentityFormat']) {
+            for (let k of ['saveSubjectChanged', 'saveRefChanged', 'saveIdentityFormat', 'saveIdentityRequired']) {
                 for (let lg of ['eng', 'cht']) {
                     A.equal(typeof lang[lg][k], 'string', `${lg}.${k}`)
                     A.ok(lang[lg][k].length > 10)
@@ -1351,9 +1743,19 @@ describe('unit-procCore-identity (伺服端強制之被引用實體身分: subje
                 }
             }
         })
+        it('IDN-609 必帶判定的站點（perm-run03）: server/procCore.mjs 之 checkRefIdentity 呼叫同時傳 decl（refDecl）與 subject, 且 srLog 的 identity-error 仍只有三處（格式、subject、refDecl／必帶共用一處）——不另有第四處必帶專用的 reject', function() {
+            let code = readCode('server/procCore.mjs')
+            A.ok(/checkRefIdentity\(\{ keyTable, decl: refDecl, subject, rowsNew: \[\.\.\.r\.add, \.\.\.r\.diff\], rowsOld: ltdtOld, refRows \}\)/.test(code), '[I-SITE] decl 與 subject 一併傳入, 由純函數判定必帶／不完整／不符') //[I-SITE]
+            A.equal(countOf(code, /updateTabItems-identity-error/g), 3)
+            A.equal(countOf(code, /saveIdentityRequired/g), 0, '必帶鍵由 refIdentity.checkRefIdentity 回傳（單一擁有者）, procCore 不重複字面')
+        })
     })
 
 })
 
-//案數(mocha 實跑 2026-10-23): IDN-1 52、IDN-2 92、IDN-3 4（IDN-301 內含 7 種不帶宣告形式 × 3 引用端）、IDN-4 11、IDN-5 28、IDN-6 10, 共 197 案全綠.
+//案數(perm-run02, mocha 實跑 2026-10-23): IDN-1 52、IDN-2 92、IDN-3 4（IDN-301 內含 7 種不帶宣告形式 × 3 引用端）、IDN-4 11、IDN-5 28、IDN-6 10, 共 197 案全綠.
+//案數(perm-run03 測試遷移後, mocha 實跑 2026-10-23): IDN-1 52、IDN-2 92（IDN-207 改寫、其餘同前）、IDN-215～222 21（移除與 subject 路徑; 215～219 × 引用端 3、220～222 × 引用端 2）、IDN-22x 逐軸矩陣 49（48 個 H×K 格組 ＝ 576 格, ＋IDN-229 格數統計）、
+//  IDN-3 7（301 改寫 ×3、303 新 ×3、302 改寫 ×1）、IDN-4 11（404 首次存檔補宣告）、IDN-5 28（501 對照改寫）、IDN-6 11（608 增鍵、新增 609）, 共 271 案全綠（上輪遷移前 12 敗: 207 ×3、301 ×3、404 ×3、501 對照 ×3, 皆已依新語意改寫）.
+//perm-run03 變異驗證（對 repo 副本沙盒〔tmp/perm-run03/mut, 驗畢已刪〕內之產品碼逐一注入缺陷, 腳本 tmp/perm-run03/mutate-B.mjs; 跑本檔＋unit-refIdentity＋unit-refIdentityWiring）: M1 必帶判定拿掉 73 案紅、M2 collectChangedNames 不含移除 64、M3 removedActiveNames 恆空 79、M4 recordPicks 不記移除 11、M5 buildRefDecl 改用 collectNewNames 11、M6 subject 名稱不計入已宣告 16、
+//  M7 漏報判定拿掉 93、M8 不符判定拿掉 150、M9 procCore 不傳 subject 16、M10 procCore 無 refs 時略過檢查 53、M11 procCore 只檢查新增列 55、M12 recordPicks 移除路徑繞過衝突語意 4、M13 新列舊值誤當有舊列 32; 13 個變異全被殺.
 //變異驗證(對副本逐一注入缺陷, 確認會紅): 略過 refs／subject 驗證、被引用表不取鎖、檢查在鎖內但寫入在鎖外、pickClientOpt 不採 subject、targets 帶宣告不拒、壞 subject 當未帶、一律取被引用表鎖(相容破壞)、log 洩名稱、refs 不含新增列、refs 舊列視為空、格式拒收降級為不帶 等 13 個變異皆被殺（另 2 個為等價／空操作變異）.

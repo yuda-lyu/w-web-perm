@@ -55,6 +55,22 @@ let getUserByToken = async (token) => {
         if (token === '{token-for-reject}') { //模擬部署方以舊版 w-web-sso helper(≤1.1.4)注入: 失敗時 reject 之字串含已代入系統介接權杖(合成秘密)與使用者權杖之完整網址
             return Promise.reject(`can not get user data by url[http://127.0.0.1:11007/api/getSsoUserInfor?token=SYNTH-SYS-SECRET-FOR-TEST&key=token&value=${token}]`)
         }
+        if (token === '{token-for-admin2}') { //測試用(perm-run03 範圍三): 第二位系統管理員, 供「標頭 token 與本體 __sysToken__ 為不同使用者」「本體 token 之使用者被停用」等 getUserIdByToken 完整驗證案例(其 perm users 列由測試自行建立／停用)
+            return {
+                id: 'id-for-admin2',
+                name: 'admin2',
+                email: 'admin2@example.com',
+                isAdmin: 'y',
+            }
+        }
+        if (token === '{token-for-member}') { //測試用(perm-run03 範圍四): 在 perm users 表內(測試自行建立)、有效、isAdmin='n' 但**通過** verifyClientUser(見下方)之瀏覽使用者, 供「通過連線閘之非管理員呼叫寫入函數被 requireAdmin 拒收」案例
+            return {
+                id: 'id-for-member',
+                name: 'member',
+                email: 'member@example.com',
+                isAdmin: 'n',
+            }
+        }
         if (token === '{token-for-verify-throw}') { //回有效使用者, 但 verifyClientUser / verifyAppUser 對其拋錯(Error.message 為合成秘密), 模擬部署方驗證函數拋錯
             return {
                 id: 'id-for-verify-throw',
@@ -74,6 +90,9 @@ let verifyClientUser = (user, from) => {
     // return false //測試無法登入
     if (process.env.NODE_ENV !== 'production' && user.id === 'id-for-verify-throw') { //測試用: 見 getUserByToken 之 '{token-for-verify-throw}'
         throw new Error('SYNTH-VERIFY-SECRET-FOR-TEST')
+    }
+    if (process.env.NODE_ENV !== 'production' && user.id === 'id-for-member') { //測試用: 見 getUserByToken 之 '{token-for-member}'(部署方放行非管理員, 套件仍須於函數層級另檢查角色)
+        return true
     }
     return user.isAdmin === 'y' //測試僅系統管理者使用
 }

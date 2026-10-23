@@ -12,6 +12,7 @@ import cloneDeep from 'lodash-es/cloneDeep.js'
 import cacheSt from 'wsemi/src/cacheSt.mjs'
 import ds from '../src/schema/index.mjs'
 import proc from '../server/procCore.mjs'
+import { autoDecl } from './tools/declHelper.mjs'
 import createLockSave from '../server/lockSave.mjs'
 import reuseDeletedIds from '../src/plugins/reuseDeletedIds.mjs'
 import { mkTable, mkCore, mkSrLog } from './tools/unitOrm.mjs'
@@ -98,7 +99,7 @@ describe('unit-procCore-updateTabItems (後台整表寫入之雙擊防護, ADR-0
         let { srLog, logs } = mkSrLog()
         let cst = cacheSt()
         let core = mkCore(ds, woItems)
-        let pc = proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) })
+        let pc = autoDecl(proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) }), woItems)
         env = { seed, woItems, logs, cst, pc }
         return env
     }
@@ -212,9 +213,12 @@ describe('unit-procCore-updateTabItems (後台整表寫入之雙擊防護, ADR-0
         assert.strict.equal(woItems.users.size(), 3, '不得多出列')
     })
 
-    //外審 sol R10(run04): 外部同步(WWebPerm.syncAndReplaceTabs)與後台整表寫入須共用同表互斥鍵 tabWriteKey, 否則兩者各自「先檢查唯一、後寫入」可交錯而略過 F-02／F-14.
-    //此處以同一個 kmx 實例從外部持有 tabWriteKey('grups'), 驗證 updateGrups 必須等它釋放才寫入(同步端同鍵由 unit-keyCheck SITE-KC-007 靜態守護)
-    it('UNIT-UTI-013 後台整表寫入與外部同步共用同表互斥鍵: 他方持有 tabWriteKey 期間 updateGrups 不寫入, 釋放後才完成', async function() {
+    //外審 sol R10(run04): 外部同步(syncCore.syncAndReplaceTabs; perm-run03 起自 WWebPerm.mjs 搬出)與後台整表寫入須共用同表互斥鎖, 否則兩者各自「先檢查唯一、後寫入」可交錯而略過 F-02／F-14.
+    //perm-run01 起鎖管理器為 w-serv-orm 實例之 withTabLocks／guardWrite(原 tabWriteKey 互斥鍵已移除): 此處以同一個真 core.withTabLocks 從外部持有 grups 表鎖, 驗證 updateGrups 必須等它釋放才寫入
+    //(同步端同鎖由 unit-keyCheck SITE-KC-007 靜態守護).
+    //perm-run03 診斷註記: 本案曾因 autoDecl 無條件附「空宣告」而逾時(180s)——帶宣告(即使是空陣列)的 updateGrups 會先取被引用表 pemis 之鎖(withRefLock)再於持有 pemis 鎖下等 grups 鎖,
+    //使後續 updatePemis 被 pemis 鎖擋住而成死等(測試在 await rp 之後才釋放 grups); autoDecl 現只在「存檔改變引用」時才附宣告(test/tools/declHelper.mjs), 本案無引用變更故不帶宣告, 回到原述語.
+    it('UNIT-UTI-013 後台整表寫入與外部同步共用同表互斥鎖: 他方持有 grups 表鎖(w-serv-orm withTabLocks)期間 updateGrups 不寫入, 釋放後才完成; 他表(targets／pemis, 無改名刪除)不受影響', async function() {
         let seed = seedRows()
         let woItems = {}
         for (let k of Object.keys(TABLES)) {
@@ -223,7 +227,7 @@ describe('unit-procCore-updateTabItems (後台整表寫入之雙擊防護, ADR-0
         let { srLog } = mkSrLog()
         let cst = cacheSt()
         let core = mkCore(ds, woItems)
-        let pc = proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) })
+        let pc = autoDecl(proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) }), woItems)
         env = { cst }
         let release = null
         let gate = new Promise((resolve) => {

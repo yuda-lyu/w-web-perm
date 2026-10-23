@@ -1,4 +1,4 @@
-//多人同時編輯共用核心(w-serv-orm 1.1.17)之使用者視角 e2e(perm-run01; 使用者 2026-10-22 裁示原則 10、規格 dspec/多人同時編輯之寫入契約.md 第 5、6、8 節; 對應 spec/流程_多人同時編輯.md E2E-001～036; E2E-025～036 為 perm-run02 範圍一「被引用實體身分」)。
+//多人同時編輯共用核心(w-serv-orm 1.1.17)之使用者視角 e2e(perm-run01; 使用者 2026-10-22 裁示原則 10、規格 dspec/多人同時編輯之寫入契約.md 第 5、6、8 節; 對應 spec/流程_多人同時編輯.md E2E-001～038; E2E-025～037 為 perm-run02 範圍一「被引用實體身分」, E2E-038 為 perm-run03 範圍一「移除引用亦須宣告」)。
 //雙模式與管線同 test/e2e-external-rows.test.mjs（makeRunner → runBaselineCase）；本檔全為語意案例（stages 空陣列、不產標準圖）——本輪所修缺口皆為「資料／狀態是否正確」，無新畫面。
 //  驗證（mocha）：npx mocha test/e2e-concurrent-edit.test.mjs --reporter list --timeout 300000
 //
@@ -26,6 +26,9 @@
 //  軸 E（perm-run02）被引用實體身分: 反向對話框 2 × {主體原封不動、同名重建且推播已抵達〔前端自檢〕、同名重建且推播尚未抵達〔伺服端強制〕、刪除未重建／改名／開框時未儲存者之同名、格式不合或未帶} ＝ 10 格, 已設 6（E2E-005／006 之成功路徑 2、014／015 2、025／026 2）、未設 4;
 //    清單頁正向引用 3 × 8 項能力 ＝ 24 格, 不適用 4（對象無同名重建、users／grups 無同 id 重建）, 適用 20 格已設 10（相符 033～035、同名重建前端 030～031／伺服端 027～028、對象刪除前端 032／伺服端 029、對象同 id 重建 036）、未設 10（被刪除未重建〔users／grups〕前端／伺服端各 2、宣告不完整或格式不合 3、新增停用項不須宣告 3; 由 test/api-identity.test.mjs 與 unit-refIdentity／unit-procCore-identity 涵蓋）。
 //  已測案例 37 × 語系 2 = 74 個 it（E2E-001～024 為 24 案 48 個 it; perm-run02 新增 E2E-025～036 共 12 案 24 個 it, 外審 sol#1 補 E2E-037〔同名跨列選取衝突, users 頁, 前端攔下〕1 案 2 個 it）。
+//  perm-run03 範圍一（宣告強制必帶＋移除亦須宣告）: 新增 E2E-038（users 頁取消勾選既有引用後存檔 → 請求 opt.refs 含被移除之名稱、存檔成功）1 案 2 個 it ⇒ 共 38 案 76 個 it。
+//    既有 E2E-001～037 的意圖不變且不倚賴「不帶宣告」: 清單頁（瀏覽器）本來就送 refs、兩反向對話框本來就送 subject; wrapFapi 只記錄後照原 opt 轉呼叫（不改 refs／subject）; 他人變更／夾具／還原皆經 editTableRows（api-setup.callRpc 自動附宣告）。
+//    E2E-005～008／014～016／025～026 之反向對話框存檔只改動主體名稱本身之引用（含取消勾選之移除）, 由 opt.subject 涵蓋（subject 只涵蓋其主體名稱）。
 //
 //手段說明（setup，非使用者動作）：「他人」＝經管理者寫入 RPC（editTableRows）或外部同步端點；「推播尚未抵達」＝攔住網路推播（holdNetPushes：store.commit 攔下 tableName+data 之 payload，
 //  但放行 payload.source==='savedRows'——頁面套用自己存檔回傳列之 commit），模擬「存檔成功後約 2 秒輪詢尚未送達」之窗口；e2e 不 import src／server（R-TEST-SCOPE-01 盤點指令 4），故 V10 以黑箱比對（id 序、格式、伺服端接受）。
@@ -108,7 +111,14 @@ async function assignViaEditor(page, P, pick) {
     await waitUntilExist(page, `編輯器第 ${pick.row} 列已渲染`, (i) => [...document.querySelectorAll(`.ag-row[row-index="${i}"]`)].some((e) => !!e.querySelector('.ag-cell[col-id="enable"]')), { arg: pick.row, timeout: 15000 })
     const txt = await dlgRowText(page, pick.row)
     assert.ok(txt !== null && txt.includes(pick.name), `編輯器第 ${pick.row} 列應為「${pick.name}」, 實得 ${JSON.stringify(txt)}`)
+    //perm-run03: pick.expectChecked 有給時, 守門「開窗時該列之勾選狀態」與「點擊後翻轉」（移除案用: 開窗時須已勾選, 點擊＝取消勾選; 未給者行為不變）
+    if (pick.expectChecked !== undefined) {
+        assert.equal(await dlgChecked(page, pick.row), pick.expectChecked, `編輯器第 ${pick.row} 列（${pick.name}）開窗時勾選狀態應為 ${pick.expectChecked}`)
+    }
     await toggleDialogEnable(page, pick.row)
+    if (pick.expectChecked !== undefined) {
+        assert.equal(await dlgChecked(page, pick.row), !pick.expectChecked, `點擊後編輯器第 ${pick.row} 列（${pick.name}）勾選狀態應翻為 ${!pick.expectChecked}`)
+    }
     await clickDialogSave(page)
     await waitDialogClosed(page, P.dlgKey)
     assert.equal(await pageSaveShown(page), true, '編輯器回填後清單頁出現儲存鈕(已修改)')
@@ -512,8 +522,10 @@ CASES.push({
         await enterPage(page, 'users', 6)
         const k = await rowIndexByCell(page, 'name', 'mary')
         await typeIntoCell(page, k, 'description', 'CE-e-renumber-draft')
-        await syncRows('users', [mkU('id-ce-x1', 'ce-x1', {}, { order: 200, description: 'ce外部一' }), mkU('id-ce-x2', 'ce-x2', {}, { order: 201, description: 'ce外部二' })], F_X)
-        await waitUntilExist(page, 'store 已含平移後之 order', () => (window.$vo.$store.state.users || []).some((r) => r.id === 'id-ce-x1' && r.order === 200), { timeout: 30000 })
+        //perm-run03(外部匯入改依 srcKey 差異同步): 夾具標籤 id-ce-x1／id-ce-x2 是 srcKey, 真實 id 由伺服端產生; 平移 order 為依 srcKey 修改(id 不變), 故先取 ce-x1 之真實 id 供 store 等待
+        const idX1 = (await selectAllRows('users')).find((r) => r.srcKey === 'id-ce-x1').id
+        assert.deepEqual(await syncRows('users', [mkU('id-ce-x1', 'ce-x1', {}, { order: 200, description: 'ce外部一' }), mkU('id-ce-x2', 'ce-x2', {}, { order: 201, description: 'ce外部二' })], F_X), { nAdd: 0, nUpdate: 2, nDel: 0, nSame: 0 }, 'order 全部平移: 依 srcKey 修改 2 列')
+        await waitUntilExist(page, 'store 已含平移後之 order', (a) => (window.$vo.$store.state.users || []).some((r) => r.id === a.id && r.order === 200), { timeout: 30000, arg: { id: idX1 } })
         await page.waitForTimeout(1200)
         //spec E2E-019 驗證: 外部列 order 數值全變而相對名次不變 → 不是他人重排: 無橫幅, 儲存成功
         assert.equal(await staleCount(page, 'users-banner-stale'), 0)
@@ -933,6 +945,36 @@ CASES.push({
             const row = us.find((r) => r.name === n)
             assert.equal(JSON5.parse(row.cgrups || '{}')[FX_G.name], undefined, `${n} 之 ${FX_G.name} 指派未寫入`)
         }
+    },
+})
+
+//E2E-038 移除引用亦須宣告（perm-run03 範圍一; 使用者 2026-10-23 裁示宣告強制必帶; R-REF-IDENTITY-01 規則 7）: 使用者在指派欄編輯器「取消勾選」既有引用後存檔 →
+//  前端 buildRefDecl 把被移除之名稱納入 opt.refs（附編輯器開啟當時之 id）, 伺服端以強制必帶＋鎖內新鮮讀取比對相符 → 存檔成功; 庫內該列之引用不再啟用, 他列不變。
+//  spec 對應: spec/流程_多人同時編輯.md E2E-038（perm-run03 補入）。
+CASES.push({
+    //6 步 user path: ①進入使用者頁 ②開 mary 之「所屬群組」編輯器, 看到 M2 已勾選, 取消勾選, 按編輯器儲存（回填, 清單頁出現儲存鈕）③按「儲存變更」④看到成功訊息, 按確認 ⑤請求送出 1 次, opt.refs 含被移除之 M2 與其開框當時之 id, 不帶 subject ⑥庫內 mary 之 M2 不再啟用, 他列之授權不變
+    name: nm('users-ref-remove-declared'),
+    stages: [],
+    run: async (page) => {
+        const P = REF_PAGES[0]
+        await P.enter(page)
+        await wrapFapi(page, P.fapi, 'capture')
+        await assignViaEditor(page, P, { name: '權限群組M2', id: 'id-for-權限群組M2', row: 1, expectChecked: true }) //spec E2E-038 驗證1: 開窗已勾選 → 取消勾選 → 回填後出現儲存鈕
+        await saveAndWaitModal(page)
+        await assertModalMsg(page, P.saveOk) //spec E2E-038 驗證2: 成功訊息（伺服端強制必帶之宣告齊備且與鎖內新鮮讀取相符）
+        await dismissResultModal(page)
+        const sent = await sentAll(page)
+        assert.equal(sent.length, 1, '請求送出 1 次')
+        assert.deepEqual(sent[0].refs, [{ name: '權限群組M2', ids: ['id-for-權限群組M2'] }]) //spec E2E-038 驗證3: 宣告含被移除之名稱, ids 為開框當時之 id
+        assert.equal(sent[0].subject, null, '清單頁不送主體摘要')
+        return null
+    },
+    semantic: async () => {
+        //spec E2E-038 驗證4: mary 之 M2 不再啟用; 他列（peter→M1、john→M3）之授權不變
+        const us = await selectAllRows('users')
+        assert.equal(isOn(JSON5.parse(rowOf(us, 'id-for-mary').cgrups || '{}')['權限群組M2']), false, 'mary 之 M2 已不再啟用')
+        assert.ok(isOn(JSON5.parse(rowOf(us, 'id-for-peter').cgrups)['權限群組M1']), 'peter 之 M1 不變')
+        assert.ok(isOn(JSON5.parse(rowOf(us, 'id-for-john').cgrups)['權限群組M3']), 'john 之 M3 不變')
     },
 })
 

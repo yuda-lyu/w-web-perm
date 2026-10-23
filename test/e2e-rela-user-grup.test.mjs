@@ -26,7 +26,7 @@
 import fs from 'fs'
 import assert from 'assert'
 import JSON5 from 'json5'
-import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal, captureBaseSeedOnce, resetDb, restoreDbOnce, setDialogModeWithShots, dialogEnableCheckboxSel, openChipsAllWithShots, dialogChipsAllBtnSel, dialogChipsVisibleTargets, readDialogChipsRow, resizeWindowForChips, setChipsAllModeWithShots, setLang, DLG_MDI, dlgBtn, waitDialogGrid, toggleDialogEnable, clickDialogSave, clickDialogClose, waitDialogClosed, gotoUsers, gotoGrups, toggleEditMode, openBelongDialog, saveBelongAndWaitModal, assertModalMsg } from './tools/e2e-setup.mjs'
+import { startServersOnce, cleanup, launchBrowser, openApp, captureStableWithBox, rowBoxSel, dialogRowBoxSel, waitUntilExist, getResolvedActiveTargets, assertBaselineMatch, dismissResultModal, captureBaseSeedOnce, resetDb, restoreDbOnce, setDialogModeWithShots, dialogEnableCheckboxSel, openChipsAllWithShots, dialogChipsAllBtnSel, dialogChipsVisibleTargets, readDialogChipsRow, resizeWindowForChips, setChipsAllModeWithShots, setLang, DLG_MDI, dlgBtn, waitDialogGrid, toggleDialogEnable, clickDialogSave, clickDialogClose, waitDialogClosed, gotoUsers, gotoGrups, toggleEditMode, openBelongDialog, saveBelongAndWaitModal, assertModalMsg, updateWithDecl } from './tools/e2e-setup.mjs'
 //產製端與比對端同一案例管線（runBaselineCase）與截圖前篩選（createBaselineGate），規格詳 w-package-tools-e2e 之 README.md §2.1-2.2
 import { runBaselineCase, createBaselineGate } from './tools/e2eLib.mjs'
 
@@ -589,13 +589,11 @@ const cases = [
         stages: ['E2E-010-1-dialog-open', 'E2E-010-2-click-enable', 'E2E-010-3-enable-checked', 'E2E-010-4-click-save', 'E2E-010-5-belong-saved'],
         run: async (page) => {
             await page.waitForFunction(() => (window.$vo.$store.state.users || []).length > 0, null, { timeout: 30000 })
-            const nAll = await page.evaluate(async () => {
-                const us = JSON.parse(JSON.stringify(window.$vo.$store.state.users)).sort((a, b) => (a.order || 0) - (b.order || 0))
-                const mary = us.find((u) => u.email === 'mary@example.com')
-                const dup = { ...mary, id: 'id-for-mary-dup', email: 'mary.dup@example.com', order: Math.max(...us.map((u) => u.order || 0)) + 1 }
-                await window.$vo.$fapi.updateUsers([...us, dup])
-                return us.length + 1
-            })
+            const us = await page.evaluate(() => JSON.parse(JSON.stringify(window.$vo.$store.state.users)).sort((a, b) => (a.order || 0) - (b.order || 0)))
+            const mary = us.find((u) => u.email === 'mary@example.com')
+            const dup = { ...mary, id: 'id-for-mary-dup', email: 'mary.dup@example.com', order: Math.max(...us.map((u) => u.order || 0)) + 1 }
+            await updateWithDecl(page, 'users', [...us, dup]) //perm-run03 宣告強制必帶: 新增列帶引用(cgrups 同 mary)須附被引用實體身分宣告 opt.refs(test setup 層, 非 act; 同 resetDb)
+            const nAll = us.length + 1
             await page.waitForFunction((n) => (window.$vo.$store.state.users || []).length === n, nAll, { timeout: 15000 })
             await page.waitForTimeout(800)
 

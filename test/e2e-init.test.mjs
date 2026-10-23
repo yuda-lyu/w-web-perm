@@ -314,7 +314,9 @@ else {
             const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify({ from: FROM_006, rows }) })
             return await res.json()
         }
-        const dupAdmin = (email) => ({ id: 'id-mk-dup', order: 0, name: 'dup-admin', email, from: FROM_006, cgrups: '{}', isAdmin: 'n', isActive: 'y' })
+        //perm-run03(外部匯入改依 srcKey 差異同步, R-IMPORT-01): 同步端點不收 id(帶 id 整批拒收 idNotAllowed), 每列須帶 srcKey; 'id-mk-dup' 改為 srcKey(真實 id 由伺服端產生),
+        //  其後「移除重複」之第二次同步為同 srcKey 改 email＝依 srcKey 修改(id 不變), 結果同「以同 from 同步取代為不同 email」
+        const dupAdmin = (email) => ({ srcKey: 'id-mk-dup', order: 0, name: 'dup-admin', email, from: FROM_006, cgrups: '{}', isAdmin: 'n', isActive: 'y' })
         for (const lang of langs) {
             it(`E2E-006-ambiguous-login [${lang}]: 對應鍵 email 命中兩位 active 使用者 → 拒絕登入(畫面停在拒絕登入、後端 ambiguousUserFromPerm、login error、權杖清空); 移除重複後登入恢復`, async function() {
                 this.timeout(300000)

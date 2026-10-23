@@ -161,8 +161,8 @@ describe('api-baseline (多人同時編輯共用核心, 真後端, perm-run01)',
         let row = (await rowsOf('grups')).find((x) => x.id === id)
         A.equal(row.description, 'ab5', 'pickKeysOnly 未被採納: description 照常寫入')
         A.equal(row.userId, rows.find((x) => x.id === id).userId, 'keepUserId 未被採納: 擁有者(userId)不變')
-        //非物件之 opt 當成沒有基準(沿用既有政策, 與 api-externalRows 一致)
-        let r2 = await write('grups', patch(await rowsOf('grups'), id, { description: 'ab5b' }), 'x')
+        //非物件之 opt 當成沒有基準(沿用既有政策, 與 api-externalRows 一致); 本案不改變引用故不需身分宣告, 並以 noDecl 保持第 2 參原樣為字串(callRpc 預設會把非物件之第 2 參換成帶宣告之物件)
+        let r2 = await callRpc(FN.grups, [patch(await rowsOf('grups'), id, { description: 'ab5b' }), 'x'], TOKEN_ADMIN, { noDecl: true })
         A.ok(r2.ok)
     })
 
@@ -173,7 +173,8 @@ describe('api-baseline (多人同時編輯共用核心, 真後端, perm-run01)',
         //    ②同步先: 庫內外部列已是本輪內容, 寫入帶的是上輪內容 → 外部列鎖定欄異動 → saveExternalRowChanged 整次拒收、零寫入 → 後台列說明＝上輪終態、外部列說明＝本輪值
         //  任何其他結果(saveWriteFail、saveStale、同步 error、逾時＝死結)皆為缺陷.
         let withTimeout = (p, ms, label) => Promise.race([p, new Promise((resolve, reject) => setTimeout(() => reject(new Error(`${label} 逾時(疑似死結)`)), ms))])
-        let fx = [{ id: 'id-ab-x1', order: 100, name: 'ab-x1', description: '外部一', cpemis: '{}' }, { id: 'id-ab-x2', order: 101, name: 'ab-x2', description: '外部二', cpemis: '{}' }]
+        //perm-run03(R-IMPORT-01): 同步端點不收 id、每列帶 srcKey(來源鍵; 內部主鍵由伺服端產生); 每輪重送同 srcKey 之列＝修改既有外部列(id 不變), 故終態依 srcKey 找列
+        let fx = [{ srcKey: 'sk-ab-x1', order: 100, name: 'ab-x1', description: '外部一', cpemis: '{}' }, { srcKey: 'sk-ab-x2', order: 101, name: 'ab-x2', description: '外部二', cpemis: '{}' }]
         A.equal((await postSync('grups', { from: F_SYNC, rows: fx })).state, 'success')
         let id = BASE.grups[0].id
         let want = BASE.grups[0].description
@@ -199,8 +200,9 @@ describe('api-baseline (多人同時編輯共用核心, 真後端, perm-run01)',
             }
             let gs = await rowsOf('grups')
             A.equal(gs.find((r) => r.id === id).description, want, `第 ${k} 輪終態: 後台列說明須等於最後一次成功寫入之值(寫入成功而未生效＝寫入失效; 落敗而被改＝非零寫入)`)
-            A.equal(gs.find((r) => r.id === 'id-ab-x1').description, `外部-${k}`, `第 ${k} 輪終態: 外部列 x1 說明須為本輪同步內容`)
-            A.equal(gs.find((r) => r.id === 'id-ab-x2').description, `外部-${k}`, `第 ${k} 輪終態: 外部列 x2 說明須為本輪同步內容`)
+            A.equal(gs.filter((r) => r.from === F_SYNC).length, 2, `第 ${k} 輪終態: 外部分區恆為 2 列(同 srcKey 重送＝修改, 不重複新增)`)
+            A.equal(gs.find((r) => r.srcKey === 'sk-ab-x1').description, `外部-${k}`, `第 ${k} 輪終態: 外部列 x1 說明須為本輪同步內容`)
+            A.equal(gs.find((r) => r.srcKey === 'sk-ab-x2').description, `外部-${k}`, `第 ${k} 輪終態: 外部列 x2 說明須為本輪同步內容`)
             A.equal(new Set(gs.map((r) => r.id)).size, gs.length, `第 ${k} 輪: 無重複主鍵`)
         }
         console.log(`[api-baseline AB-6] 六輪中後台寫入先於同步而成功 ${wins} 輪, 落敗(saveExternalRowChanged) ${6 - wins} 輪`)

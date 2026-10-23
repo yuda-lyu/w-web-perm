@@ -21,37 +21,39 @@ import fsIsFolder from 'wsemi/src/fsIsFolder.mjs'
 import fsIsFile from 'wsemi/src/fsIsFile.mjs'
 import replace from 'wsemi/src/replace.mjs'
 import strdelleft from 'wsemi/src/strdelleft.mjs'
-import ltdtmapping from 'wsemi/src/ltdtmapping.mjs'
 import cacheSt from 'wsemi/src/cacheSt.mjs'
 import WServHapiServer from 'w-serv-hapi/src/WServHapiServer.mjs'
 import WServOrm from 'w-serv-orm/src/WServOrm.mjs'
 import checkOptRemoved from 'w-serv-orm/src/checkOptRemoved.mjs'
 import ds from '../src/schema/index.mjs'
 import { getUserRules } from '../src/plugins/mShare.mjs'
-import procCore, { toOutKey, isRowObj, pickClientOpt } from './procCore.mjs'
+import procCore, { toOutKey, pickClientOpt } from './procCore.mjs'
+import syncCore from './syncCore.mjs'
 import createLockSave from './lockSave.mjs'
 import procLang from './procLang.mjs'
 import srLogInit from './srLog.mjs'
 import procStaInfor from './procStaInfor.mjs'
 import { maskTok, maskQuery, maskUrl } from './maskLog.mjs'
 import wrapInjected from './wrapInjected.mjs'
-import validateRowsBeforeWrite from './validateRows.mjs'
-import planRefChanges, { REF_OF, diffRefTargets } from '../src/js/refCascade.mjs'
-import { findDupIndex, findKeyOtherFrom, withTabLocks, mapKeyOf, checkMapKeyBatch, pickUniqueUser } from './keyCheck.mjs'
-import { checkCascadePlan, writeWithCascade, buildSyncRowsNew } from './cascadeWrite.mjs'
+import { pickUniqueUser } from './keyCheck.mjs'
 import { createAuthorizeExec, wrapOperOrm } from './dataChannel.mjs'
-import { markHasKey, keepAssignOnMissing, keepAssignByEntity, countIdRenumber } from './syncKeep.mjs'
 
 
 /**
  * 權限伺服器
+ *
+ * 身分驗證責任(dspec/使用者身分驗證原則.md 第三節, 使用方套件標準註解): 框架(w-converhp、w-serv-hapi、w-serv-webdata、w-serv-orm)不驗證 token, 一律由本套件負責.
+ * 連線閘(verifyConn)與執行身分(getUserIdByToken)皆須完整驗證(token 有效、本系統使用者存在且啟用、部署方授權); hapi apis 路由各自驗證; 函數層級另檢查角色或成員; 公開入口只限列名者.
+ * 本套件之落實: 資料通道之連線閘(標頭 token)與執行身分(請求本體 __sysToken__)皆經 getAndVerifyClientUser(外部 getUserByToken → perm users 存在且 isActive='y' → 部署方 verifyClientUser), 任一關不過函數不執行;
+ * 改變狀態之 kpFunExt 函數(updateTargets／updatePemis／updateGrups／updateUsers)另限 perm users 表中有效且 isAdmin='y' 者(perm 以自身 users 表為權威, 不採 token 宣稱之 isAdmin), 不符回 userNotAdmin、零寫入;
+ * hapi apis 路由: getUserByToken／getPerm 驗 client 使用者, getPermUserInfor／syncAndReplaceTabs 驗 app 使用者(verifyAppUser); 無公開入口(前端靜態檔除外).
  *
  * @class
  * @param {Function} WOrm 輸入資料庫ORM函數
  * @param {String} url 輸入資料庫連線字串，例如w-orm-lmdb為'./db'，或w-orm-mongodb為'mongodb://username:password@$127.0.0.1:27017'
  * @param {String} db 輸入資料庫名稱字串
  * @param {Function} getUserByToken 輸入處理函數，函數會傳入使用者token，通過此函數處理後並回傳使用者資訊物件，並至少須提供'id'、'email'、'name'、'isAdmin'欄位，且'isAdmin'限輸入'y'或'n'。注意: token 回傳之'isAdmin'僅供識別，權限系統一律以自身users表該使用者之'isAdmin'欄位值為權威，不會被 token 宣稱之值複寫。函數拋錯或reject時視同查無使用者(回自家錯誤key，錯誤原文不回前端、不入log，只於srLog記warn)
- * @param {Function} verifyClientUser 輸入驗證瀏覽使用者身份之處理函數，函數會傳入使用者資訊物件(perm users 表之列)與來源字串from，通過此函數識別後回傳布林值(可為Promise)，允許使用者回傳true，反之回傳false。from 值域: 'getUserByToken'(登入)、'getPerm'(api/getPerm)、以及資料通道之 apiType 'main'(RPC 與 ORM 執行)、'upload-controller'、'upload-slice'、'download-get-filename'、'download-get-file'、'download'；資料通道與登入採同一授權強度(反查 perm users 且 isActive='y' 後再經本函數)；函數拋錯或reject時視同回傳false
+ * @param {Function} verifyClientUser 輸入驗證瀏覽使用者身份之處理函數，函數會傳入使用者資訊物件(perm users 表之列)與來源字串from，通過此函數識別後回傳布林值(可為Promise)，允許使用者回傳true，反之回傳false。from 值域: 'getUserByToken'(登入)、'getPerm'(api/getPerm)、以及資料通道之 apiType 'main'(RPC 與 ORM 執行; 連線閘驗標頭 token、執行身分〔getUserIdByToken〕驗請求本體 __sysToken__, 兩者各經本函數一次, 本體 token 與標頭 token 不同時兩個使用者各自驗證)、'upload-controller'、'upload-slice'、'download-get-filename'、'download-get-file'、'download'；資料通道與登入採同一授權強度(反查 perm users 且 isActive='y' 後再經本函數)；函數拋錯或reject時視同回傳false
  * @param {Function} verifyAppUser 輸入驗證應用程序使用者身份之處理函數，函數會傳入使用者資訊物件，通過此函數識別後回傳布林值，允許使用者回傳true，反之回傳false；函數拋錯或reject時視同回傳false
  * @param {Object} [opt={}] 輸入設定物件，預設{}
  * @param {Integer} [opt.serverPort=11006] 輸入伺服器通訊port，預設11006。註：原opt.useCheckUser、opt.getUserById、opt.useExcludeWhenNotAdmin已隨w-serv-orm 1.1.9移除，給予undefined、null、false以外之值時建構即拋錯(錯誤訊息出自w-serv-orm之checkOptRemoved，並記srLog)；資料通道之使用者授權由verifyConn(verifyClientUser)負責、表操作只開放select，刪除該三鍵即可，無須替代設定
@@ -324,19 +326,9 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     let guardWrite = wp.guardWrite
 
 
-    //syncWarns: 外部同步「同一 from 同名異 id」(疑似 id 重編)之提示登錄(記憶體, 重啟即清; 主控定案: 不加開關, 記 warn log 並使頁面可提示):
-    //以「表名＋來源」為鍵, 最近一次同步有此情形者登錄筆數與時間, 已無此情形者清除; 只含表名、來源名稱、筆數、時間, 不含個資
-    let kpSyncWarn = new Map()
-    let setSyncWarn = (keyTable, from, n) => {
-        let k = `${keyTable}\u0000${from}`
-        if (n > 0) {
-            kpSyncWarn.set(k, { keyTable, from, n, time: new Date().toISOString() })
-        }
-        else {
-            kpSyncWarn.delete(k)
-        }
-    }
-    let getSyncWarns = () => [...kpSyncWarn.values()]
+    //sc: 外部匯入(POST /syncAndReplaceTabs)核心(server/syncCore.mjs; perm-run03 起依來源鍵 srcKey 差異同步, R-IMPORT-01): 與後台整表寫入共用同一個鎖管理器(lockTabs).
+    //syncWarns(同一 from 同名異 srcKey 之疑似來源鍵重編提示)之登錄亦在其內(記憶體, 重啟即清; 不含個資, 僅表名、來源名稱、筆數、時間)
+    let sc = syncCore({ woItems, procOrm, lockTabs, srLog, mappingBy, cascadeRename })
 
 
     //lockSave: 後台整表寫入(updateTabItems)之雙擊防護(後端, 見 lockSave.mjs, ADR-025): 以「updateTabItems:{表名}:{操作者 id}」於 cacheSt 原子占位,
@@ -385,7 +377,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
             cascadeRename, //改名是否連帶更新引用(opt.cascadeRename), 供清單頁儲存前預覽與伺服端一致(R-REF-CASCADE-01)
             lockExternalRows: lockExternalRows ? 'y' : 'n', //後台是否不得改外部列(opt.lockExternalRows), 供清單頁逐列唯讀、複製重置 from 與伺服端一致(R-EXT-OWN-01)
-            syncWarns: getSyncWarns(), //外部同步疑似 id 重編之提示(同一 from 同名異 id), 供清單頁橫幅(原則 3: 提示); 不含個資, 僅表名、來源名稱、筆數、時間
+            syncWarns: sc.getSyncWarns(), //外部同步疑似來源鍵重編之提示(同一 from 同名異 srcKey), 供清單頁橫幅(原則 3: 提示); 不含個資, 僅表名、來源名稱、筆數、時間
 
             widthTargetId,
             widthTargetDescription,
@@ -626,291 +618,6 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     }
 
 
-    //syncAndReplaceTabs
-    let syncAndReplaceTabs = async (userId, inp, keyTable) => {
-
-        //序列化同表之並行整表 delAll+insert: 防 lost update (同 keyTable 序列化, 不同表並行)
-        //與後台整表寫入(procCore.updateTabItems)共用同一個鎖管理器(w-serv-orm 實例之 withTabLocks, 每表一鍵; R-LOCK-CORE-01): 兩者各自先檢查名稱／對應鍵唯一後寫入, 鎖不同則交錯可略過 F-02／F-14(外審 sol R10);
-        //有改名或刪除而須改寫引用端時, 於內層依階層再取引用端表之鎖(同步群組／權限／標的時, 被刪除或改名者之引用須連帶清理／更新, R-REF-CASCADE-01), 皆經單一取鎖函數(R-WRITE-LOCK-02)
-        //外部同步為不帶基準之寫入(以外部為主, 原則 5): 取表鎖但不比對基準; 匯入語意(delAll({ from })＋insert)本輪不變(R-IMPORT-01 待另輪)
-        return await withTabLocks(lockTabs, [keyTable], async () => {
-
-            //from
-            let from = get(inp, 'from', '')
-            // console.log('from', from)
-
-            //check
-            if (!isestr(from)) {
-                console.log('inp', inp)
-                srLog.error({ event: 'syncAndReplaceTabs-error', msg: 'invalidFrom', keyTable })
-                return Promise.reject(`invalidFrom`)
-            }
-
-            //rows
-            let rows = get(inp, 'rows', [])
-            // console.log(keyTable, rows)
-
-            //check
-            if (!isearr(rows)) {
-                console.log('inp', inp)
-                console.log('keyTable', keyTable)
-                srLog.error({ event: 'syncAndReplaceTabs-error', msg: 'invalidRows', keyTable })
-                return Promise.reject(`invalidRows`)
-            }
-
-            //各列須為非空物件(規則帳本 R-ORM-05, 與後台整表寫入共用 isRowObj), 否則整批拒絕且不進 delAll:
-            //修正前非物件元素(字串、數字、null)使下方 v.from = from 拋 TypeError, 經 pm2resolve 把引擎原文外送給外部應用(R-ORM-02), 元素為 {} 時則寫入一筆自動主鍵之空白列
-            let kBadRow = rows.findIndex((v) => !isRowObj(v))
-            if (kBadRow >= 0) {
-                srLog.error({ event: 'syncAndReplaceTabs-error', msg: 'invalidRows', reason: 'rowInvalid', keyTable, from, row: kBadRow })
-                return Promise.reject(`invalidRows`)
-            }
-
-            //keyAssign／hasAssign: 後台可寫之指派欄(users.cgrups／grups.cpemis／pemis.crules; targets 無)及各列是否自帶該鍵(須於 ltdtmapping 缺鍵補 '' 之前記錄);
-            //缺該鍵者於下方保留庫內指派(F-23, 指派欄屬後台, 見 syncKeep.mjs)
-            let keyAssign = (keyTable === 'users') ? 'cgrups' : ((keyTable === 'grups') ? 'cpemis' : ((keyTable === 'pemis') ? 'crules' : null))
-            let hasAssign = (keyAssign !== null) ? markHasKey(rows, keyAssign) : null
-
-            //save from
-            rows = map(rows, (v, k) => {
-            // v.order = k + 1 //order大部分由外部給予, 不能複寫
-                v.from = from
-                return v
-            })
-
-            //ltdtmapping
-            rows = ltdtmapping(rows, ds[keyTable].keys)
-            // console.log('ltdtmapping rows', rows)
-
-            //映射到 schema 欄位後, 除伺服器管理欄(from 與建立者／建立時間／更新者／更新時間, 寫入時由伺服器覆寫)外, 沒有任何欄位帶有內容者為空白列, 整批拒絕(規則帳本 R-ORM-05; 外審 minimax#3、sol#3／#4):
-            //上方 isRowObj 只擋 {} 與非物件, {"foo":1}、{"length":5} 等「只含非 schema 欄位」之列映射後與 {} 相同, 仍會被 insert 成自動主鍵之空白列;
-            //只帶伺服器管理欄(如 {"userId":"x"})之列, 該值於寫入時被覆寫, 結果同為空白列; 欄位值為 []／{} 等空容器亦非內容.
-            //內容 = 非空字串、有限數字(0 亦是)、布林
-            let kpSrvKey = { from: true, userId: true, timeCreate: true, userIdUpdate: true, timeUpdate: true }
-            let isContent = (x) => (typeof x === 'string' && x !== '') || (typeof x === 'number' && Number.isFinite(x)) || typeof x === 'boolean'
-            let kBlank = rows.findIndex((v) => !Object.keys(v).some((k) => kpSrvKey[k] !== true && isContent(v[k])))
-            if (kBlank >= 0) {
-                srLog.error({ event: 'syncAndReplaceTabs-error', msg: 'invalidRows', reason: 'rowBlank', keyTable, from, row: kBlank })
-                return Promise.reject(`invalidRows`)
-            }
-
-            //名稱／標的 id 須為非空字串(規則帳本 R-SYNC-NAME-01, 主控複審 R2): 比照後台整表寫入之 ckKey(procCore.mjs: isestr(value)),
-            //grups／pemis 之 name、targets 之 id 缺漏、空字串、非字串(數字、布林、null)一律整批拒收, 於 delAll 之前, 該 from 與他 from 之既有列不變.
-            //why: 修正前 name:'' 之群組／權限可入庫, 伺服端 arrFinder 以 === 採納之(授權有效), 編輯器(cvKpToObj／doSave)視空名稱為無效, 管理者存檔即移除該授權
-            //(移除 AND 限制時等於增權); 與後台路徑(ckKey 拒收空名稱)不對稱. users 不在範圍(name 可重複); 不比照 ckKey 之重複偵測(複審範圍僅「非空」)
-            let keyName = (keyTable === 'targets') ? 'id' : ((keyTable === 'grups' || keyTable === 'pemis') ? 'name' : null)
-            if (keyName !== null) {
-                let kName = rows.findIndex((v) => !isestr(get(v, keyName)))
-                if (kName >= 0) {
-                    srLog.error({ event: 'syncAndReplaceTabs-error', msg: 'invalidRows', reason: (keyName === 'id') ? 'idInvalid' : 'nameInvalid', keyTable, from, row: kName, field: keyName })
-                    return Promise.reject(`invalidRows`)
-                }
-            }
-
-            //群組／權限名稱唯一(F-02, 規則帳本 R-NAME-UNIQ-01, ADR-034), 本批 rows 內 name 精確 === 重複整批拒收(他 from 已使用者見下方 nameOtherFrom), 於 delAll 之前, 該 from 與他 from 之既有列不變.
-            //why: 授權以名稱查找(arrFinder 取第一個同名列), 同名並存即授權取決於資料庫列序; 後台 ckKey／updateTabItems 早已拒同名, 外部同步原不拒(ADR-031 決定 4 曾明載不比照), 兩入口不對稱.
-            //外部應用只收固定語系鍵 invalidRows(規則帳本 R-ORM-02); targets 之 id 為主鍵(validateRowsBeforeWrite 已查批內重複), users 之 name 允許重複, 皆不在此
-            if (keyName === 'name') {
-                let kDup = findDupIndex(rows, 'name')
-                if (kDup >= 0) {
-                    srLog.error({ event: 'syncAndReplaceTabs-error', msg: 'invalidRows', reason: 'nameDuplicate', keyTable, from, row: kDup, field: 'name' })
-                    return Promise.reject(`invalidRows`)
-                }
-            }
-
-            //users 對應鍵批內檢查(F-14, 規則帳本 R-MAPKEY-01, ADR-034): mappingBy 為 'email'／'name' 時, 每個 isActive==='y' 之列該欄位須非空字串且批內唯一(精確 ===); 'id'(預設)不另檢查;
-            //只有「對應鍵」才是登入查找(getTokenUser)之鍵, 其唯一性才是安全前提——預設部署之 email 可空／可重複, 不得因新規則使其外部同步全數失敗. log 不記對應值(個資)
-            if (keyTable === 'users') {
-                let mk = checkMapKeyBatch(rows, mappingBy)
-                if (mk !== null) {
-                    srLog.error({ event: 'syncAndReplaceTabs-error', msg: 'invalidRows', reason: mk.reason, keyTable, from, row: mk.k, field: mappingBy })
-                    return Promise.reject(`invalidRows`)
-                }
-            }
-
-            //寫入前驗證(規則帳本 R-ORM-01, ADR-026): 於 delAll 之前擋下可預判之寫入失敗, 該 from 之既有列不變(ADR-008 防誤清源).
-            //why: 先 delAll 再 insert, 而 w-serv-orm 1.1.8 起對「會被 clearXSS 改寫之主鍵」整批拒絕、LMDB 對 > 1978 B 之主鍵整批拒絕,
-            //修正前遇之即該 from 之既有列全數清空(2026-10-14 V4/V7 實測). 主鍵問題 → invalidRows; 任一字串欄位含標記 → htmlMarkupNotAllowed
-            let ve = validateRowsBeforeWrite(rows)
-            if (ve !== null) {
-                let key = (ve.reason === 'htmlMarkup') ? 'htmlMarkupNotAllowed' : 'invalidRows'
-                srLog.error({ event: 'syncAndReplaceTabs-error', msg: key, reason: ve.reason, keyTable, from, row: ve.k, field: ve.field })
-                return Promise.reject(key)
-            }
-
-            //跨 from 同鍵(規則帳本 R-SYNC-01): 本批有給之主鍵若已屬其他 from, 整批拒絕且不進 delAll(本 from 與他 from 之既有列皆不變).
-            //why: insert 對已存在之主鍵略過而整批仍回 success, 該列不會寫入本 from(靜默遺失); w-serv-orm 1.1.11 起數字主鍵存為其字串形式(原被換成隨機主鍵),
-            //以流水號為主鍵之各應用即互撞(2026-10-14 w-serv-orm 實測). 此處直呼 woItems(不經 procOrm 之轉型), 查詢條件一律用 String(id)(R-ORM-04);
-            //同 from 之既有列不算衝突(隨後由 delAll 重寫); 本段與 delAll／insert 同在表鎖內(同表之並行同步已序列化)
-            let keyOfId = (v) => {
-                let id = get(v, 'id')
-                return (isestr(id) || (typeof id === 'number' && Number.isFinite(id))) ? String(id) : null
-            }
-            let sids = rows.map(keyOfId).filter((s) => s !== null)
-            if (sids.length > 0) {
-                let rsExist = null
-                try {
-                    rsExist = await woItems[keyTable].select({ id: { $in: sids } })
-                }
-                catch (err) {
-                    let raw = (typeof err === 'string') ? err : ((err && err.message) || String(err))
-                    let key = toOutKey(err, 'anUnexpectedErrorOccurred') //尚未寫入任何資料, 不回 saveWriteFail
-                    srLog.error({ event: 'syncAndReplaceTabs-error', msg: key, raw, keyTable, from, step: 'select' })
-                    return Promise.reject(key)
-                }
-                let fromById = new Map()
-                for (let v of rsExist) {
-                    fromById.set(String(v.id), v.from)
-                }
-                let k = rows.findIndex((v) => {
-                    let s = keyOfId(v)
-                    return s !== null && fromById.has(s) && fromById.get(s) !== from
-                })
-                if (k >= 0) {
-                    srLog.error({ event: 'syncAndReplaceTabs-error', msg: 'invalidRows', reason: 'idOtherFrom', keyTable, from, row: k, field: 'id' })
-                    return Promise.reject('invalidRows')
-                }
-            }
-
-            //跨 from 同名／同對應鍵(F-02／F-14, 規則帳本 R-NAME-UNIQ-01／R-MAPKEY-01): grups／pemis 之 name、users 於 mappingBy 為 email／name 時之該欄位(僅 active 列),
-            //已為其他 from 之既有列使用 → 整批拒絕且不進 delAll; 同 from 之既有列不算衝突(隨後由 delAll 重寫). 先 select 後比對, select 失敗之處置同上段(toOutKey, 未寫入任何資料)
-            let keyOther = (keyName === 'name') ? 'name' : ((keyTable === 'users') ? mapKeyOf(mappingBy) : null)
-            if (keyOther !== null) {
-                let rsAll = null
-                try {
-                    rsAll = await woItems[keyTable].select()
-                }
-                catch (err) {
-                    let raw = (typeof err === 'string') ? err : ((err && err.message) || String(err))
-                    let key = toOutKey(err, 'anUnexpectedErrorOccurred') //尚未寫入任何資料, 不回 saveWriteFail
-                    srLog.error({ event: 'syncAndReplaceTabs-error', msg: key, raw, keyTable, from, step: 'select' })
-                    return Promise.reject(key)
-                }
-                let kOther = findKeyOtherFrom(rows, rsAll, from, keyOther, { onlyActive: keyTable === 'users' })
-                if (kOther >= 0) {
-                    srLog.error({ event: 'syncAndReplaceTabs-error', msg: 'invalidRows', reason: (keyTable === 'users') ? 'mapKeyOtherFrom' : 'nameOtherFrom', keyTable, from, row: kOther, field: keyOther })
-                    return Promise.reject('invalidRows')
-                }
-            }
-
-            //外部同步 payload 缺指派欄鍵之列保留庫內值(F-23; 主控定案: 指派欄屬後台, 同步不得清掉後台指派; 含該鍵則以外部為準): 修正前 ltdtmapping 缺鍵補 ''、delAll＋insert 即清空後台已指派者.
-            //三個指派欄(users.cgrups／grups.cpemis／pemis.crules; run08 起 cpemis／crules 比照 cgrups)皆是; 只在確有缺鍵之列時才讀庫內(同一 from).
-            //users: 對應先依 id、無 id 者依 mappingBy(email／name)恰命中 1 筆, 對不到者視為新使用者(維持 ''), 對應鍵矛盾者不保留(keepAssignOnMissing);
-            //grups／pemis: 無登入對應鍵, 實體身分依 id(無 id 者依名稱恰 1 筆; 改名而 cascadeRename 為假者不保留; keepAssignByEntity). select 失敗之處置同上段(toOutKey, 尚未寫入任何資料)
-            if (hasAssign !== null && hasAssign.some((b) => b === false)) {
-                let rsSame = null
-                try {
-                    rsSame = await woItems[keyTable].select({ from }) //此處 keyTable 為 users／grups／pemis(hasAssign 非 null); users 非登入查找, 不經 pickUniqueUser(SITE-KC-004 只管登入反查)
-                }
-                catch (err) {
-                    let raw = (typeof err === 'string') ? err : ((err && err.message) || String(err))
-                    let key = toOutKey(err, 'anUnexpectedErrorOccurred')
-                    srLog.error({ event: 'syncAndReplaceTabs-error', msg: key, raw, keyTable, from, step: 'select' })
-                    return Promise.reject(key)
-                }
-                //isKeepable: 保留值於 delAll 之前須再通過一次寫入前驗證(上方 validateRowsBeforeWrite 看到的是補出之空字串, 外審 sol R4); 不過者不保留(視為空, 收嚴), 只記筆數
-                let isKeepable = (val) => validateRowsBeforeWrite([{ id: 'keep', [keyAssign]: val }]) === null
-                let kr = (keyTable === 'users') ? keepAssignOnMissing({ rows, hasKey: hasAssign, rowsOldSameFrom: rsSame, mappingBy, isKeepable }) : keepAssignByEntity({ rows, hasKey: hasAssign, rowsOldSameFrom: rsSame, key: keyAssign, cascadeRename, isKeepable })
-                rows = kr.rows
-                if (kr.nKeep > 0) {
-                    srLog.info({ event: 'syncAndReplaceTabs-keepAssign', keyTable, from, field: keyAssign, n: kr.nKeep })
-                }
-                if (kr.nSkip > 0) {
-                    srLog.warn({ event: 'syncAndReplaceTabs-keepAssign-skip', keyTable, from, field: keyAssign, n: kr.nSkip, reason: 'notKeepable' })
-                }
-                if (kr.nConflict > 0) {
-                    srLog.warn({ event: 'syncAndReplaceTabs-keepAssign-skip', keyTable, from, field: keyAssign, n: kr.nConflict, reason: (keyTable === 'users') ? 'mapKeyConflict' : 'identityConflict' }) //users: 對應鍵與 id 指向不同使用者; grups／pemis: 同名多筆無從對應或改名而引用不跟著改; 指派不移轉而清空(收嚴須附提示; 不含個資值)
-                }
-            }
-
-            //引用連帶(適用表 m／n, R-REF-CASCADE-01): 同步 grups／pemis／targets 時, 同一 from 內依穩定 id 判定——同 id 異名＝改名級聯、舊 id 不在本批＝刪除而連帶清理引用(寫入後仍存續之同名者不清理);
-            //未帶 id 之列(ORM 每次補隨機主鍵)改依名稱對應(見 buildSyncRowsNew). 預檢(新名撞懸空名、歷史同名組改名、容器內相撞、改寫後欄位驗證)於 delAll 之前, 被拒整批零變更;
-            //外部應用只收固定語系鍵 invalidRows／htmlMarkupNotAllowed(R-ORM-02), 動態原因入 srLog. select 失敗之處置同上段(toOutKey, 未寫入任何資料).
-            //是否須改寫引用端只依本表新舊列判定(diffRefTargets), 持有本表鎖之下即可決定是否再取引用端表之鎖(R-WRITE-LOCK-02); 取齊鎖之後才讀取引用端、規劃與預檢
-            let rowsPlan = null
-            let kind = null
-            if (Object.prototype.hasOwnProperty.call(REF_OF, keyTable)) {
-                try {
-                    let rowsOld = await woItems[keyTable].select()
-                    rowsPlan = { rowsOld, rowsNew: buildSyncRowsNew(keyTable, rowsOld, rows, from) }
-                }
-                catch (err) {
-                    let raw = (typeof err === 'string') ? err : ((err && err.message) || String(err))
-                    let key = toOutKey(err, 'anUnexpectedErrorOccurred')
-                    srLog.error({ event: 'syncAndReplaceTabs-error', msg: key, raw, keyTable, from, step: 'select' })
-                    return Promise.reject(key)
-                }
-                kind = diffRefTargets({ keyTable, rowsOld: rowsPlan.rowsOld, rowsNew: rowsPlan.rowsNew, opt: { cascadeRename } })
-
-                //外部 id 不穩定之偵測(主控定案: 不加開關; 同一 from 同一批內出現「同名異 id」＝疑似 id 重編, id 消失視為刪除會每次清理引用而可能抹掉後台指派): 記 warn log(不記個資值, 只記筆數)
-                //並登錄供 getWebInfor.syncWarns 於頁面提示; 之後同一(表, from)之同步已無此情形即清除提示. 只適用有 name 之 grups／pemis(users 之 name 可重複, targets 之 id 即名稱)
-                if (keyTable === 'grups' || keyTable === 'pemis') {
-                    let nRenum = countIdRenumber(rowsPlan.rowsOld.filter((o) => o !== null && typeof o === 'object' && o.from === from), rows)
-                    setSyncWarn(keyTable, from, nRenum)
-                    if (nRenum > 0) {
-                        srLog.warn({ event: 'syncAndReplaceTabs-idRenumber', keyTable, from, n: nRenum })
-                    }
-                }
-            }
-
-            //doWrite: delAll from, insert; ORM／I/O 失敗之原文只入 srLog, 外部應用收 saveWriteFail(規則帳本 R-ORM-02); 引用端先寫、失敗補償還原(cascadeWrite.mjs)
-            let doWrite = async (plan, holdersOld) => {
-                let r = null
-                try {
-                    r = await writeWithCascade({
-                        plan,
-                        holdersOld,
-                        woItems,
-                        procOrm,
-                        userId,
-                        srLog,
-                        writeMain: async () => {
-                            await woItems[keyTable].delAll({ from })
-                            return await procOrm(userId, keyTable, 'insert', rows) //須使用procOrm才有辦法自動給予相關欄位
-                        },
-                    })
-                }
-                catch (err) {
-                    let raw = (typeof err === 'string') ? err : ((err && err.message) || String(err))
-                    let key = toOutKey(err)
-                    srLog.error({ event: 'syncAndReplaceTabs-error', msg: key, raw, keyTable, from })
-                    return Promise.reject(key)
-                }
-                // console.log('r', r)
-                return r
-            }
-
-            //有改名或刪除: 再取引用端表之鎖, 讀取引用端、規劃、預檢後寫入
-            if (kind !== null && (kind.renames.length > 0 || kind.delNames.length > 0)) {
-                let holder = REF_OF[keyTable].holder
-                return await withTabLocks(lockTabs, [holder], async () => {
-                    let holdersOld = null
-                    try {
-                        holdersOld = await woItems[holder].select()
-                    }
-                    catch (err) {
-                        let raw = (typeof err === 'string') ? err : ((err && err.message) || String(err))
-                        let key = toOutKey(err, 'anUnexpectedErrorOccurred')
-                        srLog.error({ event: 'syncAndReplaceTabs-error', msg: key, raw, keyTable, from, step: 'select' })
-                        return Promise.reject(key)
-                    }
-                    let plan = planRefChanges({ keyTable, rowsOld: rowsPlan.rowsOld, rowsNew: rowsPlan.rowsNew, holdersOld, opt: { cascadeRename } })
-                    let errPlan = plan.err !== null ? plan.err : checkCascadePlan(plan)
-                    if (errPlan !== null) {
-                        let key = (errPlan === 'htmlMarkupNotAllowed') ? 'htmlMarkupNotAllowed' : 'invalidRows'
-                        srLog.error({ event: 'syncAndReplaceTabs-error', msg: key, reason: errPlan, keyTable, from })
-                        return Promise.reject(key)
-                    }
-                    return await doWrite(plan, holdersOld)
-                }, [keyTable])
-            }
-
-            return await doWrite(null, [])
-
-        })
-    }
-
-
     //getGenUserByKV
     let getGenUserByKV = async(keyUser, valueUser) => {
 
@@ -924,6 +631,26 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         }
 
         return userFind
+    }
+
+
+    //requireAdmin: 函數層級之角色檢查(perm-run03 範圍四; dspec/使用者身分驗證原則.md 二.4「函數層級須另檢查角色, 不得只靠部署方之授權設定把關」; w-web呼叫者身分驗證.md C2, 使用者 2026-10-23 裁示採②):
+    //改變狀態之 kpFunExt 函數(updateTargets／updatePemis／updateGrups／updateUsers; getWebInfor、getStaEvent、getStaEventTable 為唯讀不在此列)限 perm users 表中有效(isActive='y')且 isAdmin='y' 之使用者.
+    //perm 以自身 users 表為權威, 不採 token(getUserByToken)宣稱之 isAdmin(同 getTokenUser); userId 為 getUserIdByToken 回傳之 perm 內 id, 此處再新鮮讀取一次(角色可能於連線後被改, 不信任快取).
+    //不符即 reject 固定錯誤鍵 userNotAdmin、零寫入(先於 lockSave／表鎖／任何讀庫), 記 srLog(只記函數名與 userId, 不記 token 與使用者資料); 讀取失敗(ORM 例外)一律視同不符(fail-closed)
+    let requireAdmin = async (userId, funcName) => {
+        let u = null
+        try {
+            u = await getGenUserByKV('id', userId)
+        }
+        catch (err) {
+            u = null
+        }
+        if (!iseobj(u) || u.isAdmin !== 'y') {
+            srLog.error({ event: 'requireAdmin-error', msg: 'userNotAdmin', funcName, userId })
+            return Promise.reject('userNotAdmin')
+        }
+        return u
     }
 
 
@@ -1305,7 +1032,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                     let inp = await parsePayload(req)
 
                     //syncAndReplaceTabs
-                    let r = await syncAndReplaceTabs(userId, inp, keyTable)
+                    let r = await sc.syncAndReplaceTabs(userId, inp, keyTable)
 
                     //info
                     srLog.info({ event: 'api/syncAndReplaceTabs-success', userId, keyTable })
@@ -1343,6 +1070,10 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         tokenType: 'Bearer',
         verifyConn: async ({ apiType, authorization, query, headers, req }) => {
             // console.log('verifyConn', `apiType[${apiType}]`, `authorization[${authorization}]`)
+
+            //身分驗證責任(dspec/使用者身分驗證原則.md 第三節, 使用方套件標準註解): 框架(w-converhp、w-serv-hapi、w-serv-webdata、w-serv-orm)不驗證 token, 一律由本套件負責.
+            //連線閘(verifyConn)與執行身分(getUserIdByToken)皆須完整驗證(token 有效、本系統使用者存在且啟用、部署方授權); hapi apis 路由各自驗證; 函數層級另檢查角色或成員(updateXxx 限 perm users 表之 isAdmin='y', requireAdmin); 公開入口只限列名者.
+            //本函數: 驗連線標頭之 token(getAndVerifyClientUser: 外部 getUserByToken → perm users 存在且 isActive='y' → 部署方 verifyClientUser(user, apiType)).
 
             //token
             let token = strdelleft(authorization, 7) //刪除Bearer
@@ -1393,11 +1124,24 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         },
         getUserIdByToken: async (token) => { //可使用async或sync函數
             // console.log('getUserIdByToken', token)
-            let user = await getUserByToken(token)
+
+            //身分驗證責任(dspec/使用者身分驗證原則.md 第三節, 使用方套件標準註解; 規則 w-web呼叫者身分驗證.md 規則 4): 框架(w-converhp、w-serv-hapi、w-serv-webdata、w-serv-orm)不驗證 token, 一律由本套件負責.
+            //連線閘(verifyConn)與執行身分(getUserIdByToken)皆須完整驗證(token 有效、本系統使用者存在且啟用、部署方授權); hapi apis 路由各自驗證; 函數層級另檢查角色或成員; 公開入口只限列名者.
+            //本函數: 資料通道只傳遞 token, 反查使用者即驗證身分之步驟(w-serv-orm 1.1.10 起 ORM 層不做使用者檢查): 與連線閘同等完整——經 getAndVerifyClientUser(外部 getUserByToken → perm users 存在且 isActive='y' → 部署方 verifyClientUser),
+            //任一關不過即 reject(框架據此不執行函數, fail-closed)並記 srLog, 不回顯 token 與使用者資料. 請求標頭與本體 __sysToken__ 縱為不同 token, 兩個身分亦各經完整驗證(框架不比對兩 token).
+            //回傳 perm users 表內該使用者之 id(非外部 token 宣稱之 id): 稽核欄位(userId／userIdUpdate)與函數層級角色檢查(requireAdmin)皆以 perm 內之列為準; mappingBy 為 email／name 時兩者可不同.
+            //from 取 'main': 本函數只在資料通道 RPC／表操作(apiType 'main')之執行身分反查時被框架呼叫(上傳下載通道無監聽), 與連線閘對同一請求所用之 apiType 一致, 使部署方 verifyClientUser 依 from 分流之政策兩處一致, 不引入新的 from 值.
+            let user = null
+            try {
+                user = await getAndVerifyClientUser(token, 'main')
+            }
+            catch (err) {
+                let key = toOutKey(err, 'cannotFindUserId') //已知語系鍵原樣(cannotFindUserFromToken／cannotGetUserFromPerm／userNoPermission 等), 其餘(ORM／I/O 原文、Error)一律 cannotFindUserId, 不外送原文
+                srLog.error({ event: 'getUserIdByToken-error', msg: key })
+                return Promise.reject(key)
+            }
             let userId = get(user, 'id', '')
             if (!isestr(userId)) {
-                console.log('token', maskTok(token))
-                console.log('userId', userId)
                 srLog.error({ event: 'getUserIdByToken-error', msg: 'cannotFindUserId' })
                 return Promise.reject(`cannotFindUserId`)
             }
@@ -1421,16 +1165,27 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             getWebInfor,
 
             //updateXxx 第 3 參 opt 為用戶端給之 { baseline, returnRows }(草稿載入基準, F-26, R-BASELINE-01; 是否於成功回傳附寫入後之列, 規格第 8 節), 其餘鍵一律不採納(pickKeysOnly 等為伺服端設定, 更不轉給 procOrm); 未給(舊客戶端)見 procCore 之處置
-            updateTargets: (userId, rows, opt) => pc.updateTargets(userId, rows, opt),
-            updatePemis: (userId, rows, opt) => pc.updatePemis(userId, rows, opt),
-            updateGrups: (userId, rows, opt) => pc.updateGrups(userId, rows, opt),
+            //四個寫入函數皆先經 requireAdmin(函數層級角色檢查, perm-run03 範圍四): 非 perm users 表中有效之系統管理員 → userNotAdmin、零寫入
+            updateTargets: async (userId, rows, opt) => {
+                await requireAdmin(userId, 'updateTargets')
+                return await pc.updateTargets(userId, rows, opt)
+            },
+            updatePemis: async (userId, rows, opt) => {
+                await requireAdmin(userId, 'updatePemis')
+                return await pc.updatePemis(userId, rows, opt)
+            },
+            updateGrups: async (userId, rows, opt) => {
+                await requireAdmin(userId, 'updateGrups')
+                return await pc.updateGrups(userId, rows, opt)
+            },
             //updateUsers, modeEditUsers='for:grups' 時 API 與 UI 一致只採納既有使用者之 cgrups 變更, 身分欄/新增/刪除/順序以資料庫為準
-            updateUsers: (userId, rows, optClient) => {
+            updateUsers: async (userId, rows, optClient) => {
+                await requireAdmin(userId, 'updateUsers')
                 let opt = pickClientOpt(optClient)
                 if (modeEditUsers === 'for:grups') {
                     opt.pickKeysOnly = ['cgrups']
                 }
-                return pc.updateUsers(userId, rows, opt)
+                return await pc.updateUsers(userId, rows, opt)
             },
 
             getStaEvent: async (userId, timeLength, timeInterval) => {

@@ -2,7 +2,7 @@
 export default {
     table: 'pemis',
     pk: 'id',
-    fields: ['name', 'description', 'from', 'crules'],
+    fields: ['name', 'description', 'from', 'srcKey', 'crules'], //srcKey: 外部匯入之來源鍵(身分欄, 見 users.mjs)
     serverOnly: ['userId', 'timeCreate', 'userIdUpdate', 'timeUpdate'],
     orderKey: 'order',
 }

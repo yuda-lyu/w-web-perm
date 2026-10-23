@@ -1,6 +1,6 @@
 //名稱唯一與對應鍵檢查之純函數與站點不變式(F-02／F-14; 規則帳本 R-NAME-UNIQ-01／02、R-MAPKEY-01／02; ADR-034)
 //
-//受測: server/keyCheck.mjs(單一擁有者; WWebPerm.mjs:syncAndReplaceTabs、procCore.mjs:updateTabItems、WWebPerm.mjs:getTokenUser／getGenUserByKV 只呼叫、不複製判準).
+//受測: server/keyCheck.mjs(單一擁有者; syncCore.mjs:syncAndReplaceTabs〔perm-run03 自 WWebPerm.mjs 搬出〕、procCore.mjs:updateTabItems、WWebPerm.mjs:getTokenUser／getGenUserByKV 只呼叫、不複製判準).
 //述語:
 //  KC-DUP  findDupIndex(rows, key[, isPart]): 回「值(須為字串)與先前某參與列相同」之第一個列索引, 無則 -1; 精確 ===(不正規化), 非字串值略過(空／非字串另由他檢查), 原型鍵名(constructor／__proto__)無誤判;
 //  KC-OF   findKeyOtherFrom(rows, rowsExist, from, key[, { onlyActive }]): 回「值已被 from 不等於本 from 之既有列使用」之第一個列索引, 同 from 之既有列不算; onlyActive 時兩側皆只計 isActive==='y';
@@ -16,7 +16,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import ds from '../src/schema/index.mjs'
 import { findDupIndex, hasDupKey, findKeyOtherFrom, findTouchedDup, withTabLocks, mapKeyOf, checkMapKeyBatch, pickUniqueUser } from '../server/keyCheck.mjs'
-import { stripLineComment } from './tools/srcScan.mjs'
+import { stripLineComment, sourceLines } from './tools/srcScan.mjs'
 import { mkTable, mkCore } from './tools/unitOrm.mjs'
 
 
@@ -369,16 +369,23 @@ describe('unit-keyCheck (名稱唯一與對應鍵檢查之純函數, F-02／F-14
             return rest.slice(0, end)
         }
 
-        it('SITE-KC-001 syncAndReplaceTabs: 重複／他 from／對應鍵檢查皆位於 delAll 之前(R-NAME-UNIQ-01／R-MAPKEY-01: 被拒時不得先清既有列)', function() {
-            let body = takeBody(readCode('server/WWebPerm.mjs'), /let syncAndReplaceTabs = async/)
-            let iDel = body.indexOf('.delAll(')
-            assert.strict.ok(iDel > 0, '應有 delAll')
-            for (let fn of ['findDupIndex(', 'findKeyOtherFrom(', 'checkMapKeyBatch(']) {
+        it('SITE-KC-001 syncAndReplaceTabs(perm-run03 起在 syncCore.mjs 之 syncCore() 閉包內): 來源鍵／重複／他 from／對應鍵檢查皆位於第一個 ORM 寫入呼叫(procOrm／insert／save／del／delAll)之前(R-NAME-UNIQ-01／R-MAPKEY-01／R-IMPORT-01: 被拒時不得先動既有列)', function() {
+            let body = takeBody(readCode('server/syncCore.mjs'), /let syncAndReplaceTabs = async/)
+            let iWrite = body.search(/\.(insert|save|del|delAll|mix)\(|\bprocOrm\(/)
+            assert.strict.ok(iWrite > 0, '應有 ORM 寫入呼叫')
+            for (let fn of ['findDupIndex(', 'findKeyOtherFrom(', 'checkMapKeyBatch(', 'isSrcKey(', 'validateRowsBeforeWrite(']) {
                 let i = body.indexOf(fn)
                 assert.strict.ok(i > 0, `syncAndReplaceTabs 應呼叫 ${fn}`)
-                assert.strict.ok(i < iDel, `${fn} 須位於 delAll 之前`)
+                assert.strict.ok(i < iWrite, `${fn} 須位於第一個寫入呼叫之前`)
             }
-            assert.strict.ok(body.indexOf('nameDuplicate') > 0 && body.indexOf('nameOtherFrom') > 0, 'log reason 應含 nameDuplicate／nameOtherFrom')
+            //名稱重複／他 from 同名之 log reason, 及本批 srcKey 檢查之固定語系鍵, 皆須在寫入前出現; idNotAllowed 先於 srcKeyInvalid(仍送 id 者多為舊呼叫方式, 先提示移除 id; 規格第 9 節)
+            for (let r of ['idNotAllowed', 'srcKeyInvalid', 'srcKeyDuplicate', 'nameDuplicate', 'nameOtherFrom']) {
+                let i = body.indexOf(r)
+                assert.strict.ok(i > 0 && i < iWrite, `${r} 之拒收須位於寫入之前`)
+            }
+            assert.strict.ok(body.indexOf('idNotAllowed') < body.indexOf('srcKeyInvalid'), 'idNotAllowed 檢查須先於 srcKey 檢查')
+            //本表鎖內先 select 新鮮讀取、寫入在後(讀取失敗尚未寫入任何資料)
+            assert.strict.ok(body.indexOf('.select()') > 0 && body.indexOf('.select()') < iWrite, '須於鎖內新鮮讀取庫內全表後才寫入')
             for (let r of ['mapKeyInvalid', 'mapKeyDuplicate', 'mapKeyOtherFrom']) {
                 assert.strict.ok(body.indexOf(r) > 0 || fs.readFileSync(path.join(projRoot, 'server/keyCheck.mjs'), 'utf8').includes(r), `reason ${r} 須存在`)
             }
@@ -400,19 +407,32 @@ describe('unit-keyCheck (名稱唯一與對應鍵檢查之純函數, F-02／F-14
             assert.strict.ok(/findDupIndex\(rows, 'id'/.test(code), 'pemis／grups 須先拒送入整表內重複之 id(NU-044; 空字串 id 視為未給不參與, NU-046)')
         })
 
-        it('SITE-KC-007 外部同步與後台整表寫入共用同一個 w-serv-orm 實例之表鎖管理器(外審 sol R10; R-WRITE-LOCK-02、R-LOCK-CORE-01): 外部同步經 withTabLocks(lockTabs, [keyTable], …)、後台整表寫入經 guardWrite({ tables: [keyTable], … }) 取本表鎖, 兩者皆來自 wp(WServOrm 回傳物件), 不得再以各自字面鍵、套內自建 pmKeyMutex／kmx／tabWriteKey 或直接 lockTabs( 取鎖(鎖管理器不同則「先檢查唯一、後寫入」可交錯而略過 F-02／F-14; 直接取鎖則可能違反階層而死結)', function() {
+        it('SITE-KC-007 外部同步與後台整表寫入共用同一個 w-serv-orm 實例之表鎖管理器(外審 sol R10; R-WRITE-LOCK-02、R-LOCK-CORE-01): 外部同步(syncCore.mjs)經 withTabLocks(lockTabs, [keyTable], …)、後台整表寫入經 guardWrite({ tables: [keyTable], … }) 取本表鎖, 兩者皆來自 wp(WServOrm 回傳物件; WWebPerm.mjs 把同一個 lockTabs 交給 syncCore), 不得再以各自字面鍵、套內自建 pmKeyMutex／kmx／tabWriteKey 或直接 lockTabs( 取鎖(鎖管理器不同則「先檢查唯一、後寫入」可交錯而略過 F-02／F-14; 直接取鎖則可能違反階層而死結)', function() {
             //perm-run01: 原斷言「withTabLocks(kmx, [keyTable]」「server 內 pmKeyMutex() 實例恰一個、procCore 收同一個 kmx」「tabWriteKey 同表同鍵／異表異鍵」,
             //  改為同意圖之新斷言: 取鎖函數來自 w-serv-orm 實例(wp.withTabLocks／wp.guardWrite)、server 內 WServOrm( 實例恰一個且 procCore 收同一組、套內不再有自建鎖; 同表同鎖／異表異鎖之行為面見 KC-LK-005
-            let sync = readCode('server/WWebPerm.mjs')
+            //perm-run03: 外部同步搬到 syncCore.mjs(syncCore() 閉包, 收 WWebPerm 傳入之 lockTabs); WWebPerm.mjs 只負責把同一個 lockTabs／guardWrite 交給 syncCore 與 procCore, 自身不取鎖
+            //readPure: 去掉 // 註解行、JSDoc 與區塊註解後之可執行碼(JSDoc 內說明文字含 withTabLocks( 等字樣不應被計入)
+            let readPure = (rel) => sourceLines(path.join(projRoot, rel), 'code').map((l) => l.text).join('\n')
+            let wpSrc = readPure('server/WWebPerm.mjs')
+            let sync = readPure('server/syncCore.mjs')
             let upd = readCode('server/procCore.mjs')
             let kc = readCode('server/keyCheck.mjs')
-            assert.strict.ok(/withTabLocks\(lockTabs,\s*\[keyTable\]/.test(sync), 'syncAndReplaceTabs 須以 withTabLocks(lockTabs, [keyTable], …) 取本表鎖')
+            assert.strict.equal((sync.match(/withTabLocks\(lockTabs,\s*\[keyTable\]/g) || []).length, 1, 'syncCore.mjs 之 syncAndReplaceTabs 須恰一處以 withTabLocks(lockTabs, [keyTable], …) 取本表鎖(引用端另取鎖〔[holder]〕以 held=[keyTable] 守階層)')
+            assert.strict.ok(/withTabLocks\(lockTabs,\s*\[holder\][\s\S]{0,4000}?\},\s*\[keyTable\]\)/.test(sync), '有改名或刪除時再取引用端表之鎖, 須帶 held=[keyTable] 令階層守門生效(R-WRITE-LOCK-02)')
+            assert.strict.equal((sync.match(/withTabLocks\(/g) || []).length, 2, 'syncCore.mjs 取鎖站點只有兩處(本表鎖＋引用端鎖), 皆經 keyCheck.withTabLocks 依階層')
             assert.strict.ok(/guardWrite\(\{\s*tables:\s*\[keyTable\]/.test(upd), 'updateTabItems 須以 guardWrite({ tables: [keyTable], … }) 取本表鎖')
+            //syncCore 之 lockTabs 來源為建構參數(WWebPerm 傳入), 不自建、不自取 wp
+            assert.strict.ok(/function syncCore\(\{[^}]*\blockTabs\b[^}]*\}\)/.test(sync), 'syncCore() 須以參數收 lockTabs(不自建)')
+            assert.strict.equal((sync.match(/\bwp\.|\bWServOrm\b|\bpmKeyMutex\b|\bkmx\b|\btabWriteKey\b/g) || []).length, 0, 'syncCore.mjs 不得自取 wp／自建鎖')
             //取鎖函數之來源: 即 WServOrm 回傳物件(wp)之 withTabLocks／guardWrite, 不另建
-            assert.strict.ok(/let lockTabs = wp\.withTabLocks\b/.test(sync), 'WWebPerm.mjs 之 lockTabs 即 wp.withTabLocks')
-            assert.strict.ok(/let guardWrite = wp\.guardWrite\b/.test(sync), 'WWebPerm.mjs 之 guardWrite 即 wp.guardWrite')
-            assert.strict.equal((sync.match(/\bwp\.(withTabLocks|guardWrite)\b/g) || []).length, 2, 'wp.withTabLocks／wp.guardWrite 只取一次(各一處賦值), 其餘站點皆用該賦值')
-            assert.strict.equal((sync.match(/\blockTabs\(/g) || []).length, 0, 'WWebPerm.mjs 不得直接 lockTabs( 取鎖(一律經 keyCheck.withTabLocks 依階層)')
+            assert.strict.ok(/let lockTabs = wp\.withTabLocks\b/.test(wpSrc), 'WWebPerm.mjs 之 lockTabs 即 wp.withTabLocks')
+            assert.strict.ok(/let guardWrite = wp\.guardWrite\b/.test(wpSrc), 'WWebPerm.mjs 之 guardWrite 即 wp.guardWrite')
+            assert.strict.equal((wpSrc.match(/\bwp\.(withTabLocks|guardWrite)\b/g) || []).length, 2, 'wp.withTabLocks／wp.guardWrite 只取一次(各一處賦值), 其餘站點皆用該賦值')
+            assert.strict.equal((wpSrc.match(/\blockTabs\(/g) || []).length, 0, 'WWebPerm.mjs 不得直接 lockTabs( 取鎖(一律經 keyCheck.withTabLocks 依階層)')
+            assert.strict.equal((sync.match(/\blockTabs\(/g) || []).length, 0, 'syncCore.mjs 不得直接 lockTabs( 取鎖(一律經 keyCheck.withTabLocks 依階層)')
+            let mSc = /syncCore\(\{([^}]*)\}\)/.exec(wpSrc)
+            assert.strict.ok(mSc, 'WWebPerm.mjs 應呼叫 syncCore({ … })')
+            assert.strict.ok(mSc[1].split(',').map((s) => s.trim()).includes('lockTabs'), 'syncCore 須收同一個 lockTabs(wp.withTabLocks)')
             assert.strict.equal((upd.match(/\blockTabs\(/g) || []).length, 0, 'procCore.mjs 不得直接 lockTabs( 取鎖(多表一律經 keyCheck.withTabLocks 依階層; 本表經 guardWrite)')
             assert.strict.equal((upd.match(/\bguardWrite\(/g) || []).length, 1, 'procCore.mjs 內 guardWrite( 站點只有 updateTabItems 一處')
             assert.strict.equal((kc.match(/=>\s*lockTabs\(\[/g) || []).length, 1, 'keyCheck.mjs 內以 lockTabs([表], …) 取表鎖之站點只有 withTabLocks 一處(JSDoc 內文字不計)')
@@ -422,7 +442,7 @@ describe('unit-keyCheck (名稱唯一與對應鍵檢查之純函數, F-02／F-14
             let cnt = (re) => files.reduce((a, f) => a + (readCode(`server/${f}`).match(re) || []).length, 0)
             assert.strict.equal(cnt(/\bWServOrm\(/g), 1, 'server 內 WServOrm( 實例只能有一個(兩入口共用其鎖管理器)')
             assert.strict.equal(cnt(/\bpmKeyMutex\b|\bkmx\b|\btabWriteKey\b/g), 0, 'server 內不得再有自建鎖(pmKeyMutex／kmx／tabWriteKey)')
-            let m = /procCore\(woItems,\s*procOrm,\s*\{([^}]*)\}\)/.exec(sync)
+            let m = /procCore\(woItems,\s*procOrm,\s*\{([^}]*)\}\)/.exec(wpSrc)
             assert.strict.ok(m, 'WWebPerm.mjs 應呼叫 procCore(woItems, procOrm, { … })')
             let opts = m[1].split(',').map((s) => s.trim())
             assert.strict.ok(opts.includes('withTabLocks: lockTabs'), 'procCore 須收同一個 lockTabs(wp.withTabLocks)')

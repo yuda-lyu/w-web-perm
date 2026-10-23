@@ -33,6 +33,10 @@ let settings = {
         name: '來源', //供外部批次變更使用
         type: 'STRING',
     },
+    srcKey: {
+        name: '來源鍵', //外部匯入(syncAndReplaceTabs)依其差異同步之識別: 外部自訂、同一來源(from)內唯一且穩定; 後台列(from 為空)恆為空, 後台不可改(身分欄, 與 from 同; perm-run03, R-IMPORT-01)
+        type: 'STRING',
+    },
     cpemis: {
         name: '權限清單', //為json字串
         type: 'TEXT',

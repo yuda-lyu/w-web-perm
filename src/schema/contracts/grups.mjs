@@ -2,7 +2,7 @@
 export default {
     table: 'grups',
     pk: 'id',
-    fields: ['name', 'description', 'from', 'cpemis'],
+    fields: ['name', 'description', 'from', 'srcKey', 'cpemis'], //srcKey: 外部匯入之來源鍵(身分欄, 見 users.mjs)
     serverOnly: ['userId', 'timeCreate', 'userIdUpdate', 'timeUpdate'],
     orderKey: 'order',
 }

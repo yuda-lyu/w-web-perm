@@ -19,18 +19,27 @@
 //  EX-S6 回傳: null 通過; 否則 { key, reason, k, n, froms }: 以「新增 → 刪除 → 修改」之處理順序第一個違規決定 key／reason／k(該陣列內索引),
 //        n 為違規列總數(一列只計一次), froms 為涉及之外部來源名稱(去重、至多 5 個、不含 ''; 型別違規不帶來源).
 //  EX-S7 hasExternalDiff: 本次 diff 內是否有「庫內為外部列」者(決定是否須附載入基準, 外審 B.2).
+//  EX-S9 (perm-run03; R-IMPORT-01) 來源鍵 srcKey 為身分欄(同 from): 只由外部匯入端點(syncCore)寫入、後台恆為空. 四表 schema 新增 srcKey, 故 ①getLockFields 結果多一個 srcKey(外部列之 srcKey 屬鎖定欄);
+//        ②checkExternalWrite 新增守門(**不論 lockExternalRows**, 與 from 型別檢查同級): 後台新增列 srcKey 非空(缺欄／null／'' 同一空值)→ saveFromNotAllowed/addSrcKey;
+//        既有列 srcKey 相對庫內值變動(空值等價)→ 庫內為外部列者 saveExternalRowChanged/srcKeyChanged(froms 帶外部來源)、庫內為後台列(含歷史非字串 from)者 saveFromNotAllowed/srcKeyChanged;
+//        外部列(含遷移前無 srcKey 者)原樣送回 srcKey 不算變動; 後台不能補上或改掉 srcKey(遷移補 srcKey 只由匯入端點為之).
+//        處理次序: 同一列之 srcKey 違規先於 from／鎖定欄違規判定(reason 取 srcKeyChanged), 新增列則 from 型別與 addFrom 先於 addSrcKey.
 //
 //輸入空間表(軸 × 格數; 格數於檔尾 EX-999 以計數器核對, 宣告值與實測不符即失敗; 本檔總格數 = 各列之和):
 //  A isExternalRow          from 值{'pd','',undefined 值,缺欄,null,0,false,123,{},[],' '} 11 格 ＋ 列本身非物件{null,undefined,'x',5,true} 5 格 = 16, 全測
-//  B getLockFields          表4 × {精確集合, 排除項(含「鎖定欄∪排除項＝schema 全欄」), 依 keys 次序} 12 格 ＋ keys 非陣列 1 ＋ 表名未知／原型鍵名 1 ＋ 他表指派欄 1 = 15, 全測
+//  B getLockFields          表4 × {精確集合, 排除項(含「鎖定欄∪排除項＝schema 全欄」), 依 keys 次序} 12 格 ＋ keys 非陣列 1 ＋ 表名未知／原型鍵名 1 ＋ 他表指派欄 1 ＋ [perm-run03] srcKey 屬鎖定欄 表4 4 = 19, 全測
 //  C restoreExternalOrder   庫內歸屬{外部 pd,外部 ' ',後台 '',缺欄,null} × 送入 from{同庫內,pd,''} 15 格 ＋ 混合／無 order／缺 order／庫內無／非陣列／雜訊／非物件元素／不改輸入／空陣列 9 格 = 24, 全測
-//  D dropServerOnlyDiff     表4 × 伺服器管理欄{單欄 4,全欄 1}=20 ＋ 表4 × 非伺服器欄逐欄(users 8、grups 5、pemis 5、targets 3)=21 ＋ 後台列{'',缺欄,null,0} 4 ＋ 陣列保持／缺欄≡''／庫內無／不改輸入 4 ＋ 空值等價 3(null／缺欄互等且雙向、0／false 異於空值、from 欄不適用) = 52, 全測
+//  D dropServerOnlyDiff     表4 × 伺服器管理欄{單欄 4,全欄 1}=20 ＋ 表4 × 非伺服器欄逐欄(users 9、grups 6、pemis 6、targets 4; 含 srcKey)=25 ＋ 後台列{'',缺欄,null,0} 4 ＋ 陣列保持／缺欄≡''／庫內無／不改輸入 4 ＋ 空值等價 3(null／缺欄互等且雙向、0／false 異於空值、from 欄不適用) ＋ [perm-run03] EX-040b 外部列帶 srcKey 原樣＋僅伺服器欄不同 1 = 57, 全測
 //  D2 restoreServerFields   表4 × 伺服器管理欄{單欄 4,全欄 1}=20 ＋ 外部列改指派欄(三表)3 ＋ 後台列{'',缺欄,null,0} 4 ＋ 庫內無對應／缺 id 1 ＋ 庫內缺伺服器欄(單欄／全欄／all:true 後台列)3 ＋ add／del／same 原樣與同一物件 1 ＋ 不改輸入與回傳新物件 1 = 33, 全測
 //  E checkExternalWrite     E_add 新增列 from 10 格 × lock{真,假} 2 × 表 4 = 80
 //                           E_del 刪除列之庫內歸屬 8 格({pd,' ',''、缺欄,null,0,123,false}) × 2 × 4 = 64
 //                           E_from 修改列之 from: 舊歸屬{外部 pd 11 新值,後台 '' 10,後台缺欄 9,歷史 null 7,歷史 0 4,歷史 123 3,歷史 false 3}=47 格 × 2 × 4 = 376
-//                           E_field 修改列逐欄: 表之全部非 id／from 欄(users 11、grups 8、pemis 8、targets 6)=33 × 舊歸屬{外部,後台,歷史 null} 3 × 2 = 198
+//                           E_field 修改列逐欄: 表之全部非 id／from 欄(users 12、grups 9、pemis 9、targets 7; 含 srcKey——srcKey 不論 lockExternalRows 皆拒, reason srcKeyChanged)=37 × 舊歸屬{外部,後台,歷史 null} 3 × 2 = 222
 //                           E_norm 值正規化 10 格(null／""／缺欄互為空值 4 格、異於空值〔"x" 變空 2 格、0、false〕4 格、型別與空白 2 格) × 表 4 = 40; E_multi 多違規之 k／n／froms／次序 10 格; E_robust 異常輸入 5 格
+//                           [perm-run03] E_src 來源鍵 srcKey(EX-S9): 新增列 srcKey{非空 4〔'sk-1'、' '、0、false〕→ addSrcKey,空值 4〔缺欄、''、null、undefined〕→ 通過} 8 × lock 2 × 表 4 = 64
+//                             ＋ 新增列 from 與 srcKey 並存之次序{from pd × lock 真／假, from null × lock 真／假} 4 × 表 4 = 16
+//                             ＋ 修改列 srcKey: 舊歸屬{外部有 srcKey 6 新值,外部遷移前〔空〕5,外部遷移前 srcKey 舊表示 null／缺欄 2,後台空 5,歷史 null from 2,後台帶歷史 srcKey 原樣／清空 2}=22 格 × lock 2 × 表 4 = 176
+//                             ＋ 多違規次序 3(單列同時改 srcKey 與 from／鎖定欄只計一列且 reason 為 srcKeyChanged; 新增違規先於修改違規之 k／n／froms; 外部／後台 srcKey 異動並存之 key 取首個) ＋ 外部列原樣帶 srcKey 且僅改指派欄／order／伺服器欄通過 表 4 = 4 ; 合計 263
 //  F hasExternalDiff        庫內歸屬 6 格 ＋ 混合 ＋ add／del／same 不計 ＋ 無對應／缺 id／非物件 ＋ 歸屬以庫內為準 = 10, 全測
 //  刻意不測: diff 列在庫內無對應(ltdtDiffByKey 不會產生此輸入); 稀疏陣列(JSON 不會產生); keys 非陣列之 dropServerOnlyDiff(呼叫端恆給 schema keys).
 //  未測: 無.
@@ -48,9 +57,13 @@ const BK2EXT = { key: 'saveFromNotAllowed', reason: 'fromChanged' }
 const DEL = { key: 'saveExternalRowChanged', reason: 'del' }
 const EXTFROM = { key: 'saveExternalRowChanged', reason: 'fromChanged' }
 const FIELD = { key: 'saveExternalRowChanged', reason: 'fieldChanged' }
+//perm-run03 來源鍵(EX-S9): 後台新增帶值、既有列 srcKey 異動(外部列 / 後台列)
+const ADDSRC = { key: 'saveFromNotAllowed', reason: 'addSrcKey' }
+const SRCEXT = { key: 'saveExternalRowChanged', reason: 'srcKeyChanged' }
+const SRCBK = { key: 'saveFromNotAllowed', reason: 'srcKeyChanged' }
 
 //cells: 各矩陣實測格數(檔尾核對)
-const cells = { A: 0, B: 0, C: 0, D: 0, D2: 0, E_add: 0, E_del: 0, E_from: 0, E_field: 0, E_norm: 0, E_multi: 0, E_robust: 0, F: 0 }
+const cells = { A: 0, B: 0, C: 0, D: 0, D2: 0, E_add: 0, E_del: 0, E_from: 0, E_field: 0, E_norm: 0, E_multi: 0, E_robust: 0, E_src: 0, F: 0 }
 
 let mkR = (o = {}) => ({ add: [], del: [], diff: [], same: [], ...o })
 let sortCopy = (a) => [...a].sort()
@@ -157,6 +170,16 @@ describe('unit-externalRows (外部列受保護純函數, F-23, R-EXT-OWN-01)', 
             cells.B++
             assert.strict.deepEqual(getLockFields('grups', ['id', 'name', 'cgrups', 'cpemis']), ['name', 'cgrups'])
         })
+
+        //EX-S9: 四表 schema 已含 srcKey(外部匯入之來源鍵, 身分欄); 外部列之 srcKey 與 from 同屬身分欄, 但 from 另有專屬判定(不在鎖定欄), srcKey 則在鎖定欄內
+        for (let t of TABLES) {
+            it(`EX-026 ${t}: schema 含 srcKey 且 srcKey 屬鎖定欄(身分欄, 不在 id／from／order／指派欄／伺服器管理欄之排除項內)`, function() {
+                cells.B++
+                assert.strict.ok(KEYS[t].includes('srcKey'), `${t} schema 應含 srcKey`)
+                assert.strict.ok(getLockFields(t, KEYS[t]).includes('srcKey'), `${t} 之鎖定欄應含 srcKey`)
+                assert.strict.ok(!getLockFields(t, KEYS[t]).includes('from'), 'from 不在鎖定欄(另有專屬判定)')
+            })
+        }
 
     })
 
@@ -314,6 +337,15 @@ describe('unit-externalRows (外部列受保護純函數, F-23, R-EXT-OWN-01)', 
                 assert.strict.deepEqual(out.same, [])
             })
         }
+
+        it('EX-040b 外部列帶 srcKey(外部匯入寫入者)原樣送回而僅伺服器管理欄不同 → 移入 same(srcKey 相同即內容相同, 不重寫)', function() {
+            cells.D++
+            let old = [ext('grups', { srcKey: 'sk-1' })]
+            let row = ext('grups', { srcKey: 'sk-1', userId: 'stale', timeUpdate: 'stale' })
+            let out = dropServerOnlyDiff({ keys: KEYS.grups, r: { add: [], del: [], diff: [row], same: [] }, ltdtOld: old })
+            assert.strict.deepEqual(out.diff, [])
+            assert.strict.deepEqual(out.same, [row])
+        })
 
         it('EX-043 add／del 原樣; same 先保留原有、再依 diff 之次序附加被移入者; 其餘 diff 保持相對次序', function() {
             cells.D++
@@ -663,20 +695,23 @@ describe('unit-externalRows (外部列受保護純函數, F-23, R-EXT-OWN-01)', 
     describe('checkExternalWrite: 修改列逐欄(EX-S2、EX-S5②)', function() {
 
         //舊列歸屬 × 欄位: 外部列在 lock 為真時只有「鎖定欄」之變更被拒, 指派欄／order／伺服器管理欄之變更放行; 後台列與歷史 null 之列任何欄位變更皆放行
+        //perm-run03 例外: srcKey(來源鍵, 身分欄; 雖列為鎖定欄)之變更**不論 lockExternalRows、不論庫內歸屬**皆拒——外部列 saveExternalRowChanged／後台列(含歷史 null)saveFromNotAllowed, reason srcKeyChanged(EX-S9; 專屬案例見 E_src 區段)
         const OLD_KINDS = [['外部 pd', 'pd'], ['後台 空字串', ''], ['歷史 null', null]]
         for (let t of TABLES) {
             for (let [oTitle, oFrom] of OLD_KINDS) {
                 for (let f of KEYS[t].filter((k) => k !== 'id' && k !== 'from')) {
                     for (let lock of [true, false]) {
                         let isLock = SPEC_LOCK[t].includes(f)
-                        let exp = (oFrom === 'pd' && lock && isLock) ? FIELD : OK
-                        it(`EX-080 ${t} 庫內${oTitle}列改 ${f}(${isLock ? '鎖定欄' : (f === SPEC_ASSIGN[t] ? '指派欄' : (f === 'order' ? 'order' : '伺服器管理欄'))}), lockExternalRows=${lock} → ${exp === OK ? '通過' : 'fieldChanged'}`, function() {
+                        let isSrc = f === 'srcKey'
+                        let exp = isSrc ? (oFrom === 'pd' ? SRCEXT : SRCBK) : ((oFrom === 'pd' && lock && isLock) ? FIELD : OK)
+                        let kind = isSrc ? '來源鍵〔身分欄, 不論 lock 皆拒〕' : (isLock ? '鎖定欄' : (f === SPEC_ASSIGN[t] ? '指派欄' : (f === 'order' ? 'order' : '伺服器管理欄')))
+                        it(`EX-080 ${t} 庫內${oTitle}列改 ${f}(${kind}), lockExternalRows=${lock} → ${exp === OK ? '通過' : exp.reason}`, function() {
                             cells.E_field++
                             let old = rowWith(mkRow(t, { id: 'r1' }), { from: oFrom })
                             let row = rowWith(old, { [f]: f === 'order' ? 99 : `changed-${f}` })
                             let r = deepFreeze(mkR({ diff: [row] }))
                             let res = checkExternalWrite({ keyTable: t, keys: KEYS[t], r, ltdtOld: [old], lockExternalRows: lock })
-                            assertCell(res, exp, exp === OK ? [] : ['pd'], `${t}/${oTitle}/${f}/lock=${lock}`)
+                            assertCell(res, exp, (exp === OK || exp === SRCBK) ? [] : ['pd'], `${t}/${oTitle}/${f}/lock=${lock}`)
                         })
                     }
                 }
@@ -840,6 +875,154 @@ describe('unit-externalRows (外部列受保護純函數, F-23, R-EXT-OWN-01)', 
     })
 
 
+    describe('checkExternalWrite: 來源鍵 srcKey(EX-S9; perm-run03, R-IMPORT-01)', function() {
+
+        //CHG: 「srcKey 異動」之期望依庫內歸屬決定(外部列 → SRCEXT, froms 帶外部來源; 後台列／歷史非字串 from → SRCBK, froms 空)
+        const CHG = Symbol('chg')
+
+        //新增列: srcKey 非空 → saveFromNotAllowed/addSrcKey(後台不能新增帶來源鍵之列, 來源鍵只由匯入端點寫入); 缺欄／''／null／undefined 同一空值 → 通過; 不論 lockExternalRows
+        const SRC_ADD_CELLS = [
+            ['非空字串 sk-1', 'sk-1', ADDSRC],
+            ['單一空白(非空字串)', ' ', ADDSRC],
+            ['數字 0(有值, 不是空值)', 0, ADDSRC],
+            ['false(有值, 不是空值)', false, ADDSRC],
+            ['缺欄', MISSING, OK],
+            ['空字串', '', OK],
+            ['null', null, OK],
+            ['undefined 值', undefined, OK],
+        ]
+        for (let t of TABLES) {
+            for (let [title, sv, exp] of SRC_ADD_CELLS) {
+                for (let lock of [true, false]) {
+                    it(`EX-130 ${t} 新增列 srcKey=${title}, lockExternalRows=${lock} → ${exp === OK ? '通過' : exp.reason}`, function() {
+                        cells.E_src++
+                        let row = rowWith(mkRow(t, { id: 'n1' }), { srcKey: sv })
+                        let r = deepFreeze(mkR({ add: [row] }))
+                        let res = checkExternalWrite({ keyTable: t, keys: KEYS[t], r, ltdtOld: [mkRow(t, { id: 'e1', from: 'pd', srcKey: 'sk-0' })], lockExternalRows: lock })
+                        assertCell(res, exp, [], `${t}/srcKey=${label(sv)}/lock=${lock}`)
+                    })
+                }
+            }
+        }
+
+        //新增列 from 與 srcKey 並存之次序: from 型別違規與(lock 真時)addFrom 先於 addSrcKey; lock 假時 from 非空不拒, 但 srcKey 仍拒(srcKey 守門不受 lockExternalRows 影響)
+        const SRC_ORDER_CELLS = [
+            ['from=pd', 'pd', true, ADD, ['pd']],
+            ['from=pd', 'pd', false, ADDSRC, []],
+            ['from=null(型別違規)', null, true, TYPE, []],
+            ['from=null(型別違規)', null, false, TYPE, []],
+        ]
+        for (let t of TABLES) {
+            for (let [title, nf, lock, exp, froms] of SRC_ORDER_CELLS) {
+                it(`EX-131 ${t} 新增列 ${title} 且 srcKey=sk-1, lockExternalRows=${lock} → ${exp.reason}`, function() {
+                    cells.E_src++
+                    let row = rowWith(mkRow(t, { id: 'n1' }), { from: nf, srcKey: 'sk-1' })
+                    let res = checkExternalWrite({ keyTable: t, keys: KEYS[t], r: deepFreeze(mkR({ add: [row] })), ltdtOld: [], lockExternalRows: lock })
+                    assertCell(res, exp, froms, `${t}/${title}/lock=${lock}`)
+                })
+            }
+        }
+
+        //修改列: srcKey 相對庫內值變動(缺欄／null／'' 同一空值)→ 拒; 原樣送回通過. 庫內為外部列 → saveExternalRowChanged(froms 帶 pd), 庫內為後台列(含歷史非字串 from)→ saveFromNotAllowed(froms 空); 皆 reason srcKeyChanged, 不論 lockExternalRows
+        //[舊歸屬標籤, 舊 from, 舊 srcKey(MISSING＝缺欄), [[新 srcKey 標籤, 新 srcKey, 期望]...]]
+        const SRC_DIFF = [
+            ['外部列(有 srcKey sk-old)', 'pd', 'sk-old', [
+                ['原樣 sk-old', 'sk-old', OK],
+                ['改為 sk-new', 'sk-new', CHG],
+                ['缺欄', MISSING, CHG],
+                ['空字串', '', CHG],
+                ['null', null, CHG],
+                ['undefined 值', undefined, CHG],
+            ]],
+            ['外部列(遷移前: 庫內 srcKey 空字串)', 'pd', '', [
+                ['缺欄', MISSING, OK],
+                ['空字串', '', OK],
+                ['null', null, OK],
+                ['undefined 值', undefined, OK],
+                ['由後台補上 sk-1(只有匯入端點可補)', 'sk-1', CHG],
+            ]],
+            ['外部列(遷移前: 庫內 srcKey 為 null)', 'pd', null, [
+                ['空字串(空值等價)', '', OK],
+            ]],
+            ['外部列(遷移前: 庫內缺 srcKey 欄)', 'pd', MISSING, [
+                ['null(空值等價)', null, OK],
+            ]],
+            ['後台列(srcKey 空字串)', '', '', [
+                ['缺欄', MISSING, OK],
+                ['空字串', '', OK],
+                ['null', null, OK],
+                ['undefined 值', undefined, OK],
+                ['改為 sk-1(後台不能自填來源鍵)', 'sk-1', CHG],
+            ]],
+            ['歷史 from=null 之列(srcKey 空字串)', null, '', [
+                ['缺欄', MISSING, OK],
+                ['改為 sk-1', 'sk-1', CHG],
+            ]],
+            ['後台列(帶歷史 srcKey sk-odd)', '', 'sk-odd', [
+                ['原樣送回(歷史資料不致無法儲存)', 'sk-odd', OK],
+                ['清空', '', CHG],
+            ]],
+        ]
+        for (let t of TABLES) {
+            for (let [oTitle, oFrom, oSrc, list] of SRC_DIFF) {
+                it(`EX-132 ${t} 庫內${oTitle}: 新 srcKey 逐格(lockExternalRows 真／假皆同)`, function() {
+                    let old = rowWith(mkRow(t, { id: 'r1', order: 1 }), { from: oFrom, srcKey: oSrc })
+                    let other = mkRow(t, { id: 'r2', from: 'pd', srcKey: 'sk-other' })
+                    for (let [nTitle, nv, exp0] of list) {
+                        for (let lock of [true, false]) {
+                            cells.E_src++
+                            let row = rowWith(old, { srcKey: nv, order: 2 }) //order 變更不受限, 與 srcKey 並存以貼近實況
+                            let r = deepFreeze(mkR({ diff: [row] }))
+                            let res = checkExternalWrite({ keyTable: t, keys: KEYS[t], r, ltdtOld: [old, other], lockExternalRows: lock })
+                            let isExt = oFrom === 'pd'
+                            let exp = exp0 === CHG ? (isExt ? SRCEXT : SRCBK) : exp0
+                            assertCell(res, exp, exp === SRCEXT ? ['pd'] : [], `${t}/庫內${oTitle}→${nTitle}/lock=${lock}`)
+                        }
+                    }
+                })
+            }
+        }
+
+        it('EX-133 單列同時改 srcKey、from 與鎖定欄(外部列)→ 只計一列(n=1), reason 為 srcKeyChanged(srcKey 判定先於 from／鎖定欄)', function() {
+            cells.E_src++
+            let old = mkRow('grups', { id: 'x1', from: 'pd', srcKey: 'sk-old' })
+            let res = checkExternalWrite({ keyTable: 'grups', keys: KEYS.grups, r: mkR({ diff: [{ ...old, srcKey: 'sk-new', from: 'pz', name: 'changed' }] }), ltdtOld: [old] })
+            assert.strict.deepEqual(res, { key: 'saveExternalRowChanged', reason: 'srcKeyChanged', k: 0, n: 1, froms: ['pd'] })
+        })
+
+        it('EX-134 處理次序「新增 → 刪除 → 修改」: 新增列 srcKey 違規(索引 1)先於修改列 srcKey 違規, key／reason 取新增之 addSrcKey, k=1, n 計 2, froms 含修改列之外部來源', function() {
+            cells.E_src++
+            let old = mkRow('grups', { id: 'x1', from: 'pd', srcKey: 'sk-old' })
+            let r = mkR({ add: [mkRow('grups', { id: 'n0' }), mkRow('grups', { id: 'n1', srcKey: 'sk-1' })], diff: [{ ...old, srcKey: 'sk-new' }] })
+            assert.strict.deepEqual(checkExternalWrite({ keyTable: 'grups', keys: KEYS.grups, r, ltdtOld: [old] }), { key: 'saveFromNotAllowed', reason: 'addSrcKey', k: 1, n: 2, froms: ['pd'] })
+        })
+
+        it('EX-135 外部列與後台列之 srcKey 異動並存: key／reason／k 取 diff 陣列內第一個違規者, n 計 2, froms 只含外部來源(後台列不帶)', function() {
+            cells.E_src++
+            let ext = mkRow('grups', { id: 'x1', from: 'pd', srcKey: 'sk-old' })
+            let bk = mkRow('grups', { id: 'b1', from: '', srcKey: '' })
+            let dExt = { ...ext, srcKey: 'sk-new' }
+            let dBk = { ...bk, srcKey: 'sk-1' }
+            assert.strict.deepEqual(checkExternalWrite({ keyTable: 'grups', keys: KEYS.grups, r: mkR({ diff: [dExt, dBk] }), ltdtOld: [ext, bk] }), { key: 'saveExternalRowChanged', reason: 'srcKeyChanged', k: 0, n: 2, froms: ['pd'] })
+            assert.strict.deepEqual(checkExternalWrite({ keyTable: 'grups', keys: KEYS.grups, r: mkR({ diff: [dBk, dExt] }), ltdtOld: [ext, bk] }), { key: 'saveFromNotAllowed', reason: 'srcKeyChanged', k: 0, n: 2, froms: ['pd'] })
+        })
+
+        for (let t of TABLES) {
+            it(`EX-136 ${t} 外部列原樣帶 srcKey(sk-1)送回, 僅 order／伺服器管理欄${SPEC_ASSIGN[t] === null ? '' : `／指派欄 ${SPEC_ASSIGN[t]}`} 改變 → 通過(外部列可帶 srcKey; 與 from 同, 原樣不算變動)`, function() {
+                cells.E_src++
+                let old = mkRow(t, { id: 'x1', from: 'pd', srcKey: 'sk-1' })
+                let patch = { order: 9, userId: 'u2', timeUpdate: 'T2' }
+                if (SPEC_ASSIGN[t] !== null) {
+                    patch[SPEC_ASSIGN[t]] = 'changed-assign'
+                }
+                let res = checkExternalWrite({ keyTable: t, keys: KEYS[t], r: deepFreeze(mkR({ diff: [{ ...old, ...patch }] })), ltdtOld: [old], lockExternalRows: true })
+                assert.strict.equal(res, null)
+            })
+        }
+
+    })
+
+
     describe('hasExternalDiff(EX-S7)', function() {
 
         let ks = (rows, old) => ({ r: mkR({ diff: rows }), ltdtOld: old })
@@ -894,17 +1077,18 @@ describe('unit-externalRows (外部列受保護純函數, F-23, R-EXT-OWN-01)', 
             }
             assert.strict.deepEqual(cells, {
                 A: 16,
-                B: 15,
+                B: 19,
                 C: 24,
-                D: 52,
+                D: 57,
                 D2: 33,
                 E_add: 80,
                 E_del: 64,
                 E_from: 376,
-                E_field: 198,
+                E_field: 222,
                 E_norm: 40,
                 E_multi: 10,
                 E_robust: 5,
+                E_src: 263,
                 F: 10,
             })
         })

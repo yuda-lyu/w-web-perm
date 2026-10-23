@@ -8,7 +8,9 @@ import { checkSubject } from './draftSync.mjs'
 //  ①反向對話框之主體: opt.subject = { id, name, saved }(開框時之主體摘要), 判準即 draftSync.checkSubject(伺服端以引用表之新鮮讀取呼叫);
 //  ②清單頁指派欄之正向引用: opt.refs = [{ name, ids }](本次新增之啟用引用項, 其名稱在使用者**選取當時**對應之實體 id 陣列; 空陣列＝選取當時查無該名稱), 伺服端於引用表鎖內重算名稱對應之 id 陣列, 須逐名稱相等.
 //「新增之啟用引用項」＝列之授權字串內 isActive 為 'y' 的項目, 其名稱不在該列舊值之啟用項內(停用項目不授權, 不入; 未變更之舊引用不入: 它們是已持久之關係, 刪除時引用連帶已清理).
-//相容: 未帶 subject／refs 者(外部應用、舊客戶端)維持原行為(名稱引用、不驗身分; 不擴權: 不比原行為多放行任何寫入); 帶了但格式不合或不符一律拒收(不降級為不帶, 原則 1、3).
+//「移除之啟用引用項」＝舊值啟用項中不再啟用者(被移除或被停用; perm-run03 範圍一); 整列被刪除不算(刪的是引用端之列, 未對任何被引用實體做操作).
+//perm-run03 範圍一(使用者 2026-10-23 裁示「這本來就該強制必帶吧? 要不然怎麼確認與驗證調用者身份?」): 宣告強制必帶——凡存檔改變了引用(新增或移除啟用之引用項, 新增列所帶之引用亦算), 每個涉及之名稱都須有身分宣告,
+//缺宣告或不完整整次拒收(saveIdentityRequired／saveRefChanged); 不改變引用之存檔不需宣告. 原「未帶者維持名稱引用原行為」之相容已取消(不支援舊呼叫方式, 升版前開著之舊頁面須重新載入); 帶了但格式不合或不符一律拒收(不降級為不帶, 原則 1、3).
 //targets 之 id 即名稱(主鍵＝標的名稱, 外部同步每次以同 id 重寫列), 故其身分定義即 id: 檢查涵蓋「已被刪除」, 刪除後同 id 重建依定義是同一實體(見 R-REF-IDENTITY-01 規則 5).
 
 
@@ -97,6 +99,33 @@ function newActiveNames(keyTable, rowOld, rowNew) {
 
 
 /**
+ * 一列相對舊值「移除之啟用引用名稱」(舊值啟用項 − 新值啟用項: 項目被移除、被停用〔isActive 不再為 'y'〕皆算); 舊值為 null(新增列)時為空
+ *
+ * perm-run03 範圍一: 移除引用亦須身分宣告(把「移除」套到被同名新實體替換之位置, 同樣是把操作套到錯的實體上, 原則 6; 使用者 2026-10-23 裁示)。
+ * 整列被刪除不在此列(刪除的是引用端之列本身, 其身分由列 id 與表級基準把關, 未對任何被引用實體做操作)。
+ *
+ * @param {String} keyTable 輸入引用端表名
+ * @param {Object|null} rowOld 輸入舊列(null 為新增)
+ * @param {Object} rowNew 輸入新列
+ * @returns {Array} 回傳名稱陣列(依舊值內之次序、去重)
+ */
+function removedActiveNames(keyTable, rowOld, rowNew) {
+    let t = getRefTarget(keyTable)
+    if (t === null || !isPlain(rowOld) || !isPlain(rowNew)) {
+        return []
+    }
+    let now = activeNames(rowNew[t.field], t.kind)
+    let out = []
+    activeNames(rowOld[t.field], t.kind).forEach((n) => {
+        if (!now.has(n)) {
+            out.push(n)
+        }
+    })
+    return out
+}
+
+
+/**
  * 多列相對舊表(以 id 對應)新增之啟用引用名稱集合
  *
  * @param {Object} p 輸入參數物件
@@ -118,6 +147,34 @@ function collectNewNames({ keyTable, rowsNew, rowsOld }) {
         let id = toId(r)
         let old = (id !== null && byId.has(id)) ? byId.get(id) : null
         newActiveNames(keyTable, old, r).forEach((n) => out.add(n))
+    })
+    return out
+}
+
+
+/**
+ * 多列相對舊表(以 id 對應)「改變了引用」之啟用引用名稱集合: 新增之啟用引用名稱(含新增列所帶者) ∪ 移除之啟用引用名稱(perm-run03 範圍一: 新增與移除皆須宣告)
+ *
+ * @param {Object} p 輸入參數物件
+ * @param {String} p.keyTable 輸入引用端表名
+ * @param {Array} p.rowsNew 輸入新列陣列(整表或僅改動列皆可; 不在其中之舊列〔被刪除或未改動〕不計)
+ * @param {Array} p.rowsOld 輸入舊表列陣列(同一版本: 前端為草稿載入時之列, 伺服端為鎖內新鮮讀取)
+ * @returns {Set} 回傳名稱集合
+ */
+function collectChangedNames({ keyTable, rowsNew, rowsOld }) {
+    let byId = new Map()
+    ;(Array.isArray(rowsOld) ? rowsOld : []).forEach((r) => {
+        let id = toId(r)
+        if (id !== null) {
+            byId.set(id, r)
+        }
+    })
+    let out = new Set()
+    ;(Array.isArray(rowsNew) ? rowsNew : []).forEach((r) => {
+        let id = toId(r)
+        let old = (id !== null && byId.has(id)) ? byId.get(id) : null
+        newActiveNames(keyTable, old, r).forEach((n) => out.add(n))
+        removedActiveNames(keyTable, old, r).forEach((n) => out.add(n))
     })
     return out
 }
@@ -194,15 +251,24 @@ function recordPicks({ keyTable, strOld, strNew, snap, picks }) {
         return picks
     }
     let was = activeNames(strOld, t.kind)
-    activeNames(strNew, t.kind).forEach((n) => {
+    let now = activeNames(strNew, t.kind)
+    let rec = (n) => {
+        let ids = [...((snap instanceof Map && snap.has(n)) ? snap.get(n) : [])].sort()
+        if (picks.has(n) && (picks.get(n) === null || !sameIds([...picks.get(n)].sort(), ids))) {
+            picks.set(n, null) //衝突: 同名兩次選取當時對應不同實體
+        }
+        else {
+            picks.set(n, ids)
+        }
+    }
+    now.forEach((n) => {
         if (!was.has(n)) {
-            let ids = [...((snap instanceof Map && snap.has(n)) ? snap.get(n) : [])].sort()
-            if (picks.has(n) && (picks.get(n) === null || !sameIds([...picks.get(n)].sort(), ids))) {
-                picks.set(n, null) //衝突: 同名兩次選取當時對應不同實體
-            }
-            else {
-                picks.set(n, ids)
-            }
+            rec(n) //新增之啟用引用項
+        }
+    })
+    was.forEach((n) => {
+        if (!now.has(n)) {
+            rec(n) //移除(或停用)之啟用引用項(perm-run03 範圍一: 移除亦須宣告, 身分以編輯器開啟當下被移除之名稱所對應之實體為準; 懸空引用〔當時查無該名稱〕記空陣列)
         }
     })
     return picks
@@ -228,7 +294,7 @@ function buildRefDecl({ keyTable, rowsNew, rowsOld, picks, refRows }) {
     if (t === null) {
         return []
     }
-    let names = [...collectNewNames({ keyTable, rowsNew, rowsOld })].sort()
+    let names = [...collectChangedNames({ keyTable, rowsNew, rowsOld })].sort() //新增與移除之啟用引用名稱皆須宣告(perm-run03 範圍一)
     return names.map((name) => {
         if (picks instanceof Map && picks.has(name)) {
             let v = picks.get(name)
@@ -298,30 +364,43 @@ function countRefMismatch({ keyTable, decl, refRows }) {
 
 
 /**
- * 伺服端: 寫入前驗證正向引用之身分(引用表鎖內, refRows 為新鮮讀取)
+ * 伺服端: 寫入前驗證引用之身分宣告(引用表鎖內, refRows 為新鮮讀取; 改變引用者宣告為強制必帶, perm-run03 範圍一)
  *
+ * ⓪本次寫入「改變了引用」(任一列相對庫內舊列新增或移除啟用之引用項, 新增列所帶之引用亦算; collectChangedNames)而請求未附任何身分宣告(opt.refs 與 opt.subject 皆未帶)
+ *   → saveIdentityRequired(不再「未帶者維持名稱引用原行為」; 使用者 2026-10-23 裁示: 不宣告身分, 無從確認與驗證調用者身分);
+ *   不改變引用之存檔(只改名、只改其他欄)不需宣告, 照常通過。
  * ①宣告之每個名稱, 目前對應之 id 陣列須與宣告相同(被刪除、被刪除後同名重建〔id 不同〕、新增了同名實體皆不符);
- * ②宣告須完整: 本次寫入之列相對舊表新增之啟用引用名稱, 每個都須在宣告內(宣告不完整即拒, 免用戶端漏報)。
+ * ②宣告須完整: 本次寫入之列改變之啟用引用名稱, 每個都須在宣告內(opt.refs 之各名稱, 或反向對話框 opt.subject 之主體名稱; 不完整即拒, 免用戶端漏報)。
+ *   主體(subject)本身之身分由呼叫端以 checkSubjectIdentity 於引用表鎖內先驗(先於基準比對), 此處只認「主體名稱已被宣告」。
  *
  * @param {Object} p 輸入參數物件
  * @param {String} p.keyTable 輸入引用端表名
- * @param {Array} p.decl 輸入已正規化之宣告(parseRefDecl)
+ * @param {Array|null} p.decl 輸入已正規化之宣告(parseRefDecl); 請求未帶 refs 為 null
+ * @param {Object|null} [p.subject=null] 輸入已正規化之主體摘要(parseSubject); 請求未帶 subject 為 null
  * @param {Array} p.rowsNew 輸入本次將寫入之列(新增列＋改動列)
  * @param {Array} p.rowsOld 輸入鎖內新鮮讀取之引用端表舊列
- * @param {Array} p.refRows 輸入鎖內新鮮讀取之被引用表列
- * @returns {Object|null} 回傳 null 為通過; 否則 { key, reason, n }(key 為語系鍵 saveRefChanged／saveIdentityFormat; reason 為 refChanged／refIncomplete／refNoTarget)
+ * @param {Array|null} p.refRows 輸入鎖內新鮮讀取之被引用表列(decl 與 subject 皆為 null 時未讀取, 可為 null)
+ * @returns {Object|null} 回傳 null 為通過; 否則 { key, reason, n }(key 為語系鍵 saveIdentityRequired／saveRefChanged／saveIdentityFormat; reason 為 identityRequired／refChanged／refIncomplete／refNoTarget)
  */
-function checkRefIdentity({ keyTable, decl, rowsNew, rowsOld, refRows }) {
+function checkRefIdentity({ keyTable, decl, subject = null, rowsNew, rowsOld, refRows }) {
     let t = getRefTarget(keyTable)
     if (t === null) {
         return { key: 'saveIdentityFormat', reason: 'refNoTarget', n: 0 }
     }
-    let n = countRefMismatch({ keyTable, decl, refRows })
+    let changed = collectChangedNames({ keyTable, rowsNew, rowsOld })
+    if (decl === null && subject === null) {
+        return changed.size > 0 ? { key: 'saveIdentityRequired', reason: 'identityRequired', n: changed.size } : null
+    }
+    let declList = decl === null ? [] : decl
+    let n = countRefMismatch({ keyTable, decl: declList, refRows })
     if (n > 0) {
         return { key: 'saveRefChanged', reason: 'refChanged', n }
     }
-    let declared = new Set(decl.map((d) => d.name))
-    let miss = [...collectNewNames({ keyTable, rowsNew, rowsOld })].filter((name) => !declared.has(name))
+    let declared = new Set(declList.map((d) => d.name))
+    if (subject !== null) {
+        declared.add(subject.name)
+    }
+    let miss = [...changed].filter((name) => !declared.has(name))
     if (miss.length > 0) {
         return { key: 'saveRefChanged', reason: 'refIncomplete', n: miss.length }
     }
@@ -344,6 +423,6 @@ function checkSubjectIdentity({ subject, refRows }) {
 
 
 export {
-    getRefTarget, activeNames, newActiveNames, collectNewNames, idsOfName, snapRefIds, recordPicks, buildRefDecl,
+    getRefTarget, activeNames, newActiveNames, removedActiveNames, collectNewNames, collectChangedNames, idsOfName, snapRefIds, recordPicks, buildRefDecl,
     parseSubject, parseRefDecl, countRefMismatch, checkRefIdentity, checkSubjectIdentity,
 }

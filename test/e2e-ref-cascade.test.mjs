@@ -23,6 +23,8 @@
 //夾具(後台列由管理者寫入 RPC(editTableRows)先建, 外部列經真 /syncAndReplaceTabs 後建): 群組 rc-del-g／rc-lone／rc-ren-g; 使用者 rc-del-uo(後台)、rc-del-ua(外部)、rc-ren-u(後台)、rc-ren-ext(外部)、
 //  rc-dg-u1／rc-dg-u2(外部, 引用不存在之群組 rc-ghost-g); 外部群組 rc-dang-g(引用不存在之權限 rc-ghost-p)。收尾 restoreTables(purgeExternalRows 直刪外部列夾具 → 整表寫回快照)並回驗(R-E2E-ISO-01)。
 //授權樹期望值由 base seed 規則集依 R-AUTH-MERGE-00 推導(見 test/tools/e2eExt.mjs 之 TREE), 不抄實測值。
+//perm-run03(外部匯入改依 srcKey 差異同步, R-IMPORT-01): 外部列夾具之標籤(id-rc-ua／id-rc-rx／id-rc-dg1／id-rc-dg2 等)是送入同步端點之 srcKey, 其真實 id 由伺服端產生(不等於標籤);
+//  以 id 查端到端授權(getPermUserInfor)者一律先經 idOfSrc('users', 標籤) 取真實 id; 以 rowOf／hasRow 比對庫內列者依 srcKey 找列(後台列仍以 id)。
 import fs from 'fs'
 import assert from 'assert'
 import JSON5 from 'json5'
@@ -33,7 +35,7 @@ import {
 import { editTableRows, selectAllRows } from './tools/api-setup.mjs'
 import { createBaselineGate } from './tools/e2eLib.mjs'
 import {
-    TREE, T, BASE_UIDS, ON, mkU, mkG, fmtT, tOf, syncRows, snapTables, rowOf, hasRow, createIsolation, makeRunner,
+    TREE, T, BASE_UIDS, ON, mkU, mkG, fmtT, tOf, syncRows, idOfSrc, snapTables, rowOf, hasRow, createIsolation, makeRunner,
     waitCellGone, waitNameGone, hasName, hasCell, enterPage, gotoTargets, cellWarnTitle, topModalBox,
 } from './tools/e2eExt.mjs'
 
@@ -98,7 +100,7 @@ const CASES = [
         fixture: fxDel,
         run: async (page, lang) => {
             assert.deepEqual(await getResolvedActiveTargets(page, 'id-rc-uo'), TREE.M1_OR_P3, '刪除前 rc-del-uo 之授權 = M1 ∪ P3')
-            assert.deepEqual(await getResolvedActiveTargets(page, 'id-rc-ua'), TREE.M1_AND_P3, '刪除前 rc-del-ua 之授權 = M1 ∩ P3')
+            assert.deepEqual(await getResolvedActiveTargets(page, await idOfSrc('users', 'id-rc-ua')), TREE.M1_AND_P3, '刪除前 rc-del-ua 之授權 = M1 ∩ P3')
             ST.db0 = await snapTables()
             await enter(page, 'grups', 5) //base 4 + rc-del-g
             await checkRow(page, await rowIndexByCell(page, 'name', 'rc-del-g'))
@@ -143,7 +145,7 @@ const CASES = [
             assert.deepEqual(after.pemis, ST.db0.pemis, 'pemis 表不動')
             //端到端不變式: 刪除後兩位引用者之授權皆為 M1(AND 限制解除者授權變多)
             assert.deepEqual(await getResolvedActiveTargets(page, 'id-rc-uo'), TREE.M1, '刪除後 rc-del-uo 之授權 = M1')
-            assert.deepEqual(await getResolvedActiveTargets(page, 'id-rc-ua'), TREE.M1, '刪除後 rc-del-ua 之授權 = M1(AND 限制解除, 由 M1 ∩ P3 變為 M1)')
+            assert.deepEqual(await getResolvedActiveTargets(page, await idOfSrc('users', 'id-rc-ua')), TREE.M1, '刪除後 rc-del-ua 之授權 = M1(AND 限制解除, 由 M1 ∩ P3 變為 M1)')
         },
     },
     {
@@ -188,7 +190,7 @@ const CASES = [
         fixture: fxRen,
         run: async (page, lang) => {
             assert.deepEqual(await getResolvedActiveTargets(page, 'id-rc-ru'), TREE.P1P3, '改名前 rc-ren-u 之授權 = P1 ∪ P3')
-            assert.deepEqual(await getResolvedActiveTargets(page, 'id-rc-rx'), TREE.M1_AND_P1P3, '改名前 rc-ren-ext 之授權 = M1 ∩ (P1 ∪ P3)')
+            assert.deepEqual(await getResolvedActiveTargets(page, await idOfSrc('users', 'id-rc-rx')), TREE.M1_AND_P1P3, '改名前 rc-ren-ext 之授權 = M1 ∩ (P1 ∪ P3)')
             ST.db0 = await snapTables()
             await enter(page, 'grups', 5) //base 4 + rc-ren-g
             await typeIntoCell(page, await rowIndexByCell(page, 'name', 'rc-ren-g'), 'name', 'rc-ren-g-new')
@@ -225,7 +227,7 @@ const CASES = [
             assert.deepEqual(after.pemis, ST.db0.pemis, 'pemis 表不動')
             //端到端不變式: 改名前後各使用者之授權不變(連帶更新引用)
             assert.deepEqual(await getResolvedActiveTargets(page, 'id-rc-ru'), TREE.P1P3, '改名後 rc-ren-u 之授權不變')
-            assert.deepEqual(await getResolvedActiveTargets(page, 'id-rc-rx'), TREE.M1_AND_P1P3, '改名後 rc-ren-ext 之授權不變')
+            assert.deepEqual(await getResolvedActiveTargets(page, await idOfSrc('users', 'id-rc-rx')), TREE.M1_AND_P1P3, '改名後 rc-ren-ext 之授權不變')
         },
     },
     {
@@ -321,8 +323,8 @@ const CASES = [
         },
         run: async (page, lang) => {
             //前提: 兩位使用者之授權皆為空(OR 引用懸空名不增加授權; AND 引用懸空名使結果為空)
-            assert.deepEqual(await getResolvedActiveTargets(page, 'id-rc-dg1'), TREE.EMPTY, '新增前 rc-dg-u1 之授權為空(OR 引用懸空名)')
-            assert.deepEqual(await getResolvedActiveTargets(page, 'id-rc-dg2'), TREE.EMPTY, '新增前 rc-dg-u2 之授權為空(AND 引用懸空名)')
+            assert.deepEqual(await getResolvedActiveTargets(page, await idOfSrc('users', 'id-rc-dg1')), TREE.EMPTY, '新增前 rc-dg-u1 之授權為空(OR 引用懸空名)')
+            assert.deepEqual(await getResolvedActiveTargets(page, await idOfSrc('users', 'id-rc-dg2')), TREE.EMPTY, '新增前 rc-dg-u2 之授權為空(AND 引用懸空名)')
             ST.db0 = await snapTables()
             await enter(page, 'grups', 4)
             await clickAdd(page)
@@ -359,8 +361,8 @@ const CASES = [
             for (const id of ['id-rc-dg1', 'id-rc-dg2']) {
                 assert.deepEqual(rowOf(after.users, id), rowOf(ST.db0.users, id), `${id} 之列整列逐位元不動(新增群組不改寫引用端)`)
             }
-            assert.deepEqual(await getResolvedActiveTargets(page, 'id-rc-dg1'), TREE.EMPTY, '新增後 rc-dg-u1 之授權仍為空(新群組尚無指派)')
-            assert.deepEqual(await getResolvedActiveTargets(page, 'id-rc-dg2'), TREE.EMPTY, '新增後 rc-dg-u2 之授權仍為空')
+            assert.deepEqual(await getResolvedActiveTargets(page, await idOfSrc('users', 'id-rc-dg1')), TREE.EMPTY, '新增後 rc-dg-u1 之授權仍為空(新群組尚無指派)')
+            assert.deepEqual(await getResolvedActiveTargets(page, await idOfSrc('users', 'id-rc-dg2')), TREE.EMPTY, '新增後 rc-dg-u2 之授權仍為空')
         },
     },
     {
@@ -396,7 +398,7 @@ const CASES = [
         run: async (page) => {
             assert.equal(await page.evaluate(() => window.$vo.$store.state.webInfor.cascadeRename), false, '前提: 前端取得之 webInfor.cascadeRename 為 false(後端已以 cascadeRename:false 重啟)')
             assert.deepEqual(await getResolvedActiveTargets(page, 'id-rc-ru'), TREE.P1P3, '改名前 rc-ren-u 之授權 = P1 ∪ P3')
-            assert.deepEqual(await getResolvedActiveTargets(page, 'id-rc-rx'), TREE.M1_AND_P1P3, '改名前 rc-ren-ext 之授權 = M1 ∩ (P1 ∪ P3)')
+            assert.deepEqual(await getResolvedActiveTargets(page, await idOfSrc('users', 'id-rc-rx')), TREE.M1_AND_P1P3, '改名前 rc-ren-ext 之授權 = M1 ∩ (P1 ∪ P3)')
             ST.db0 = await snapTables()
             await enter(page, 'grups', 5)
             await typeIntoCell(page, await rowIndexByCell(page, 'name', 'rc-ren-g'), 'name', 'rc-ren-g-new')
@@ -406,7 +408,7 @@ const CASES = [
             await dismissResultModal(page)
             //授權(R-AUTH-MERGE-00; 引用名稱查無實體 ⇒ 懸空, 以其 mode 參與、內容全 n): rc-ren-u(OR 引用懸空名)→ 空; rc-ren-ext(M1 之 OR 與懸空名之 AND)→ 空
             assert.deepEqual(await getResolvedActiveTargets(page, 'id-rc-ru'), TREE.EMPTY, '改名後 rc-ren-u 之引用成為懸空 → 授權為空')
-            assert.deepEqual(await getResolvedActiveTargets(page, 'id-rc-rx'), TREE.EMPTY, '改名後 rc-ren-ext 之 AND 引用懸空 → 授權為空(收嚴)')
+            assert.deepEqual(await getResolvedActiveTargets(page, await idOfSrc('users', 'id-rc-rx')), TREE.EMPTY, '改名後 rc-ren-ext 之 AND 引用懸空 → 授權為空(收嚴)')
             //使用者頁: 兩位引用者之 cgrups 儲存格出現懸空警告圖示, base seed 四位無圖示
             await enter(page, 'users', 6) //base 4 + rc-ren-u + rc-ren-ext
             const expDang = await fmtT(page, 'warnRefDangling', { names: 'rc-ren-g', kind: await tOf(page, 'warnKindGrup') })

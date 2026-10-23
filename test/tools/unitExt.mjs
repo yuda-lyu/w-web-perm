@@ -11,11 +11,12 @@ export const TABLES = ['users', 'grups', 'pemis', 'targets']
 export const KEYS = Object.fromEntries(TABLES.map((t) => [t, ds[t].keys]))
 
 //SPEC_LOCK: 外部列之鎖定欄(身分／結構欄) = schema 欄位扣除 id、from、order、指派欄、伺服器管理欄; 逐表手列(見 src/schema/tables/*.mjs)
+//perm-run03: 四表新增 srcKey(外部匯入之來源鍵, 身分欄, 同 from 屬鎖定欄), 故各表鎖定欄多一個 srcKey
 export const SPEC_LOCK = {
-    users: ['name', 'email', 'description', 'isAdmin', 'isActive'],
-    grups: ['name', 'description'],
-    pemis: ['name', 'description'],
-    targets: ['description'],
+    users: ['name', 'email', 'description', 'srcKey', 'isAdmin', 'isActive'],
+    grups: ['name', 'description', 'srcKey'],
+    pemis: ['name', 'description', 'srcKey'],
+    targets: ['description', 'srcKey'],
 }
 
 //SPEC_ASSIGN: 各表之授權指派欄(後台可寫); targets 無
@@ -25,11 +26,12 @@ export const SPEC_ASSIGN = { users: 'cgrups', grups: 'cpemis', pemis: 'crules', 
 export const SPEC_SERVER = ['userId', 'timeCreate', 'userIdUpdate', 'timeUpdate']
 
 //SPEC_DIGEST: 各表之「內容欄位」(內容指紋所含; rowDigest 規格 RD-S1) = schema 欄位扣除 order 與伺服器管理欄; 逐表手列, 作為內容相同／不同判定之獨立來源(run07 U1b 自 unit-rowDigest 移入, 供 unit-procCore-external 共用)
+//perm-run03: 四表新增 srcKey(外部匯入之來源鍵), 屬內容欄(入寫入契約 fields, 見 unit-rowDigest RD-C4)
 export const SPEC_DIGEST = {
-    users: ['id', 'name', 'email', 'description', 'from', 'cgrups', 'isAdmin', 'isActive'],
-    grups: ['id', 'name', 'description', 'from', 'cpemis'],
-    pemis: ['id', 'name', 'description', 'from', 'crules'],
-    targets: ['id', 'description', 'from'],
+    users: ['id', 'name', 'email', 'description', 'from', 'srcKey', 'cgrups', 'isAdmin', 'isActive'],
+    grups: ['id', 'name', 'description', 'from', 'srcKey', 'cpemis'],
+    pemis: ['id', 'name', 'description', 'from', 'srcKey', 'crules'],
+    targets: ['id', 'description', 'from', 'srcKey'],
 }
 
 //MISSING: 於 mkRow／rowWith 之覆寫值, 表示該鍵不存在
@@ -37,7 +39,10 @@ export const MISSING = Symbol('missing')
 
 
 /**
- * 依 schema 欄位建完整列: 每欄預設 `v-<欄位>`, id 預設 r1, order 預設 1, from 預設 ''
+ * 依 schema 欄位建完整列: 每欄預設 `v-<欄位>`, id 預設 r1, order 預設 1, from 預設 '', srcKey 預設 ''
+ *
+ * srcKey(perm-run03; 外部匯入之來源鍵, 身分欄)預設為空字串: 後台列恆為空, 後台不可新增帶值之列、不可改既有列之值(externalRows.checkExternalWrite: addSrcKey／srcKeyChanged);
+ * 預設「`v-srcKey`」會使每個後台新增列夾具都被拒. 需要帶來源鍵之外部列夾具請明給 srcKey 覆寫.
  *
  * @param {String} table 輸入表名
  * @param {Object} [o={}] 輸入覆寫(值為 MISSING 者刪除該鍵)
@@ -51,6 +56,7 @@ export function mkRow(table, o = {}) {
     r.id = 'r1'
     r.order = 1
     r.from = ''
+    r.srcKey = ''
     return rowWith(r, o)
 }
 

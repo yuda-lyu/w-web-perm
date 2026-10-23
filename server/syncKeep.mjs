@@ -1,7 +1,7 @@
-//外部同步(WWebPerm.mjs:syncAndReplaceTabs)之三個純函數(F-23; R-PRINCIPLE-00 原則 3、5; 規則帳本 R-EXT-OWN-01; ADR-037), 不依賴 ORM／Vue, 供單元測試:
+//外部同步(server/syncCore.mjs:syncAndReplaceTabs; perm-run03 起依 srcKey 差異同步, 本檔函數由其以「配對到之庫內 id／新配之 id」呼叫)之三個純函數(F-23; R-PRINCIPLE-00 原則 3、5; 規則帳本 R-EXT-OWN-01; ADR-037), 不依賴 ORM／Vue, 供單元測試:
 //  keepAssignOnMissing: users 列「payload 缺 cgrups 鍵」時保留庫內指派(指派欄屬後台, Lv1; 含該鍵則以外部為準)——修正前 ltdtmapping 缺鍵補 ''、delAll＋insert 即清掉後台已指派之群組(run06 已知限制④);
 //  keepAssignByEntity: grups 列缺 cpemis 鍵、pemis 列缺 crules 鍵時同樣保留(run08; 同為後台可寫之指派欄)——群組／權限無登入對應鍵, 實體身分依 id(無 id 者依名稱), 見該函數說明;
-//  countIdRenumber: 同一 from 同一批內出現「同名異 id」(疑似外部 id 重編)之筆數, 供 warn log 與頁面提示(外部 id 不穩定時, id 消失＝刪除會每次清理引用而抹掉後台指派, 不加開關, 以提示處理)
+//  countSrcKeyRenumber: 同一 from 同一批內出現「同名異 srcKey」(疑似外部來源鍵重編)之筆數, 供 warn log 與頁面提示(外部來源鍵不穩定時, 來源鍵消失＝刪除會每次清理引用而抹掉後台指派, 不加開關, 以提示處理; 原 countIdRenumber 之 id 口徑隨差異同步改為 srcKey)
 
 
 let isStr = (v) => typeof v === 'string'
@@ -202,33 +202,40 @@ function keepAssignByEntity({ rows, hasKey, rowsOldSameFrom, key, cascadeRename 
 
 
 /**
- * 同一 from 同一批內「同名異 id」之筆數(疑似外部 id 重編): 本批列帶 id 與其名稱, 而庫內同一 from 有另一列同名、不同 id、且該舊 id 不在本批
+ * 同一 from 同一批內「同名異 srcKey」之筆數(疑似外部來源鍵重編; perm-run03 範圍二: 差異同步下身分是 srcKey, 原「同名異 id」之判定口徑改為 srcKey)
+ *
+ * 本批列之 srcKey 不屬庫內同一 from 任何列(新來源鍵), 而庫內同一 from 有另一列同名、其來源鍵不在本批(將被刪除)——外部來源若重編來源鍵(如目錄重建後 GUID 全換),
+ * 該列等於「刪舊增新」, 引用每次被連帶清理而抹掉後台指派(原則 6: 新實體不繼承). 庫內尚無 srcKey 之列(遷移前資料)以其 id 為身分候選(批次 srcKey 等於其 id 者視為同一列, 見 syncCore).
  *
  * @param {Array} rowsOldSameFrom 輸入庫內同一 from 之既有列(grups／pemis; users 之 name 可重複故不適用)
- * @param {Array} rows 輸入本批列(帶 id 者才計)
+ * @param {Array} rows 輸入本批列(須帶 srcKey 與 name)
  * @returns {Number} 回傳筆數
  */
-function countIdRenumber(rowsOldSameFrom, rows) {
-    let idsBatch = new Set()
+function countSrcKeyRenumber(rowsOldSameFrom, rows) {
+    let idOf = (o) => (isStr(o.srcKey) && o.srcKey !== '') ? o.srcKey : (isStr(o.id) ? o.id : null) //庫內列之身分候選: 有 srcKey 用 srcKey, 遷移前資料用 id
+    let keysBatch = new Set()
     rows.forEach((v) => {
-        let id = toId(v)
-        if (id !== null) {
-            idsBatch.add(id)
+        if (isObj(v) && isStr(v.srcKey)) {
+            keysBatch.add(v.srcKey)
         }
     })
-    let oldByName = new Map() //名稱 → 本批未沿用之舊 id 集合
+    let keysOld = new Set()
+    let goneByName = new Set() //將被刪除之庫內列之名稱(其身分不在本批)
     rowsOldSameFrom.forEach((o) => {
-        if (isObj(o) && isStr(o.id) && isStr(o.name) && !idsBatch.has(o.id)) {
-            if (!oldByName.has(o.name)) {
-                oldByName.set(o.name, new Set())
-            }
-            oldByName.get(o.name).add(o.id)
+        if (!isObj(o)) {
+            return
+        }
+        let k = idOf(o)
+        if (k !== null) {
+            keysOld.add(k)
+        }
+        if (k !== null && !keysBatch.has(k) && isStr(o.name)) {
+            goneByName.add(o.name)
         }
     })
     let n = 0
     rows.forEach((v) => {
-        let id = toId(v)
-        if (id !== null && isObj(v) && isStr(v.name) && oldByName.has(v.name)) {
+        if (isObj(v) && isStr(v.srcKey) && !keysOld.has(v.srcKey) && isStr(v.name) && goneByName.has(v.name)) {
             n++
         }
     })
@@ -236,4 +243,4 @@ function countIdRenumber(rowsOldSameFrom, rows) {
 }
 
 
-export { markHasKey, keepAssignOnMissing, keepAssignByEntity, countIdRenumber }
+export { markHasKey, keepAssignOnMissing, keepAssignByEntity, countSrcKeyRenumber }

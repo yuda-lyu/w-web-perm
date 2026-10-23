@@ -77,7 +77,8 @@ let kpRejectKey = {
 /**
  * 用戶端(kpFunExt 第 3 參)的 opt 只採納 baseline、returnRows(是否於回傳附寫入後之列, 布林)、subject(反向對話框之主體身分摘要)與 refs(清單頁新增引用之被引用實體身分宣告),
  * 不接受 pickKeysOnly 等伺服端設定, 更不轉給 procOrm 之 opt(規格第 6 節: procOrm 之 opt 只能由伺服端程式自組);
- * 未給(undefined／null)之 baseline／subject／refs 視為舊客戶端／外部應用(不帶, 本 major 允許; 不比原行為多放行任何寫入), 給了則一律驗證, 格式不合即拒收(baselineFormat／identityFormat; 不降級為不帶, R-SUBJECT-ID-01、R-REF-IDENTITY-01).
+ * 未給(undefined／null)之 baseline 視為舊客戶端／外部應用(不帶, 本 major 允許; 不比原行為多放行任何寫入); 未給之 subject／refs 自 perm-run03 起僅限「本次存檔不改變引用」者,
+ * 改變引用(新增或移除啟用之引用項、新增列帶引用)而未附宣告 → 拒收 saveIdentityRequired(R-REF-IDENTITY-01 規則 7); 給了則一律驗證, 格式不合即拒收(baselineFormat／identityFormat; 不降級為不帶, R-SUBJECT-ID-01、R-REF-IDENTITY-01).
  * subject／refs 在此原樣轉出(不信任其內容), 由 updateTabItems 解析驗證; 驗證所需之表與鎖皆由伺服端依 keyTable 自組(getRefTarget), 用戶端不得指定
  *
  * @param {*} opt 輸入用戶端給之 opt(任何值)
@@ -154,16 +155,18 @@ function proc(woItems, procOrm, { srLog, withTabLocks: lockTabs, guardWrite, loc
         }
 
         //被引用實體身分(perm-run02 範圍一; R-SUBJECT-ID-01、R-REF-IDENTITY-01; 使用者 2026-10-23 裁示「正反關聯與主體身份檢查, 前後端都要做」; 原則 4: 檢查與寫入同一把鎖、原則 6: 引用不得被同名新資料接管):
-        //  subject: 反向關聯對話框(users 之主體為 grups、grups 之主體為 pemis)開框時之主體摘要 { id, name, saved }; refs: 清單頁新增之啟用引用項其名稱在選取當時對應之實體 id 宣告 [{ name, ids }].
+        //  subject: 反向關聯對話框(users 之主體為 grups、grups 之主體為 pemis)開框時之主體摘要 { id, name, saved }; refs: 清單頁新增或移除之啟用引用項其名稱在選取當時對應之實體 id 宣告 [{ name, ids }].
         //  被引用表由伺服端依 keyTable 自組(getRefTarget, 用戶端不得指定), 於本表鎖之外層取其表鎖(階層: 被引用者先、引用端後, R-WRITE-LOCK-02)並新鮮讀取後驗證;
-        //  未給(undefined／null)＝外部應用／舊客戶端, 維持名稱引用原行為(不驗身分, 不擴權); 給了但格式不合或該表無授權引用欄 → 拒收 saveIdentityFormat(不降級), 於任何讀寫之前
+        //  perm-run03 範圍一(使用者 2026-10-23 裁示「這本來就該強制必帶吧? 要不然怎麼確認與驗證調用者身份?」): 宣告強制必帶——存檔改變了引用(新增或移除啟用之引用項、新增列帶引用)而未附宣告 → 拒收 saveIdentityRequired
+        //  (於 write 內本表鎖下判定、零寫入; 無宣告者不取被引用表鎖: 無從驗證即拒收, 不需讀被引用表); 不改變引用之存檔(只改名、只改其他欄)不需宣告, 照常. 給了但格式不合或該表無授權引用欄 → 拒收 saveIdentityFormat(不降級), 於任何讀寫之前
         let subjectRaw = get(opt, 'subject', null)
         let refsRaw = get(opt, 'refs', null)
+        let refInfo = getRefTarget(keyTable) //本表有授權引用欄者(users／grups／pemis)為 { table, field, kind }; targets 為 null(無需宣告)
         let refTarget = null
         let subject = null
         let refDecl = null
         if (subjectRaw !== null || refsRaw !== null) {
-            refTarget = getRefTarget(keyTable)
+            refTarget = refInfo
             subject = subjectRaw === null ? null : parseSubject(subjectRaw)
             refDecl = refsRaw === null ? null : parseRefDecl(refsRaw)
             //主體摘要只用於反向對話框(主體表 grups／pemis, 有 name 欄); pemis 之被引用表為 targets(無 name、無反向對話框), 帶 subject 屬格式錯誤
@@ -408,10 +411,10 @@ function proc(woItems, procOrm, { srLog, withTabLocks: lockTabs, guardWrite, loc
         r = dropServerOnlyDiff({ keys: keysTab, r, ltdtOld, all: true })
         r = restoreServerFields({ r, ltdtOld, all: true }) //改動之列帶庫內之伺服器管理欄: 持舊草稿(保留未存編輯期間外部同步重寫了該列)不得把較新之建立者／建立時間回退(外審 sol 第 3 點)
 
-        //正向引用身分(perm-run02 範圍一; R-REF-IDENTITY-01): 本次寫入之列(新增＋改動)相對庫內舊列新增之啟用引用項, 其名稱對應之被引用實體須與選取當時同一身分(同 id), 且宣告須完整;
-        //被刪除、刪除後同名重建(id 不同)、同名新增實體皆整次拒收 saveRefChanged(零寫入): 不得把授權寫到同名新實體(原則 6). refRows 為被引用表鎖內之新鮮讀取
-        if (refDecl !== null) {
-            let ri = checkRefIdentity({ keyTable, decl: refDecl, rowsNew: [...r.add, ...r.diff], rowsOld: ltdtOld, refRows })
+        //引用身分(perm-run02 範圍一; R-REF-IDENTITY-01; perm-run03 範圍一起宣告強制必帶): 本次寫入之列(新增＋改動)相對庫內舊列新增或移除之啟用引用項, 其名稱對應之被引用實體須與選取當時同一身分(同 id), 且宣告須完整;
+        //改變了引用卻未附宣告 → saveIdentityRequired; 被刪除、刪除後同名重建(id 不同)、同名新增實體皆整次拒收 saveRefChanged(零寫入): 不得把授權寫到(或移除到)同名新實體(原則 6). refRows 為被引用表鎖內之新鮮讀取(無宣告者未讀取, 為 null)
+        if (refInfo !== null) {
+            let ri = checkRefIdentity({ keyTable, decl: refDecl, subject, rowsNew: [...r.add, ...r.diff], rowsOld: ltdtOld, refRows })
             if (ri !== null) {
                 srLog.error({ event: 'updateTabItems-identity-error', keyTable, userId, msg: ri.key, reason: ri.reason, n: ri.n })
                 return Promise.reject(ri.key)

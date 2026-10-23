@@ -1,0 +1,449 @@
+import get from 'lodash-es/get.js'
+import isestr from 'wsemi/src/isestr.mjs'
+import isearr from 'wsemi/src/isearr.mjs'
+import clearXSS from 'wsemi/src/clearXSS.mjs'
+import genIDSeq from 'wsemi/src/genIDSeq.mjs'
+import ltdtmapping from 'wsemi/src/ltdtmapping.mjs'
+import ds from '../src/schema/index.mjs'
+import validateRowsBeforeWrite, { maxIdBytes } from './validateRows.mjs'
+import planRefChanges, { REF_OF, diffRefTargets } from '../src/js/refCascade.mjs'
+import { SERVER_FIELDS } from '../src/js/externalRows.mjs'
+import { findDupIndex, findKeyOtherFrom, withTabLocks, mapKeyOf, checkMapKeyBatch } from './keyCheck.mjs'
+import { checkCascadePlan, writeWithCascade } from './cascadeWrite.mjs'
+import { markHasKey, keepAssignOnMissing, keepAssignByEntity, countSrcKeyRenumber } from './syncKeep.mjs'
+import { toOutKey, isRowObj } from './procCore.mjs'
+
+
+//外部匯入(外部同步)之核心: 依外部自訂之來源鍵 srcKey 於表鎖內做差異同步(perm-run03 範圍二; 使用者 2026-10-22 裁示原則 11、2026-10-23 裁示不提供呼叫端相容;
+//規格(真理源) C:\opensrcOper\dspec\外部匯入之定義與機制.md 第 3～10 節; 規則帳本 R-IMPORT-01).
+//由 WWebPerm.mjs 之 POST /syncAndReplaceTabs 呼叫; 獨立成模組以便注入 ORM 替身做單元測試(寫入中途失敗之補償、鎖、配對).
+//
+//語意: 本文 { from, rows }, rows＝該 from 之完整清單; 每列帶外部自訂之 srcKey(同一 from 內唯一且穩定), 不得帶 id(內部主鍵由本系統產生).
+//  於該表之表鎖內(與後台整表寫入、引用連帶之引用端寫入共鎖, R-WRITE-LOCK-01／02)新鮮讀取庫內全表, 依 srcKey 配對該 from 之庫內列:
+//    新增: 配新 id(targets 例外: 其 id 即標的名稱〔被 pemis.crules 以名稱引用〕, 由 srcKey 衍生, id＝srcKey);
+//    修改: 保留 id, 只寫外部擁有欄位與有帶鍵之外部可選欄位(指派欄), 改名之引用跟著改(R-REF-CASCADE-01);
+//    刪除: 庫有、批次無 → 刪除, 引用依原則 6 連帶清理;
+//    不變: 不寫(零寫入; 冪等).
+//  後台列(from 為空字串)與他 from 之列永不被觸及. 回 { nAdd, nUpdate, nDel, nSame }.
+//欄位歸屬: 外部擁有(批次提供之欄位, 缺鍵視為空值)、外部可選(指派欄 users.cgrups／grups.cpemis／pemis.crules: 有帶鍵才寫、缺鍵保留庫內值, F-23, syncKeep.mjs)、
+//  本系統擁有(伺服器管理欄: 建立者／建立時間／更新者／更新時間, 一律不採批次值). id、srcKey、from 為身分欄: 由本函式寫入, 後台不可改(procCore／externalRows 守門).
+//一次性資料遷移(非呼叫端相容): 既有外部列(舊同步寫入、無 srcKey)於首次匯入時, 批次 srcKey 等於其 id 者視為同一列, 於鎖內補上 srcKey; 其後只認 srcKey, 對不上者依差異同步刪舊增新.
+//寫入中途失敗: 先預檢(整批驗證、引用預檢)攔下可預見之失敗; 寫入階段失敗時補償還原——引用端由 writeWithCascade 還原, 本表由 undoMain 以鎖內讀取之舊列還原(新增者刪除、被刪者與被改者以整列覆寫寫回);
+//  補償亦失敗 → saveWriteFail ＋ srLog(syncAndReplaceTabs-restore-error), 由稽核工具人工處置.
+
+
+let hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k)
+let isEmptyV = (v) => v === undefined || v === null || v === ''
+
+
+//eqV: 同步比對用相等(缺欄／null／'' 視為同一空值; 純量以字串形式比, 數字 1 與字串 '1' 同一〔ORM 欄位型別轉換不致使冪等失效〕; 物件以 JSON 比)
+let eqV = (a, b) => {
+    if (isEmptyV(a) || isEmptyV(b)) {
+        return isEmptyV(a) && isEmptyV(b)
+    }
+    if (typeof a === 'object' || typeof b === 'object') {
+        return JSON.stringify(a) === JSON.stringify(b)
+    }
+    return String(a) === String(b)
+}
+
+
+//isSrcKey: 來源鍵須為非空白字串、UTF-8 位元組數不超過 ORM 主鍵長度上限(targets 之 id 即 srcKey, 受 LMDB 主鍵上限約束; 其餘表統一同一上限)、不含 HTML 標記(會被 clearXSS 改寫者; 送入值即儲存值)
+let isSrcKey = (s) => typeof s === 'string' && s.trim() !== '' && Buffer.byteLength(s, 'utf8') <= maxIdBytes && clearXSS(s) === s
+
+
+//KEY_ASSIGN: 各表之授權指派欄(外部可選); targets 無
+let KEY_ASSIGN = { users: 'cgrups', grups: 'cpemis', pemis: 'crules', targets: null }
+
+
+/**
+ * 建立外部匯入核心
+ *
+ * @param {Object} p 輸入參數物件
+ * @param {Object} p.woItems 輸入 ORM 表物件集合(select／save／delAll)
+ * @param {Function} p.procOrm 輸入 procOrm(userId, 表名, 方法, 資料, opt)
+ * @param {Function} p.lockTabs 輸入 w-serv-orm 實例之 withTabLocks(tableNames, fn)
+ * @param {Object} p.srLog 輸入 srLog
+ * @param {String} [p.mappingBy='id'] 輸入使用者對應鍵('id'｜'email'｜'name')
+ * @param {Boolean} [p.cascadeRename=true] 輸入改名是否連帶更新引用
+ * @returns {Object} 回傳 { syncAndReplaceTabs(userId, inp, keyTable), getSyncWarns() }
+ */
+function syncCore({ woItems, procOrm, lockTabs, srLog, mappingBy = 'id', cascadeRename = true }) {
+
+
+    //syncWarns: 外部同步「同一 from 同名異 srcKey」(疑似來源鍵重編)之提示登錄(記憶體, 重啟即清; 主控定案: 不加開關, 記 warn log 並使頁面可提示):
+    //以「表名＋來源」為鍵, 最近一次同步有此情形者登錄筆數與時間, 已無此情形者清除; 只含表名、來源名稱、筆數、時間, 不含個資.
+    //why 保留(perm-run03 範圍二 5 評估): 差異同步下身分是 srcKey, 「同名異 id」之 id 重編已不存在, 但外部來源若重編 srcKey(如目錄重建後 GUID 全換), 該列等於「刪舊增新」,
+    //引用每次被連帶清理而抹掉後台指派(原則 6: 新實體不繼承)——此風險仍在, 提示仍有價值, 故判定口徑由 id 改為 srcKey(countSrcKeyRenumber), 不移除
+    let kpSyncWarn = new Map()
+    let setSyncWarn = (keyTable, from, n) => {
+        let k = `${keyTable}\u0000${from}`
+        if (n > 0) {
+            kpSyncWarn.set(k, { keyTable, from, n, time: new Date().toISOString() })
+        }
+        else {
+            kpSyncWarn.delete(k)
+        }
+    }
+    let getSyncWarns = () => [...kpSyncWarn.values()]
+
+
+    //syncAndReplaceTabs
+    let syncAndReplaceTabs = async (userId, inp, keyTable) => {
+
+        //序列化同表之並行匯入／後台整表寫入: 防 lost update (同 keyTable 序列化, 不同表並行); 與後台整表寫入(procCore.updateTabItems)共用同一個鎖管理器(w-serv-orm 實例之 withTabLocks, R-LOCK-CORE-01);
+        //有改名或刪除而須改寫引用端時, 於內層依階層再取引用端表之鎖(R-REF-CASCADE-01、R-WRITE-LOCK-02). 外部匯入為不帶基準之寫入(以外部為主, 原則 5): 取表鎖但不比對基準
+        return await withTabLocks(lockTabs, [keyTable], async () => {
+
+            let logErr = (msg, extra = {}) => srLog.error({ event: 'syncAndReplaceTabs-error', msg, keyTable, ...extra })
+
+            //from
+            let from = get(inp, 'from', '')
+            if (!isestr(from)) {
+                logErr('invalidFrom')
+                return Promise.reject(`invalidFrom`)
+            }
+
+            //rows: 空批次拒收(清空某來源須另以明確操作, 防誤清源, ADR-008)
+            let rowsIn = get(inp, 'rows', [])
+            if (!isearr(rowsIn)) {
+                logErr('invalidRows')
+                return Promise.reject(`invalidRows`)
+            }
+
+            //各列須為非空物件(規則帳本 R-ORM-05, 與後台整表寫入共用 isRowObj)
+            let kBadRow = rowsIn.findIndex((v) => !isRowObj(v))
+            if (kBadRow >= 0) {
+                logErr('invalidRows', { reason: 'rowInvalid', from, row: kBadRow })
+                return Promise.reject(`invalidRows`)
+            }
+
+            //idNotAllowed: 內部主鍵 id 由本系統產生, 外部不得指定(含空值; 規格第 9 節): 任一列帶有 id 鍵 → 整批拒收、零寫入. 先於 srcKey 檢查——
+            //仍送 id 者多為舊呼叫方式(以 id 代 srcKey), 先提示移除 id, 再提示補 srcKey
+            let kId = rowsIn.findIndex((v) => hasOwn(v, 'id'))
+            if (kId >= 0) {
+                logErr('idNotAllowed', { from, row: kId, field: 'id' })
+                return Promise.reject(`idNotAllowed`)
+            }
+
+            //srcKey 必填(規格第 5 節): 缺、空白、非字串、過長、含標記 → srcKeyInvalid; 同批重複 → srcKeyDuplicate; 皆整批拒收、零寫入
+            let kSrc = rowsIn.findIndex((v) => !isSrcKey(v.srcKey))
+            if (kSrc >= 0) {
+                logErr('srcKeyInvalid', { from, row: kSrc, field: 'srcKey' })
+                return Promise.reject(`srcKeyInvalid`)
+            }
+            let kSrcDup = findDupIndex(rowsIn, 'srcKey')
+            if (kSrcDup >= 0) {
+                logErr('srcKeyDuplicate', { from, row: kSrcDup, field: 'srcKey' })
+                return Promise.reject(`srcKeyDuplicate`)
+            }
+
+            //keyAssign／hasAssign: 外部可選之指派欄及各列是否自帶該鍵(須於 ltdtmapping 缺鍵補 '' 之前記錄); 缺該鍵者保留庫內值(F-23, 見 syncKeep.mjs)
+            let keyAssign = KEY_ASSIGN[keyTable]
+            let hasAssign = (keyAssign !== null) ? markHasKey(rowsIn, keyAssign) : null
+
+            //rows: 映射到 schema 欄位(缺鍵補 ''; 不在 schema 之鍵剝除), 寫入 from; targets 之 id 即標的名稱, 由 srcKey 衍生(id＝srcKey)
+            let rows = ltdtmapping(rowsIn.map((v) => {
+                let o = { ...v, from }
+                if (keyTable === 'targets') {
+                    o.id = o.srcKey
+                }
+                return o
+            }), ds[keyTable].keys)
+
+            //名稱須為非空字串(規則帳本 R-SYNC-NAME-01): grups／pemis 之 name 缺漏、空字串、非字串一律整批拒收(targets 之 id 即 srcKey, 已於上方保證非空字串; users 之 name 可空)
+            let keyName = (keyTable === 'grups' || keyTable === 'pemis') ? 'name' : null
+            if (keyName !== null) {
+                let kName = rows.findIndex((v) => !isestr(get(v, keyName)))
+                if (kName >= 0) {
+                    logErr('invalidRows', { reason: 'nameInvalid', from, row: kName, field: keyName })
+                    return Promise.reject(`invalidRows`)
+                }
+
+                //群組／權限名稱唯一(F-02, 規則帳本 R-NAME-UNIQ-01): 本批內 name 精確 === 重複整批拒收(他 from／後台列已使用者見下方 nameOtherFrom)
+                let kDup = findDupIndex(rows, 'name')
+                if (kDup >= 0) {
+                    logErr('invalidRows', { reason: 'nameDuplicate', from, row: kDup, field: 'name' })
+                    return Promise.reject(`invalidRows`)
+                }
+            }
+
+            //users 對應鍵批內檢查(F-14, 規則帳本 R-MAPKEY-01): mappingBy 為 'email'／'name' 時, 每個 isActive==='y' 之列該欄位須非空字串且批內唯一; log 不記對應值(個資)
+            if (keyTable === 'users') {
+                let mk = checkMapKeyBatch(rows, mappingBy)
+                if (mk !== null) {
+                    logErr('invalidRows', { reason: mk.reason, from, row: mk.k, field: mappingBy })
+                    return Promise.reject(`invalidRows`)
+                }
+            }
+
+            //寫入前驗證(規則帳本 R-ORM-01): 主鍵(targets 之 id)長度／標記、任一字串欄位含會被 clearXSS 改寫之標記 → htmlMarkupNotAllowed; 其餘 → invalidRows
+            let ve = validateRowsBeforeWrite(rows)
+            if (ve !== null) {
+                let key = (ve.reason === 'htmlMarkup') ? 'htmlMarkupNotAllowed' : 'invalidRows'
+                logErr(key, { reason: ve.reason, from, row: ve.k, field: ve.field })
+                return Promise.reject(key)
+            }
+
+            //rsAll: 庫內全表(表鎖內新鮮讀取, 後續配對、跨 from 檢查、引用規劃共用同一版本); 讀取失敗尚未寫入任何資料, 不回 saveWriteFail
+            let rsAll = null
+            try {
+                rsAll = await woItems[keyTable].select()
+            }
+            catch (err) {
+                let raw = (typeof err === 'string') ? err : ((err && err.message) || String(err))
+                let key = toOutKey(err, 'anUnexpectedErrorOccurred')
+                logErr(key, { raw, from, step: 'select' })
+                return Promise.reject(key)
+            }
+            let objs = rsAll.filter((r) => r !== null && typeof r === 'object')
+            let sameFrom = objs.filter((r) => r.from === from)
+            let others = objs.filter((r) => r.from !== from)
+
+            //跨 from 同名／同對應鍵(F-02／F-14, 規則帳本 R-NAME-UNIQ-01／R-MAPKEY-01): grups／pemis 之 name、users 於 mappingBy 為 email／name 時之該欄位(僅 active 列),
+            //已為其他 from(含後台列)之既有列使用 → 整批拒絕(雙方不變、提示); 同 from 之既有列不算衝突(同批比對後被修改或刪除)
+            let keyOther = (keyName === 'name') ? 'name' : ((keyTable === 'users') ? mapKeyOf(mappingBy) : null)
+            if (keyOther !== null) {
+                let kOther = findKeyOtherFrom(rows, objs, from, keyOther, { onlyActive: keyTable === 'users' })
+                if (kOther >= 0) {
+                    logErr('invalidRows', { reason: (keyTable === 'users') ? 'mapKeyOtherFrom' : 'nameOtherFrom', from, row: kOther, field: keyOther })
+                    return Promise.reject('invalidRows')
+                }
+            }
+
+            //配對(依 srcKey): 庫內該 from 之列有 srcKey 者依其值對應; 無 srcKey 者為遷移前資料(舊同步寫入), 批次 srcKey 等於其 id 者視為同一列並補上 srcKey(一次性資料遷移, 規格第 9 節);
+            //庫內同 from 有重複 srcKey, 或同一 srcKey 同時被兩個庫內列主張(一個有 srcKey、一個以 id 主張)→ 無法唯一配對, 整批拒收(srcKeyConflict), 以稽核／清源工具人工處置
+            let oldBySrc = new Map()
+            let legacyById = new Map()
+            for (let r of sameFrom) {
+                if (isestr(r.srcKey)) {
+                    if (oldBySrc.has(r.srcKey)) {
+                        logErr('srcKeyConflict', { reason: 'dupInDb', from })
+                        return Promise.reject('srcKeyConflict')
+                    }
+                    oldBySrc.set(r.srcKey, r)
+                }
+                else if (isestr(r.id)) {
+                    legacyById.set(r.id, r)
+                }
+            }
+            for (let k of oldBySrc.keys()) {
+                if (legacyById.has(k)) { //同一 srcKey 被兩個庫內列主張(一個已有 srcKey、一個以 id 主張): 與庫內重複 srcKey 同屬庫內資料異常, 不論本批是否帶該鍵一律拒收(外審 sol#2)
+                    logErr('srcKeyConflict', { reason: 'claimTwice', from })
+                    return Promise.reject('srcKeyConflict')
+                }
+            }
+            let matched = rows.map((v) => {
+                let o = oldBySrc.get(v.srcKey)
+                if (o === undefined && legacyById.has(v.srcKey)) {
+                    return { old: legacyById.get(v.srcKey), migrate: true }
+                }
+                return o === undefined ? { old: null, migrate: false } : { old: o, migrate: false }
+            })
+
+            //各列之身分 id: 配對者沿用庫內 id(不變); 新增者配新 id(targets 為 srcKey 衍生之標的名稱——主鍵已被庫內任何其他列占用者整批拒收, 免 insert 對既有主鍵靜默略過; 其餘表產生不撞既有之循序 id)
+            let usedIds = new Set(objs.map((r) => r.id))
+            let idOf = []
+            for (let k = 0; k < rows.length; k++) {
+                let m = matched[k]
+                if (m.old !== null) {
+                    idOf.push(m.old.id)
+                    continue
+                }
+                if (keyTable === 'targets') {
+                    if (usedIds.has(rows[k].id)) {
+                        logErr('invalidRows', { reason: 'idTaken', from, row: k, field: 'srcKey' }) //標的名稱(id)已被其他來源或後台列使用: 與他 from 同鍵(R-SYNC-01 精神)
+                        return Promise.reject('invalidRows')
+                    }
+                    idOf.push(rows[k].id)
+                }
+                else {
+                    let nid = `${genIDSeq()}`
+                    while (usedIds.has(nid)) {
+                        nid = `${genIDSeq()}`
+                    }
+                    idOf.push(nid)
+                }
+                usedIds.add(idOf[k])
+            }
+
+            //外部可選之指派欄: payload 缺該鍵之列保留庫內值(F-23; 指派欄屬後台, 同步不得清掉後台指派; 含該鍵則以外部為準). 身分已由 srcKey 配對(rowsKeep 之 id 即配對到之庫內 id, 新增者為新配之 id),
+            //故 syncKeep 以 id 認列; users 另依實際 mappingBy 做登入對應鍵矛盾檢查(外審 sol#1): mappingBy 為 email／name 時登入以該欄位找使用者, 同 srcKey 之對應鍵值被改成別值、或新值為庫內別列持有,
+            //保留指派會使該登入值取得原擁有者之授權(換主移轉, 增權), 一律不保留並記 warn(收嚴＋提示, 同 perm-run03 之前的行為); 改名而 cascadeRename 為假者不保留(keepAssignByEntity, 引用不跟著改時名稱即授權身分)
+            let rowsKeep = rows.map((v, k) => ({ ...v, id: idOf[k] }))
+            if (keyAssign !== null && hasAssign.some((b) => b === false)) {
+                //isKeepable: 保留值須能通過與外部寫入同一套寫入前驗證(外審 sol R4): 不通過者不保留(視為空, 收嚴), 只記筆數
+                let isKeepable = (val) => validateRowsBeforeWrite([{ id: 'keep', [keyAssign]: val }]) === null
+                let kr = (keyTable === 'users') ? keepAssignOnMissing({ rows: rowsKeep, hasKey: hasAssign, rowsOldSameFrom: sameFrom, mappingBy, isKeepable }) : keepAssignByEntity({ rows: rowsKeep, hasKey: hasAssign, rowsOldSameFrom: sameFrom, key: keyAssign, cascadeRename, isKeepable })
+                rowsKeep = kr.rows
+                if (kr.nKeep > 0) {
+                    srLog.info({ event: 'syncAndReplaceTabs-keepAssign', keyTable, from, field: keyAssign, n: kr.nKeep })
+                }
+                if (kr.nSkip > 0) {
+                    srLog.warn({ event: 'syncAndReplaceTabs-keepAssign-skip', keyTable, from, field: keyAssign, n: kr.nSkip, reason: 'notKeepable' })
+                }
+                if (kr.nConflict > 0) {
+                    srLog.warn({ event: 'syncAndReplaceTabs-keepAssign-skip', keyTable, from, field: keyAssign, n: kr.nConflict, reason: 'identityConflict' }) //改名而引用不跟著改、或 users 登入對應鍵矛盾(email／name 被改或為別列持有): 指派不移轉而清空(收嚴須附提示; 不含個資值)
+                }
+            }
+
+            //差異分類: 外部擁有欄位(schema 欄位扣除 id／srcKey／from／伺服器管理欄／指派欄; 含 order——外部列之順序由外部擁有)與指派欄(缺鍵者已於上方換成庫內值)任一不同、或需補 srcKey(遷移)即修改; 皆同即不變
+            let keysExt = ds[keyTable].keys.filter((k) => k !== 'id' && k !== 'srcKey' && k !== 'from' && k !== keyAssign && SERVER_FIELDS.indexOf(k) < 0)
+            let keysCmp = keyAssign !== null ? [...keysExt, keyAssign] : keysExt
+            let adds = []
+            let upds = []
+            let updPre = []
+            let nSame = 0
+            let nMigrate = 0
+            let postById = new Map() //修改後之列(供規劃改名), 以庫內 id 為鍵
+            rowsKeep.forEach((v, k) => {
+                let m = matched[k]
+                if (m.old === null) {
+                    adds.push({ ...v, id: idOf[k], srcKey: v.srcKey, from })
+                    return
+                }
+                let o = m.old
+                let isDiff = m.migrate || keysCmp.some((f) => !eqV(v[f], o[f]))
+                if (!isDiff) {
+                    nSame++
+                    return
+                }
+                if (m.migrate) {
+                    nMigrate++
+                }
+                let w = { ...o }
+                keysCmp.forEach((f) => {
+                    w[f] = v[f]
+                })
+                w.srcKey = v.srcKey
+                w.from = from
+                upds.push(w)
+                updPre.push({ ...o })
+                postById.set(o.id, w)
+            })
+            let matchedIds = new Set(matched.filter((m) => m.old !== null).map((m) => m.old.id))
+            let dels = sameFrom.filter((r) => !matchedIds.has(r.id))
+
+            //引用連帶(適用表 m／n, R-REF-CASCADE-01): 以「寫入後整表」＝他 from 之列＋同 from 存續者（含修改後）＋新增者, 與寫入前整表比對——同 id 異名＝改名級聯(srcKey 同、名稱變)、
+            //舊 id 不在寫入後整表＝刪除而連帶清理引用(寫入後仍存續之同名者不清理). 預檢(新名撞懸空名、歷史同名組改名、容器內相撞、改寫後欄位驗證)於任何寫入之前, 被拒整批零變更.
+            //是否須改寫引用端只依本表新舊列判定(diffRefTargets), 持有本表鎖之下即可決定是否再取引用端表之鎖(R-WRITE-LOCK-02); 取齊鎖之後才讀取引用端、規劃與預檢
+            let rowsPlan = null
+            let kind = null
+            if (hasOwn(REF_OF, keyTable)) {
+                let survivors = sameFrom.filter((r) => matchedIds.has(r.id)).map((r) => postById.get(r.id) || r)
+                rowsPlan = { rowsOld: objs, rowsNew: [...others, ...survivors, ...adds] }
+                kind = diffRefTargets({ keyTable, rowsOld: rowsPlan.rowsOld, rowsNew: rowsPlan.rowsNew, opt: { cascadeRename } })
+
+                //外部來源鍵重編之偵測(見檔頭 syncWarns): 只適用有 name 之 grups／pemis(users 之 name 可重複, targets 之 id 即 srcKey)
+                if (keyTable === 'grups' || keyTable === 'pemis') {
+                    let nRenum = countSrcKeyRenumber(sameFrom, rows)
+                    setSyncWarn(keyTable, from, nRenum)
+                    if (nRenum > 0) {
+                        srLog.warn({ event: 'syncAndReplaceTabs-srcKeyRenumber', keyTable, from, n: nRenum })
+                    }
+                }
+            }
+
+            let result = { nAdd: adds.length, nUpdate: upds.length, nDel: dels.length, nSame }
+            let info = () => srLog.info({ event: 'syncAndReplaceTabs-diff', keyTable, from, userId, ...result, nMigrate })
+
+            //無任何變更: 零寫入(冪等; 表之基準不變)
+            if (adds.length === 0 && upds.length === 0 && dels.length === 0) {
+                info()
+                return result
+            }
+
+            //writeMain: 刪除 → 新增 → 修改(同後台整表寫入之次序); 任一步失敗即以鎖內讀取之舊列補償還原本表(逐步冪等, 不論做到哪一步皆可無條件全做): 新增者以 id 刪除、被刪者與被改者以整列覆寫寫回(upsert, merge:false);
+            //還原失敗 → saveWriteFail ＋ srLog; 還原成功後重新拋出原錯誤(外層轉 saveWriteFail 並記 raw)
+            let writeMain = async () => {
+                try {
+                    if (dels.length > 0) {
+                        await procOrm(userId, keyTable, 'del', dels, { mustExist: true })
+                    }
+                    if (adds.length > 0) {
+                        await procOrm(userId, keyTable, 'insert', adds)
+                    }
+                    if (upds.length > 0) {
+                        await procOrm(userId, keyTable, 'save', upds, { mustExist: true })
+                    }
+                }
+                catch (err) {
+                    let okUndo = true
+                    try {
+                        if (adds.length > 0) {
+                            await woItems[keyTable].delAll({ id: { $in: adds.map((a) => a.id) } })
+                        }
+                        let back = [...dels, ...updPre].map((r) => ({ ...r }))
+                        if (back.length > 0) {
+                            let rs = await woItems[keyTable].save(back, { merge: false })
+                            if (Array.isArray(rs) ? rs.some((v) => v && v.ok === 0) : (rs !== null && typeof rs === 'object' && rs.ok === 0)) { //逐筆結果陣列(或單一結果物件)有 ok:0 即還原失敗(外審 beam#1)
+                                okUndo = false
+                            }
+                        }
+                    }
+                    catch (errUndo) {
+                        okUndo = false
+                    }
+                    if (!okUndo) {
+                        srLog.error({ event: 'syncAndReplaceTabs-restore-error', msg: 'saveWriteFail', keyTable, from, userId, nAdd: adds.length, nUpdate: upds.length, nDel: dels.length })
+                        return Promise.reject('saveWriteFail')
+                    }
+                    srLog.warn({ event: 'syncAndReplaceTabs-restored', keyTable, from, userId, nAdd: adds.length, nUpdate: upds.length, nDel: dels.length })
+                    return Promise.reject(err)
+                }
+            }
+
+            //doWrite: ORM／I/O 失敗之原文只入 srLog, 外部應用收 saveWriteFail(規則帳本 R-ORM-02); 引用端先寫、失敗補償還原(cascadeWrite.mjs)
+            let doWrite = async (plan, holdersOld) => {
+                try {
+                    await writeWithCascade({ plan, holdersOld, woItems, procOrm, userId, srLog, writeMain })
+                }
+                catch (err) {
+                    let raw = (typeof err === 'string') ? err : ((err && err.message) || String(err))
+                    let key = toOutKey(err)
+                    if (key === 'saveCascadePartial') {
+                        key = 'saveWriteFail' //引用端補償失敗(雙重故障): 同步端點之固定錯誤契約為 saveWriteFail(規格 §5.6); 引用端懸空由 cascadeWrite 之 refCascade-restore-error 供稽核(外審 sol#3)
+                    }
+                    logErr(key, { raw, from })
+                    return Promise.reject(key)
+                }
+                info()
+                return result
+            }
+
+            //有改名或刪除: 再取引用端表之鎖, 讀取引用端、規劃、預檢後寫入
+            if (kind !== null && (kind.renames.length > 0 || kind.delNames.length > 0)) {
+                let holder = REF_OF[keyTable].holder
+                return await withTabLocks(lockTabs, [holder], async () => {
+                    let holdersOld = null
+                    try {
+                        holdersOld = await woItems[holder].select()
+                    }
+                    catch (err) {
+                        let raw = (typeof err === 'string') ? err : ((err && err.message) || String(err))
+                        let key = toOutKey(err, 'anUnexpectedErrorOccurred')
+                        logErr(key, { raw, from, step: 'select' })
+                        return Promise.reject(key)
+                    }
+                    let plan = planRefChanges({ keyTable, rowsOld: rowsPlan.rowsOld, rowsNew: rowsPlan.rowsNew, holdersOld, opt: { cascadeRename } })
+                    let errPlan = plan.err !== null ? plan.err : checkCascadePlan(plan)
+                    if (errPlan !== null) {
+                        let key = (errPlan === 'htmlMarkupNotAllowed') ? 'htmlMarkupNotAllowed' : 'invalidRows'
+                        logErr(key, { reason: errPlan, from })
+                        return Promise.reject(key)
+                    }
+                    return await doWrite(plan, holdersOld)
+                }, [keyTable])
+            }
+
+            return await doWrite(null, [])
+
+        })
+    }
+
+
+    return { syncAndReplaceTabs, getSyncWarns }
+}
+
+
+export default syncCore

@@ -15,6 +15,7 @@ import cloneDeep from 'lodash-es/cloneDeep.js'
 import cacheSt from 'wsemi/src/cacheSt.mjs'
 import ds from '../src/schema/index.mjs'
 import proc from '../server/procCore.mjs'
+import { autoDecl } from './tools/declHelper.mjs'
 import createLockSave from '../server/lockSave.mjs'
 import { mkTable, mkCore, mkSrLog } from './tools/unitOrm.mjs'
 
@@ -82,7 +83,7 @@ describe('unit-procCore-nameUniq (後台整表寫入之群組／權限名稱唯�
         let { srLog, logs } = mkSrLog()
         let cst = cacheSt()
         let core = mkCore(ds, woItems) //perm-run01: 原 mkProcOrm(ds, woItems)＋kmx: pmKeyMutex() 改 mkCore(真 WServOrm 之 procOrm／withTabLocks／guardWrite)
-        let pc = proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) })
+        let pc = autoDecl(proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) }), woItems)
         env = { seed, woItems, logs, cst, pc }
         return env
     }
@@ -452,7 +453,7 @@ describe('unit-procCore-nameUniq (後台整表寫入之群組／權限名稱唯�
         let { srLog } = mkSrLog()
         let cst = cacheSt()
         let core = mkCore(ds, woItems) //perm-run01: 原 mkProcOrm＋kmx 改 mkCore
-        let pc = proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) })
+        let pc = autoDecl(proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) }), woItems)
         let dupU = [...(await woItems.users.select()), { ...users[0], id: 'id-u3', email: 'b@example.com' }]
         let r1 = await pc.updateUsers('id-admin', dupU).then(() => null, (e) => e)
         assert.strict.equal(r1, 'saveRowFieldDuplicate')

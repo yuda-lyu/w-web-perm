@@ -2,7 +2,7 @@
 export default {
     table: 'targets',
     pk: 'id',
-    fields: ['description', 'from'],
+    fields: ['description', 'from', 'srcKey'], //srcKey: 外部匯入之來源鍵(身分欄, 見 users.mjs; 外部匯入時 id＝srcKey)
     serverOnly: ['userId', 'timeCreate', 'userIdUpdate', 'timeUpdate'],
     orderKey: 'order',
 }

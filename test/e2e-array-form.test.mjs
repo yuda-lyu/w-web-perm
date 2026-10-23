@@ -30,13 +30,19 @@
 //  ②AF-035: 被勾選啟用之 john-off 須為後台列(外部列之身分欄與 isActive 唯讀, 後台無從編輯), 前置改以後台寫入 RPC 新增停用之同名使用者(對應鍵仍於新增當時之預設 id, 其後才重啟為 name);
 //  ③AF-036／037／038／039／041: 被改名／刪除之主體(群組／權限)與引用端夾具改為後台列(經 updateXxx 新增), 唯「外部來源之引用端」(ren-ext／ren-gx／del-ue／del-ge)只能經同步端點建立(後台新增外部列被拒 saveFromNotAllowed),
 //  其 cgrups／cpemis 為指派欄, 由伺服端引用連帶改寫(不受守門限制); 另把夾具建立移入 try(夾具中途失敗仍走 finally 還原, 否則殘列使後續案誤報重複).
+//perm-run03(外部匯入改依來源鍵 srcKey 差異同步; R-IMPORT-01、規格 C:\opensrcOper\dspec\外部匯入之定義與機制.md): 同步端點不再收 id(帶 id 整批拒收 idNotAllowed)、每列須帶 srcKey; 外部列之 id 由伺服端產生(新增配新 id、修改保留 id)。
+//  ①本檔各外部列夾具之 id 欄(U_ID／id-arr-g／id-ren-ext 等)改為「標籤」＝送入同步端點之 srcKey(本檔 syncRows／seedArrayForm 送出時改送 srcKey 並丟掉 id);
+//  ②凡以標籤當真實 id 者(getResolvedActiveTargets〔getPermUserInfor 依 id 查〕、readDbField、rowOfSnap、列比對)一律先經 realId／srcKey 解析——見檔內 realId、getResolvedActiveTargets 包裝、keyOf;
+//  ③同分區再送一批為差異同步(依 srcKey 新增／修改／刪除／不變), 不再整批取代: 每案 beforeEach 重送夾具 → 被前案改過之夾具列依 srcKey 還原為夾具值(夾具各列皆帶 cgrups／cpemis／crules 鍵, 指派欄亦被還原);
+//  ④AF-014a／b／e 之 reverseTableByOtherEnd: 外部列以同 srcKey 重送並給反序 order(依 srcKey 對應, 非依 id)。
+//  後台列夾具(editTable／seedExtra 旁路寫庫)之 id 不變, 仍以 id 比對。本檔無「以外部同步建立之使用者登入」之案例(全程以預設管理者登入), 故不受 users.mappingBy='id' 待裁示之影響。
 //跑法: npx mocha test/e2e-array-form.test.mjs --timeout 300000
 import assert from 'assert'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import JSON5 from 'json5'
-import { startServersOnce, launchBrowser, openApp, saveAndWaitModal, clickSave, assertModalMsg, dismissResultModal, gotoUsers, gotoGrups, gotoPemis, toggleDialogEnable, clickDialogSave, clickDialogClose, waitDialogClosed, openBelongDialog, saveBelongAndWaitModal, getResolvedActiveTargets, setDialogMode, apiBaseUrl, clickAdd, typeIntoCell, waitUntilExist, setLang, checkRow, iconBtn, MDI, DLG_MDI, dlgBtn, readDialogChipsRow, restartBackend, genTempSettings } from './tools/e2e-setup.mjs'
+import { startServersOnce, launchBrowser, openApp, saveAndWaitModal, clickSave, assertModalMsg, dismissResultModal, gotoUsers, gotoGrups, gotoPemis, toggleDialogEnable, clickDialogSave, clickDialogClose, waitDialogClosed, openBelongDialog, saveBelongAndWaitModal, getResolvedActiveTargets as getResolvedActiveTargetsById, setDialogMode, apiBaseUrl, clickAdd, typeIntoCell, waitUntilExist, setLang, checkRow, iconBtn, MDI, DLG_MDI, dlgBtn, readDialogChipsRow, restartBackend, genTempSettings } from './tools/e2e-setup.mjs'
 import { callRpc, TOKEN_ADMIN, TOKEN_APP, readTables, restoreTables } from './tools/api-setup.mjs'
 
 const FROM = 'appArrForm'
@@ -109,20 +115,40 @@ FIX.users.push(
     { id: 'id-rs-u2', order: 108, name: 'rs-u2', email: MAIL('rs-u2'), isAdmin: 'n', isActive: 'y', cgrups: JSON.stringify({ 'rs-g2': ON() }) },
 )
 
-//經外部同步端點寫入陣列形式夾具(app token; 以 from 為界全量取代, 每案前重寫即還原)
+//經外部同步端點寫入陣列形式夾具(app token; 以 from 為界依 srcKey 差異同步, 每案前重送即還原: 已存在之夾具列依 srcKey 修改回夾具值、不存在者新增)
 async function seedArrayForm() {
     for (const kt of ['pemis', 'grups', 'users']) {
-        const url = `${apiBaseUrl}/syncAndReplaceTabs?keyTable=${kt}&token=${encodeURIComponent(TOKEN_APP)}`
-        const res = await (await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify({ from: FROM, rows: FIX[kt].map((v) => ({ ...v, from: FROM })) }) })).json()
-        assert.ok(res.state === 'success', `夾具 ${kt} 寫入應成功, 實得 ${JSON.stringify(res)}`)
+        await syncRows(kt, FIX[kt], FROM)
     }
 }
 
-//另一個 from 分區的同步寫入(app token; 以 from 為界全量取代該分區, 不動夾具分區 FROM): 供「壞 JSON 列」等一次性夾具(run03 AF-013c); 收尾同樣由 restoreTables 還原
+//外部同步端點之寫入(app token; 以 from 為界依 srcKey 差異同步): 夾具列之 id 欄是標籤, 送出時改為 srcKey 並丟掉 id(同步端點不收 id); 回傳伺服端結果 { nAdd, nUpdate, nDel, nSame }。
+//  供夾具分區 FROM 與其他 from 分區(「壞 JSON 列」等一次性夾具, run03 AF-013c; 不動夾具分區 FROM); 收尾同樣由 restoreTables 還原
 async function syncRows(kt, rows, from) {
     const url = `${apiBaseUrl}/syncAndReplaceTabs?keyTable=${kt}&token=${encodeURIComponent(TOKEN_APP)}`
-    const res = await (await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify({ from, rows: rows.map((v) => ({ ...v, from })) }) })).json()
+    const body = rows.map((v) => {
+        const { id, ...rest } = v
+        return { ...rest, srcKey: (typeof v.srcKey === 'string' && v.srcKey !== '') ? v.srcKey : id, from }
+    })
+    const res = await (await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify({ from, rows: body }) })).json()
     assert.ok(res.state === 'success', `夾具 ${kt}(${from}) 寫入應成功, 實得 ${JSON.stringify(res)}`)
+    return res.msg
+}
+
+//列的身分鍵: 外部列為 srcKey(夾具標籤), 後台列為 id(後台列 srcKey 恆空)——供「以夾具標籤排除／找列」之比對(外部列之真實 id 由伺服端產生, 不等於標籤)
+function keyOf(row) {
+    return (typeof row.srcKey === 'string' && row.srcKey !== '') ? row.srcKey : row.id
+}
+//夾具標籤 → 庫內真實 id: 先以 id 找(後台列、已是真實 id 者), 找不到再以 srcKey 找(外部列夾具); 皆無則原樣回傳(由呼叫端之後續斷言／查詢失敗)
+async function realId(kt, label) {
+    const r = await callRpc(`${kt}.select`, [], TOKEN_ADMIN)
+    const rows = (r.ok && Array.isArray(r.output)) ? r.output : []
+    const hit = rows.find((v) => v.id === label) || rows.find((v) => v.srcKey === label)
+    return hit ? hit.id : label
+}
+//端到端授權(getPermUserInfor 依真實 id 查): 參數可為真實 id 或外部列夾具標籤(經 realId 解析), 其餘同 e2e-setup 之 getResolvedActiveTargets
+async function getResolvedActiveTargets(page, idOrLabel) {
+    return await getResolvedActiveTargetsById(page, await realId('users', idOrLabel))
 }
 
 //「另一端把 users／grups 整表反序」(AF-014a／b／e; run07): 外部列之 order 由外部擁有, 後台整表寫入(updateXxx)不改其 order(伺服端還原為庫內值, R-EXT-OWN-01), 單以 updateXxx 反序只會重排後台列、外部列不動;
@@ -139,9 +165,10 @@ async function reverseTableByOtherEnd(kt) {
     assert.ok(exts.length > 0 && exts.every((v) => v.from === FROM), `前提: ${kt} 之外部列皆屬夾具分區 ${FROM}(其他分區之列不在本函式之重排範圍), 實得 ${JSON.stringify(exts.map((v) => [v.id, v.from]))}`)
     const resp = await callRpc(fn, [reversed], TOKEN_ADMIN)
     assert.ok(resp.ok, `另一端(另一位管理者)重排後台列 ${fn} 應成功, 實得 ${JSON.stringify(resp)}`)
-    const pos = new Map(reversed.map((v, i) => [v.id, i + 1]))
-    assert.ok(FIX[kt].every((v) => pos.has(v.id)), `前提: 夾具分區 ${FROM} 之 ${kt} 皆在現況表內`)
-    await syncRows(kt, FIX[kt].map((v) => ({ ...v, order: pos.get(v.id) })), FROM)
+    //perm-run03: 外部列之 id 由伺服端產生, 夾具標籤是 srcKey → 以 srcKey 對應其在反序整表中之位置(外部列 srcKey 非空; 後台列 srcKey 空, 不入此表)
+    const pos = new Map(reversed.filter((v) => typeof v.srcKey === 'string' && v.srcKey !== '').map((v) => [v.srcKey, reversed.indexOf(v) + 1]))
+    assert.ok(FIX[kt].every((v) => pos.has(v.id)), `前提: 夾具分區 ${FROM} 之 ${kt} 皆在現況表內(依 srcKey)`)
+    await syncRows(kt, FIX[kt].map((v) => ({ ...v, order: pos.get(v.id) })), FROM) //同 srcKey 重送並給反序 order: 依 srcKey 修改 order(id 不變)
     const now = (await readTables())[kt]
     assert.deepStrictEqual(now.map((v) => v.id), reversed.map((v) => v.id), `前提: 另一端重排後 DB 之 ${kt} 列序應為原列序之反序`)
     return reversed
@@ -200,7 +227,7 @@ async function waitDlgReorder(page, names) {
 //讀庫內某表某 id 之欄位(經資料通道 select; 不經瀏覽器狀態)
 async function readDbField(kt, id, field) {
     const r = await callRpc(`${kt}.select`, [], TOKEN_ADMIN)
-    const row = (r.output || []).find((v) => v.id === id)
+    const row = (r.output || []).find((v) => v.id === id) || (r.output || []).find((v) => v.srcKey === id) //perm-run03: 外部列夾具之標籤是 srcKey(真實 id 由伺服端產生)
     assert.ok(row, `${kt} 應有 ${id}`)
     return row[field]
 }
@@ -796,7 +823,7 @@ describe('e2e-array-form (陣列形式授權資料: 編輯器顯示與存檔, �
     })
 
     //第二輪外審 minimax2 R1／R2: 「所屬使用者」對話框三顆批次按鈕(全選／全取消／反選)以使用者 id 定位列; 修前(以 name)同名使用者時改到另一位, 第一版以 id 但取資料來源為 getDisplayData(不含 id)而三顆按鈕完全失效——
-    //此二者靜態不變式都抓不到, 須真瀏覽器點按鈕. 夾具: 另一個 from 分區同步寫入兩位同名使用者(dup-same, 不同 id／email).
+    //此二者靜態不變式都抓不到, 須真瀏覽器點按鈕. 夾具: 另一個 from 分區同步寫入兩位同名使用者(dup-same, 不同 srcKey〔庫內 id 由伺服端各自產生〕／email).
     it('AF-015-bulk-toggle-buttons-by-id: 「所屬使用者」對話框之全選／全取消／反選對全部列生效, 含兩位同名使用者(以 id 定位, 不以 name)', async function() {
         await syncRows('users', [
             { id: 'id-dup-1', order: 130, name: 'dup-same', email: 'dup1@example.com', isAdmin: 'n', isActive: 'y', cgrups: '{}' },
@@ -1357,7 +1384,7 @@ async function snapAll() {
 }
 //run06: 快照中某表某 id 之列
 function rowOfSnap(snapKt, id) {
-    const r = snapKt.find((v) => v.id === id)
+    const r = snapKt.find((v) => v.id === id) || snapKt.find((v) => v.srcKey === id) //perm-run03: 外部列夾具之標籤是 srcKey(真實 id 由伺服端產生)
     assert.ok(r, `快照應有 ${id}`)
     return r
 }
@@ -1526,7 +1553,7 @@ describe('e2e-array-form run05 衝突之收嚴與提示 (R-PRINCIPLE-00; 語意�
                     assert.deepEqual(o['權限群組M1'], { mode: 'OR', isActive: 'y' }, 'M1 不變')
                     assert.strict.equal(o['權限群組M2']?.isActive, 'y', '新增 M2 之啟用項')
                     const after = await selectAll('users')
-                    for (const u of after.filter((v) => v.id !== 'id-dang-u')) {
+                    for (const u of after.filter((v) => keyOf(v) !== 'id-dang-u')) { //dang-u 為外部列(標籤 id-dang-u 是 srcKey, 真實 id 由伺服端產生)
                         assert.strict.equal(u.cgrups, before.find((v) => v.id === u.id).cgrups, `${u.name} 之 cgrups 不變`)
                     }
                     assert.deepEqual(await getResolvedActiveTargets(page, 'id-dang-u'), [], '儲存後仍為空(MX 之 AND 限制保留; 修前丟棄而變為非空)')
@@ -1646,7 +1673,7 @@ describe('e2e-array-form run05 衝突之收嚴與提示 (R-PRINCIPLE-00; 語意�
                     assert.deepEqual(o['權限P1'], { mode: 'OR', isActive: 'y' }, 'P1 不變')
                     assert.strict.equal(o['權限P2']?.isActive, 'y', '新增 P2 之啟用項')
                     const after = await selectAll('grups')
-                    for (const g of after.filter((v) => v.id !== 'id-dang-g')) {
+                    for (const g of after.filter((v) => keyOf(v) !== 'id-dang-g')) { //dang-g 為外部列(標籤是 srcKey)
                         assert.strict.equal(g.cpemis, before.find((v) => v.id === g.id).cpemis, `${g.name} 之 cpemis 不變`)
                     }
                     assert.deepEqual(await getResolvedActiveTargets(page, 'id-dang-gu'), [], '儲存後仍為空(PX 之 AND 限制保留)')
@@ -1954,8 +1981,8 @@ describe('e2e-array-form run05 衝突之收嚴與提示 (R-PRINCIPLE-00; 語意�
                     }
                     const us = await selectAll('users')
                     assert.strict.equal(us.find((u) => u.id === 'id-for-peter').description, desc, 'peter 之說明已更新')
-                    for (const id of ['id-dup-a', 'id-dup-b']) {
-                        const u = us.find((v) => v.id === id)
+                    for (const id of ['id-dup-a', 'id-dup-b']) { //dupA／dupB 為外部列(標籤是 srcKey, 真實 id 由伺服端產生)
+                        const u = us.find((v) => keyOf(v) === id)
                         assert.ok(u && u.name === 'dup-n' && u.email === 'dup-shared@example.com', `${id} 仍在且 name／email 不變`)
                     }
                 })
@@ -1980,7 +2007,7 @@ describe('e2e-array-form run05 衝突之收嚴與提示 (R-PRINCIPLE-00; 語意�
                     await dismissResultModal(page)
                     let us = await selectAll('users')
                     assert.strict.equal(us.find((u) => u.id === 'id-for-peter').description, desc, 'peter 之說明已更新')
-                    assert.strict.equal(us.find((u) => u.id === 'id-noemail-u').email, '', 'noemail-u 之 email 仍為空字串')
+                    assert.strict.equal(us.find((u) => keyOf(u) === 'id-noemail-u').email, '', 'noemail-u 之 email 仍為空字串') //外部列(標籤是 srcKey)
                     const n0 = us.length
                     await clickAdd(page)
                     await typeIntoCell(page, 0, 'name', 'run05-new-u')
@@ -2551,7 +2578,7 @@ describe('e2e-array-form run06 引用連帶: 改名預覽確認、刪除確認�
                     const gy = JSON.parse(rowOfSnap(after.grups, 'id-ren-gy').cpemis)
                     assert.ok(Array.isArray(gy), 'ren-gy 仍為陣列形式')
                     assert.deepEqual(gy, [{ name: 'ren-p-new', mode: 'OR', isActive: 'y' }, { name: '權限P2', mode: 'OR', isActive: 'y' }], 'ren-gy 之引用已改為 ren-p-new(P2 項與次序不變)')
-                    for (const g of after.grups.filter((v) => !['id-ren-g1', 'id-ren-gx', 'id-ren-gy'].includes(v.id))) {
+                    for (const g of after.grups.filter((v) => !['id-ren-g1', 'id-ren-gx', 'id-ren-gy'].includes(keyOf(v)))) { //ren-gx 為外部列(標籤是 srcKey), 以 keyOf 排除
                         assert.deepEqual(g, rowOfSnap(db0.grups, g.id), `群組 ${g.name} 未引用 ren-p: 整列逐位元不動`)
                     }
                     assert.deepEqual(after.users, db0.users, 'users 表不動')
@@ -2622,7 +2649,7 @@ describe('e2e-array-form run06 引用連帶: 改名預覽確認、刪除確認�
                     assert.deepEqual(JSON.parse(rowOfSnap(after.grups, 'id-del-gd').cpemis), P2_OR, 'del-gd(停用之 AND 引用者)之 cpemis 只剩 P2(停用項亦被清理)')
                     assert.deepEqual(JSON.parse(rowOfSnap(after.grups, 'id-del-ge').cpemis), P1_OR, 'del-ge(外部來源之 AND 引用者)之 cpemis 只剩 P1')
                     assert.strict.equal(rowOfSnap(after.grups, 'id-del-ge').from, 'teamA', 'del-ge 之來源仍為 teamA')
-                    for (const g of after.grups.filter((v) => !['id-del-go', 'id-del-ga', 'id-del-gd', 'id-del-ge'].includes(v.id))) {
+                    for (const g of after.grups.filter((v) => !['id-del-go', 'id-del-ga', 'id-del-gd', 'id-del-ge'].includes(keyOf(v)))) { //del-ge 為外部列(標籤是 srcKey), 以 keyOf 排除
                         assert.deepEqual(g, rowOfSnap(db0.grups, g.id), `群組 ${g.name} 未引用 del-p: 整列逐位元不動`)
                     }
                     assert.deepEqual(after.users, db0.users, 'users 表不動')

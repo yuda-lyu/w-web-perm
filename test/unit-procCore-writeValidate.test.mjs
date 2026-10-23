@@ -11,6 +11,7 @@ import cloneDeep from 'lodash-es/cloneDeep.js'
 import cacheSt from 'wsemi/src/cacheSt.mjs'
 import ds from '../src/schema/index.mjs'
 import proc from '../server/procCore.mjs'
+import { autoDecl } from './tools/declHelper.mjs'
 import * as procMod from '../server/procCore.mjs'
 import createLockSave from '../server/lockSave.mjs'
 import { mkTable, mkCore, mkSrLog } from './tools/unitOrm.mjs'
@@ -87,7 +88,7 @@ describe('unit-procCore-writeValidate (寫入前驗證與寫入失敗回 key, AD
         let { srLog, logs } = mkSrLog()
         let cst = cacheSt()
         let core = mkCore(ds, woItems) //perm-run01: 原 mkProcOrm＋kmx: pmKeyMutex() 改 mkCore
-        let pc = proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) })
+        let pc = autoDecl(proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) }), woItems)
         env = { seed, woItems, logs, cst, pc }
         return env
     }
@@ -211,7 +212,7 @@ describe('unit-procCore-writeValidate (寫入前驗證與寫入失敗回 key, AD
         let { srLog } = mkSrLog()
         let cst = cacheSt()
         let core = mkCore(ds, woItems) //perm-run01: 原 mkProcOrm＋kmx 改 mkCore
-        let pc = proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) })
+        let pc = autoDecl(proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) }), woItems)
         env = { cst }
         let rows = (await woItems.targets.select()).sort((a, b) => a.order - b.order)
         rows[0].description = 'changed'

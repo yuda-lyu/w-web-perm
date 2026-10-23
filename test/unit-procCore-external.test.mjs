@@ -25,7 +25,7 @@
 //  EXT-S7 用戶端 opt 只採納 baseline 與 returnRows(updateTargets／Pemis／Grups 經 pickClientOpt; updateUsers 經 WWebPerm 之 kpFunExt 亦經 pickClientOpt, 再加伺服端之 pickKeysOnly).
 //
 //輸入空間表(軸 × 案數; 案數為 mocha 實測, 共 334 案〔run07 U1b 修訂: 238 → 291, +A02b 4、+SITE-EX-003b 1、+O 區段 48; run07 U1c 修訂: 291 → 307, +J 區段 EXT-J03 重複 id 基準 12、+EXT-J03b 對照 4;
-//  perm-run01 修訂: 307 → 334〔含重新點算前即已存在而未入表之差 +6〕, +C05b 名次改變 4、+J01 三種 h1 形似壞基準 12、+J04 舊版指紋基準 4、+G11 pickClientOpt 1〕; 軸與格之展開見各 describe):
+//  perm-run01 修訂: 307 → 334〔含重新點算前即已存在而未入表之差 +6〕, +C05b 名次改變 4、+J01 三種 h1 形似壞基準 12、+J04 舊版指紋基準 4、+G11 pickClientOpt 1〕; perm-run03 修訂: +SITE-EX-013 requireAdmin 先於 pc.updateXxx 1; 軸與格之展開見各 describe):
 //  A 守門拒收    22 項(A01 逐表×違規種類: 新增非空 from／複製繼承 from／非字串 from×3(null,123,true)／刪外部列／改外部 from×2(''、pz)／改鎖定欄 description／改身分欄 name|email／後台改成外部 pz, 共 11 種 × 表 4, targets 無身分欄故 43 案)＋ A02 復活(未帶基準 → 守門)4 ＋ A02b 復活(附基準 → saveStale/rowRemoved)4 ＋ A03 多違規 froms ＋ A04 整次拒收不靜默 ＋ A05 指派欄可寫 = 54; 每案斷言 key、四表逐位元不變且零寫入、集中 errLog、external-error 欄位(keyTable／userId／msg／reason／n／froms)
 //  B 指派欄      表 3(users／grups／pemis)× {有基準可寫, 無基準 saveBaselineRequired, 基準過期 saveStale, 後台列無基準舊行為} 12 ＋ targets 無指派欄 ＋ 外部指派與後台編修並行寫入 ＋ 無外部 diff 無須基準 = 15
 //  C B.1 過期    表 4 × {他人改同列, 他人新增列而草稿將其刪除, 草稿原樣帶回他人新增列(舊基準 → saveStale/rowAdded; 重新載入後成功), 復活他人已刪列, 同版與外部同步重寫伺服器欄／order 數值(名次不變, 不作廢)} 20 ＋ [perm-run01] C05b 外部同步使外部列名次改變 → saveStale/rowReordered 4 ＋ 表 3 外部指派被他人改後送回舊值 3 ＋ 基準先於守門(C07 外部說明被同步改、C08 外部列被同步移除; 原為「守門先於基準」之舊語意, 已重寫)2 ＋ 表 4 空基準 [](≠未帶基準)4 = 33
@@ -42,7 +42,7 @@
 //  M 並行        同表兩操作者同基準(後台列、外部指派)2 ＋ 跨表 1 ＋ 鎖內比對(等待鎖期間他人已改／已納為外部列)2 = 5
 //  O 基準先於守門(run07 修訂; run11 表級改寫: C-1 他人新增 X 後以舊基準送出即 saveStale/rowAdded, 重新載入後成功)  表 4 ×{C-1 舊基準 saveStale 後重新載入成功, X 被再改而帶舊版 saveStale/rowAdded, 基準含 X 舊版而庫內已變 saveStale/rowChanged, 列新基準舊 saveStale 後新基準成功} 16 ＋ lockExternalRows:false 之 C-1 1 ＋
 //                表 4 ×{外部同步改外部列 → saveStale, 外部同步移除外部列 → saveStale/rowRemoved, 新鮮基準改外部身分欄／新增非空 from／刪外部列／帶回已移除外部列 → 守門, 過期且違規 → saveStale} 28 ＋ 無基準且違規 → 守門(users／grups／pemis)3 = 48
-//  N 靜態站點    updateTabItems 之呼叫位置／次序(基準先於守門; perm-run01: 以 guardWrite 之 read:／baseline:／write: 與 .catch(mapGuardErr)、引用端 withTabLocks(lockTabs, [holder] 釘住)／鎖內／單點／lock 守護 9 ＋ WWebPerm kpFunExt 簽名與 opt 採納 3 = 12; 另 EXT-999 區段存在核對 1
+//  N 靜態站點    updateTabItems 之呼叫位置／次序(基準先於守門; perm-run01: 以 guardWrite 之 read:／baseline:／write: 與 .catch(mapGuardErr)、引用端 withTabLocks(lockTabs, [holder] 釘住)／鎖內／單點／lock 守護 9 ＋ WWebPerm kpFunExt 簽名與 opt 採納 3 ＋ [perm-run03] SITE-EX-013 requireAdmin 先於 pc.updateXxx 1 = 13; 另 EXT-999 區段存在核對 1
 //  刻意不測: 真後端端到端(api 層); 外部同步入口(api-syncAndReplaceTabs 與 unit-syncKeep); 前端唯讀／橫幅(e2e); 前端 baseline 之建立時機(UI1／UI2 之測試).
 //  未測: 無.
 //跑法: npx mocha test/unit-procCore-external.test.mjs --reporter list --timeout 120000
@@ -54,6 +54,7 @@ import cloneDeep from 'lodash-es/cloneDeep.js'
 import cacheSt from 'wsemi/src/cacheSt.mjs'
 import ds from '../src/schema/index.mjs'
 import proc, { pickClientOpt } from '../server/procCore.mjs'
+import { autoDecl } from './tools/declHelper.mjs'
 import createLockSave from '../server/lockSave.mjs'
 import { makeBaseline } from '../src/js/rowDigest.mjs'
 import { mkTable, mkCore, mkSrLog } from './tools/unitOrm.mjs'
@@ -164,7 +165,7 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
         let { srLog, logs } = mkSrLog()
         let cst = cacheSt()
         let core = mkCore(ds, woItems)
-        let pc = proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst), ...(opt.proc || {}) })
+        let pc = autoDecl(proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst), ...(opt.proc || {}) }), woItems)
         let env = { seed, woItems, logs, cst, core, pc }
         envs.push(env)
         return env
@@ -1611,11 +1612,13 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
             let pcode = readCode('server/procCore.mjs')
             let iK = wcode.indexOf('kpFunExt: {')
 
-            it('SITE-EX-010 kpFunExt 四個 updateXxx 皆為 3 參簽名 (userId, rows, opt／optClient)', function() {
+            //perm-run03: 四個 updateXxx 由 `(userId, rows, opt) => pc.updateXxx(...)` 改為 `async (userId, rows, opt) => { await requireAdmin(userId, 'updateXxx'); return await pc.updateXxx(...) }`
+            //(函數層級角色檢查); 簽名(3 參)與 opt 採納規則不變, 只多 async 與函數本體
+            it('SITE-EX-010 kpFunExt 四個 updateXxx 皆為 async 3 參簽名 (userId, rows, opt／optClient)', function() {
                 assert.strict.ok(iK > 0)
                 let seg = wcode.slice(iK, iK + 3000)
                 for (let [fn, p3] of [['updateTargets', 'opt'], ['updatePemis', 'opt'], ['updateGrups', 'opt'], ['updateUsers', 'optClient']]) {
-                    let re = new RegExp(`${fn}:\\s*\\(userId,\\s*rows,\\s*${p3}\\)\\s*=>`)
+                    let re = new RegExp(`${fn}:\\s*async\\s*\\(userId,\\s*rows,\\s*${p3}\\)\\s*=>`)
                     assert.strict.ok(re.test(seg), `${fn} 簽名`)
                 }
             })
@@ -1623,7 +1626,7 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
             //perm-run01: 原 `{ baseline: optClient.baseline }` 逐鍵組裝之釘住, 改為經共用單點 pickClientOpt(optClient) 過濾(只採 baseline 與 returnRows; 行為見 EXT-G11), 其後才由伺服端加 pickKeysOnly
             it('SITE-EX-011 updateUsers 不把用戶端 optClient 整包傳入 pc.updateUsers(經 pickClientOpt 過濾, 只採 baseline／returnRows; pickKeysOnly 由伺服端 modeEditUsers 決定)', function() {
                 let seg = wcode.slice(iK, iK + 3000)
-                let m = /updateUsers:\s*\(userId,\s*rows,\s*optClient\)\s*=>\s*\{([\s\S]*?)\n            \},/.exec(seg)
+                let m = /updateUsers:\s*async\s*\(userId,\s*rows,\s*optClient\)\s*=>\s*\{([\s\S]*?)\n            \},/.exec(seg)
                 assert.strict.ok(m, '應能取得 updateUsers 函數本體')
                 let b = m[1]
                 assert.strict.ok(!/pc\.updateUsers\([^)]*optClient/.test(b), '不得把 optClient 傳入 pc.updateUsers')
@@ -1642,6 +1645,30 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
                 assert.strict.ok(/lockExternalRows = true\s*\}\)/.test(pcode), 'proc 之 lockExternalRows 預設 true')
                 assert.strict.ok(/procCore\(woItems,\s*procOrm,\s*\{[^}]*\blockExternalRows\b[^}]*\}\)/.test(wcode), 'WWebPerm 須把 lockExternalRows 帶入 procCore')
                 assert.strict.ok(/lockExternalRows:\s*lockExternalRows \? 'y' : 'n'/.test(wcode), 'getWebInfor 須帶 lockExternalRows 供前端')
+            })
+
+            //perm-run03 範圍四(函數層級角色檢查; dspec/使用者身分驗證原則.md 二.4): 四個寫入函數的第一個敘述即 `await requireAdmin(userId, '<自身函數名>')`, 其後才可呼叫 pc.updateXxx(
+            //(先於 pickClientOpt、lockSave、表鎖與任何讀庫——非管理員零寫入、零讀庫); requireAdmin 本體以 perm users 表之 isAdmin==='y' 為準, 不符 reject 固定鍵 userNotAdmin(行為面見 api 層)
+            it('SITE-EX-013 kpFunExt 四個 updateXxx 皆先 await requireAdmin(userId, 自身函數名) 再呼叫 pc.updateXxx(; requireAdmin 不符即 reject userNotAdmin', function() {
+                assert.strict.ok(iK > 0)
+                let seg = wcode.slice(iK, iK + 3000)
+                for (let [fn, p3] of [['updateTargets', 'opt'], ['updatePemis', 'opt'], ['updateGrups', 'opt'], ['updateUsers', 'optClient']]) {
+                    let m = new RegExp(`${fn}:\\s*async\\s*\\(userId,\\s*rows,\\s*${p3}\\)\\s*=>\\s*\\{([\\s\\S]*?)\\n            \\},`).exec(seg)
+                    assert.strict.ok(m, `${fn} 應能取得函數本體`)
+                    let b = m[1]
+                    assert.strict.ok(b.trim().startsWith(`await requireAdmin(userId, '${fn}')`), `${fn} 之第一個敘述須為 await requireAdmin(userId, '${fn}')`)
+                    assert.strict.equal(count(b, /\brequireAdmin\(/g), 1, `${fn} 內 requireAdmin( 恰一處`)
+                    let iPc = b.indexOf(`pc.${fn}(`)
+                    assert.strict.ok(iPc > b.indexOf('requireAdmin('), `${fn}: pc.${fn}( 須在 requireAdmin 之後`)
+                    assert.strict.equal(count(b, new RegExp(`\\bpc\\.${fn}\\(`, 'g')), 1, `${fn} 內 pc.${fn}( 恰一處`)
+                    assert.strict.ok(/return await pc\./.test(b), `${fn} 須 await 並回傳 pc.${fn} 之結果(拒絕原樣傳出)`)
+                }
+                //kpFunExt 內除這四個外不得有其他改變狀態之函數未經 requireAdmin: requireAdmin( 於整檔恰 4 個呼叫站點 ＋ 1 個定義
+                assert.strict.equal(count(wcode, /\bawait requireAdmin\(/g), 4, 'WWebPerm.mjs 內 await requireAdmin( 恰 4 處(四個 updateXxx)')
+                let mDef = /let requireAdmin = async \(userId, funcName\) => \{([\s\S]*?)\n    \}\n/.exec(wcode)
+                assert.strict.ok(mDef, '應有 requireAdmin 定義')
+                assert.strict.ok(/isAdmin !== 'y'/.test(mDef[1]) && /Promise\.reject\('userNotAdmin'\)/.test(mDef[1]), 'requireAdmin 須以 isAdmin 判定並 reject userNotAdmin')
+                assert.strict.ok(/catch \(err\) \{\s*u = null\s*\}/.test(mDef[1]), '讀取失敗須視同不符(fail-closed)')
             })
 
         })

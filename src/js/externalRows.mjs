@@ -196,6 +196,9 @@ function checkExternalWrite({ keyTable, keys, r, ltdtOld, lockExternalRows = tru
         bad.push({ key, reason, k, from: isStr(from) ? from : '' })
     }
 
+    //srcKey: 外部匯入之來源鍵為身分欄(與 from 同; perm-run03, R-IMPORT-01), 只由匯入端點寫入, 後台不可新增帶值之列、不可改既有列之值(不論 lockExternalRows; 缺欄／null／'' 同一空值)
+    let normSrc = (v) => (v === undefined || v === null ? '' : v)
+
     //add
     r.add.forEach((row, k) => {
         let f = isObj(row) ? normFrom(row.from) : ''
@@ -204,6 +207,9 @@ function checkExternalWrite({ keyTable, keys, r, ltdtOld, lockExternalRows = tru
         }
         else if (lockExternalRows && f !== '') {
             push('saveFromNotAllowed', 'addFrom', k, f)
+        }
+        else if (isObj(row) && normSrc(row.srcKey) !== '') {
+            push('saveFromNotAllowed', 'addSrcKey', k, '')
         }
     })
 
@@ -223,6 +229,10 @@ function checkExternalWrite({ keyTable, keys, r, ltdtOld, lockExternalRows = tru
         let of = o === undefined ? '' : normFrom(o.from)
         if (!isStr(nf) && nf !== of) {
             push('saveFromNotAllowed', 'fromType', k, '')
+            return
+        }
+        if (o !== undefined && isObj(row) && normSrc(row.srcKey) !== normSrc(o.srcKey)) {
+            push(isExternalRow(o) ? 'saveExternalRowChanged' : 'saveFromNotAllowed', 'srcKeyChanged', k, isExternalRow(o) ? o.from : '')
             return
         }
         if (!lockExternalRows || o === undefined) {

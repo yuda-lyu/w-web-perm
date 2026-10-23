@@ -20,8 +20,10 @@
 //  軸 G 多人同時編輯(R-PRINCIPLE-00 原則 7; run11 新增, 9 格): 四清單頁各一(016 users 同列／017 grups 他列／018 pemis 他人新增列／019 targets 他人刪除列)、兩反向對話框各一(020、021)、外部同步內容未變不擋(022)、無草稿照舊重建(023)、語系切換後表頭仍更新(024); 全測。
 //  已測案例 26 × 語系 2 = 52 個 it(標準圖 8 案: run07 6 案 ＋ run11 E2E-016、020 各 1 張／語系)。
 //
-//夾具(皆以外部來源 from 為界之真同步端點建立; 外部列 id／名稱前綴 xr／ext-, 不撞他檔夾具): 使用者 ext-u1(cgrups 引用 權限群組M2)、ext-u2、ext-u3(引用 ext-g1); 群組 ext-g1(cpemis 含 權限P1)、ext-g2;
+//夾具(皆以外部來源 from 為界之真同步端點建立; 外部列 id 標籤／名稱前綴 xr／ext-, 不撞他檔夾具): 使用者 ext-u1(cgrups 引用 權限群組M2)、ext-u2、ext-u3(引用 ext-g1); 群組 ext-g1(cpemis 含 權限P1)、ext-g2;
 //  後台列夾具由管理者寫入 RPC(editTableRows)先於外部列建立。收尾 restoreTables(purgeExternalRows 直刪外部列夾具 → 整表寫回快照)並回驗筆數與無外部列殘留(R-E2E-ISO-01)。
+//perm-run03(外部匯入改依來源鍵 srcKey 差異同步, R-IMPORT-01): 外部列夾具之 id 標籤(id-xr-u1 等)是送入同步端點之 srcKey(syncRows 改送 srcKey 並丟掉 id), 庫內外部列之真實 id 由伺服端產生、不等於標籤;
+//  凡以 id 運作者(getPermUserInfor 查授權、store 欄位等待)先經 idOfSrc 取真實 id; 比對庫內外部列依 srcKey(rowOf／hasRow、PICK_UX／PICK_GX); 後台列夾具(editTableRows)id 不變。
 //授權樹期望值由 base seed 規則集依 R-AUTH-MERGE-00 推導(見 test/tools/e2eExt.mjs 之 TREE), 不抄實測值。
 //
 //跑法註記：本檔所有時序等待皆為偵測式(waitUntilExist／waitStoreCount／expectResultBox 等), 固定 waitForTimeout 只用於前端同步重繪後之短暫 settle(同既有 e2e 檔慣例)。
@@ -36,7 +38,7 @@ import {
 import { editTableRows, selectAllRows } from './tools/api-setup.mjs'
 import { createBaselineGate, itemsUnionBox } from './tools/e2eLib.mjs'
 import {
-    TREE, ON, mkU, mkG, pickRow, PICK_U, PICK_G, fmtT, tOf, syncRows, clearSyncWarn, snapTables, rowOf, hasRow, createIsolation, makeRunner,
+    TREE, ON, mkU, mkG, pickRow, PICK_U, PICK_G, fmtT, tOf, syncRows, idOfSrc, clearSyncWarn, snapTables, rowOf, hasRow, createIsolation, makeRunner,
     waitStoreCount, waitStoreField, bannerTexts, lockTitles, lockCount, cellText, checkboxState, dblclickEditorCount, assertEditableControl, cellWarnTitle, topModalBox, showFromColumn, expectResultBoxAbove,
     hasName, waitNameGone, enterPage, gotoTargets, T,
 } from './tools/e2eExt.mjs'
@@ -46,10 +48,10 @@ const PICS_DIR = `./test/pics/${FLOW}`
 const LANGS = ['eng', 'cht']
 const isBaseline = process.argv.includes('--baseline')
 
-//外部來源名稱(from; 各分區互不影響, 以 from 為界全量取代)
+//外部來源名稱(from; 各分區互不影響, 以 from 為界依 srcKey 差異同步)
 const F_U = 'appExtU' //外部使用者
 const F_G = 'appExtG' //外部群組
-const F_W = 'appExtWarn' //同步警示(同名異 id)
+const F_W = 'appExtWarn' //同步警示(同名異 srcKey)
 const F_LATE = 'appExtLate' //開對話框後才同步進來之外部使用者
 
 const BELONG_USERS = { colId: 'belongUsers', titleKey: 'grupBlngEditUsers', label: 'VeGrupBlngUsers 對話框標題' } //群組頁開「所屬使用者」對話框(同 e2e-rela-user-grup 之 BELONG_DIALOG_OPT)
@@ -62,8 +64,14 @@ const X_G1 = mkG('id-xr-g1', 'ext-g1', { '權限P1': ON() }, { description: '外
 const X_G2 = mkG('id-xr-g2', 'ext-g2', {}, { description: '外部群組二', order: 101 })
 const fxUsers = async () => { await syncRows('users', [X_U1, X_U2], F_U) }
 const fxGrups = async () => { await syncRows('grups', [X_G1, X_G2], F_G) }
-//比對夾具與庫內外部列(來源由同步端點蓋上)
-const asExt = (r, from) => ({ ...r, from })
+//比對夾具與庫內外部列(來源由同步端點蓋上)。perm-run03(外部匯入改依 srcKey 差異同步, R-IMPORT-01): 夾具列之 id 標籤是送入同步端點之 srcKey, 庫內外部列之真實 id 由伺服端產生(不等於標籤),
+//  故夾具列轉為「srcKey＝標籤」之期望列, 並以 PICK_UX／PICK_GX(PICK_U／PICK_G 之 id 換成 srcKey)取比對欄——除原有各欄外另驗庫內 srcKey 等於夾具標籤(比原本只驗 id 更強)
+const asExt = (r, from) => {
+    const { id, ...rest } = r
+    return { ...rest, srcKey: id, from }
+}
+const PICK_UX = PICK_U.map((k) => (k === 'id' ? 'srcKey' : k))
+const PICK_GX = PICK_G.map((k) => (k === 'id' ? 'srcKey' : k))
 //各語系字面片段(擋範本佔位符對調; 期望全由範本代入時範本錯誤無從察覺)
 const LIT = {
     eng: {
@@ -241,8 +249,8 @@ const CASES = [
         semantic: async () => {
             //庫內夾具未被動到(逐欄等於夾具)
             const us = await selectAllRows('users')
-            assert.deepEqual(pickRow(rowOf(us, 'id-xr-u1'), PICK_U), pickRow(asExt(X_U1, F_U), PICK_U), 'ext-u1 庫內不變')
-            assert.deepEqual(pickRow(rowOf(us, 'id-xr-u2'), PICK_U), pickRow(asExt(X_U2, F_U), PICK_U), 'ext-u2 庫內不變')
+            assert.deepEqual(pickRow(rowOf(us, 'id-xr-u1'), PICK_UX), pickRow(asExt(X_U1, F_U), PICK_UX), 'ext-u1 庫內不變')
+            assert.deepEqual(pickRow(rowOf(us, 'id-xr-u2'), PICK_UX), pickRow(asExt(X_U2, F_U), PICK_UX), 'ext-u2 庫內不變')
         },
     },
     {
@@ -316,8 +324,8 @@ const CASES = [
         semantic: async () => {
             const us = await selectAllRows('users')
             assert.ok(!hasRow(us, 'id-xr-bk1'), '庫內 bk-u1 應已刪除')
-            assert.deepEqual(pickRow(rowOf(us, 'id-xr-u1'), PICK_U), pickRow(asExt(X_U1, F_U), PICK_U), '外部列 ext-u1 逐欄不變')
-            assert.deepEqual(pickRow(rowOf(us, 'id-xr-u2'), PICK_U), pickRow(asExt(X_U2, F_U), PICK_U), '外部列 ext-u2 逐欄不變')
+            assert.deepEqual(pickRow(rowOf(us, 'id-xr-u1'), PICK_UX), pickRow(asExt(X_U1, F_U), PICK_UX), '外部列 ext-u1 逐欄不變')
+            assert.deepEqual(pickRow(rowOf(us, 'id-xr-u2'), PICK_UX), pickRow(asExt(X_U2, F_U), PICK_UX), '外部列 ext-u2 逐欄不變')
             assert.equal(us.length, 6, '庫內 base 4 + 外部 2')
         },
     },
@@ -383,11 +391,12 @@ const CASES = [
         semantic: async () => {
             //spec E2E-006 驗證2: 庫內多出一列後台列(from 為空; 沿用來源之說明與授權), 外部列 ext-u1 逐欄不變
             const us = await selectAllRows('users')
-            const copies = us.filter((r) => r.id !== 'id-xr-u1' && r.description === X_U1.description)
+            const copies = us.filter((r) => r.srcKey !== 'id-xr-u1' && r.description === X_U1.description) //排除來源之外部列(依 srcKey: 其真實 id 由伺服端產生, 不等於標籤)
             assert.equal(copies.length, 1, '庫內應恰有一列由 ext-u1 複製而來之新列')
             assert.equal(copies[0].from, '', '複製出之新列 from 應為空(後台列, 非外部列)')
+            assert.equal(copies[0].srcKey || '', '', '複製出之新列 srcKey 應為空(來源鍵屬外部身分欄, 後台列恆空, 不繼承外部列之來源鍵; 否則伺服端 saveFromNotAllowed)')
             assert.equal(copies[0].cgrups, X_U1.cgrups, '複製列沿用來源之授權設定')
-            assert.deepEqual(pickRow(rowOf(us, 'id-xr-u1'), PICK_U), pickRow(asExt(X_U1, F_U), PICK_U), '外部列 ext-u1 逐欄不變')
+            assert.deepEqual(pickRow(rowOf(us, 'id-xr-u1'), PICK_UX), pickRow(asExt(X_U1, F_U), PICK_UX), '外部列 ext-u1 逐欄不變')
             assert.equal(us.length, 7, '庫內 base 4 + 外部 2 + 新列 1')
         },
     },
@@ -437,7 +446,7 @@ const CASES = [
             }
             assert.equal(await lockCount(page), 2, '全頁鎖頭總數＝外部群組數 2')
             const gs = await selectAllRows('grups')
-            assert.deepEqual(pickRow(rowOf(gs, 'id-xr-g1'), PICK_G), pickRow(asExt(X_G1, F_G), PICK_G), 'ext-g1 庫內不變')
+            assert.deepEqual(pickRow(rowOf(gs, 'id-xr-g1'), PICK_GX), pickRow(asExt(X_G1, F_G), PICK_GX), 'ext-g1 庫內不變')
         },
     },
     {
@@ -451,7 +460,9 @@ const CASES = [
             await syncRows('users', [X_U3], F_U) //引用 ext-g1 之外部使用者(以其授權樹觀察端到端結果)
         },
         run: async (page) => {
-            assert.deepEqual(await getResolvedActiveTargets(page, 'id-xr-u3'), TREE.P1, '改指派前 ext-u3 之授權＝ext-g1 之 P1')
+            const idU3 = await idOfSrc('users', 'id-xr-u3') //ext-u3 之真實 id(外部列 id 由伺服端產生; 標籤 id-xr-u3 是 srcKey)
+            assert.ok(idU3 !== null && idU3 !== 'id-xr-u3', `ext-u3 應已經同步建立且真實 id 不等於 srcKey 標籤(實得 ${JSON.stringify(idU3)})`)
+            assert.deepEqual(await getResolvedActiveTargets(page, idU3), TREE.P1, '改指派前 ext-u3 之授權＝ext-g1 之 P1')
             await enter(page, 'grups', 6)
             const k1 = await rowIndexByCell(page, 'name', 'ext-g1')
             await page.locator(`.ag-row[row-index="${k1}"] .ag-cell[col-id="cpemis"] button`).first().click()
@@ -477,7 +488,7 @@ const CASES = [
             assert.equal(g.description, X_G1.description)
             assert.equal(g.from, F_G, '外部群組之來源不變')
             //spec E2E-008 驗證2(端到端不變式): 引用 ext-g1 之 ext-u3 實際查到之授權樹 = P1 ∪ P2(＝M1 之授權集)
-            assert.deepEqual(await getResolvedActiveTargets(page, 'id-xr-u3'), TREE.M1, '改指派後 ext-u3 之授權樹應含 P2 之標的')
+            assert.deepEqual(await getResolvedActiveTargets(page, await idOfSrc('users', 'id-xr-u3')), TREE.M1, '改指派後 ext-u3 之授權樹應含 P2 之標的')
         },
     },
     {
@@ -507,9 +518,9 @@ const CASES = [
         },
     },
     {
-        //E2E-010: 外部來源對 grups 同步一批後, 再送同一來源「同名異 id」之一批 → 重新載入頁面後群組頁出現同步警示橫幅(syncWarnIdRenumber, 含來源名與筆數); 再送無此情形之一批 → 重新載入後橫幅消失。
-        //警示登錄於伺服端記憶體, 前端於連線時取一次(webInfor.syncWarns), 故須重新載入(新開頁面)才反映。
-        //6 步 user path: ①外部來源同步第一批(夾具) ②外部來源同步同名異 id 之第二批 ③重新載入進入群組頁 ④看到警示橫幅(來源名、1 筆) ⑤外部來源同步無重編之第三批 ⑥重新載入, 警示橫幅消失(外部列橫幅仍在)
+        //E2E-010(perm-run03 改寫判定口徑: 由「同名異 id」改為「同名異 srcKey」, countSrcKeyRenumber): 外部來源對 grups 同步一批後, 再送同一來源「同名異 srcKey」之一批(舊 srcKey 消失＝刪舊, 新 srcKey 同名＝增新; 疑似外部來源鍵重編) → 重新載入頁面後群組頁出現同步警示橫幅(syncWarnIdRenumber, 含來源名與筆數); 再送無此情形之一批(同 srcKey 同名＝不變) → 重新載入後橫幅消失。
+        //警示登錄於伺服端記憶體, 前端於連線時取一次(webInfor.syncWarns), 故須重新載入(新開頁面)才反映。夾具標籤 id-xr-wa／id-xr-wb 即 srcKey(syncRows 改送 srcKey); 「同 srcKey 改名」是改名級聯、不警示(由 api-externalRows／api-syncAndReplaceTabs 涵蓋, 本案不重複)。
+        //6 步 user path: ①外部來源同步第一批(夾具) ②外部來源同步同名異 srcKey 之第二批 ③重新載入進入群組頁 ④看到警示橫幅(來源名、1 筆) ⑤外部來源同步無重編之第三批 ⑥重新載入, 警示橫幅消失(外部列橫幅仍在)
         //圖: 警示橫幅出現(框住警示橫幅; 觀察步驟); 橫幅消失之畫面不另設圖
         name: 'E2E-010-sync-warn-banner',
         stages: ['E2E-010-1-warn-banner'],
@@ -517,8 +528,8 @@ const CASES = [
         cleanup: async () => { await clearSyncWarn('grups', F_W) },
         run: async (page, lang) => {
             const browser = page.context().browser()
-            //②同一來源同名(wg-renum)異 id 之第二批
-            await syncRows('grups', [mkG('id-xr-wb', 'wg-renum', {}, { order: 100 })], F_W)
+            //②同一來源同名(wg-renum)異 srcKey(id-xr-wa → id-xr-wb)之第二批: 回傳之伺服端結果＝刪舊 1、增新 1(身分是 srcKey, 非同名配對)
+            assert.deepEqual(await syncRows('grups', [mkG('id-xr-wb', 'wg-renum', {}, { order: 100 })], F_W), { nAdd: 1, nUpdate: 0, nDel: 1, nSame: 0 }, '同名異 srcKey: 舊來源鍵之列被刪、新來源鍵之列被新增(不依名稱配對)')
             //③重新載入(新開 context 即重新連線取 webInfor)
             const p2 = await openApp(browser)
             await setLang(p2, lang)
@@ -530,8 +541,8 @@ const CASES = [
             assert.deepEqual(await bannerTexts(p2, 'grups', 'warn'), [wantWarn], '應有一條同步警示橫幅(來源名、筆數 1)')
             assert.deepEqual(await bannerTexts(p2, 'grups', 'ext'), [await fmtT(p2, 'externalRowsNotice', { n: 1 })], '外部列橫幅(外部群組 1 筆)同時存在')
             const s1 = await captureStableWithBox(p2, itemsUnionBox('[data-fmid="grups-banner-warn"]', { fit: true })) //結果: 同步警示橫幅(框住警示橫幅; 緊貼外部列橫幅, 經 fit 取間隙)
-            //⑤再送無重編之第三批(同 id 同名)並重新載入
-            await syncRows('grups', [mkG('id-xr-wb', 'wg-renum', {}, { order: 100 })], F_W)
+            //⑤再送無重編之第三批(同 srcKey 同名＝不變, 零寫入; 此次同步使伺服端登錄之警示清除)並重新載入
+            assert.deepEqual(await syncRows('grups', [mkG('id-xr-wb', 'wg-renum', {}, { order: 100 })], F_W), { nAdd: 0, nUpdate: 0, nDel: 0, nSame: 1 }, '同 srcKey 同名重送: 不變(零寫入)')
             const p3 = await openApp(browser)
             await setLang(p3, lang)
             await gotoGrups(p3)
@@ -677,10 +688,12 @@ const CASES = [
             //spec E2E-013 驗證1(前提): 勾選後、同步前, 過期提示為 0 節點; ext-u1 已勾選
             assert.equal(await staleCount(page, FM_BLNG_USERS_STALE), 0, '前提: 尚無過期提示')
             assert.equal(await page.locator(dialogEnableCheckboxSel(4)).first().isChecked(), true, '前提: ext-u1 已勾選')
-            //外部來源同步改了 ext-u1 之說明(同分區全量取代; 其餘欄位同夾具)
+            //外部來源同步改了 ext-u1 之說明(同分區依 srcKey 差異同步: ext-u1 修改〔id 不變〕、ext-u2 不變; 其餘欄位同夾具)
             const NEW_DESC = '外部來源改過之說明'
-            await syncRows('users', [{ ...X_U1, description: NEW_DESC }, X_U2], F_U)
-            await waitStoreField(page, 'users', 'id-xr-u1', 'description', NEW_DESC)
+            const idU1 = await idOfSrc('users', 'id-xr-u1') //ext-u1 之真實 id(同步前後不變: 修改保留 id)
+            assert.deepEqual(await syncRows('users', [{ ...X_U1, description: NEW_DESC }, X_U2], F_U), { nAdd: 0, nUpdate: 1, nDel: 0, nSame: 1 }, '外部同步只改 ext-u1 之說明: 修改 1、不變 1')
+            assert.equal(await idOfSrc('users', 'id-xr-u1'), idU1, '依 srcKey 修改: ext-u1 之 id 不變')
+            await waitStoreField(page, 'users', idU1, 'description', NEW_DESC)
             //spec E2E-013 驗證1: 推播抵達後提示恰一條(文字＝staleDraftNoticeDialog); ext-u1 仍已勾選(草稿保留)
             await expectUsersDialogStale(page, lang)
             assert.equal(await page.locator(dialogEnableCheckboxSel(4)).first().isChecked(), true, '推播後 ext-u1 仍已勾選(草稿保留, 不重建)')
@@ -717,7 +730,7 @@ const CASES = [
             assert.equal(kp['權限群組M2'] && kp['權限群組M2'].isActive, 'y', 'ext-u1 原有之 權限群組M2 歸屬不變')
             assert.equal(u.description, '外部來源改過之說明', 'ext-u1 之說明維持外部新值')
             assert.equal(u.from, F_U, 'ext-u1 之來源不變')
-            assert.deepEqual(pickRow(rowOf(us, 'id-xr-u2'), PICK_U), pickRow(asExt(X_U2, F_U), PICK_U), 'ext-u2 逐欄不變')
+            assert.deepEqual(pickRow(rowOf(us, 'id-xr-u2'), PICK_UX), pickRow(asExt(X_U2, F_U), PICK_UX), 'ext-u2 逐欄不變')
         },
     },
     {
@@ -849,8 +862,8 @@ const CASES = [
             await typeIntoCell(page, k, 'description', DRAFT)
             assert.equal(await pageSaveShown(page), true, '前提: 有未存編輯')
             const NEW = '外部來源改過之說明(別列)'
-            await syncRows('grups', [X_G1, { ...X_G2, description: NEW }], F_G)
-            await waitStoreField(page, 'grups', 'id-xr-g2', 'description', NEW)
+            await syncRows('grups', [X_G1, { ...X_G2, description: NEW }], F_G) //依 srcKey 差異同步: ext-g2 修改(id 不變)、ext-g1 不變
+            await waitStoreField(page, 'grups', await idOfSrc('grups', 'id-xr-g2'), 'description', NEW)
             await waitStale(page, 'grups-banner-stale')
             assert.deepEqual(await staleTexts(page, 'grups-banner-stale'), [await tOf(page, 'staleDraftNotice')])
             assert.ok((await staleTexts(page, 'grups-banner-stale'))[0].includes(LIT[lang].staleDraft), `橫幅應含字面片段「${LIT[lang].staleDraft}」`)
@@ -1006,9 +1019,11 @@ const CASES = [
         },
     },
     {
-        //E2E-022(原則 7: 表雜湊以內容計算, 排除系統自動變更之欄位): 使用者頁有未存編輯(mary 之說明)時, 外部來源把同一批外部使用者原樣再同步一次(內容未變; 每列之建立者／時間欄皆重寫)→ 推播抵達,
-        //但表內容未變: 不出現過期橫幅、草稿保留 → 按儲存成功(不被誤擋), 外部列內容逐欄不變。純語意。
-        //6 步 user path: ①使用者頁(含 2 位外部使用者) ②雙擊 mary 之說明欄輸入新說明(未存) ③(外部來源原樣再同步一次) ④看不到過期橫幅、草稿與儲存鈕仍在 ⑤按儲存, 看到成功訊息 ⑥庫內 mary 已存、外部列內容不變
+        //E2E-022(原則 7: 表雜湊以內容計算, 排除系統自動變更之欄位與 order 數值〔只看名次〕; perm-run03 改寫夾具): 使用者頁有未存編輯(mary 之說明)時, 外部來源對同一批外部使用者做「整批重寫但內容未變」之同步
+        //(每列之建立者／更新時間等伺服器管理欄皆重寫、order 值整批重編而名次不變)→ 推播抵達, 但表內容(雜湊)未變: 不出現過期橫幅、草稿保留 → 按儲存成功(不被誤擋), 外部列內容逐欄不變。純語意。
+        //〔perm-run03 改寫原因: 外部匯入改依 srcKey 差異同步後, 「逐欄完全相同」之重送為 nSame 零寫入(無推播、伺服器管理欄不重寫), 原夾具(原樣重送)不再造成「整批重寫」;
+        //  改以 order 值重編(100/101 → 110/111, 名次不變; order 屬外部擁有欄位, 差異同步會改寫該 2 列並重寫其伺服器管理欄)代表之, 仍驗同一規則(伺服器管理欄與 order 數值之改變不使草稿作廢); 另先驗原樣重送回 nSame=2。〕
+        //6 步 user path: ①使用者頁(含 2 位外部使用者) ②雙擊 mary 之說明欄輸入新說明(未存) ③(外部來源原樣再同步一次: 零寫入; 再同步一次 order 重編而名次不變之整批重寫) ④看不到過期橫幅、草稿與儲存鈕仍在 ⑤按儲存, 看到成功訊息 ⑥庫內 mary 已存、外部列內容不變
         name: 'E2E-022-users-external-rewrite-unchanged',
         stages: [],
         fixture: fxUsers,
@@ -1018,8 +1033,9 @@ const CASES = [
             const DRAFT = 'A管理員未儲存之說明'
             await typeIntoCell(page, k, 'description', DRAFT)
             assert.equal(await pageSaveShown(page), true, '前提: 有未存編輯')
+            assert.deepEqual(await syncRows('users', [X_U1, X_U2], F_U), { nAdd: 0, nUpdate: 0, nDel: 0, nSame: 2 }, '原樣重送(內容與夾具逐欄相同): 差異同步全為不變(零寫入, 冪等)')
             await markStoreRef(page, 'users')
-            await syncRows('users', [X_U1, X_U2], F_U) //內容與夾具逐欄相同(僅伺服器管理欄被重寫)
+            assert.deepEqual(await syncRows('users', [{ ...X_U1, order: 110 }, { ...X_U2, order: 111 }], F_U), { nAdd: 0, nUpdate: 2, nDel: 0, nSame: 0 }, 'order 重編而名次不變(100/101 → 110/111): 2 列皆被改寫(order 屬外部擁有欄位)')
             await waitStoreRefChanged(page, 'users')
             await page.waitForTimeout(1500) //清單 computed 重算 settle
             assert.equal(await staleCount(page, 'users-banner-stale'), 0, '外部同步內容未變: 不得出現過期橫幅')
@@ -1033,8 +1049,8 @@ const CASES = [
         semantic: async () => {
             const us = await selectAllRows('users')
             assert.equal(rowOf(us, 'id-for-mary').description, 'A管理員未儲存之說明', 'mary 之編輯已存')
-            assert.deepEqual(pickRow(rowOf(us, 'id-xr-u1'), PICK_U), pickRow(asExt(X_U1, F_U), PICK_U), 'ext-u1 逐欄不變')
-            assert.deepEqual(pickRow(rowOf(us, 'id-xr-u2'), PICK_U), pickRow(asExt(X_U2, F_U), PICK_U), 'ext-u2 逐欄不變')
+            assert.deepEqual(pickRow(rowOf(us, 'id-xr-u1'), PICK_UX), pickRow(asExt(X_U1, F_U), PICK_UX), 'ext-u1 逐欄不變')
+            assert.deepEqual(pickRow(rowOf(us, 'id-xr-u2'), PICK_UX), pickRow(asExt(X_U2, F_U), PICK_UX), 'ext-u2 逐欄不變')
         },
     },
     {

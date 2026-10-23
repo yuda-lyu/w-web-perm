@@ -1,8 +1,8 @@
 //使用者對應鍵(mappingBy)之外部同步檢查與登入多筆拒絕(F-14; 規則帳本 R-MAPKEY-01、R-MAPKEY-02; ADR-034)
 //
 //述語:
-//  M1 mappingBy='email'／'name' 時, 外部同步 users 於 delAll 之前檢查: 每個 isActive==='y' 之列, 該欄位須為非空字串(trim 後長度>0)且在〔本批 active 列〕∪〔他 from 既有 active 列〕內唯一
-//     (比對用原值精確 ===), 違規整批 invalidRows 且該 from 與他 from 全列不變; isActive!=='y' 之列不參與; 同 from 之既有列不算衝突;
+//  M1 mappingBy='email'／'name' 時, 外部同步 users 於寫入之前檢查: 每個 isActive==='y' 之列, 該欄位須為非空字串(trim 後長度>0)且在〔本批 active 列〕∪〔他 from 既有 active 列〕內唯一
+//     (比對用原值精確 ===), 違規整批 invalidRows 且該 from 與他 from 全列不變; isActive!=='y' 之列不參與; 同 from 之既有列不算衝突(同批比對後被修改或刪除);
 //  M2 mappingBy='id'(預設)不另檢查(見 api-syncAndReplaceTabs API-sync-027);
 //  M3 getTokenUser 以對應鍵查 perm users 命中多於 1 筆 → 拒絕(ambiguousUserFromPerm), 不取首筆: 登入入口(/api/getUserByToken)與資料通道(verifyConn)兩條路徑皆拒, 0 筆行為不變, 恰 1 筆照常登入;
 //  M4 (run05, R-PRINCIPLE-00 適用表 h) 後台 updateUsers 整表寫入於 mappingBy='email'／'name' 時對 active 列檢查該欄位(非空／唯一), 只擋本次造成或觸及者(MK-020／021; 歷史資料先以 mappingBy='id' 同步造成).
@@ -22,6 +22,10 @@ import { restartBackend, genTempSettings, apiBaseUrl } from './tools/e2e-setup.m
 //  並由後台編修該些列之 name／email／isActive 與刪改——自 run07 起外部列(from 非空)之身分欄後台不得改(saveExternalRowChanged), 故歷史資料改為「後台列」(from ''; 即 F-14 之前版本由後台寫入之歷史列),
 //  以 restartBackend 之 seedExtra 於後端停止期間旁路寫庫(同 api-refCascade 歷史同名列之作法; 現行任何寫入入口皆拒造出此類資料); 後台新增列之 from 一律 ''。
 //  外部列版之守門(後台不得改外部列之 name／email)見 api-externalRows。
+//perm-run03 調整說明(外部匯入改依來源鍵 srcKey 差異同步; server/syncCore.mjs): 夾具列改送 srcKey(不送 id; 帶 id 整批 idNotAllowed), 內部 id 由伺服端產生(不再等於外部給的值);
+//  外部同步為差異同步(同 srcKey 重送＝修改/不變, 批次沒有的列＝刪除), 不再 delAll＋insert; 故各案以 srcKey 取代 id 找列(srcsOf), 「同 from 重送同 email」之舊列隨差異同步刪除。
+//  本檔無案例以「經同步建立之外部使用者」之 token 登入(MK-010／011 以 base seed 之 admin 'sys' 登入, 其 email 與同步建立之使用者重複; mappingBy='id' 本輪未改〔待裁示〕, 若需外部使用者登入須改用 mappingBy email／name 或後台列),
+//  故 mappingBy 登入對應之變更對本檔無影響。
 const dirTmp = path.join(path.dirname(fileURLToPath(import.meta.url)), '_tmp', 'api-mapKey') //seed-extra.json, 收尾刪除
 const SEED_EXTRA_IDS = ['id-mk9-a', 'id-mk9-b', 'id-mk9-c', 'id-mk9-new', 'id-mk10-a', 'id-mk10-b', 'id-mk10-c', 'id-mk10-new']
 
@@ -37,9 +41,10 @@ let getUserByTokenApi = async (token) => {
     return await res.json()
 }
 
-let u = (id, name, email, from, isActive = 'y', isAdmin = 'n') => ({ id, order: 0, name, email, from, cgrups: '{}', isAdmin, isActive })
+//u: 外部同步之使用者列夾具; 第 1 參為外部自訂之來源鍵 srcKey(perm-run03 起外部不送 id, 內部 id 由伺服端產生)
+let u = (srcKey, name, email, from, isActive = 'y', isAdmin = 'n') => ({ srcKey, order: 0, name, email, from, cgrups: '{}', isAdmin, isActive })
 
-let idsOf = async (from) => (await (await getWoItems()).users.select({ from })).map((v) => v.id).sort()
+let srcsOf = async (from) => (await (await getWoItems()).users.select({ from })).map((v) => v.srcKey).sort()
 let snapOf = async (from) => JSON.stringify((await (await getWoItems()).users.select({ from })).sort((a, b) => String(a.id).localeCompare(String(b.id))))
 let snapOthers = async (from) => JSON.stringify((await (await getWoItems()).users.select()).filter((v) => v.from !== from).sort((a, b) => String(a.id).localeCompare(String(b.id))))
 
@@ -96,9 +101,10 @@ describe('api-mapKey (F-14: 使用者對應鍵之外部同步檢查與登入多�
     })
 
     it('MK-011 移除重複後(同 email 剩 1 筆)登入恢復; 0 筆行為不變(cannotGetUserFromPerm)', async function() {
-        //此時 backend 為 mappingBy='email'; 以 app token 同步取代 appMk-dup 之列為另一個 email(M1: 該 email 唯一, 通過)
+        //此時 backend 為 mappingBy='email'; 以 app token 同步:同 srcKey 把 appMk-dup 之列改為另一個 email(＝修改, id 不變; M1: 該 email 唯一, 通過)
         let res = await postSync('users', { from: 'appMk-dup', rows: [u('id-mk-dup', 'dup-admin', 'dup-admin@example.com', 'appMk-dup')] })
         assert.strict.equal(res.state, 'success', `改為不同 email 應成功，實得: ${JSON.stringify(res)}`)
+        assert.strict.deepEqual(res.msg, { nAdd: 0, nUpdate: 1, nDel: 0, nSame: 0 }, '同 srcKey 改 email 應為 nUpdate=1(差異同步)')
         let r1 = await getUserByTokenApi('sys')
         assert.strict.equal(r1.state, 'success', `重複移除後恰 1 筆, 登入應成功，實得: ${JSON.stringify(r1)}`)
         assert.strict.equal(r1.msg.id, 'id-for-admin')
@@ -184,8 +190,9 @@ describe('api-mapKey (F-14: 使用者對應鍵之外部同步檢查與登入多�
         ] })
         assert.strict.equal(res.state, 'success', `inactive 列不參與檢查，應成功，實得: ${JSON.stringify(res)}`)
         let again = await postSync('users', { from: F, rows: [u('id-mk4-c2', 'c42', 'same4@appMk.com', F, 'y')] })
-        assert.strict.equal(again.state, 'success', `同 from 重送同 email(舊列隨 delAll 移除)應成功，實得: ${JSON.stringify(again)}`)
-        assert.strict.deepEqual(await idsOf(F), ['id-mk4-c2'])
+        assert.strict.equal(again.state, 'success', `同 from 重送同 email(換 srcKey＝刪舊增新; 同 from 之既有列不算衝突)應成功，實得: ${JSON.stringify(again)}`)
+        assert.strict.deepEqual(again.msg, { nAdd: 1, nUpdate: 0, nDel: 5, nSame: 0 }, '新 srcKey 新增 1 筆、批次沒有的 5 筆舊列刪除')
+        assert.strict.deepEqual(await srcsOf(F), ['id-mk4-c2'])
     })
 
     it('MK-005 email: 他 from 之 inactive 列不構成衝突(getTokenUser 只匹配 active)', async function() {
@@ -276,7 +283,8 @@ describe('api-mapKey (F-14: 使用者對應鍵之外部同步檢查與登入多�
         assert.strict.equal((await usersSorted()).find((v) => v.id === 'id-mk9-c').description, 'mk20-edited')
 
         //(2) 本次造成者仍擋: 新增第三個 active 同名／新增 active 空 name／新增 active 全空白 name／無關 active 列改成該名; 停用列改成該名而維持停用則可存(inactive 不參與)
-        let newRow = (o) => (rows) => [...rows, { ...rows[0], id: 'id-mk9-new', name: 'new9', email: 'new9@appMk.com', from: F, isActive: 'y', ...o }]
+        //perm-run03: rows[0] 可能是前案遺留之外部使用者列(order 0 排最前), 新增列須清空繼承之 srcKey(來源鍵與 from 同為身分欄, 後台不可新增帶 srcKey 之列, saveFromNotAllowed)
+        let newRow = (o) => (rows) => [...rows, { ...rows[0], id: 'id-mk9-new', name: 'new9', email: 'new9@appMk.com', from: F, srcKey: '', isActive: 'y', ...o }]
         await expectReject('新增第三個同名 active 列', newRow({ name: 'hist9' }), 'saveRowFieldDuplicate')
         await expectReject('新增 active 空 name', newRow({ name: '' }), 'saveRowFieldInvalid')
         await expectReject('新增 active 全空白 name', newRow({ name: '   ' }), 'saveRowFieldInvalid')
@@ -306,7 +314,7 @@ describe('api-mapKey (F-14: 使用者對應鍵之外部同步檢查與登入多�
         assert.strict.equal((await usersSorted()).find((v) => v.id === 'id-mk10-a').description, 'mk21-edited')
 
         //(2) 本次造成或觸及者被拒
-        let newRow = (o) => (rows) => [...rows, { ...rows[0], id: 'id-mk10-new', name: 'new10', email: 'new10@appMk.com', from: F, isActive: 'y', ...o }]
+        let newRow = (o) => (rows) => [...rows, { ...rows[0], id: 'id-mk10-new', name: 'new10', email: 'new10@appMk.com', from: F, srcKey: '', isActive: 'y', ...o }]
         await expectReject('新增 active 列 email 空', newRow({ email: '' }), 'saveRowFieldInvalid')
         await expectReject('新增 inactive 列 email 空(email 全表檢查)', newRow({ email: '', isActive: 'n' }), 'saveRowFieldInvalid')
         await expectReject('新增 active 列 email 全空白(對應鍵以 trim 判空)', newRow({ email: '   ' }), 'saveRowFieldInvalid')

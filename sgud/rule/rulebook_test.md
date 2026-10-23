@@ -231,3 +231,19 @@
   ```
 - **測試**: `unit-srLogMark`(SLM-001～010: 時鐘偏差下仍讀到、標記前不讀、殘行、跨小時、位元組定位／CRLF／不可解析行、檔名篩選、哨兵〔管線中前序行、延遲落檔、新檔、等不到拋錯〕、非標記拋 TypeError); 端到端由 `api-refCascade` API-RC-044 等 17 個標記站點(refCascade 9＋externalRows 8)之案與 `api-tokenSafety`／`api-externalRows` 之 log 斷言經真後端驗證。
 - **已知限制**: ①`markSrLog` 多一個哨兵 HTTP 請求(約數十 ms／次); ②哨兵順序保證假設單一後端行程單一 transport(現況成立; 若日後多行程共寫同一目錄須改以各行程哨兵); ③只看最新 3 個 log 檔(logNumKeep 上限 8760 檔, 不逐檔 stat); ④「測試端時鐘 vs 後端時鐘」之偏差本身是環境事實, 未修(也不需要修); 其他跨行程時間比較若新增須依本規則改寫。
+
+
+## 測試輔助之規則: 被引用實體身分宣告之「合規客戶端」模擬與外部匯入夾具之 srcKey 標籤(2026-10-23 perm-run03; 來源: 宣告強制必帶〔R-REF-IDENTITY-01 規則 10〕與外部匯入改 srcKey 差異同步〔R-IMPORT-01〕使既有直打測試的前提改變)
+
+### R-TEST-DECL-01 直打 `update*` 之測試一律經「附宣告」的合規客戶端; 要測「缺宣告被拒」者明示略過
+
+軸: 測試入口 { 單元〔`proc(woItems, procOrm, …)` 之 `pc.updateXxx`〕, API〔`callRpc('updateXxx', …)`〕, e2e 置備〔`resetDb`／`resetDbTables`〕, e2e UI〔清單頁／對話框，應用程式碼本來就送宣告〕 } × 宣告需求 { 改變引用, 不改變引用 }.
+
+- **規則**:
+  1. 單元: `test/tools/declHelper.mjs:autoDecl(pc, woItems)` 把 `pc.updateUsers／updateGrups／updatePemis` 包成「合規客戶端」——未帶 `refs`／`subject` 時，依送出之整表與替身資料表目前內容以 `buildRefDecl`（無 picks 路徑，同清單頁）組宣告，**僅在宣告非空（本次存檔改變了引用）時附上**（空宣告會使伺服端取被引用表鎖，改變取鎖軌跡／持鎖互斥類測試的被測前提）；讀替身時用 `snapshot()`，不計入 `select` 次數。要測缺宣告被拒者在 opt 加 `__noDecl: true`。直接測宣告本身的檔（`unit-procCore-identity`、`unit-refIdentity`）**不包**。
+  2. API: `test/tools/api-setup.mjs:callRpc` 對 `updateUsers／updateGrups／updatePemis` 自動附 `refs`（讀庫以管理者權杖經資料通道 `select`）；`opt.noDecl: true` 略過。已帶 `refs`／`subject` 者不覆蓋。
+  3. e2e 置備: `test/tools/e2e-setup.mjs:resetDb／resetDbTables` 經 `updateWithDecl` 於 throwaway page 附宣告；e2e UI 案例不包（應用程式碼自行送）。
+  4. 外部匯入夾具: `test/tools/e2eExt.mjs:syncRows(kt, rows, from)` 把夾具列的 `id`（夾具標籤）改送為 `srcKey` 並丟掉 `id`（同步端點不收 `id`），`rowOf`／`hasRow` 在 id 找不到時以 `srcKey` 找，`idOfSrc(kt, srcKey)` 取真實 id；外部列的真實 id 由伺服端產生（targets 例外: id＝srcKey）。
+- **why**: 不如此，每個「直打 update」的既有測試都得逐案補宣告，案例意圖被樣板淹沒；而測的是各自的規則，不是宣告本身。宣告本身由 `unit-refIdentity`／`unit-procCore-identity`／`api-identity` 與 e2e `e2e-concurrent-edit` 專測。
+- **盤點指令**: `rg -n "autoDecl\(" test`（單元包裝站點，10 檔）；`rg -n "noDecl|__noDecl" test`（刻意略過者應只在缺宣告案例）。
+- **測試**: `unit-syncCore`（外部匯入核心 64 案）、`api-callerIdentity`（執行身分＋角色檢查 26 案）。

@@ -4,6 +4,8 @@
 //  給定 'y'(還原後): updateUsers 整表 diff 寫入不受限(既有 api-updateTabs 覆蓋, 此處只驗 getWebInfor 回 'y' 對照)。
 //
 //以 restartBackend(genTempSettings({ modeEditUsers: 'for:grups' })) 換設定, after 還原 './settings.json'; DB 以 RPC 還原 base seed。
+//perm-run03: updateUsers 改變引用(FG-002 新增 M2 引用、after 還原時移除之)須附被引用實體身分宣告, 本檔經共用 callRpc 呼叫(對 updateUsers 自動附 refs, 同清單頁); 宣告只涵蓋被採納之 cgrups 變更(身分欄／新增／缺列不採納, 不入宣告),
+//  寫入函數另須呼叫者為 perm users 內有效之系統管理員(requireAdmin; TOKEN_ADMIN 即是), 本檔各案之契約與斷言不變。
 
 import assert from 'assert'
 import { startApi, TOKEN_ADMIN, getWoItems, callRpc as callRpcShared } from './tools/api-setup.mjs'

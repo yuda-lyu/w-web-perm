@@ -4,16 +4,23 @@
 //  [A1] 反向主體 subject（updateUsers 之主體為群組、updateGrups 之主體為權限）: 相符成功; 主體被刪除後以同名重建（id 不同, saved:true）→ saveSubjectChanged、庫內零變更、srLog identity-error（reason gone, n 1, 不含名稱／id）;
 //  [A2] 正向 refs（users.cgrups→grups、grups.cpemis→pemis、pemis.crules→targets）: 宣告相符成功; 被引用實體已刪除 → saveRefChanged; 〔users／grups〕刪後同名重建（id 不同）→ saveRefChanged;
 //       〔pemis〕targets 之 id 即名稱, 刪後同 id 重建依定義是同一實體 → 成功（設計事實, R-REF-IDENTITY-01 規則 5）; 宣告不完整 → saveRefChanged／refIncomplete;
-//  [A3] 相容: 不帶宣告（或 subject／refs 為 null）時行為與修正前相同——被引用實體已被替換者亦照舊成功寫入（外部應用相容, 名稱引用語意）;
+//  [A3] 必帶（perm-run03 範圍一; 取消 perm-run02 之相容）: 改變引用（新增啟用引用、移除引用、停用既有項、新增列帶引用、複製列帶引用）而不帶宣告（opt.noDecl:true 抑止 callRpc 之自動附宣告; 或 subject:null＋refs:null、{}）→ saveIdentityRequired/identityRequired,
+//       庫內零變更（逐位元）、srLog identity-error 一筆（n＝改變之名稱數, 不含名稱／id）; 即使被引用實體已被替換亦然（不再靜默接管同名新實體）; 不改變引用（只改說明、只改名、整列刪除）不帶宣告 → 成功;
+//       移除引用的宣告: 相符 → 成功; ids 不符／空陣列而實體仍在 → saveRefChanged/refChanged; 漏報 → refIncomplete（AI-7～AI-9）;
 //  [A4] 格式不合 → saveIdentityFormat/format（含 targets 帶 refs／subject）, 庫內零變更;
 //  [A5] 真後端並發（V14）: 一邊存檔（帶宣告）、一邊「刪除被引用實體並以同名重建（pemis 為單純刪除）」各 6 輪（A 先／B 先 × 啟動間隔 0／4／12 ms）, 每輪終態只有兩種合法結果之一:
 //       ①存檔成功（A 先持鎖）, 其後被引用實體才被替換, 且替換之引用連帶清理已把剛寫入之引用移除; ②被引用實體先被替換, 存檔被拒、零寫入;
 //       不得出現「存檔成功但寫入之授權指向替換後之新實體」（終態為存檔成功且引用仍在）。
-//輸入空間: 引用端 H {users, grups, pemis} × 宣告 {subject〔users, grups〕, refs} × 被引用實體狀態 {未變, 刪除, 刪後同名重建} ＋ 相容 {無第 3 參, subject:null＋refs:null} ＋ 格式不合 ＋ 並發 5 組（users-subject／users-refs／grups-subject／grups-refs／pemis-refs）× 6 輪。
+//輸入空間: 引用端 H {users, grups, pemis} × 宣告 {subject〔users, grups〕, refs} × 被引用實體狀態 {未變, 刪除, 刪後同名重建} ＋ 必帶（perm-run03）H 3 × 缺宣告之變更 {新增引用, 移除引用, 停用既有項, 新增列帶引用, 複製列帶引用} × 不帶形式 {noDecl 無第 3 參, noDecl＋{}, subject:null＋refs:null}（AI-3、AI-7）
+//  ＋ 不改變引用不需宣告 {只改說明, 只改名, 整列刪除}（AI-8）＋ 移除引用之宣告 {相符, 亂 id, 空陣列而實體仍在, 漏報, 停用有宣告}（AI-9）＋ 格式不合 ＋ 並發 5 組（users-subject／users-refs／grups-subject／grups-refs／pemis-refs）× 6 輪。
+//perm-run03 註: callRpc 對 updateUsers／updateGrups／updatePemis 自動附宣告（test/tools/api-setup.mjs）, 故本檔「要測缺宣告」者一律明傳 { noDecl: true }; 「要測帶了但不符」者明確傳 refs／subject（自動附掛不覆蓋已帶者）。
 //夾具: 每案前於 base seed 之上加三個未被任何人引用之實體（群組 idn-g、權限 idn-p、標的 專案IDN/頁1/區塊X）; 各案之引用端為 john（cgrups）、權限群組M3（cpemis）、權限P4（crules）之列; 每案後以「被引用者先、引用端後」(targets → pemis → grups → users)還原為 base seed（同 api-baseline／api-refCascade 之次序: 反序則引用端先指向尚無實體之名稱而使改名類寫入被拒）。
 //測試 token: 'sys'(id-for-admin, 後台 RPC 操作者); DB 讀取一律經資料通道 select(selectAllRows), 寫入一律走後端 RPC。
 //跑法(需測試鎖): node C:/opensrcOper/tools/quiet-run.mjs --name tidn --lock --timeout 1800 -- npx mocha test/api-identity.test.mjs --timeout 300000
-//案數: 47（AI-1 6、AI-2 15、AI-3 6、AI-4 14、AI-5 5〔各 6 輪〕、AI-6 1）。實跑紀錄: 撰寫時以「行程內真 procCore＋替身資料表」乾跑 47 案全綠(驗證夾具、還原次序與斷言邏輯); 2026-10-23 perm-run02 主代理對真後端實跑(測試鎖內)47／47 通過(44 秒), 之後與 unit-*／其餘 api-* 同一行程 4021 過／0 敗(chain unitapi)。
+//案數: perm-run02 為 47（AI-1 6、AI-2 15、AI-3 6、AI-4 14、AI-5 5〔各 6 輪〕、AI-6 1）, 2026-10-23 perm-run02 主代理對真後端實跑(測試鎖內)47／47 通過(44 秒)。
+//  perm-run03 改寫／新增: AI-3（原「相容」6 案 → 「必帶」改寫, 3 引用端 × 3 不帶形式 ＝ 9 案）、AI-7（缺宣告拒收 3 引用端 × 5 變更 ＝ 15 案）、AI-8（不改變引用不需宣告, 每引用端 1 案含只改說明／只改名／整列刪除 ＝ 3 案）、AI-9（移除引用之宣告, 每引用端 2 案 ＝ 6 案）, AI-6 增 saveIdentityRequired 語系鍵; 其餘不動 ⇒ 共 74 案。
+//  撰寫者（perm-run03 測試遷移子代理 B）未對真後端實跑（共用 port 11006 與 ./db, 由主責 agent 序列執行）; 已做 node --check 語法檢查, 並以「行程內真 procCore＋替身資料表＋與 api-setup.callRpc 相同之自動附宣告邏輯」之替身
+//  （tmp/perm-run03/apisim-B/fake-api-setup.mjs 等, 供在 repo 副本沙盒內重建; 不進 repo）乾跑本檔 74 案全綠（驗證夾具／期望鍵／n／零寫入／還原次序）; 對該乾跑注入缺陷（必帶判定拿掉、略過檢查、只檢查新增列、collectChangedNames 不含移除、新列誤當有舊列）皆被抓（紅 27／27／27／12／6 案）。
 //註(外審 sol#3, 2026-10-23): AI-5 並發案為「終態不變式」斷言(每輪終態只能是兩種合法結果之一, 不得出現存檔成功但授權指向替換後之新實體), 經 RPC 無法強制兩請求在伺服端交錯, 故不單獨證明「檢查與寫入同鎖」; 該證明由 unit-procCore-identity IDN-510／520 以人為延遲(替身表 select 加延遲, 事件序不交錯且終態等價依序執行)與取鎖軌跡(IDN-501)承擔, 本檔補真後端之格式、拒收、零寫入、相容與兩種次序皆能發生(各 3 輪)之實證。
 
 import assert from 'assert'
@@ -59,8 +66,8 @@ let rowsOf = async (kt) => (await selectAllRows(kt)).slice().sort(byOrder).map(c
 let snapKt = async (kt) => JSON.stringify((await selectAllRows(kt)).slice().sort(byId))
 let snap4 = async () => JSON.stringify([await snapKt('users'), await snapKt('grups'), await snapKt('pemis'), await snapKt('targets')])
 
-//後台寫入 RPC（第 3 參 opt 為用戶端給之 { baseline, returnRows, subject, refs }）
-let write = (kt, rows, opt) => callRpc(FN[kt], opt === undefined ? [rows] : [rows, opt], TOKEN_ADMIN)
+//後台寫入 RPC（第 3 參 opt 為用戶端給之 { baseline, returnRows, subject, refs }; copt 為 callRpc 之第 4 參——{ noDecl: true } 抑止自動附宣告, 用於要測「缺宣告被拒」或不需宣告者）
+let write = (kt, rows, opt, copt = {}) => callRpc(FN[kt], opt === undefined ? [rows] : [rows, opt], TOKEN_ADMIN, copt)
 let mustWrite = async (kt, rows, opt) => {
     let r = await write(kt, rows, opt)
     A.ok(r.ok, `預置 ${FN[kt]} 應成功, 實得: ${JSON.stringify(r).slice(0, 300)}`)
@@ -85,6 +92,55 @@ let holderOf = (h, rows) => rows.find((r) => r.name === HOLD[h].holderName)
 let authKeys = (h, rows) => Object.keys(JSON5.parse(holderOf(h, rows)[HOLD[h].field]))
 let declOf = (h) => [{ name: HOLD[h].name, ids: [HOLD[h].id] }]
 let subjOf = (h) => ({ id: HOLD[h].id, name: HOLD[h].name, saved: true })
+
+//perm-run03: 引用端編輯對象列「原本就有」之啟用引用（base seed）, 供「移除引用」案: john→權限群組M3、權限群組M3→權限P2、權限P4→「專案B/頁B/區塊A/待辦事項清單」
+const RM = {
+    users: { name: '權限群組M3', id: 'id-for-權限群組M3' },
+    grups: { name: '權限P2', id: 'id-for-權限P2' },
+    pemis: { name: '專案B/頁B/區塊A/待辦事項清單', id: '專案B/頁B/區塊A/待辦事項清單' },
+}
+let rmDecl = (h) => [{ name: RM[h].name, ids: [RM[h].id] }]
+//editHolderAuth: 引用端表整表, 其編輯對象列之授權欄經 fn(物件) 改寫後送出
+let editHolderAuth = (h, rows, fn) => rows.map((r) => {
+    if (r.name !== HOLD[h].holderName) {
+        return r
+    }
+    let kp = JSON5.parse(r[HOLD[h].field])
+    fn(kp)
+    return { ...r, [HOLD[h].field]: JSON.stringify(kp) }
+})
+//sendRemove: 編輯對象列移除其原有之啟用引用 RM[h]; sendDisable: 同一項改為停用（y→n）
+let sendRemove = (h, rows) => editHolderAuth(h, rows, (kp) => {
+    delete kp[RM[h].name]
+})
+let sendDisable = (h, rows) => editHolderAuth(h, rows, (kp) => {
+    kp[RM[h].name] = (h === 'pemis') ? 'n' : { mode: 'OR', isActive: 'n' }
+})
+let isOnVal = (v) => v === 'y' || (v !== null && typeof v === 'object' && v.isActive === 'y')
+let activeIn = (h, rows, name) => isOnVal(JSON5.parse(holderOf(h, rows)[HOLD[h].field])[name])
+//idOfRef: base seed 被引用實體之 id（users/grups 之被引用實體 id 為 id-for-<名稱>; pemis 之被引用標的 id 即名稱）
+let idOfRef = (h, name) => (h === 'pemis' ? name : `id-for-${name}`)
+//activeDecl: 某列授權欄內全部啟用項之宣告（複製列帶有原列之全部啟用引用）
+let activeDecl = (h, row) => {
+    let kp = JSON5.parse(row[HOLD[h].field])
+    return Object.keys(kp).filter((k) => isOnVal(kp[k])).sort().map((k) => ({ name: k, ids: [idOfRef(h, k)] }))
+}
+//新增列／複製列（帶對夾具實體之啟用引用）: id 為庫內不存在者（視為新增）, 名稱／email 唯一
+let newHolderRow = (h, tag) => {
+    let auth = addRef(h, '{}', HOLD[h].name)
+    if (h === 'users') {
+        return { id: `id-idn-u-${tag}`, order: 0, name: `idn-newbie-${tag}`, email: `idn-newbie-${tag}@example.com`, description: '', from: '', cgrups: auth, isAdmin: 'n', isActive: 'y' }
+    }
+    return h === 'grups' ? { ...gRow(`id-idn-g-${tag}`, `idn-ng-${tag}`), cpemis: auth } : { ...pRow(`id-idn-p-${tag}`, `idn-np-${tag}`), crules: auth }
+}
+let copyHolderRow = (h, rows, tag) => {
+    let src = holderOf(h, rows)
+    let r = { ...clone(src), id: `id-idn-copy-${h}-${tag}`, name: `${src.name}-${tag}`, order: 0 }
+    if (h === 'users') {
+        r.email = `${tag}-${src.email}`
+    }
+    return r
+}
 
 //被引用實體被改動（經後端 RPC, 與真實「他人」同路徑）
 let delEnt = async (h) => {
@@ -139,10 +195,10 @@ let expectIdentityLog = async (mark, { keyTable, msg, reason, n }, label) => {
     checkNoSecrets(lines, label)
 }
 //expectReject: 被拒——回指定語系鍵、四表逐位元不變、srLog 正確
-let expectReject = async (h, rows, opt, key, reason, n, label) => {
+let expectReject = async (h, rows, opt, key, reason, n, label, copt = {}) => {
     let s0 = await snap4()
     let mark = await markSrLog()
-    let r = await write(h, rows, opt)
+    let r = await write(h, rows, opt, copt)
     A.equal(r.ok, false, `${label} 應被拒, 實得: ${JSON.stringify(r).slice(0, 300)}`)
     A.equal(r.msg, key, `${label} 應回語系鍵 ${key}, 實得: ${r.msg}`)
     A.equal(await snap4(), s0, `${label} 被拒時四表須逐位元不變(零寫入)`)
@@ -301,10 +357,11 @@ describe('api-identity (正反關聯與主體身分檢查, 真後端, perm-run02
         })
     }
 
-    // ===== A3 相容 =====
+    // ===== A3 必帶（perm-run03; 原 perm-run02「相容」6 案改寫）=====
+    //不帶宣告三種形式（noDecl 無第 3 參／noDecl＋{}／subject:null＋refs:null）× 被引用實體已被替換 × 新增啟用引用 → saveIdentityRequired（不再照舊成功寫入、不再靜默接管同名新實體）
     for (let h of H3) {
-        for (let [tag, opt] of [['無第 3 參', undefined], ['subject:null＋refs:null', { subject: null, refs: null }]]) {
-            it(`AI-3 [${h}→${HOLD[h].ref}] 相容（${tag}）: 被引用實體已被替換${h === 'pemis' ? '（標的已刪）' : '（刪後同名重建）'}, 不帶宣告 → 照舊成功寫入（外部應用相容, 名稱引用語意; 不擴權）  [A3]`, async function() {
+        for (let [tag, opt] of [['noDecl 無第 3 參', undefined], ['noDecl＋空物件 {}', {}], ['subject:null＋refs:null', { subject: null, refs: null }]]) {
+            it(`AI-3 [${h}→${HOLD[h].ref}] 必帶（${tag}）: 被引用實體已被替換${h === 'pemis' ? '（標的已刪）' : '（刪後同名重建）'}, 不帶宣告而新增啟用引用 → saveIdentityRequired/identityRequired(n 1), 四表零變更, srLog 不含名稱／id（不再靜默接管同名新實體）  [A3]`, async function() {
                 let rows = await rowsOf(h)
                 if (h === 'pemis') {
                     await delEnt(h)
@@ -312,12 +369,102 @@ describe('api-identity (正反關聯與主體身分檢查, 真後端, perm-run02
                 else {
                     await replaceEnt(h)
                 }
-                let r = await write(h, sendAdd(h, rows), opt)
-                A.ok(r.ok, `不帶宣告應與修正前相同（成功）, 實得: ${JSON.stringify(r).slice(0, 300)}`)
-                A.equal(r.output, OKS)
-                A.ok(authKeys(h, await rowsOf(h)).includes(HOLD[h].name), '授權已依名稱寫入')
+                await expectReject(h, sendAdd(h, rows), opt, 'saveIdentityRequired', 'identityRequired', 1, `AI-3 ${h} ${tag}`, { noDecl: true })
+                checkLangKey('saveIdentityRequired')
             })
         }
+    }
+
+    // ===== AI-7 缺宣告之各種改變引用（perm-run03）=====
+    //每格: 不帶宣告 → saveIdentityRequired（n＝改變之名稱數）、四表逐位元不變、srLog identity-error 恰一筆; 對照: 帶相符宣告 → 成功並寫入
+    const MISSING = [
+        {
+            title: '新增啟用引用', mk: (h, rows) => sendAdd(h, rows), okDecl: (h) => declOf(h), n: () => 1,
+            verify: (h, rows0, rows2) => A.ok(authKeys(h, rows2).includes(HOLD[h].name), '授權已寫入'),
+        },
+        {
+            title: '移除引用（刪項）', mk: (h, rows) => sendRemove(h, rows), okDecl: (h) => rmDecl(h), n: () => 1,
+            verify: (h, rows0, rows2) => A.equal(authKeys(h, rows2).includes(RM[h].name), false, '引用已移除'),
+        },
+        {
+            title: '停用既有項（y→n）', mk: (h, rows) => sendDisable(h, rows), okDecl: (h) => rmDecl(h), n: () => 1,
+            verify: (h, rows0, rows2) => A.equal(activeIn(h, rows2, RM[h].name), false, '引用已停用'),
+        },
+        {
+            title: '新增列帶引用', mk: (h, rows) => [...rows, newHolderRow(h, 'a')], okDecl: (h) => declOf(h), n: () => 1,
+            verify: (h, rows0, rows2) => A.equal(rows2.length, rows0.length + 1, '新增列已寫入'),
+        },
+        {
+            title: '複製列帶引用（原列全部啟用項）', mk: (h, rows) => [...rows, copyHolderRow(h, rows, 'cp')], okDecl: (h, rows) => activeDecl(h, holderOf(h, rows)), n: (h, rows) => activeDecl(h, holderOf(h, rows)).length,
+            verify: (h, rows0, rows2) => A.equal(rows2.length, rows0.length + 1, '複製列已寫入'),
+        },
+    ]
+    for (let h of H3) {
+        for (let m of MISSING) {
+            it(`AI-7 [${h}→${HOLD[h].ref}] 缺宣告「${m.title}」→ saveIdentityRequired/identityRequired, 四表逐位元不變, srLog 不含名稱／id; 對照: 帶相符宣告 → 成功  [A3]`, async function() {
+                let rows = await rowsOf(h)
+                let sent = m.mk(h, rows)
+                await expectReject(h, sent, undefined, 'saveIdentityRequired', 'identityRequired', m.n(h, rows), `AI-7 ${h} ${m.title}`, { noDecl: true })
+                let r = await write(h, sent, { refs: m.okDecl(h, rows) })
+                A.ok(r.ok, `帶相符宣告應成功, 實得: ${JSON.stringify(r).slice(0, 300)}`)
+                A.equal(r.output, OKS)
+                m.verify(h, rows, await rowsOf(h))
+            })
+        }
+    }
+
+    // ===== AI-8 不改變引用不需宣告（perm-run03）=====
+    //noDecl: true 之下: 只改說明、只改名、整列刪除（刪引用端之列本身）皆不改變啟用引用 → 成功
+    for (let h of H3) {
+        it(`AI-8 [${h}→${HOLD[h].ref}] 不帶宣告且不改變引用（只改說明／只改名／整列刪除）→ 成功  [A3]`, async function() {
+            let rows = await rowsOf(h)
+            let desc = rows.map((r) => (r.name === HOLD[h].holderName ? { ...r, description: 'idn-desc' } : r))
+            let r1 = await write(h, desc, undefined, { noDecl: true })
+            A.ok(r1.ok, `只改說明不需宣告, 實得: ${JSON.stringify(r1).slice(0, 300)}`)
+            A.equal(holderOf(h, await rowsOf(h)).description, 'idn-desc')
+            let rows2 = await rowsOf(h)
+            let renamed = rows2.map((r) => (r.name === HOLD[h].holderName ? { ...r, name: `${r.name}-idn` } : r))
+            let r2 = await write(h, renamed, undefined, { noDecl: true })
+            A.ok(r2.ok, `只改名不需宣告, 實得: ${JSON.stringify(r2).slice(0, 300)}`)
+            A.ok((await rowsOf(h)).some((r) => r.name === `${HOLD[h].holderName}-idn`), '改名已寫入')
+            let rows3 = await rowsOf(h)
+            let r3 = await write(h, rows3.filter((r) => r.name !== `${HOLD[h].holderName}-idn`), undefined, { noDecl: true })
+            A.ok(r3.ok, `整列刪除不需宣告, 實得: ${JSON.stringify(r3).slice(0, 300)}`)
+            A.ok(!(await rowsOf(h)).some((r) => r.name === `${HOLD[h].holderName}-idn`), '整列已刪除')
+        })
+    }
+
+    // ===== AI-9 移除引用之宣告（perm-run03）=====
+    for (let h of H3) {
+        let ref = HOLD[h].ref
+        it(`AI-9 [${h}→${ref}] 移除引用之宣告: ids 亂填 → saveRefChanged/refChanged(n 1); ids 空陣列而實體仍在 → refChanged(n 1); 空宣告（漏報）→ refIncomplete(n 1); 皆四表零變更; 相符 → 成功且被引用表不變  [A3]`, async function() {
+            let rows = await rowsOf(h)
+            let sent = sendRemove(h, rows)
+            await expectReject(h, sent, { refs: [{ name: RM[h].name, ids: ['ghost'] }] }, 'saveRefChanged', 'refChanged', 1, `AI-9 ${h} ghost`)
+            await expectReject(h, sent, { refs: [{ name: RM[h].name, ids: [] }] }, 'saveRefChanged', 'refChanged', 1, `AI-9 ${h} empty-ids`)
+            await expectReject(h, sent, { refs: [] }, 'saveRefChanged', 'refIncomplete', 1, `AI-9 ${h} incomplete`)
+            let refSnap = await snapKt(ref)
+            let r = await write(h, sent, { refs: rmDecl(h) })
+            A.ok(r.ok, `相符應成功, 實得: ${JSON.stringify(r).slice(0, 300)}`)
+            A.equal(r.output, OKS)
+            A.equal(authKeys(h, await rowsOf(h)).includes(RM[h].name), false, '引用已移除')
+            A.equal(await snapKt(ref), refSnap, '被引用表只讀不寫')
+        })
+
+        it(`AI-9 [${h}→${ref}] 同時移除既有引用並新增夾具引用: 不帶宣告 → saveIdentityRequired(n 2); 只宣告新增者／只宣告移除者 → refIncomplete(n 1); 兩者皆宣告 → 成功  [A3]`, async function() {
+            let rows = await rowsOf(h)
+            let sent = editHolderAuth(h, rows, (kp) => {
+                delete kp[RM[h].name]
+                kp[HOLD[h].name] = (h === 'pemis') ? 'y' : { mode: 'OR', isActive: 'y' }
+            })
+            await expectReject(h, sent, undefined, 'saveIdentityRequired', 'identityRequired', 2, `AI-9 ${h} both-none`, { noDecl: true })
+            await expectReject(h, sent, { refs: declOf(h) }, 'saveRefChanged', 'refIncomplete', 1, `AI-9 ${h} only-add`)
+            await expectReject(h, sent, { refs: rmDecl(h) }, 'saveRefChanged', 'refIncomplete', 1, `AI-9 ${h} only-rm`)
+            let r = await write(h, sent, { refs: [...declOf(h), ...rmDecl(h)] })
+            A.ok(r.ok, `兩者皆宣告應成功, 實得: ${JSON.stringify(r).slice(0, 300)}`)
+            let rows2 = await rowsOf(h)
+            A.ok(authKeys(h, rows2).includes(HOLD[h].name) && !authKeys(h, rows2).includes(RM[h].name), '新增與移除皆已寫入')
+        })
     }
 
     // ===== A4 格式不合 =====
@@ -380,12 +527,13 @@ describe('api-identity (正反關聯與主體身分檢查, 真後端, perm-run02
                 let aFirst = (k % 2 === 0)
                 let pA = null
                 let pB = null
+                //perm-run03: B 只刪除／同名重建被引用實體本身, 不改變任何引用端之授權欄 → 不需宣告; 傳 noDecl 免 callRpc 自動附宣告所多出的兩次 select 往返（維持原並發時序: A 與 B 之啟動間隔 gap 不被擾動）
                 if (aFirst) {
                     pA = write(h, rowsA, optA)
-                    pB = sleep(gap).then(() => write(ref, rowsB))
+                    pB = sleep(gap).then(() => write(ref, rowsB, undefined, { noDecl: true }))
                 }
                 else {
-                    pB = write(ref, rowsB)
+                    pB = write(ref, rowsB, undefined, { noDecl: true })
                     pA = sleep(gap).then(() => write(h, rowsA, optA))
                 }
                 let [rA, rB] = await withTimeout(Promise.all([pA, pB]), 120000, label)
@@ -419,8 +567,8 @@ describe('api-identity (正反關聯與主體身分檢查, 真後端, perm-run02
     }
 
     // ===== 語系鍵 =====
-    it('AI-6 語系鍵 saveSubjectChanged／saveRefChanged／saveIdentityFormat 有 eng 與 cht 固定訊息（後端回 key 供前端 $t 換算）', function() {
-        for (let k of ['saveSubjectChanged', 'saveRefChanged', 'saveIdentityFormat']) {
+    it('AI-6 語系鍵 saveSubjectChanged／saveRefChanged／saveIdentityFormat／saveIdentityRequired(perm-run03) 有 eng 與 cht 固定訊息（後端回 key 供前端 $t 換算）', function() {
+        for (let k of ['saveSubjectChanged', 'saveRefChanged', 'saveIdentityFormat', 'saveIdentityRequired']) {
             checkLangKey(k)
         }
     })

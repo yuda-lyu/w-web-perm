@@ -27,6 +27,8 @@
 //  isActive='y'、isAdmin='y'（verifyClientUser 讀 perm 列），故 before 以 TOKEN_ADMIN 之 updateUsers 插入 OP_B 列（from＝''，後台列）；
 //  users 表之案例基底（caseBase.users）＝ base seed ＋ OP_B 列，快照一律含之。after 以 base seed 還原（移除 OP_B 列），另以
 //  delAll({id}) 兜底（run07: 原以 from 兜底）——OP_B 列若殘留，api-verifyConn-auth「TOKEN_APP 走 client 通道應拒」會失敗。
+//  perm-run03: 資料通道之執行身分（getUserIdByToken）改為與連線閘同等完整驗證，且四個寫入函數先經 requireAdmin（perm users 表中該使用者須存在、isActive='y'、isAdmin='y'，否則 userNotAdmin）；
+//  OP_B 列本即 isAdmin='y'、isActive='y'（見 OP_B_ROW），兩位操作者皆滿足，並行序列化／雙擊防護之契約與斷言不變。執行身分（userId）取 perm users 內該使用者之 id（mappingBy 預設 'id' 時與外部 id 相同）。
 //
 //act＝以 Promise.allSettled 並行打 2 次（或依序 2 次）同表寫入 RPC；assert 走 DB 終態（g_mOrm 唯讀 select）+ RPC 回傳。
 //callRpc 改自 test/tools/api-setup.mjs import（2026-09-28 收斂；本檔原一份局部實作，與共用版邏輯僅差 raw／

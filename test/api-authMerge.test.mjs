@@ -2,9 +2,11 @@
 //
 //【規格】sgud/rule/rulebook.md 之 R-AUTH-MERGE-00(未給＝n、OR 聯集後與所有 AND 交集、與排列順序無關; ADR-033). 規則說明與窮舉見 unit-authMerge.test.mjs 檔頭.
 //前身為 run01 之現況刻畫(api-authMerge-characterize, 預期值為舊規則之順序相依結果), 2026-10-21 依使用者最終裁示改為規格; 各案「舊規則」結果見 CASES 註解.
-//做法: 以 tools/authMerge.mjs 的 buildData 由規格組出四表字串 → POST /syncAndReplaceTabs(全量取代本檔專屬 from)→ 唯讀 select 讀回,
+//做法: 以 tools/authMerge.mjs 的 buildData 由規格組出四表字串 → POST /syncAndReplaceTabs(依來源鍵 srcKey 對本檔專屬 from 做差異同步)→ 唯讀 select 讀回,
 //  ①授權字串(crules／cpemis／cgrups)逐字不變(後端不改寫、不補齊稠密)②getPermUserInfor 回傳之 rules 等於單元層對讀回資料呼叫 getUserRules 之結果 ③等於本檔寫死之規格預期值.
 //DB 斷言一律 getWoItems() 後唯讀 select; 本檔專屬 from 於 after 經 cleanExternalFixtures 清除(base seed 不動).
+//perm-run03(外部匯入改依 srcKey 差異同步, R-IMPORT-01): 同步端點不收 id(送 id 整批拒收 idNotAllowed), 每列須帶 srcKey; 內部主鍵 id 由伺服端產生(targets 例外: id＝srcKey),
+//  故本檔夾具列只帶 srcKey(標籤 sk-…), 讀回時依 srcKey 找列, getPermUserInfor 用讀回之真實 id 查詢. 授權字串以「名稱」互相引用(cgrups→群組名、cpemis→權限名、crules→標的 id), 與 id 無關, 規格表(CASES)不受影響.
 
 import assert from 'assert'
 import { startApi, urlSync, urlGetPermUserInfor, TOKEN_APP, getWoItems, cleanExternalFixtures } from './tools/api-setup.mjs'
@@ -50,7 +52,14 @@ const CASES = [
 ]
 
 
-const F2 = 'appTest-chm2' //「同步入口是否驗授權字串內容」專用分區(同步為整區全量取代, 不可與 F 共用)
+const F2 = 'appTest-chm2' //「同步入口是否驗授權字串內容」專用分區(同步為以 from 為界之差異同步, 與 F 分開以免互相刪除對方之列)
+
+/** 依 srcKey 找讀回之列(外部列之 id 由伺服端產生, 夾具以 srcKey 識別) */
+let bySrc = (rs, sk) => {
+    let r = rs.find((x) => x.srcKey === sk)
+    assert.ok(r, `讀回應有 srcKey=${sk} 之列`)
+    return r
+}
 
 let postSync = async (keyTable, rows, from = F) => {
     let url = urlSync.replace('{keyTable}', keyTable).replace('{token}', TOKEN_APP)
@@ -87,12 +96,12 @@ describe('api-authMerge - 授權合併規格(R-AUTH-MERGE-00)之 API 層抽驗',
             let d = buildData(spec, T)
             d.grups.forEach((x) => put('grups', x, 'cpemis'))
             d.pemis.forEach((x) => put('pemis', x, 'crules'))
-            sent.users.push({ id: `id-chm-${id}`, order: k, name: `chm-${id}`, email: `chm-${id}@appTest.com`, description: '', from: F, cgrups: d.user.cgrups, isAdmin: 'n', isActive: 'y' })
+            sent.users.push({ srcKey: `sk-chm-${id}`, order: k, name: `chm-${id}`, email: `chm-${id}@appTest.com`, description: '', from: F, cgrups: d.user.cgrups, isAdmin: 'n', isActive: 'y' })
         })
         let order = 0
-        sent.grups = [...byName.grups.values()].map((x) => ({ id: `id-${x.name}`, order: order++, name: x.name, description: '', from: F, cpemis: x.cpemis }))
-        sent.pemis = [...byName.pemis.values()].map((x) => ({ id: `id-${x.name}`, order: order++, name: x.name, description: '', from: F, crules: x.crules }))
-        sent.targets = T.map((id, k) => ({ id, order: k, description: '', from: F }))
+        sent.grups = [...byName.grups.values()].map((x) => ({ srcKey: `sk-${x.name}`, order: order++, name: x.name, description: '', from: F, cpemis: x.cpemis }))
+        sent.pemis = [...byName.pemis.values()].map((x) => ({ srcKey: `sk-${x.name}`, order: order++, name: x.name, description: '', from: F, crules: x.crules }))
+        sent.targets = T.map((id, k) => ({ srcKey: id, order: k, description: '', from: F })) //targets 之 id 即標的名稱: 外部匯入時 id＝srcKey
 
         for (let kt of ['targets', 'pemis', 'grups', 'users']) {
             let res = await postSync(kt, sent[kt])
@@ -109,24 +118,25 @@ describe('api-authMerge - 授權合併規格(R-AUTH-MERGE-00)之 API 層抽驗',
         const bad = ['not json', '{"chm-T1":', '[1,2,3]', 'null', '{"__proto__":"y"}']
         let rows = { pemis: [], grups: [], users: [] }
         bad.forEach((s, k) => {
-            rows.pemis.push({ id: `id-chm2-p${k}`, order: k, name: `chm2-p${k}`, description: '', from: F2, crules: s })
-            rows.grups.push({ id: `id-chm2-g${k}`, order: k, name: `chm2-g${k}`, description: '', from: F2, cpemis: s })
-            rows.users.push({ id: `id-chm2-u${k}`, order: k, name: `chm2-u${k}`, email: `chm2-u${k}@appTest.com`, description: '', from: F2, cgrups: s, isAdmin: 'n', isActive: 'y' })
+            rows.pemis.push({ srcKey: `sk-chm2-p${k}`, order: k, name: `chm2-p${k}`, description: '', from: F2, crules: s })
+            rows.grups.push({ srcKey: `sk-chm2-g${k}`, order: k, name: `chm2-g${k}`, description: '', from: F2, cpemis: s })
+            rows.users.push({ srcKey: `sk-chm2-u${k}`, order: k, name: `chm2-u${k}`, email: `chm2-u${k}@appTest.com`, description: '', from: F2, cgrups: s, isAdmin: 'n', isActive: 'y' })
         })
         for (let kt of ['pemis', 'grups', 'users']) {
             let res = await postSync(kt, rows[kt], F2)
             assert.strictEqual(res.state, 'success', `${kt} 含損壞字串之推送應成功(現況: 不驗內容), 實得: ${JSON.stringify(res)}`)
+            assert.strictEqual(res.msg.nAdd + res.msg.nUpdate + res.msg.nSame, bad.length, `${kt} 本批 ${bad.length} 列皆應被處理(新增／修改／不變), 實得 ${JSON.stringify(res.msg)}`)
         }
         let woItems = await getWoItems()
         let back = { pemis: await woItems.pemis.select({ from: F2 }), grups: await woItems.grups.select({ from: F2 }), users: await woItems.users.select({ from: F2 }) }
         bad.forEach((s, k) => {
-            assert.strictEqual(back.pemis.find((x) => x.id === `id-chm2-p${k}`).crules, s)
-            assert.strictEqual(back.grups.find((x) => x.id === `id-chm2-g${k}`).cpemis, s)
-            assert.strictEqual(back.users.find((x) => x.id === `id-chm2-u${k}`).cgrups, s)
+            assert.strictEqual(bySrc(back.pemis, `sk-chm2-p${k}`).crules, s)
+            assert.strictEqual(bySrc(back.grups, `sk-chm2-g${k}`).cpemis, s)
+            assert.strictEqual(bySrc(back.users, `sk-chm2-u${k}`).cgrups, s)
         })
-        //查詢端不因損壞字串而失敗: 該使用者的有效權限為全 n(fail-safe)
+        //查詢端不因損壞字串而失敗: 該使用者的有效權限為全 n(fail-safe); 使用者之 id 由伺服端產生, 依 srcKey 取得
         for (let k = 0; k < bad.length; k++) {
-            let ur = await getPermUserInfor(urlGetPermUserInfor, TOKEN_APP, `id-chm2-u${k}`)
+            let ur = await getPermUserInfor(urlGetPermUserInfor, TOKEN_APP, bySrc(back.users, `sk-chm2-u${k}`).id)
             assert.ok(ur.rules.every((x) => x.isActive === 'n'), `損壞 cgrups #${k} → 全 n`)
         }
     })
@@ -137,28 +147,31 @@ describe('api-authMerge - 授權合併規格(R-AUTH-MERGE-00)之 API 層抽驗',
         for (let kt of ['users', 'grups', 'pemis', 'targets']) {
             rows[kt] = await woItems[kt].select({ from: F })
         }
-        let by = (kt, id) => rows[kt].find((x) => x.id === id)
-        sent.pemis.forEach((x) => assert.strictEqual(by('pemis', x.id).crules, x.crules, `pemis ${x.name}`))
-        sent.grups.forEach((x) => assert.strictEqual(by('grups', x.id).cpemis, x.cpemis, `grups ${x.name}`))
-        sent.users.forEach((x) => assert.strictEqual(by('users', x.id).cgrups, x.cgrups, `users ${x.name}`))
+        sent.pemis.forEach((x) => assert.strictEqual(bySrc(rows.pemis, x.srcKey).crules, x.crules, `pemis ${x.name}`))
+        sent.grups.forEach((x) => assert.strictEqual(bySrc(rows.grups, x.srcKey).cpemis, x.cpemis, `grups ${x.name}`))
+        sent.users.forEach((x) => assert.strictEqual(bySrc(rows.users, x.srcKey).cgrups, x.cgrups, `users ${x.name}`))
         assert.strictEqual(rows.targets.length, 3)
+        assert.deepStrictEqual(rows.targets.map((x) => x.id).sort(), [...T].sort(), 'targets 之 id 即標的名稱(外部匯入時 id＝srcKey)')
     })
 
     CASES.forEach(([id, spec, want]) => {
         it(`API-chm-${id}-經 getPermUserInfor 查得之授權 = 單元層對讀回資料之 getUserRules = 規格預期 {${want}}`, async function() {
-            //①API
-            let ur = await getPermUserInfor(urlGetPermUserInfor, TOKEN_APP, `id-chm-${id}`)
-            assert.ok(Array.isArray(ur.rules))
-            assert.ok(!ur.rules.some((x) => x.name === 'chm-TX'), '孤兒管理對象不輸出')
-            let apiYs = ysOf(ur.rules)
-
-            //②單元層: 對 DB 讀回之資料呼叫真函數
+            //讀回本檔分區之四表(使用者之 id 由伺服端產生, 依 srcKey 找列)
             let woItems = await getWoItems()
             let users = await woItems.users.select({ from: F })
             let grups = await woItems.grups.select({ from: F })
             let pemis = await woItems.pemis.select({ from: F })
             let targets = await woItems.targets.select({ from: F })
-            let unit = getUserRules(users.find((x) => x.id === `id-chm-${id}`), grups, pemis, targets)
+            let me = bySrc(users, `sk-chm-${id}`)
+
+            //①API
+            let ur = await getPermUserInfor(urlGetPermUserInfor, TOKEN_APP, me.id)
+            assert.ok(Array.isArray(ur.rules))
+            assert.ok(!ur.rules.some((x) => x.name === 'chm-TX'), '孤兒管理對象不輸出')
+            let apiYs = ysOf(ur.rules)
+
+            //②單元層: 對 DB 讀回之資料呼叫真函數
+            let unit = getUserRules(me, grups, pemis, targets)
             assert.strictEqual(ysOf(unit.rules), apiYs, '單元層與 API 層須一致')
             //完整 rules(含 n 與輸出順序)相等: 現存管理對象各一筆、依 targets 順序(外審 sol R12: 只比 y 集合會漏掉缺項／額外項／非 y／n 之值)
             assert.deepStrictEqual(mineOf(ur.rules), mineOf(unit.rules), 'API 與單元層之完整 rules 須相等')

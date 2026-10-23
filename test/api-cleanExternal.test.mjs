@@ -15,9 +15,12 @@
 
 import assert from 'assert'
 import { startApi, TOKEN_ADMIN, TOKEN_APP, callRpc, urlSync, selectAllRows, cleanExternalFixtures, purgeExternalRows } from './tools/api-setup.mjs'
+import { idOfSrc } from './tools/e2eExt.mjs'
 import { BASE_SEED_COUNT } from './tools/baseSeed.mjs'
 
 
+//perm-run03(外部匯入改依來源鍵 srcKey 差異同步; server/syncCore.mjs): 夾具列改送 srcKey(外部不送 id, 送 id 整批 idNotAllowed), 外部列之內部 id 由伺服端產生(不再等於夾具標籤);
+//  故各案以 srcKey(夾具標籤)找列(srcsOf), 需要真實 id 者(keepIds、assertPristineSeed 訊息)以 e2eExt.idOfSrc 查。cleanExternalFixtures／purgeExternalRows 依 from 與 id 直接刪外部列, 不依賴外部給 id, 行為不受協定影響。
 const A = assert.strict
 const F1 = 'appCe-1'
 const F2 = 'appCe-2'
@@ -29,9 +32,9 @@ let postSync = async (kt, from, rows) => {
     let r = await res.json()
     A.equal(r.state, 'success', `夾具 ${kt}(${from}) 同步應成功, 實得 ${JSON.stringify(r)}`)
 }
-let mkU = (id) => ({ id, order: 90, name: id, email: `${id}@ext.example.com`, description: '', cgrups: '{}', isAdmin: 'n', isActive: 'y' })
-let mkG = (id) => ({ id, order: 90, name: id, description: '', cpemis: '{}' })
-let idsOf = async (kt, from) => (await selectAllRows(kt)).filter((r) => r.from === from).map((r) => r.id).sort()
+let mkU = (srcKey) => ({ srcKey, order: 90, name: srcKey, email: `${srcKey}@ext.example.com`, description: '', cgrups: '{}', isAdmin: 'n', isActive: 'y' })
+let mkG = (srcKey) => ({ srcKey, order: 90, name: srcKey, description: '', cpemis: '{}' })
+let srcsOf = async (kt, from) => (await selectAllRows(kt)).filter((r) => r.from === from).map((r) => r.srcKey).sort()
 let snapAll = async () => {
     let out = {}
     for (let kt of KTS) {
@@ -58,15 +61,15 @@ describe('api-cleanExternal (外部列夾具收尾之單一入口 cleanExternalF
         await postSync('users', F1, [mkU('ce-u1')])
         await postSync('users', F2, [mkU('ce-u2')])
         await postSync('grups', F1, [mkG('ce-g1')])
-        A.deepEqual(await idsOf('users', F1), ['ce-u1'], '前置')
+        A.deepEqual(await srcsOf('users', F1), ['ce-u1'], '前置')
         let r = await cleanExternalFixtures({ kts: ['users', 'grups'], froms: [F1] })
         A.deepEqual(r, { users: 1, grups: 1 })
-        A.deepEqual(await idsOf('users', F1), [], 'F1 之 users 已移除')
-        A.deepEqual(await idsOf('grups', F1), [], 'F1 之 grups 已移除')
-        A.deepEqual(await idsOf('users', F2), ['ce-u2'], '他分區 F2 不動')
+        A.deepEqual(await srcsOf('users', F1), [], 'F1 之 users 已移除')
+        A.deepEqual(await srcsOf('grups', F1), [], 'F1 之 grups 已移除')
+        A.deepEqual(await srcsOf('users', F2), ['ce-u2'], '他分區 F2 不動')
         A.equal((await selectAllRows('users')).filter((x) => x.from === '').length, BASE_SEED_COUNT.users, '後台列不動')
         A.deepEqual(await cleanExternalFixtures({ kts: ['users'], froms: [F2] }), { users: 1 })
-        A.deepEqual(await idsOf('users', F2), [])
+        A.deepEqual(await srcsOf('users', F2), [])
     })
 
     it('CE-002 不限分區＋pristine: 移除全部外部列後四表回到 base seed(筆數與種子相符、from 皆為空字串)', async function() {
@@ -83,32 +86,36 @@ describe('api-cleanExternal (外部列夾具收尾之單一入口 cleanExternalF
 
     it('CE-003 不放寬產品: 管理者寫入無法移除外部列(回 saveExternalRowChanged、列仍在); 唯有本入口移除', async function() {
         await postSync('users', F1, [mkU('ce-u1')])
-        let rows = (await selectAllRows('users')).filter((x) => x.id !== 'ce-u1').sort((a, b) => (a.order || 0) - (b.order || 0))
+        let rows = (await selectAllRows('users')).filter((x) => x.srcKey !== 'ce-u1').sort((a, b) => (a.order || 0) - (b.order || 0))
         let res = await callRpc('updateUsers', [rows], TOKEN_ADMIN)
         A.equal(res.ok, false, `管理者寫入應拒絕, 實得 ${JSON.stringify(res).slice(0, 200)}`)
         A.equal(res.msg, 'saveExternalRowChanged', '拒絕鍵')
-        A.deepEqual(await idsOf('users', F1), ['ce-u1'], '外部列仍在')
+        A.deepEqual(await srcsOf('users', F1), ['ce-u1'], '外部列仍在')
         A.deepEqual(await cleanExternalFixtures({ kts: ['users'], froms: [F1], pristine: true }), { users: 1 })
-        A.deepEqual(await idsOf('users', F1), [])
+        A.deepEqual(await srcsOf('users', F1), [])
     })
 
     it('CE-004 keepIds: 指定 id 之外部列保留, 其餘移除', async function() {
         await postSync('users', F1, [mkU('ce-u1'), mkU('ce-u2')])
-        let r = await cleanExternalFixtures({ kts: ['users'], froms: [F1], keepIds: { users: ['ce-u2'] } })
+        let idU2 = await idOfSrc('users', 'ce-u2') //keepIds 以內部 id 計(伺服端產生, 非夾具標籤 srcKey)
+        A.ok(typeof idU2 === 'string' && idU2 !== 'ce-u2', `前置: ce-u2 之內部 id 由伺服端產生, 實得 ${idU2}`)
+        let r = await cleanExternalFixtures({ kts: ['users'], froms: [F1], keepIds: { users: [idU2] } })
         A.deepEqual(r, { users: 1 })
-        A.deepEqual(await idsOf('users', F1), ['ce-u2'])
+        A.deepEqual(await srcsOf('users', F1), ['ce-u2'])
         A.deepEqual(await cleanExternalFixtures({ kts: ['users'], froms: [F1] }), { users: 1 })
-        A.deepEqual(await idsOf('users', F1), [])
+        A.deepEqual(await srcsOf('users', F1), [])
     })
 
     it('CE-005 pristine 回驗不放寬: 表內仍有種子以外之列(此處以 keepIds 保留一筆外部列模擬)即拋錯, 訊息含多出主鍵與其 from 分區(指向遺留之測試檔)', async function() {
         await postSync('users', F1, [mkU('ce-u1')])
-        await A.rejects(cleanExternalFixtures({ kts: ['users'], froms: [F1], keepIds: { users: ['ce-u1'] }, pristine: true }), (err) => {
+        let idU1 = await idOfSrc('users', 'ce-u1') //assertPristineSeed 訊息之「多出主鍵」是內部 id(伺服端產生)
+        A.ok(typeof idU1 === 'string' && idU1 !== 'ce-u1', `前置: ce-u1 之內部 id 由伺服端產生, 實得 ${idU1}`)
+        await A.rejects(cleanExternalFixtures({ kts: ['users'], froms: [F1], keepIds: { users: [idU1] }, pristine: true }), (err) => {
             A.ok(/cleanExternalFixtures\(users\)/.test(err.message) && /不是 pristine base seed/.test(err.message), err.message)
-            A.ok(/多出主鍵 \[ce-u1\(from=appCe-1\)\]/.test(err.message), err.message)
+            A.ok(err.message.includes(`多出主鍵 [${idU1}(from=${F1})]`), err.message)
             return true
         })
-        A.deepEqual(await idsOf('users', F1), ['ce-u1'], '回驗失敗不代表會多刪或少刪: 保留之列仍在')
+        A.deepEqual(await srcsOf('users', F1), ['ce-u1'], '回驗失敗不代表會多刪或少刪: 保留之列仍在')
         A.deepEqual(await cleanExternalFixtures({ kts: ['users'], froms: [F1] }), { users: 1 })
         A.equal((await selectAllRows('users')).length, BASE_SEED_COUNT.users, '清除後回到種子筆數')
     })

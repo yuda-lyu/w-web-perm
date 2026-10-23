@@ -1,6 +1,4 @@
 import truncate from 'lodash-es/truncate.js'
-import ds from '../src/schema/index.mjs'
-import { fillIdlessIds } from '../src/js/refCascade.mjs'
 import validateRowsBeforeWrite from './validateRows.mjs'
 
 
@@ -131,23 +129,4 @@ async function writeWithCascade({ plan, holdersOld, woItems, procOrm, userId, sr
 }
 
 
-/**
- * 外部同步(delAll({ from }) + insert)之「寫入後整表」, 供 planRefChanges 判定同一 from 內之改名與刪除(Q6: 依同一來源內之穩定 id 判定)
- *
- * 他 from 之既有列原樣; 本批各列帶 id 者以其 id(有限數字取字串形式)為身分(同 id 異名＝改名、舊 id 不在本批＝刪除);
- * 本批未帶 id 之列(grups／pemis, 寫入時由 ORM 補隨機主鍵, 每次同步皆不同)無穩定 id 可依, 改以「名稱」對應同一 from 之既有列(同名即同一實體, 不算刪除再新增; 名稱不同即視為舊列刪除、新列新增), 僅供規劃, 不改寫入之列.
- *
- * @param {String} keyTable 輸入同步之表名
- * @param {Array} rowsOld 輸入該表全部既有列(select 結果)
- * @param {Array} rows 輸入本批列(已 ltdtmapping 並帶 from)
- * @param {String} from 輸入本批之 from
- * @returns {Array} 回傳寫入後之整表(僅供規劃, 不寫入)
- */
-function buildSyncRowsNew(keyTable, rowsOld, rows, from) {
-    let others = rowsOld.filter((r) => r !== null && typeof r === 'object' && r.from !== from)
-    let sameFrom = rowsOld.filter((r) => r !== null && typeof r === 'object' && r.from === from)
-    return [...others, ...fillIdlessIds(keyTable, sameFrom, rows, others)] //未帶 id 之列依名稱對應同一 from 之既有列(見 fillIdlessIds); 規劃 id 須避開他 from 列之主鍵
-}
-
-
-export { checkCascadePlan, writeWithCascade, buildSyncRowsNew }
+export { checkCascadePlan, writeWithCascade }

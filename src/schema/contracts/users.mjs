@@ -7,7 +7,7 @@
 export default {
     table: 'users',
     pk: 'id',
-    fields: ['name', 'email', 'description', 'from', 'cgrups', 'isAdmin', 'isActive'],
+    fields: ['name', 'email', 'description', 'from', 'srcKey', 'cgrups', 'isAdmin', 'isActive'], //srcKey: 外部匯入之來源鍵(身分欄, perm-run03; 與 from 同, 後台不可改〔externalRows.checkExternalWrite〕, 外部匯入補上或改變者持舊畫面者存檔即被拒)
     serverOnly: ['userId', 'timeCreate', 'userIdUpdate', 'timeUpdate'],
     orderKey: 'order',
 }

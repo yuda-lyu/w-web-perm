@@ -32,6 +32,7 @@ import cloneDeep from 'lodash-es/cloneDeep.js'
 import cacheSt from 'wsemi/src/cacheSt.mjs'
 import ds from '../src/schema/index.mjs'
 import proc from '../server/procCore.mjs'
+import { autoDecl } from './tools/declHelper.mjs'
 import createLockSave from '../server/lockSave.mjs'
 import pairRowsToSnapshot from '../src/js/pairRowsToSnapshot.mjs'
 import cvKpToObj from '../src/js/cvKpToObj.mjs'
@@ -221,7 +222,7 @@ function createEnv() {
     let { srLog, logs } = mkSrLog()
     let cst = cacheSt()
     let core = mkCore(ds, woItems) //perm-run01: 原 mkProcOrm＋kmx: pmKeyMutex() 改為 w-serv-orm 實例之 procOrm＋withTabLocks／guardWrite
-    let pc = proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) })
+    let pc = autoDecl(proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) }), woItems)
     let env = { seed, woItems, logs, cst, pc }
     envs.push(env)
     return env

@@ -1,6 +1,9 @@
 //正反向關聯之「被引用實體身分」純函數單元測試(perm-run02 範圍一; 使用者 2026-10-23 裁示「正反關聯與主體身份檢查, 應該是前後端都要做」; 規則帳本草案 R-SUBJECT-ID-01 規則 4〔伺服端強制〕、R-REF-IDENTITY-01; R-PRINCIPLE-00 原則 3、4、6; R-KEY-01 原型鍵名)
 //
-//受測: src/js/refIdentity.mjs 全部 13 個匯出(getRefTarget／activeNames／newActiveNames／collectNewNames／idsOfName／snapRefIds／recordPicks／buildRefDecl／parseSubject／parseRefDecl／countRefMismatch／checkRefIdentity／checkSubjectIdentity);
+//perm-run03 範圍一(使用者 2026-10-23 裁示「這本來就該強制必帶吧? 要不然怎麼確認與驗證調用者身份?」; R-REF-IDENTITY-01 規則 7、R-SUBJECT-ID-01 規則 5): 宣告強制必帶且「移除引用」亦須宣告——新增 removedActiveNames／collectChangedNames, recordPicks／buildRefDecl 納入移除,
+//  checkRefIdentity 新簽名 { decl, subject }（decl／subject 皆 null 而本次改變了引用 → saveIdentityRequired）; 本檔新增 RI-15～RI-19 對應之案例, 並更新 RI-7／RI-12 內已過時之標題（原「移除項不記」「移除舊引用免宣告」）。
+//
+//受測: src/js/refIdentity.mjs 全部 15 個匯出(getRefTarget／activeNames／newActiveNames／removedActiveNames／collectNewNames／collectChangedNames／idsOfName／snapRefIds／recordPicks／buildRefDecl／parseSubject／parseRefDecl／countRefMismatch／checkRefIdentity／checkSubjectIdentity);
 //  依賴一律真實(src/js/refCascade.mjs 之 REF_OF／keyOf／entName／decodeKp／listEntries、src/js/draftSync.mjs 之 checkSubject、json5), 不起 server、不碰 ORM.
 //斷言原則: 預期值獨立於實作——一律由下列「規格句」手算於測試內(字面量或手建字串), 不以被測函數(或其內部 helper)算預期值; 同一純函數前後端共用, 故此處之判準即前端自檢與伺服端強制之共同判準.
 //
@@ -18,6 +21,11 @@
 //  [R-CHK2]   宣告須完整: 本次寫入之列相對舊表新增之啟用引用名稱, 每個都須在宣告內 → saveRefChanged／refIncomplete, n＝漏報名稱數(先判 [R-CHK1], 再判 [R-CHK2])
 //  [R-TGT-ID] targets 之 id 即名稱, 故其身分定義即 id: 檢查涵蓋「已被刪除」, 刪除後同 id 重建依定義是同一實體(R-REF-IDENTITY-01 規則 5)
 //  [R-NOTGT]  引用端表無授權引用欄(targets)或表名不識: checkRefIdentity 回 saveIdentityFormat／refNoTarget; countRefMismatch 視為全部不符
+//  [R-RM]     perm-run03 「移除之啟用引用項」＝舊值啟用項 − 新值啟用項(被移除、被停用皆算; 新值缺欄／壞 JSON／空字串視為空容器, 舊啟用項全算移除); 舊值為 null〔新增列〕、舊列非物件、新列非物件、表名不識／targets → 無; 整列被刪除（不在 rowsNew）不算
+//  [R-CHG]    perm-run03 「改變引用之名稱集合」＝新增之啟用名稱 ∪ 移除之啟用名稱（跨列以名稱去重; 新列以 id 對應舊列; 不在 rowsNew 之舊列不計）
+//  [R-REQ]    perm-run03 checkRefIdentity: decl 與 subject 皆 null 而 [R-CHG] 非空 → saveIdentityRequired／identityRequired, n＝[R-CHG] 之名稱數（不讀被引用表, refRows 可為 null）; [R-CHG] 為空 → 通過
+//  [R-SUBJ-SCOPE] perm-run03 subject 只涵蓋其主體名稱（subject.name; 新增或移除皆算已宣告）; 另有其他被改名稱未在 decl 內 → saveRefChanged／refIncomplete
+//  [R-PICK-RM] perm-run03 recordPicks 另記「移除（或停用）之啟用引用名稱」在編輯器開啟當下所對應之 id 陣列（懸空記 []）; 與新增共用同一份選取記錄: 同名兩次記錄而 id 陣列不同 → 衝突（null）; buildRefDecl 納入移除之名稱
 //  [R-SUBJ]   主體判準即 draftSync.checkSubject: 同 id 同名 ok; 同 id 異名 renamed; saved 且 id 不在 gone(刪除或刪後同名重建); 未儲存之主體現有同名而 id 不同 taken; 摘要無效 noSubject; 非 ok 一律 saveSubjectChanged
 //  [R-PROTO]  使用者資料作為鍵時, 原型鍵名(__proto__／constructor／toString／hasOwnProperty…)不得出錯或誤判(R-KEY-01)
 //
@@ -33,13 +41,18 @@
 //  RI-11 countRefMismatch ／ RI-12 checkRefIdentity: 宣告 D {完整相符, 空, 漏報, 多報相符, 多報不符, 同時不符且漏報} × 被引用狀態 S {不變, 刪除, 刪後同名重建, 新增同名, 懸空→出現, 歷史同名多筆} × 引用端表 {users, grups, pemis} ＋ targets／不識表名
 //  RI-13 checkSubjectIdentity: 5 種結果 ＋ 與 checkSubject 之格網一致性(6 主體 × 5 表況)
 //  RI-14 原型鍵名全流程: 6 個原型鍵名 × 引用端 {users, grups}(快照 → 回填 → 組宣告 → 解析 → 檢查 → 刪後同名重建被拒)
+//  RI-15 removedActiveNames(perm-run03): 舊值 O {無該名, 啟用, 停用, 舊列 null, 舊值壞 JSON} × 新值 N {無該名, 啟用, 停用} × 引用端 {users, grups, pemis} ＋ 移除多個次序去重 ＋ 新值缺欄／壞 JSON ＋ 三種表示形式 ＋ 非法輸入 ＋ 原型鍵名
+//  RI-16 collectChangedNames(perm-run03): 列對應 {id 同, 新列, 缺 id, 數字 id, 舊列被刪〔不在 rowsNew〕} × 變更 {新增, 移除, 停用, 重新啟用, 搬移, 兩列同名} ＋ 與 collectNewNames／removedActiveNames 之集合關係
+//  RI-17 recordPicks 移除(perm-run03): 移除／停用記錄 × snap {有, 缺, 非 Map} × 衝突語意 {同 id 不衝突, 異 id 衝突, 移除後重選, 先選後移除} × 種類 {ref, rule}
+//  RI-18 buildRefDecl 含移除(perm-run03): picks {有記錄, 缺漏退回目前被引用表, 懸空, 衝突} × 變更 {僅移除, 新增＋移除, 停用, 整列刪除〔不入〕}
+//  RI-19 checkRefIdentity 新簽名 { decl, subject }(perm-run03): 引用端 {users, grups, pemis} × 變更 C 6 {無, 新增, 移除, 新增＋移除, 新增列, 停用} × 宣告 D 6 {null, 空陣列, 完整, 僅新增者, 僅移除者, 亂 id} 手寫 36 格 ＋ subject S {null, 涵蓋新增名稱, 涵蓋移除名稱, 不涵蓋} 手寫格(users／grups) ＋ 移除與被引用實體狀態（刪除／同名重建／懸空／另增同名／targets 同 id 重建）＋ refRows 不讀（必帶判定）
 //未測(刻意): 伺服端取鎖與寫入(見 unit-procCore-identity)、前端元件如何呼叫(見元件與 e2e)、JSON5 解析器本身.
 //跑法: node C:/opensrcOper/tools/quiet-run.mjs --name ri -- node node_modules/mocha/bin/mocha.js --no-parallel test/unit-refIdentity.test.mjs --timeout 180000 --exit
 import assert from 'assert'
 import { REF_OF } from '../src/js/refCascade.mjs'
 import { checkSubject } from '../src/js/draftSync.mjs'
 import {
-    getRefTarget, activeNames, newActiveNames, collectNewNames, idsOfName, snapRefIds, recordPicks, buildRefDecl,
+    getRefTarget, activeNames, newActiveNames, removedActiveNames, collectNewNames, collectChangedNames, idsOfName, snapRefIds, recordPicks, buildRefDecl,
     parseSubject, parseRefDecl, countRefMismatch, checkRefIdentity, checkSubjectIdentity,
 } from '../src/js/refIdentity.mjs'
 
@@ -410,7 +423,7 @@ describe('unit-refIdentity (正反向關聯之被引用實體身分: 純函數)'
     // =================================================================
     describe('RI-7 recordPicks', function() {
         const SNAP = () => new Map([['GA', ['g1']], ['GB', ['g2']], ['GC', ['g3']], ['GD', ['g4', 'g5']]])
-        it('RI-7 就地更新並回傳同一個 Map; 只記本次新增之啟用名稱(未變更舊引用、停用項、移除項皆不記)', function() {
+        it('RI-7 就地更新並回傳同一個 Map; 本案只含新增: 只記本次新增之啟用名稱(未變更舊引用、新增之停用項皆不記; perm-run03 起「移除／停用既有啟用項」另記, 見 RI-17)', function() {
             let picks = new Map()
             let ret = recordPicks({
                 keyTable: 'users',
@@ -738,7 +751,7 @@ describe('unit-refIdentity (正反向關聯之被引用實體身分: 純函數)'
                 A.deepEqual(chk({ rowsNew: newRows(N[2]), decl: [] }), { key: 'saveRefChanged', reason: 'refIncomplete', n: 1 }) //[R-CHK2]
                 A.deepEqual(chk({ rowsNew: newRows(N[1], N[2]), decl: [] }), { key: 'saveRefChanged', reason: 'refIncomplete', n: 2 })
             })
-            it(`RI-12 [${h}] 空宣告且無新增啟用引用(只改 mode／新增停用項／移除舊引用) → null`, function() {
+            it(`RI-12 [${h}] 空宣告且啟用引用未變(只改 mode／新增停用項／本次無寫入列) → null（perm-run03: 移除啟用引用不在此列, 見 RI-19）`, function() {
                 let mode = [hrow(h, 'h2', [[N[0], 'y']])] //未變更
                 A.equal(chk({ rowsNew: mode, decl: [] }), null) //[R-CHK2][R-NEW]
                 let off = [hrow(h, 'h1', [[N[1], 'n']])]
@@ -907,7 +920,464 @@ describe('unit-refIdentity (正反向關聯之被引用實體身分: 純函數)'
         }
     })
 
+
+    // =================================================================
+    // RI-15 removedActiveNames (perm-run03; [R-RM])
+    // =================================================================
+    describe('RI-15 removedActiveNames', function() {
+        //TRUTH: [舊值狀態, 新值狀態, 名稱 A 是否為「移除之啟用引用項」]（手寫真值表; nullrow＝舊列 null〔新增列〕, badjson＝舊值壞 JSON）
+        const TRUTH = [
+            ['none', 'none', false], ['none', 'on', false], ['none', 'off', false],
+            ['on', 'none', true], ['on', 'on', false], ['on', 'off', true],
+            ['off', 'none', false], ['off', 'on', false], ['off', 'off', false],
+            ['nullrow', 'none', false], ['nullrow', 'on', false], ['nullrow', 'off', false],
+            ['badjson', 'none', false], ['badjson', 'on', false], ['badjson', 'off', false],
+        ]
+        let rowOf = (h, state) => {
+            if (state === 'nullrow') {
+                return null
+            }
+            if (state === 'badjson') {
+                return { id: 'h1', [HOLD[h].field]: '{bad' }
+            }
+            if (state === 'none') {
+                return hrow(h, 'h1', [['OTHER', 'y']])
+            }
+            return hrow(h, 'h1', [['OTHER', 'y'], ['A', state === 'on' ? 'y' : 'n']])
+        }
+        for (let h of ['users', 'grups', 'pemis']) {
+            for (let [o, n, want] of TRUTH) {
+                it(`RI-15 [${h}] 舊值 ${o} → 新值 ${n}: 名稱 A ${want ? '算' : '不算'}移除之啟用引用項; 未變更之 OTHER 恆不算`, function() {
+                    let got = removedActiveNames(h, rowOf(h, o), rowOf(h, n === 'nullrow' ? 'none' : n))
+                    A.ok(Array.isArray(got))
+                    A.equal(got.includes('A'), want) //[R-RM]
+                    A.equal(got.includes('OTHER'), false, 'OTHER 兩邊皆啟用, 不是移除')
+                })
+            }
+        }
+        it('RI-15 只改 mode（兩邊皆啟用）→ 不算移除; 新增停用項、新增啟用項 → 不算移除', function() {
+            A.deepEqual(removedActiveNames('users', { cgrups: J({ A: OR }) }, { cgrups: J({ A: AND }) }), []) //[R-RM]
+            A.deepEqual(removedActiveNames('grups', { cpemis: J({ A: OR }) }, { cpemis: J({ A: OR, C: OFF, D: OR }) }), [])
+        })
+        it('RI-15 移除多個: 依舊值內之次序回傳、去重; 停用者與移除者並列; 舊值已停用者不入', function() {
+            let got = removedActiveNames('users', { cgrups: J({ C: OR, A: OR, B: OR, D: OFF, E: OR }) }, { cgrups: J({ B: OR, E: OFF }) })
+            A.deepEqual(got, ['C', 'A', 'E']) //[R-RM] 次序＝舊值內次序; E 由啟用改停用算移除; D 舊值已停用不算
+        })
+        it('RI-15 新值缺授權欄／壞 JSON／空字串／純量 → 視為空容器, 舊值之啟用項全算移除', function() {
+            let old = { cgrups: J({ A: OR, B: OR, C: OFF }) }
+            for (let nw of [{ id: 'x' }, { cgrups: '{bad' }, { cgrups: '' }, { cgrups: '123' }, { cgrups: null }, { cgrups: '{}' }]) {
+                A.deepEqual(removedActiveNames('users', old, nw), ['A', 'B'], J(nw)) //[R-RM]
+            }
+        })
+        it('RI-15 舊列為 null／非物件、新列為 null／非物件 → []', function() {
+            for (let o of [null, undefined, 'x', 5, []]) {
+                A.deepEqual(removedActiveNames('users', o, { cgrups: '{}' }), [], `舊列 ${J(o)}`) //[R-RM]
+            }
+            for (let nw of [null, undefined, 'x', 5, []]) {
+                A.deepEqual(removedActiveNames('users', { cgrups: J({ A: OR }) }, nw), [], `新列 ${J(nw)}`)
+            }
+        })
+        it('RI-15 引用端表無授權引用欄(targets)或表名不識(含原型鍵名) → []', function() {
+            for (let t of ['targets', 'zzz', '__proto__', 'constructor', null, undefined, 5]) {
+                A.deepEqual(removedActiveNames(t, { cgrups: J({ A: OR }), cpemis: J({ A: OR }), crules: J({ A: 'y' }) }, { cgrups: '{}', cpemis: '{}', crules: '{}' }), [], String(t)) //[R-TGT]
+            }
+        })
+        it('RI-15 三種表示形式皆可偵測移除: users 純量簡寫 { 名稱: y }、物件形式、陣列形式; pemis 字串值／物件值／陣列', function() {
+            A.deepEqual(removedActiveNames('users', { cgrups: J({ A: 'y', B: 'n' }) }, { cgrups: '{}' }), ['A']) //[R-RM][R-ACT]
+            A.deepEqual(removedActiveNames('users', { cgrups: J({ A: OR }) }, { cgrups: '{}' }), ['A'])
+            A.deepEqual(removedActiveNames('users', { cgrups: J([{ name: 'A', isActive: 'y' }, { name: 'B', isActive: 'n' }]) }, { cgrups: '[]' }), ['A'])
+            A.deepEqual(removedActiveNames('pemis', { crules: J({ 'sys/a': 'y', 'sys/b': 'n' }) }, { crules: '{}' }), ['sys/a'])
+            A.deepEqual(removedActiveNames('pemis', { crules: J({ 'sys/a': { isActive: 'y' } }) }, { crules: '{}' }), ['sys/a'])
+            A.deepEqual(removedActiveNames('pemis', { crules: J([{ name: 'sys/a', isActive: 'y' }]) }, { crules: '[]' }), ['sys/a'])
+        })
+        for (let p of PROTO_NAMES) {
+            it(`RI-15 原型鍵名「${p}」: 舊值啟用、新值移除 → 算移除; 兩邊皆有 → 不算`, function() {
+                A.deepEqual(removedActiveNames('users', { cgrups: authStr('users', [[p, 'y']]) }, { cgrups: '{}' }), [p]) //[R-PROTO][R-RM]
+                A.deepEqual(removedActiveNames('users', { cgrups: authStr('users', [[p, 'y']]) }, { cgrups: authStr('users', [[p, 'y']]) }), [])
+            })
+        }
+    })
+
+
+    // =================================================================
+    // RI-16 collectChangedNames (perm-run03; [R-CHG])
+    // =================================================================
+    describe('RI-16 collectChangedNames', function() {
+        const OLD = [hrow('users', 'u1', [['A', 'y']]), hrow('users', 'u2', [['B', 'n']]), hrow('users', 'u3', [])]
+        it('RI-16 新增與移除皆入集合: u1 移除 A 並新增 C、u2 停用改啟用 B、u3 新增停用項 D（不授權）→ {A, B, C}; 其中新增 {B, C}、移除 {A}', function() {
+            let rowsNew = [hrow('users', 'u1', [['C', 'y']]), hrow('users', 'u2', [['B', 'y']]), hrow('users', 'u3', [['D', 'n']])]
+            let ch = collectChangedNames({ keyTable: 'users', rowsNew, rowsOld: OLD })
+            A.ok(ch instanceof Set)
+            A.deepEqual(sorted(ch), ['A', 'B', 'C']) //[R-CHG]
+            A.deepEqual(sorted(collectNewNames({ keyTable: 'users', rowsNew, rowsOld: OLD })), ['B', 'C'], '關係: 新增集合 ⊂ 改變集合')
+            A.deepEqual(sorted(ch).filter((n) => !sorted(collectNewNames({ keyTable: 'users', rowsNew, rowsOld: OLD })).includes(n)), ['A'], '關係: 改變集合 − 新增集合 ＝ 移除者')
+        })
+        it('RI-16 同名在一列移除、另一列新增（搬移）只算 1 個名稱; 兩列各新增同一名稱只算 1 個', function() {
+            let move = [hrow('users', 'u1', []), hrow('users', 'u3', [['A', 'y']])]
+            A.deepEqual(sorted(collectChangedNames({ keyTable: 'users', rowsNew: move, rowsOld: OLD })), ['A']) //[R-CHG]
+            let dup = [hrow('users', 'u2', [['B', 'n'], ['X', 'y']]), hrow('users', 'u3', [['X', 'y']])]
+            A.deepEqual(sorted(collectChangedNames({ keyTable: 'users', rowsNew: dup, rowsOld: OLD })), ['X'])
+        })
+        it('RI-16 整列被刪除（舊列不在 rowsNew）不算移除; 未在 rowsNew 之舊列不計', function() {
+            A.deepEqual(sorted(collectChangedNames({ keyTable: 'users', rowsNew: [OLD[1], OLD[2]], rowsOld: OLD })), []) //[R-CHG] u1 被刪, A 不算
+            A.deepEqual(sorted(collectChangedNames({ keyTable: 'users', rowsNew: [], rowsOld: OLD })), [])
+        })
+        it('RI-16 無對應舊列（id 不在舊表、缺 id、id 為 null）者視為新增列: 全部啟用項皆算, 不產生移除', function() {
+            let rowsNew = [hrow('users', 'u-new', [['X', 'y'], ['Y', 'n']]), { cgrups: authStr('users', [['Z', 'y']]) }, { id: null, cgrups: authStr('users', [['W', 'y']]) }]
+            A.deepEqual(sorted(collectChangedNames({ keyTable: 'users', rowsNew, rowsOld: OLD })), ['W', 'X', 'Z']) //[R-CHG][R-COL]
+        })
+        it('RI-16 數字 id 與字串 id 視為同一（移除亦然）', function() {
+            let rowsOld = [hrow('grups', '5', [['P', 'y'], ['Q', 'y']])]
+            A.deepEqual(sorted(collectChangedNames({ keyTable: 'grups', rowsNew: [{ id: 5, cpemis: authStr('grups', [['P', 'y']]) }], rowsOld })), ['Q']) //[R-CHG][R-COL]
+        })
+        it('RI-16 舊表非陣列視為空表: 新列全部啟用項皆算（無移除）; 新表非陣列／空陣列 → 空集合', function() {
+            let rowsNew = [hrow('users', 'u1', [['A', 'y']])]
+            for (let v of [null, undefined, {}, 'x', 5]) {
+                A.deepEqual(sorted(collectChangedNames({ keyTable: 'users', rowsNew, rowsOld: v })), ['A']) //[R-CHG]
+            }
+            for (let v of [null, undefined, {}, 'x', 5, []]) {
+                A.deepEqual(sorted(collectChangedNames({ keyTable: 'users', rowsNew: v, rowsOld: OLD })), [])
+            }
+        })
+        it('RI-16 只改 mode／新增停用項／移除停用項／未變更 → 空集合; 引用端為 targets／不識 → 空集合', function() {
+            let rowsOld = [hrow('users', 'u1', [['A', 'y'], ['B', 'n']])]
+            A.deepEqual(sorted(collectChangedNames({ keyTable: 'users', rowsNew: [{ id: 'u1', cgrups: J({ A: AND, B: OFF }) }], rowsOld })), []) //只改 mode
+            A.deepEqual(sorted(collectChangedNames({ keyTable: 'users', rowsNew: [hrow('users', 'u1', [['A', 'y'], ['B', 'n'], ['C', 'n']])], rowsOld })), []) //新增停用項
+            A.deepEqual(sorted(collectChangedNames({ keyTable: 'users', rowsNew: [hrow('users', 'u1', [['A', 'y']])], rowsOld })), []) //移除停用項 B
+            A.deepEqual(sorted(collectChangedNames({ keyTable: 'users', rowsNew: rowsOld, rowsOld })), [])
+            for (let t of ['targets', 'zzz', '__proto__']) {
+                A.deepEqual(sorted(collectChangedNames({ keyTable: t, rowsNew: [hrow('users', 'u1', [['Q', 'y']])], rowsOld: [] })), [], t) //[R-TGT]
+            }
+        })
+        it('RI-16 舊表含非物件列／缺 id 列 → 略過不當對應來源', function() {
+            let rowsOld = [null, 'x', { cgrups: authStr('users', [['A', 'y']]) }, hrow('users', 'u1', [['B', 'y']])]
+            A.deepEqual(sorted(collectChangedNames({ keyTable: 'users', rowsNew: [hrow('users', 'u1', [['A', 'y']])], rowsOld })), ['A', 'B']) //[R-CHG] u1 相對自己的舊列: 新增 A、移除 B
+        })
+        for (let h of ['users', 'grups', 'pemis']) {
+            it(`RI-16 [${h}] 三種引用端表皆納入移除（授權欄 ${HOLD[h].field}）`, function() {
+                let { N } = HOLD[h]
+                let rowsOld = [hrow(h, 'h1', [[N[0], 'y'], [N[1], 'y']])]
+                let rowsNew = [hrow(h, 'h1', [[N[1], 'y'], [N[2], 'y']])]
+                A.deepEqual(sorted(collectChangedNames({ keyTable: h, rowsNew, rowsOld })), [N[0], N[2]].sort()) //[R-CHG]
+            })
+        }
+        for (let p of PROTO_NAMES) {
+            it(`RI-16 原型鍵名「${p}」: 移除亦入集合`, function() {
+                let ch = collectChangedNames({ keyTable: 'users', rowsNew: [hrow('users', 'u1', [])], rowsOld: [{ id: 'u1', cgrups: authStr('users', [[p, 'y']]) }] })
+                A.deepEqual(sorted(ch), [p]) //[R-PROTO][R-CHG]
+            })
+        }
+    })
+
+
+    // =================================================================
+    // RI-17 recordPicks 移除 (perm-run03; [R-PICK-RM])
+    // =================================================================
+    describe('RI-17 recordPicks 移除', function() {
+        const SNAP = () => new Map([['GA', ['g1']], ['GB', ['g2']], ['GC', ['g3']], ['GD', ['g4', 'g5']]])
+        it('RI-17 移除之啟用名稱記開框當時之 id: strOld {GA, GB} → strNew {GA} ⇒ 只記 GB[g2]（GA 未變不記）', function() {
+            let picks = new Map()
+            recordPicks({ keyTable: 'users', strOld: authStr('users', [['GA', 'y'], ['GB', 'y']]), strNew: authStr('users', [['GA', 'y']]), snap: SNAP(), picks })
+            A.deepEqual([...picks.entries()], [['GB', ['g2']]]) //[R-PICK-RM]
+        })
+        it('RI-17 停用（y→n）算移除; 新增＋移除同一次回填各記各的; 歷史同名多筆移除記全部 id', function() {
+            let p1 = new Map()
+            recordPicks({ keyTable: 'users', strOld: authStr('users', [['GA', 'y']]), strNew: authStr('users', [['GA', 'n']]), snap: SNAP(), picks: p1 })
+            A.deepEqual([...p1.entries()], [['GA', ['g1']]]) //[R-PICK-RM] 停用
+            let p2 = new Map()
+            recordPicks({ keyTable: 'users', strOld: authStr('users', [['GA', 'y'], ['GB', 'y']]), strNew: authStr('users', [['GB', 'y'], ['GC', 'y']]), snap: SNAP(), picks: p2 })
+            A.deepEqual([...p2.entries()].sort(), [['GA', ['g1']], ['GC', ['g3']]]) //GB 未變不記
+            let p3 = new Map()
+            recordPicks({ keyTable: 'users', strOld: authStr('users', [['GD', 'y']]), strNew: '{}', snap: SNAP(), picks: p3 })
+            A.deepEqual(p3.get('GD'), ['g4', 'g5'])
+        })
+        it('RI-17 懸空引用被移除（開框當時被引用表查無／snap 缺或非 Map）→ 記空陣列', function() {
+            let p1 = new Map()
+            recordPicks({ keyTable: 'users', strOld: authStr('users', [['GZ', 'y']]), strNew: '{}', snap: SNAP(), picks: p1 })
+            A.deepEqual([...p1.entries()], [['GZ', []]]) //[R-PICK-RM]
+            for (let sn of [null, undefined, {}, [['GA', ['g1']]]]) {
+                let p2 = new Map()
+                recordPicks({ keyTable: 'users', strOld: authStr('users', [['GA', 'y']]), strNew: '{}', snap: sn, picks: p2 })
+                A.deepEqual([...p2.entries()], [['GA', []]])
+            }
+        })
+        it('RI-17 不記: 被移除者本來就停用／本來就不存在／兩邊皆有; 回傳仍為同一個 Map', function() {
+            let picks = new Map()
+            let ret = recordPicks({ keyTable: 'users', strOld: authStr('users', [['GA', 'n']]), strNew: '{}', snap: SNAP(), picks })
+            A.equal(ret, picks)
+            recordPicks({ keyTable: 'users', strOld: '{}', strNew: '{}', snap: SNAP(), picks })
+            recordPicks({ keyTable: 'users', strOld: authStr('users', [['GA', 'y']]), strNew: authStr('users', [['GA', 'y']]), snap: SNAP(), picks })
+            A.equal(picks.size, 0) //[R-PICK-RM]
+        })
+        it('RI-17 同名移除兩次（兩列各取消勾選同一名稱）: 對應 id 陣列相同 → 不衝突; 不同（中間被引用實體被刪後同名重建）→ 衝突（null）', function() {
+            let s = authStr('users', [['GA', 'y']])
+            let p1 = new Map()
+            recordPicks({ keyTable: 'users', strOld: s, strNew: '{}', snap: new Map([['GA', ['g1']]]), picks: p1 })
+            recordPicks({ keyTable: 'users', strOld: s, strNew: '{}', snap: new Map([['GA', ['g1']]]), picks: p1 })
+            A.deepEqual(p1.get('GA'), ['g1'])
+            let p2 = new Map()
+            recordPicks({ keyTable: 'users', strOld: s, strNew: '{}', snap: new Map([['GA', ['g1']]]), picks: p2 })
+            recordPicks({ keyTable: 'users', strOld: s, strNew: '{}', snap: new Map([['GA', ['g1-NEW']]]), picks: p2 })
+            A.equal(p2.get('GA'), null) //[R-PICK-RM][R-CONFLICT]
+        })
+        it('RI-17 移除後重選／選了又移除（同一工作階段）: 兩次記錄之 id 相同不衝突、不同則衝突（與新增共用同一份記錄）', function() {
+            let s = authStr('users', [['GC', 'y']])
+            //移除後重選
+            let p1 = new Map()
+            recordPicks({ keyTable: 'users', strOld: s, strNew: '{}', snap: new Map([['GC', ['g3']]]), picks: p1 })
+            recordPicks({ keyTable: 'users', strOld: '{}', strNew: s, snap: new Map([['GC', ['g3']]]), picks: p1 })
+            A.deepEqual(p1.get('GC'), ['g3'])
+            recordPicks({ keyTable: 'users', strOld: '{}', strNew: s, snap: new Map([['GC', ['g3-NEW']]]), picks: p1 })
+            A.equal(p1.get('GC'), null) //[R-CONFLICT] 兩次記錄不同 id
+            //選了又移除
+            let p2 = new Map()
+            recordPicks({ keyTable: 'users', strOld: '{}', strNew: s, snap: new Map([['GC', ['g3']]]), picks: p2 })
+            recordPicks({ keyTable: 'users', strOld: s, strNew: '{}', snap: new Map([['GC', ['g3-NEW']]]), picks: p2 })
+            A.equal(p2.get('GC'), null)
+            //衝突不自行解除
+            recordPicks({ keyTable: 'users', strOld: s, strNew: '{}', snap: new Map([['GC', ['g3']]]), picks: p2 })
+            A.equal(p2.get('GC'), null)
+        })
+        it('RI-17 衝突之移除名稱經 buildRefDecl 成 ids: null → parseRefDecl 判格式不合、countRefMismatch 視為不符（前端自檢不放行）', function() {
+            let s = authStr('users', [['G', 'y']])
+            let picks = new Map()
+            recordPicks({ keyTable: 'users', strOld: s, strNew: '{}', snap: new Map([['G', ['g1']]]), picks })
+            recordPicks({ keyTable: 'users', strOld: s, strNew: '{}', snap: new Map([['G', ['g2']]]), picks })
+            let rowsOld = [{ id: 'u1', cgrups: s }, { id: 'u2', cgrups: s }]
+            let rowsNew = [{ id: 'u1', cgrups: '{}' }, { id: 'u2', cgrups: '{}' }]
+            let refRows = [{ id: 'g2', name: 'G' }]
+            let d = buildRefDecl({ keyTable: 'users', rowsNew, rowsOld, picks, refRows })
+            A.deepEqual(d, [{ name: 'G', ids: null }]) //[R-PICK-RM][R-CONFLICT]
+            A.equal(parseRefDecl(d), null)
+            A.ok(countRefMismatch({ keyTable: 'users', decl: parseRefDecl(d), refRows }) > 0)
+        })
+        it('RI-17 [pemis → crules] 字串值／陣列形式之移除皆可記錄（名稱即標的 id）', function() {
+            let p1 = new Map()
+            recordPicks({ keyTable: 'pemis', strOld: J({ 'sys/a': 'y', 'sys/b': 'y' }), strNew: J({ 'sys/b': 'y' }), snap: new Map([['sys/a', ['sys/a']], ['sys/b', ['sys/b']]]), picks: p1 })
+            A.deepEqual([...p1.entries()], [['sys/a', ['sys/a']]]) //[R-PICK-RM][R-ACT]
+            let p2 = new Map()
+            recordPicks({ keyTable: 'pemis', strOld: J([{ name: 'sys/c', isActive: 'y' }]), strNew: '[]', snap: new Map(), picks: p2 })
+            A.deepEqual([...p2.entries()], [['sys/c', []]])
+        })
+        it('RI-17 引用端為 targets／不識、picks 非 Map → 移除亦原樣回傳不動', function() {
+            for (let t of ['targets', 'zzz']) {
+                let picks = new Map([['K', ['k']]])
+                let ret = recordPicks({ keyTable: t, strOld: authStr('users', [['GA', 'y']]), strNew: '{}', snap: SNAP(), picks })
+                A.equal(ret, picks) //[R-TGT]
+                A.deepEqual([...picks.entries()], [['K', ['k']]])
+            }
+            for (let pk of [null, undefined, {}, []]) {
+                A.equal(recordPicks({ keyTable: 'users', strOld: authStr('users', [['GA', 'y']]), strNew: '{}', snap: SNAP(), picks: pk }), pk)
+            }
+        })
+    })
+
+
+    // =================================================================
+    // RI-18 buildRefDecl 含移除 (perm-run03)
+    // =================================================================
+    describe('RI-18 buildRefDecl 含移除', function() {
+        const REFROWS = [{ id: 'g1', name: 'GA' }, { id: 'g2', name: 'GB' }, { id: 'g3', name: 'GC' }]
+        const OLD2 = [hrow('users', 'u1', [['GA', 'y'], ['GB', 'y']]), hrow('users', 'u2', [['GC', 'n']])]
+        it('RI-18 僅移除: 宣告含被移除之名稱; 有選取記錄者以記錄為準（開框當時, 不取送出當下之被引用表）', function() {
+            let rowsNew = [hrow('users', 'u1', [['GA', 'y']]), OLD2[1]]
+            let picks = new Map([['GB', ['g2-at-pick']]])
+            A.deepEqual(buildRefDecl({ keyTable: 'users', rowsNew, rowsOld: OLD2, picks, refRows: REFROWS }), [{ name: 'GB', ids: ['g2-at-pick'] }]) //[R-DECL][R-CHG]
+        })
+        it('RI-18 無選取記錄之被移除名稱（picks 缺／非 Map／未含該名）退回送出當下之被引用表; 懸空（被引用表查無）→ []', function() {
+            let rowsNew = [hrow('users', 'u1', [['GA', 'y']]), OLD2[1]]
+            for (let pk of [null, undefined, {}, [], new Map(), new Map([['GA', ['x']]])]) {
+                A.deepEqual(buildRefDecl({ keyTable: 'users', rowsNew, rowsOld: OLD2, picks: pk, refRows: REFROWS }), [{ name: 'GB', ids: ['g2'] }]) //[R-DECL]
+            }
+            A.deepEqual(buildRefDecl({ keyTable: 'users', rowsNew, rowsOld: OLD2, picks: new Map(), refRows: REFROWS.filter((r) => r.id !== 'g2') }), [{ name: 'GB', ids: [] }], '被引用實體已不在 → 懸空 []')
+            A.deepEqual(buildRefDecl({ keyTable: 'users', rowsNew, rowsOld: OLD2, picks: new Map([['GB', []]]), refRows: REFROWS }), [{ name: 'GB', ids: [] }], '記錄為 [] 則以記錄為準')
+        })
+        it('RI-18 新增＋移除混合: 兩者皆入宣告, 依名稱排序; 停用（y→n）亦入', function() {
+            let rowsNew = [hrow('users', 'u1', [['GB', 'y'], ['GC', 'y']]), OLD2[1]] //u1 移除 GA、新增 GC
+            A.deepEqual(buildRefDecl({ keyTable: 'users', rowsNew, rowsOld: OLD2, picks: new Map([['GC', ['g3']], ['GA', ['g1']]]), refRows: REFROWS }), [{ name: 'GA', ids: ['g1'] }, { name: 'GC', ids: ['g3'] }]) //[R-DECL][R-CHG]
+            let off = [hrow('users', 'u1', [['GA', 'n'], ['GB', 'y']]), OLD2[1]] //u1 停用 GA
+            A.deepEqual(buildRefDecl({ keyTable: 'users', rowsNew: off, rowsOld: OLD2, picks: new Map(), refRows: REFROWS }), [{ name: 'GA', ids: ['g1'] }])
+        })
+        it('RI-18 整列刪除（舊列不在 rowsNew）不入宣告; 本次無任何改變 → []', function() {
+            A.deepEqual(buildRefDecl({ keyTable: 'users', rowsNew: [OLD2[1]], rowsOld: OLD2, picks: new Map(), refRows: REFROWS }), []) //[R-CHG]
+            A.deepEqual(buildRefDecl({ keyTable: 'users', rowsNew: OLD2, rowsOld: OLD2, picks: new Map(), refRows: REFROWS }), [])
+        })
+        it('RI-18 新增列（舊表無該 id）帶引用 ＋ 另一列移除引用: 兩者皆入宣告', function() {
+            let rowsNew = [hrow('users', 'u1', [['GA', 'y']]), OLD2[1], hrow('users', 'u-new', [['GC', 'y']])]
+            A.deepEqual(buildRefDecl({ keyTable: 'users', rowsNew, rowsOld: OLD2, picks: new Map(), refRows: REFROWS }), [{ name: 'GB', ids: ['g2'] }, { name: 'GC', ids: ['g3'] }]) //[R-DECL][R-CHG][R-COL]
+        })
+        it('RI-18 選取記錄為衝突（null）之移除名稱 → ids: null（parseRefDecl 判格式不合）; 回傳之 ids 為拷貝', function() {
+            let rowsNew = [hrow('users', 'u1', [['GA', 'y']]), OLD2[1]]
+            let d = buildRefDecl({ keyTable: 'users', rowsNew, rowsOld: OLD2, picks: new Map([['GB', null]]), refRows: REFROWS })
+            A.deepEqual(d, [{ name: 'GB', ids: null }]) //[R-DECL][R-CONFLICT]
+            A.equal(parseRefDecl(d), null)
+            let picks = new Map([['GB', ['g2']]])
+            let d2 = buildRefDecl({ keyTable: 'users', rowsNew, rowsOld: OLD2, picks, refRows: REFROWS })
+            d2[0].ids.push('HACK')
+            A.deepEqual(picks.get('GB'), ['g2'])
+        })
+        it('RI-18 與 parseRefDecl 銜接: 含移除之宣告必為合法格式且解析後內容不變', function() {
+            let rowsNew = [hrow('users', 'u1', [['GB', 'y'], ['GC', 'y']]), OLD2[1]]
+            let d = buildRefDecl({ keyTable: 'users', rowsNew, rowsOld: OLD2, picks: new Map([['GA', ['g1']], ['GC', ['g3']]]), refRows: REFROWS })
+            A.deepEqual(parseRefDecl(d), d) //[R-DECL][R-FMT-R]
+        })
+        it('RI-18 [grups → pemis]／[pemis → targets]: 移除亦入宣告（pemis 以 targets 之 id 為名）', function() {
+            A.deepEqual(buildRefDecl({ keyTable: 'grups', rowsNew: [hrow('grups', 'h1', [])], rowsOld: [hrow('grups', 'h1', [['PA', 'y']])], picks: null, refRows: [{ id: 'p1', name: 'PA' }] }), [{ name: 'PA', ids: ['p1'] }])
+            A.deepEqual(buildRefDecl({ keyTable: 'pemis', rowsNew: [hrow('pemis', 'h1', [])], rowsOld: [hrow('pemis', 'h1', [['sys/a', 'y'], ['sys/zzz', 'y']])], picks: null, refRows: [{ id: 'sys/a' }] }), [{ name: 'sys/a', ids: ['sys/a'] }, { name: 'sys/zzz', ids: [] }]) //[R-TGT-ID] 懸空 sys/zzz 被移除 → []
+        })
+        it('RI-18 引用端為 targets／不識 → 移除亦不產宣告', function() {
+            for (let t of ['targets', 'zzz']) {
+                A.deepEqual(buildRefDecl({ keyTable: t, rowsNew: [hrow('users', 'u1', [])], rowsOld: OLD2, picks: new Map(), refRows: REFROWS }), []) //[R-TGT]
+            }
+        })
+    })
+
+
+    // =================================================================
+    // RI-19 checkRefIdentity 新簽名 { decl, subject } (perm-run03; [R-REQ][R-SUBJ-SCOPE][R-RM])
+    // =================================================================
+    describe('RI-19 checkRefIdentity 新簽名 { decl, subject }', function() {
+        const REQ = (n) => ({ key: 'saveIdentityRequired', reason: 'identityRequired', n })
+        const INC = (n) => ({ key: 'saveRefChanged', reason: 'refIncomplete', n })
+        const CHG = (n) => ({ key: 'saveRefChanged', reason: 'refChanged', n })
+        //refRows 若被讀取即拋錯（證明必帶判定不讀被引用表）
+        const NO_READ = new Proxy([], { get() { throw new Error('必帶判定不得讀取被引用表') } })
+
+        for (let h of ['users', 'grups', 'pemis']) {
+            let { N, I } = HOLD[h]
+            let rowsOld = [hrow(h, 'h1', []), hrow(h, 'h2', [[N[0], 'y']])]
+            let refRows = refRowsOf(h)
+            //變更 C（rowsOld: h1 無引用、h2 啟用 N0）: adds／rms 為被改變之被引用實體序
+            const CH = {
+                none: { rowsNew: [], adds: [], rms: [] },
+                add: { rowsNew: [hrow(h, 'h1', [[N[2], 'y']])], adds: [2], rms: [] },
+                rm: { rowsNew: [hrow(h, 'h2', [])], adds: [], rms: [0] },
+                both: { rowsNew: [hrow(h, 'h1', [[N[2], 'y']]), hrow(h, 'h2', [])], adds: [2], rms: [0] },
+                newRow: { rowsNew: [hrow(h, 'h-new', [[N[2], 'y']])], adds: [2], rms: [] },
+                disable: { rowsNew: [hrow(h, 'h2', [[N[0], 'n']])], adds: [], rms: [0] },
+            }
+            let dc = (ks) => ks.map((k) => ({ name: N[k], ids: [I[k]] }))
+            const DC = {
+                null: () => null,
+                empty: () => [],
+                full: (c) => dc([...c.adds, ...c.rms]),
+                addsOnly: (c) => dc(c.adds),
+                rmsOnly: (c) => dc(c.rms),
+                ghost: (c) => [...c.adds, ...c.rms].map((k) => ({ name: N[k], ids: ['ghost'] })),
+            }
+            //WANT[變更][宣告]: 手寫 36 格（subject 為 null）
+            //  decl null → 有改變為 saveIdentityRequired(n＝改變之名稱數), 無改變通過; 空陣列 → 有改變為 refIncomplete(n＝改變數); 完整 → 通過;
+            //  僅宣告新增者／僅宣告移除者 → 未宣告者為 refIncomplete; 亂 id → refChanged(n＝被宣告且不符之名稱數)
+            const WANT = {
+                none: { null: null, empty: null, full: null, addsOnly: null, rmsOnly: null, ghost: null },
+                add: { null: REQ(1), empty: INC(1), full: null, addsOnly: null, rmsOnly: INC(1), ghost: CHG(1) },
+                rm: { null: REQ(1), empty: INC(1), full: null, addsOnly: INC(1), rmsOnly: null, ghost: CHG(1) },
+                both: { null: REQ(2), empty: INC(2), full: null, addsOnly: INC(1), rmsOnly: INC(1), ghost: CHG(2) },
+                newRow: { null: REQ(1), empty: INC(1), full: null, addsOnly: null, rmsOnly: INC(1), ghost: CHG(1) },
+                disable: { null: REQ(1), empty: INC(1), full: null, addsOnly: INC(1), rmsOnly: null, ghost: CHG(1) },
+            }
+            for (let cn of Object.keys(CH)) {
+                it(`RI-19 [${h}] 變更「${cn}」× 6 種宣告（null／空陣列／完整／僅新增者／僅移除者／亂 id）, subject 為 null: 逐格預期手寫`, function() {
+                    let c = CH[cn]
+                    for (let dn of Object.keys(DC)) {
+                        let got = checkRefIdentity({ keyTable: h, decl: DC[dn](c), rowsNew: c.rowsNew, rowsOld, refRows })
+                        A.deepEqual(got, WANT[cn][dn], `格 ${cn} × ${dn}`) //[R-REQ][R-CHK1][R-CHK2][R-RM]
+                    }
+                })
+            }
+
+            it(`RI-19 [${h}] 必帶判定不讀被引用表: decl 與 subject 皆 null 時 refRows 為 null／會拋錯之代理亦得相同結果（改變 → saveIdentityRequired, 未改變 → null）`, function() {
+                for (let rr of [null, undefined, NO_READ]) {
+                    A.deepEqual(checkRefIdentity({ keyTable: h, decl: null, rowsNew: CH.both.rowsNew, rowsOld, refRows: rr }), REQ(2)) //[R-REQ]
+                    A.equal(checkRefIdentity({ keyTable: h, decl: null, rowsNew: CH.none.rowsNew, rowsOld, refRows: rr }), null)
+                    A.equal(checkRefIdentity({ keyTable: h, decl: null, subject: null, rowsNew: [hrow(h, 'h2', [[N[0], 'y'], [N[1], 'n']])], rowsOld, refRows: rr }), null, '只新增停用項: 未改變')
+                }
+            })
+
+            it(`RI-19 [${h}] 名稱以集合計: 搬移（一列移除、另一列新增同名）與兩列各新增同名皆只算 1 個 → saveIdentityRequired n＝1; 宣告該名稱一次即通過`, function() {
+                let move = [hrow(h, 'h2', []), hrow(h, 'h1', [[N[0], 'y']])]
+                A.deepEqual(checkRefIdentity({ keyTable: h, decl: null, rowsNew: move, rowsOld, refRows }), REQ(1)) //[R-REQ][R-CHG]
+                A.equal(checkRefIdentity({ keyTable: h, decl: dc([0]), rowsNew: move, rowsOld, refRows }), null)
+                let dup = [hrow(h, 'h1', [[N[2], 'y']]), hrow(h, 'h-new', [[N[2], 'y']])]
+                A.deepEqual(checkRefIdentity({ keyTable: h, decl: null, rowsNew: dup, rowsOld, refRows }), REQ(1))
+                A.equal(checkRefIdentity({ keyTable: h, decl: dc([2]), rowsNew: dup, rowsOld, refRows }), null)
+            })
+
+            it(`RI-19 [${h}] 移除 N0 × 被引用實體狀態: 現況未變 → null; 已刪除 → refChanged; 懸空（宣告 []）被移除 → null; 宣告 [] 而現已出現 → refChanged; ${h === 'pemis' ? 'targets 刪後同 id 重建 → null（同一實體）' : '刪後同名重建／另增同名 → refChanged'}`, function() {
+                let c = CH.rm
+                let chk = (decl, rr) => checkRefIdentity({ keyTable: h, decl, rowsNew: c.rowsNew, rowsOld, refRows: rr })
+                A.equal(chk(dc([0]), refRows), null) //[R-RM] 現況未變
+                let gone = refRows.filter((r) => r.id !== I[0])
+                A.deepEqual(chk(dc([0]), gone), CHG(1), '使用者所見有實體而現已查無') //[R-RM][R-CHK1]
+                A.equal(chk([{ name: N[0], ids: [] }], gone), null, '懸空引用被移除, 宣告 [] 且仍查無') //[R-RM]
+                A.deepEqual(chk([{ name: N[0], ids: [] }], refRows), CHG(1), '宣告查無而現已有')
+                if (h === 'pemis') {
+                    A.equal(chk(dc([0]), refRows.map((r) => ({ ...r, description: 'recreated' }))), null, '[R-TGT-ID]')
+                }
+                else {
+                    A.deepEqual(chk(dc([0]), [...gone, entRow(h, `${I[0]}-NEW`, N[0])]), CHG(1), '刪後同名重建（id 不同）')
+                    A.deepEqual(chk(dc([0]), [...refRows, entRow(h, `${I[0]}-DUP`, N[0])]), CHG(1), '另增同名')
+                }
+            })
+        }
+
+        //subject 路徑（反向對話框; users／grups）: 手寫格 [變更, 宣告, 主體之被引用實體序, 預期]
+        const SUBJ_CELLS = [
+            ['add', 'null', 2, null], ['add', 'null', 0, INC(1)],
+            ['rm', 'null', 0, null], ['rm', 'null', 2, INC(1)],
+            ['both', 'null', 2, INC(1)], ['both', 'null', 0, INC(1)], ['both', 'null', 1, INC(2)],
+            ['both', 'full', 2, null], ['both', 'addsOnly', 0, null], ['both', 'rmsOnly', 2, null],
+            ['none', 'null', 2, null], ['none', 'ghost', 2, null],
+            ['add', 'empty', 2, null], ['add', 'ghost', 2, CHG(1)],
+            ['newRow', 'null', 2, null], ['disable', 'null', 0, null],
+        ]
+        for (let h of ['users', 'grups']) {
+            let { N, I } = HOLD[h]
+            let rowsOld = [hrow(h, 'h1', []), hrow(h, 'h2', [[N[0], 'y']])]
+            let refRows = refRowsOf(h)
+            const CHS = {
+                none: { rowsNew: [], adds: [], rms: [] },
+                add: { rowsNew: [hrow(h, 'h1', [[N[2], 'y']])], adds: [2], rms: [] },
+                rm: { rowsNew: [hrow(h, 'h2', [])], adds: [], rms: [0] },
+                both: { rowsNew: [hrow(h, 'h1', [[N[2], 'y']]), hrow(h, 'h2', [])], adds: [2], rms: [0] },
+                newRow: { rowsNew: [hrow(h, 'h-new', [[N[2], 'y']])], adds: [2], rms: [] },
+                disable: { rowsNew: [hrow(h, 'h2', [[N[0], 'n']])], adds: [], rms: [0] },
+            }
+            let dc = (ks) => ks.map((k) => ({ name: N[k], ids: [I[k]] }))
+            const DCS = {
+                null: () => null,
+                empty: () => [],
+                full: (c) => dc([...c.adds, ...c.rms]),
+                addsOnly: (c) => dc(c.adds),
+                rmsOnly: (c) => dc(c.rms),
+                ghost: (c) => [...c.adds, ...c.rms].map((k) => ({ name: N[k], ids: ['ghost'] })),
+            }
+            it(`RI-19 [${h}] subject 只涵蓋其主體名稱（新增或移除皆算已宣告）: ${SUBJ_CELLS.length} 格手寫預期（變更 × 宣告 × 主體）`, function() {
+                for (let [cn, dn, sk, want] of SUBJ_CELLS) {
+                    let c = CHS[cn]
+                    let subject = { name: N[sk], id: I[sk], saved: true }
+                    let got = checkRefIdentity({ keyTable: h, decl: DCS[dn](c), subject, rowsNew: c.rowsNew, rowsOld, refRows })
+                    A.deepEqual(got, want, `格 ${cn} × ${dn} × subject N${sk}`) //[R-SUBJ-SCOPE]
+                }
+            })
+            it(`RI-19 [${h}] subject 給了而 decl 為 null: 不走必帶判定（subject 自成宣告）; 主體名稱未變而他名被改 → refIncomplete 而非 saveIdentityRequired`, function() {
+                let subject = { name: N[2], id: I[2], saved: true }
+                let got = checkRefIdentity({ keyTable: h, decl: null, subject, rowsNew: CHS.rm.rowsNew, rowsOld, refRows })
+                A.deepEqual(got, INC(1)) //[R-SUBJ-SCOPE]
+                A.equal(got.key === 'saveIdentityRequired', false)
+            })
+        }
+
+        it('RI-19 引用端為 targets／不識表名: decl 為 null 時亦回 saveIdentityFormat／refNoTarget, n＝0（先於必帶判定）', function() {
+            for (let t of ['targets', 'zzz', '__proto__', null]) {
+                A.deepEqual(checkRefIdentity({ keyTable: t, decl: null, rowsNew: [hrow('users', 'h1', [['A', 'y']])], rowsOld: [], refRows: null }), { key: 'saveIdentityFormat', reason: 'refNoTarget', n: 0 }, String(t)) //[R-NOTGT]
+            }
+        })
+    })
+
 })
 
-//案數(mocha 實跑 2026-10-23): RI-1 12、RI-2 34、RI-3 58、RI-4 7、RI-5 13、RI-6 10、RI-7 7、RI-8 10、RI-9 21、RI-10 32、RI-11 6、RI-12 47、RI-13 8、RI-14 15, 共 280 案全綠.
+//案數(perm-run02, mocha 實跑 2026-10-23): RI-1 12、RI-2 34、RI-3 58、RI-4 7、RI-5 13、RI-6 10、RI-7 7、RI-8 10、RI-9 21、RI-10 32、RI-11 6、RI-12 47、RI-13 8、RI-14 15, 共 280 案全綠.
+//案數(perm-run03 測試遷移後, mocha 實跑 2026-10-23): RI-1～RI-14 同前（RI-7 實為 8 案, 前行誤記 7）, 新增 RI-15 57、RI-16 17、RI-17 9、RI-18 9、RI-19 32（含 36 格 × 3 引用端之手寫格網、subject 16 格 × 2 引用端、移除 × 被引用實體狀態）, 共 405 案全綠（同輪 unit-refIdentityWiring 19 案全綠）.
+//perm-run03 變異驗證: 見 test/unit-procCore-identity.test.mjs 檔尾（13 個變異, 本檔參與擊殺 M1～M9、M12、M13）.
 //變異驗證(對副本逐一注入缺陷, 確認會紅): 16 個變異中 15 個被殺, 1 個為等價變異（targets 之比對種類 rule→ref 對字串 id 結果相同）.

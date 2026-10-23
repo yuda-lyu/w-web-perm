@@ -1134,6 +1134,7 @@ export default {
             let _r = vo.$ds.pemis.funNew()
             r.id = _r.id //使用新建方式預先產生id避免重複
             r.from = '' //複製出之列為後台新增列, 不繼承來源(來源非空即外部列, 後台新增列 from 須為空, 否則伺服端 saveFromNotAllowed; 不論是否啟用外部列保護)
+            r.srcKey = '' //來源鍵 srcKey 與 from 同為身分欄(perm-run03 範圍二, R-IMPORT-01): 後台列之 srcKey 恆空, 不繼承外部列之來源鍵(否則伺服端 saveFromNotAllowed)
             r.name = vo.$s.getNameNew(rows, 'name', nameOld, vo.$t('pemiCopyNameNew'))
             r.userId = `{${vo.$t('pemiAddIdNew')}}`
             r.timeCreate = `{${vo.$t('pemiAddIdNew')}}`

@@ -1,6 +1,6 @@
-//外部同步(syncAndReplaceTabs)之保留指派欄與 id 重編偵測純函數單元測試(F-23; R-PRINCIPLE-00 原則 3、5; 規則帳本 R-EXT-OWN-01; ADR-037; run07 U1)
+//外部同步(syncAndReplaceTabs)之保留指派欄與來源鍵重編偵測純函數單元測試(F-23; R-PRINCIPLE-00 原則 3、5; 規則帳本 R-EXT-OWN-01、R-IMPORT-01; ADR-037; run07 U1; perm-run03: countIdRenumber → countSrcKeyRenumber)
 //
-//受測: server/syncKeep.mjs: markHasKey／keepAssignOnMissing／countIdRenumber.
+//受測: server/syncKeep.mjs: markHasKey／keepAssignOnMissing／countSrcKeyRenumber.
 //
 //規格來源(期望由下列規則推導, 不抄實作):
 //  SK-S1 users 指派欄(cgrups)屬後台(Lv1): 外部同步 payload 之 users 列「缺 cgrups 鍵」時保留庫內值(含該鍵則以外部為準, 即使值為 ''／undefined);
@@ -13,10 +13,13 @@
 //  SK-S3 庫內該列無此欄位(自有屬性)時不保留; 回傳 { rows, nKeep, nSkip }: rows 為新陣列(不改輸入), nKeep 為保留筆數, nSkip 為「可對應且庫內有該欄位, 但 isKeepable 為假而未保留」之筆數.
 //  SK-S6 (run07 外審 sol R4) 保留值須能原樣通過寫入前驗證: 呼叫端傳入 isKeepable(收庫內值, 回布林; 預設恆可), 為假者不保留(列原樣、不補鍵、計入 nSkip 不計 nKeep);
 //        庫內歷史值若含會被 clearXSS 改寫之標記或非純量, 入庫時被 ORM 改寫而使引用改指他名(增權), 一律不保留(視為空, 收嚴). isKeepable 只對「已對應到庫內列、庫內有該欄位且非含鍵列」之值呼叫(對不到／含鍵／矛盾者不呼叫).
-//        站點接線(server/WWebPerm.mjs:syncAndReplaceTabs): isKeepable = (val) => validateRowsBeforeWrite([{ id: 'keep', [keyAssign]: val }]) === null(keyAssign 於 users 為 cgrups; run08 起 grups／pemis 之 cpemis／crules 共用同一接線, 其純函數見 unit-syncKeepEntity), 位於 delAll 之前, nSkip>0 記 warn(syncAndReplaceTabs-keepAssign-skip, 不含值);
+//        站點接線(server/syncCore.mjs:syncAndReplaceTabs〔perm-run03 自 WWebPerm.mjs 搬出〕): isKeepable = (val) => validateRowsBeforeWrite([{ id: 'keep', [keyAssign]: val }]) === null(keyAssign 於 users 為 cgrups; run08 起 grups／pemis 之 cpemis／crules 共用同一接線, 其純函數見 unit-syncKeepEntity), 位於第一個 ORM 寫入之前, nSkip>0 記 warn(syncAndReplaceTabs-keepAssign-skip, 不含值);
+//        perm-run03: 身分改依 srcKey 配對, 傳入 keepAssignOnMissing 之 rows 其 id 即「配對到之庫內 id／新配之 id」, 故 mappingBy 固定為 'id'(不再有對應鍵與 id 指向不同使用者之矛盾); 本檔 SK-S2／R3 對 mappingBy email／name 之行為仍為純函數層之規格.
 //        真後端行為由 API 層另測(本檔只做純函數層與站點之靜態斷言).
-//  SK-S4 id 重編偵測(外部 id 不穩定時, id 消失＝刪除會每次清理引用而抹掉後台指派, 故以 warn log 與頁面橫幅提示): 本批列帶 id 與其名稱, 庫內同一 from 有「同名、不同 id、且該舊 id 不在本批」之列 → 計入;
-//        同名同 id、舊 id 仍在本批、本批列無 id、非物件元素 → 不計; 筆數以本批列計.
+//  SK-S4 來源鍵重編偵測(perm-run03: 原 id 重編偵測 countIdRenumber 之判定口徑由 id 改 srcKey; 外部來源鍵不穩定〔如目錄重建後 GUID 全換〕時, 來源鍵消失＝刪舊增新會每次連帶清理引用而抹掉後台指派〔原則 6: 新實體不繼承〕, 故以 warn log 與頁面橫幅提示):
+//        本批列帶 srcKey 與其名稱, 庫內同一 from 有「同名、不同 srcKey、且該舊 srcKey 不在本批」之列 → 計入;
+//        同名同 srcKey、舊 srcKey 仍在本批、本批列無(字串)srcKey、非物件元素 → 不計; 筆數以本批列計.
+//        庫內尚無 srcKey 之列(遷移前資料, 舊同步寫入)以其 id 為身分候選(syncCore 於首次匯入時, 批次 srcKey 等於其 id 者視為同一列並補上 srcKey): 批次 srcKey 等於其 id → 同一列不計; 不等且同名 → 計入.
 //  SK-S5 原型鍵名(__proto__／constructor／toString／hasOwnProperty)作為 id、email、name 時不出錯、不污染原型、判定與一般字串相同.
 //
 //輸入空間表(軸 × 格數; 格數於檔尾 SK-999 以計數器核對):
@@ -25,14 +28,15 @@
 //                        批次／不改輸入／非物件／自訂 key／庫內值型別／hasKey 異常／原型鍵名 id 6＋庫內 3＋email／name 2 共 56 格, 全測
 //                        [run07 R3 對應鍵矛盾] mappingBy{email,name} × id 對到之舊列對應鍵{相同,相異,雙缺／空,一缺一有 4 種, 與他列互換} 與 mappingBy{id,foo,null} 不受影響: SK-025／025b／026／027／028／029／036／037 共 17 格(SK-025 計入 KA 之 56 格, 其餘 16 格計 R3)
 //                        [run07 R4 isKeepable] 預設恆可／為假不保留與 nSkip／僅對保留候選呼叫／混批／不改輸入／與 R3 互動 6 ＋ 以站點同式 predicate(validateRowsBeforeWrite)接真驗證 8 種庫內值 共 14 格(計 R4); 站點靜態 SITE-SK 另 2 案(不計格)
-//  countIdRenumber       12 格(同名異 id／同名同 id／舊 id 仍在本批／無 id／非物件／部分重編／改名非重編／數字 id／庫內雜訊／空輸入／精確比對／原型鍵名), 全測
+//  countSrcKeyRenumber   14 格(同名異 srcKey／同名同 srcKey／舊 srcKey 仍在本批／本批列無 srcKey／非物件／部分重編／改名非重編／庫內雜訊〔身分不明列〕／空輸入／精確比對／原型鍵名／筆數以本批列計〔SK-061〕＋ 遷移前資料〔庫內列無 srcKey、以 id 為候選〕2 格〔SK-062／063〕), 全測
+//                        [perm-run03 改寫自 countIdRenumber 之 12 格: 原「數字 id」格不復存在〔srcKey 只能是字串, 數字不是來源鍵, 併入 SK-053〕, 由「庫內雜訊」格取代其位置; 另增遷移前資料 2 格]
 //  刻意不測: 庫內同 id 重複列(庫內主鍵唯一); hasKey 非陣列(呼叫端恆給 markHasKey 之結果); isKeepable 非函數或拋例外(呼叫端為站點內固定之 predicate); 真後端同步行為(API 層).
 //  未測: 無.
 //跑法: npx mocha test/unit-syncKeep.test.mjs --reporter list --timeout 30000
 import assert from 'assert'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { markHasKey, keepAssignOnMissing, countIdRenumber } from '../server/syncKeep.mjs'
+import { markHasKey, keepAssignOnMissing, countSrcKeyRenumber } from '../server/syncKeep.mjs'
 import validateRowsBeforeWrite from '../server/validateRows.mjs'
 import { deepFreeze } from './tools/unitExt.mjs'
 import { sourceLines } from './tools/srcScan.mjs'
@@ -52,7 +56,7 @@ let oldUsers = () => [
 let keep = (rows, o = {}) => keepAssignOnMissing({ rows, hasKey: rows.map(() => false), rowsOldSameFrom: oldUsers(), ...o })
 
 
-describe('unit-syncKeep (外部同步保留指派欄與 id 重編偵測, F-23)', function() {
+describe('unit-syncKeep (外部同步保留指派欄與來源鍵重編偵測, F-23)', function() {
 
     // =====================================================================
     // markHasKey
@@ -328,14 +332,14 @@ describe('unit-syncKeep (外部同步保留指派欄與 id 重編偵測, F-23)',
             assert.strict.equal(out3.nConflict, 0)
         })
 
-        it('SK-040 (N2) 同一 id 改 email 而缺 cgrups → 清空且 nConflict=1(供呼叫端記 warn mapKeyConflict, 收嚴須附提示); WWebPerm 於 nConflict>0 時記 syncAndReplaceTabs-keepAssign-skip(reason mapKeyConflict)', async function() {
+        it('SK-040 (N2) 同一 id 改 email 而缺 cgrups → 清空且 nConflict=1(供呼叫端記 warn, 收嚴須附提示); syncCore 於 nConflict>0 時記 syncAndReplaceTabs-keepAssign-skip(perm-run03: 呼叫端以 mappingBy 固定 id 呼叫, 此純函數層矛盾不會於站點發生, reason 統一 identityConflict)', async function() {
             cells.R3++
             let out = keepAssignOnMissing({ rows: [{ id: 'a', email: 'new@x.test' }], hasKey: [false], rowsOldSameFrom: [{ id: 'a', email: 'old@x.test', cgrups: 'SECRET' }], mappingBy: 'email' })
             assert.strict.equal('cgrups' in out.rows[0], false)
             assert.strict.equal(out.nConflict, 1)
             let fs = await import('fs')
-            let txt = fs.readFileSync(new URL('../server/WWebPerm.mjs', import.meta.url), 'utf8')
-            assert.ok(/if \(kr\.nConflict > 0\) \{[\s\S]{0,200}syncAndReplaceTabs-keepAssign-skip[\s\S]{0,200}mapKeyConflict/.test(txt))
+            let txt = fs.readFileSync(new URL('../server/syncCore.mjs', import.meta.url), 'utf8')
+            assert.ok(/if \(kr\.nConflict > 0\) \{[\s\S]{0,200}syncAndReplaceTabs-keepAssign-skip[\s\S]{0,200}identityConflict/.test(txt))
         })
 
         it('SK-041 (run08 外審 sol #3) 無 id、mappingBy=email／name 而對應鍵命中庫內同來源多筆(如同值之啟用與停用列)→ 不取首筆、不保留, 且計入 nConflict(收嚴須附提示; WWebPerm 記 mapKeyConflict); 命中 0 筆(新使用者)與恰 1 筆不計 nConflict; 不計格(SK-040 同型之補充)', function() {
@@ -509,7 +513,7 @@ describe('unit-syncKeep (外部同步保留指派欄與 id 重編偵測, F-23)',
             assert.strict.equal(nSkip, 0)
         })
 
-        //以站點同式之 predicate 接真 validateRowsBeforeWrite(與 WWebPerm.mjs:syncAndReplaceTabs 傳入者同一式, 站點同式由 SITE-SK-001 靜態斷言): 期望由 SK-S6 推導——
+        //以站點同式之 predicate 接真 validateRowsBeforeWrite(與 syncCore.mjs:syncAndReplaceTabs 傳入者同一式, 站點同式由 SITE-SK-001 靜態斷言): 期望由 SK-S6 推導——
         //「保留值須能原樣通過寫入前驗證」= 不含會被 clearXSS 改寫之標記、為純量(字串／數字／布林／null)
         it('SK-076 以站點同式 predicate(validateRowsBeforeWrite)接真驗證: 乾淨 JSON 字串／空字串／null／數字保留; 含 <script> 之名稱／HTML 標記字串／物件／陣列不保留(8 種庫內值)', function() {
             let isKeepable = (val) => validateRowsBeforeWrite([{ id: 'keep', cgrups: val }]) === null
@@ -541,24 +545,26 @@ describe('unit-syncKeep (外部同步保留指派欄與 id 重編偵測, F-23)',
             assert.strict.deepEqual(exp, { nKeep: 4, nSkip: 4 }, '夾具確含保留與不保留各半, 非空洞')
         })
 
-        //站點靜態斷言(整合層; 真後端行為由 API 層另測): WWebPerm.mjs:syncAndReplaceTabs 傳入之 isKeepable 使用 validateRowsBeforeWrite, 位於 delAll 之前; 不保留者記 warn(不含值)
+        //站點靜態斷言(整合層; 真後端行為由 API 層另測): syncCore.mjs:syncAndReplaceTabs(perm-run03 自 WWebPerm.mjs 搬出)傳入之 isKeepable 使用 validateRowsBeforeWrite, 位於第一個 ORM 寫入之前; 不保留者記 warn(不含值)
         describe('站點(靜態)', function() {
 
-            let code = () => sourceLines(path.join(projRoot, 'server/WWebPerm.mjs'), 'code').map((l) => l.text).join('\n')
+            let code = () => sourceLines(path.join(projRoot, 'server/syncCore.mjs'), 'code').map((l) => l.text).join('\n')
 
-            it('SITE-SK-001 syncAndReplaceTabs 呼叫 keepAssignOnMissing 時傳入 isKeepable, 其以 validateRowsBeforeWrite([{ id: \'keep\', [keyAssign]: val }]) === null 判定(run08 起 keyAssign 於 users 為 cgrups, 見 unit-syncKeepEntity SITE-KE-001); 呼叫位於 delAll 之前(保留值於破壞性寫入前驗證)', function() {
+            it('SITE-SK-001 syncAndReplaceTabs 呼叫 keepAssignOnMissing 時傳入 isKeepable, 其以 validateRowsBeforeWrite([{ id: \'keep\', [keyAssign]: val }]) === null 判定(run08 起 keyAssign 於 users 為 cgrups, 見 unit-syncKeepEntity SITE-KE-001); 呼叫位於第一個 ORM 寫入(procOrm／save／delAll)之前(保留值於破壞性寫入前驗證); perm-run03: 傳入之 rows 為 srcKey 配對後之 id, mappingBy 傳實際值(不固定 \'id\'; 外審 sol#1)', function() {
                 let c = code()
-                assert.strict.ok(/import validateRowsBeforeWrite from '\.\/validateRows\.mjs'/.test(c), '須匯入 validateRowsBeforeWrite')
+                assert.strict.ok(/import validateRowsBeforeWrite(, \{ maxIdBytes \})? from '\.\/validateRows\.mjs'/.test(c), '須匯入 validateRowsBeforeWrite')
                 let m = /keepAssignOnMissing\(\{([^\n]*?)\}\)/.exec(c)
                 assert.strict.ok(m, '找不到 keepAssignOnMissing({...}) 呼叫')
                 assert.strict.ok(c.includes(`let isKeepable = (val) => validateRowsBeforeWrite([{ id: 'keep', [keyAssign]: val }]) === null`), 'isKeepable 須以 validateRowsBeforeWrite 判定')
                 assert.strict.ok(m[1].includes('isKeepable'), `須傳入 isKeepable: ${m[1]}`)
-                assert.strict.ok(m[1].includes('mappingBy'), '須傳入 mappingBy(R3 需要)')
-                assert.strict.ok(c.includes(`let keyAssign = (keyTable === 'users') ? 'cgrups'`), 'users 之指派欄須為 cgrups')
+                assert.strict.ok(/mappingBy[,\s}]/.test(m[1]) && !m[1].includes(`mappingBy: 'id'`), `身分已由 srcKey 配對(rowsKeep 之 id 即配對到之庫內 id), 但須傳入實際 mappingBy(email／name 時驗登入對應鍵矛盾, 外審 sol#1), 不得固定 'id': ${m[1]}`)
+                assert.strict.ok(m[1].includes('rowsOldSameFrom: sameFrom'), `須以庫內同一 from 之列為保留來源: ${m[1]}`)
+                assert.strict.ok(/users:\s*'cgrups'/.test(c), 'users 之指派欄須為 cgrups(KEY_ASSIGN)')
+                assert.strict.ok(c.includes(`let keyAssign = KEY_ASSIGN[keyTable]`), 'keyAssign 須取自 KEY_ASSIGN[keyTable]')
                 let iKeep = c.indexOf('keepAssignOnMissing({')
-                let iDelAll = c.indexOf('.delAll({ from })')
-                assert.strict.ok(iKeep > 0 && iDelAll > 0 && iKeep < iDelAll, 'keepAssignOnMissing 須位於 delAll 之前')
-                assert.strict.ok(/rows = kr\.rows/.test(c), '保留結果須回寫 rows(之後才驗證／寫入)')
+                let iWrite = c.search(/\.(insert|save|del|delAll|mix)\(|\bprocOrm\(/)
+                assert.strict.ok(iKeep > 0 && iWrite > 0 && iKeep < iWrite, 'keepAssignOnMissing 須位於第一個 ORM 寫入呼叫之前')
+                assert.strict.ok(/rowsKeep = kr\.rows/.test(c), '保留結果須回寫 rowsKeep(之後才做差異分類／寫入)')
             })
 
             it('SITE-SK-002 nSkip>0 記 warn 事件 syncAndReplaceTabs-keepAssign-skip, 只帶表名／來源／欄位／筆數／原因(不含值); nKeep>0 之 info 事件仍在', function() {
@@ -573,79 +579,104 @@ describe('unit-syncKeep (外部同步保留指派欄與 id 重編偵測, F-23)',
 
 
     // =====================================================================
-    // countIdRenumber
+    // countSrcKeyRenumber
     // =====================================================================
-    describe('countIdRenumber(SK-S4)', function() {
+    describe('countSrcKeyRenumber(SK-S4)', function() {
 
-        let g = (id, name) => ({ id, name })
+        //g: 庫內列(有 srcKey 者為差異同步寫入之列, id 為系統配的內部主鍵, 與 srcKey 無關); h: 本批列(外部不帶 id, 只帶 srcKey 與名稱)
+        let g = (id, srcKey, name) => ({ id, srcKey, name })
+        let h = (srcKey, name) => ({ srcKey, name })
+        //gLegacy: 遷移前資料(舊同步寫入, 庫內無 srcKey 欄位)
+        let gLegacy = (id, name) => ({ id, name })
 
-        it('SK-050 同名異 id(舊 id 不在本批)→ 計入(1)', function() {
+        it('SK-050 同名異 srcKey(舊 srcKey 不在本批)→ 計入(1)', function() {
             cells.CR++
-            assert.strict.equal(countIdRenumber([g('a', 'N')], [g('b', 'N')]), 1)
+            assert.strict.equal(countSrcKeyRenumber([g('i1', 'a', 'N')], [h('b', 'N')]), 1)
         })
 
-        it('SK-051 同名同 id → 不計(0)', function() {
+        it('SK-051 同名同 srcKey → 不計(0); 庫內 id 與批次 srcKey 相同或相異皆無關(身分是 srcKey)', function() {
             cells.CR++
-            assert.strict.equal(countIdRenumber([g('a', 'N')], [g('a', 'N')]), 0)
+            assert.strict.equal(countSrcKeyRenumber([g('i1', 'a', 'N')], [h('a', 'N')]), 0)
+            assert.strict.equal(countSrcKeyRenumber([g('a', 'z', 'N')], [h('a', 'N')]), 1, '庫內 id 恰等於批次 srcKey 但庫內已有 srcKey z: 身分是 srcKey(z), 不再以 id 配對 → 同名異 srcKey 計入')
         })
 
-        it('SK-052 舊 id 仍在本批(改名而非重編)→ 不計(0)', function() {
+        it('SK-052 舊 srcKey 仍在本批(改名而非重編)→ 不計(0)', function() {
             cells.CR++
-            assert.strict.equal(countIdRenumber([g('a', 'N')], [g('a', 'M'), g('b', 'N')]), 0)
+            assert.strict.equal(countSrcKeyRenumber([g('i1', 'a', 'N')], [h('a', 'M'), h('b', 'N')]), 0)
         })
 
-        it('SK-053 本批列無 id(缺、空字串、NaN、null、布林、物件)→ 不計', function() {
+        it('SK-053 本批列無(字串)srcKey(缺、null、數字、布林、物件、陣列)→ 不計', function() {
             cells.CR++
-            let rows = [{ name: 'N' }, { id: '', name: 'N' }, { id: NaN, name: 'N' }, { id: null, name: 'N' }, { id: true, name: 'N' }, { id: {}, name: 'N' }]
-            assert.strict.equal(countIdRenumber([g('a', 'N')], rows), 0)
+            let rows = [{ name: 'N' }, { srcKey: null, name: 'N' }, { srcKey: 7, name: 'N' }, { srcKey: true, name: 'N' }, { srcKey: {}, name: 'N' }, { srcKey: ['b'], name: 'N' }, { srcKey: NaN, name: 'N' }]
+            assert.strict.equal(countSrcKeyRenumber([g('i1', 'a', 'N')], rows), 0)
         })
 
         it('SK-054 非物件元素(null／字串／數字)於本批與庫內皆不拋例外且不計; 非字串名稱不計', function() {
             cells.CR++
-            let old = [null, 'x', 5, g('a', 'N'), g(5, 'N'), g('c', 5)]
-            let rows = [null, 'x', 5, g('b', 'N'), g('d', 5)]
-            assert.strict.equal(countIdRenumber(old, rows), 1)
+            let old = [null, 'x', 5, g('i1', 'a', 'N'), g('i2', 'e', 5)]
+            let rows = [null, 'x', 5, h('b', 'N'), h('d', 5)]
+            assert.strict.equal(countSrcKeyRenumber(old, rows), 1)
         })
 
-        it('SK-055 部分重編: 庫內 {a:A, b:B}、本批 {a:A, y:B} → 1(A 同 id 不計, B 異 id 計 1); 全重編 {x:A, y:B} → 2', function() {
+        it('SK-055 部分重編: 庫內 {a:A, b:B}、本批 {a:A, y:B} → 1(A 同 srcKey 不計, B 異 srcKey 計 1); 全重編 {x:A, y:B} → 2', function() {
             cells.CR++
-            assert.strict.equal(countIdRenumber([g('a', 'A'), g('b', 'B')], [g('a', 'A'), g('y', 'B')]), 1)
-            assert.strict.equal(countIdRenumber([g('a', 'A'), g('b', 'B')], [g('x', 'A'), g('y', 'B')]), 2)
+            assert.strict.equal(countSrcKeyRenumber([g('i1', 'a', 'A'), g('i2', 'b', 'B')], [h('a', 'A'), h('y', 'B')]), 1)
+            assert.strict.equal(countSrcKeyRenumber([g('i1', 'a', 'A'), g('i2', 'b', 'B')], [h('x', 'A'), h('y', 'B')]), 2)
         })
 
-        it('SK-056 純改名(新名稱無庫內同名)→ 不計(0)', function() {
+        it('SK-056 純改名(新名稱無庫內同名)→ 不計(0); 純改名同 srcKey 亦 0', function() {
             cells.CR++
-            assert.strict.equal(countIdRenumber([g('a', 'A')], [g('b', 'C')]), 0)
+            assert.strict.equal(countSrcKeyRenumber([g('i1', 'a', 'A')], [h('b', 'C')]), 0, '新 srcKey、新名稱: 單純刪舊增新, 無同名者, 不是疑似重編')
+            assert.strict.equal(countSrcKeyRenumber([g('i1', 'a', 'A')], [h('a', 'C')]), 0, '同 srcKey 改名: 差異同步的改名, 不是重編')
         })
 
-        it('SK-057 id 為有限數字取字串形式: 本批 id 7 對庫內 "7" 同名 → 同 id 不計(0); 對庫內 "6" 同名 → 計(1)', function() {
+        it('SK-057 庫內身分不明列(無字串 id 亦無字串 srcKey)不貢獻: 不使同名之批次列被視為重編', function() {
             cells.CR++
-            assert.strict.equal(countIdRenumber([g('7', 'N')], [{ id: 7, name: 'N' }]), 0)
-            assert.strict.equal(countIdRenumber([g('6', 'N')], [{ id: 7, name: 'N' }]), 1)
+            let old = [{ id: 5, srcKey: 5, name: 'N' }, { name: 'N' }, { id: null, srcKey: null, name: 'N' }, { id: {}, srcKey: [], name: 'N' }]
+            assert.strict.equal(countSrcKeyRenumber(old, [h('b', 'N')]), 0)
         })
 
         it('SK-058 空輸入: 庫內空、本批空、兩者皆空 → 0', function() {
             cells.CR++
-            assert.strict.equal(countIdRenumber([], [g('a', 'N')]), 0)
-            assert.strict.equal(countIdRenumber([g('a', 'N')], []), 0)
-            assert.strict.equal(countIdRenumber([], []), 0)
+            assert.strict.equal(countSrcKeyRenumber([], [h('a', 'N')]), 0)
+            assert.strict.equal(countSrcKeyRenumber([g('i1', 'a', 'N')], []), 0)
+            assert.strict.equal(countSrcKeyRenumber([], []), 0)
         })
 
-        it('SK-059 名稱精確 ===: 大小寫、前後空白不同不算同名(0)', function() {
+        it('SK-059 名稱與 srcKey 皆精確 ===: 大小寫、前後空白不同不算同名(0); srcKey 大小寫不同視為不同來源鍵(同名者計入)', function() {
             cells.CR++
-            assert.strict.equal(countIdRenumber([g('a', 'N')], [g('b', 'n'), g('c', 'N '), g('d', ' N')]), 0)
+            assert.strict.equal(countSrcKeyRenumber([g('i1', 'a', 'N')], [h('b', 'n'), h('c', 'N '), h('d', ' N')]), 0)
+            assert.strict.equal(countSrcKeyRenumber([g('i1', 'a', 'N')], [h('A', 'N')]), 1, 'srcKey A 與 a 不同: a 將被刪除、A 為新增、同名 → 計入')
         })
 
-        it('SK-060 名稱為原型鍵名(__proto__／constructor)不出錯: 同名異 id 仍計入, 無對應者不計', function() {
+        it('SK-060 名稱或 srcKey 為原型鍵名(__proto__／constructor)不出錯: 同名異 srcKey 仍計入, 無對應者不計', function() {
             cells.CR++
-            assert.strict.equal(countIdRenumber([g('a', '__proto__'), g('b', 'constructor')], [g('x', '__proto__'), g('y', 'toString')]), 1)
+            assert.strict.equal(countSrcKeyRenumber([g('i1', 'a', '__proto__'), g('i2', 'b', 'constructor')], [h('x', '__proto__'), h('y', 'toString')]), 1)
+            assert.strict.equal(countSrcKeyRenumber([g('i1', '__proto__', 'N')], [h('__proto__', 'N')]), 0, 'srcKey 為 __proto__ 且同: 不計')
+            assert.strict.equal(countSrcKeyRenumber([g('i1', '__proto__', 'N')], [h('constructor', 'N')]), 1, 'srcKey 由 __proto__ 變 constructor 且同名: 計入')
         })
 
-        it('SK-061 筆數以本批列計: 庫內同名兩筆(皆不在本批)、本批一列同名異 id → 1; 不改輸入', function() {
+        it('SK-061 筆數以本批列計: 庫內同名兩筆(皆不在本批)、本批一列同名異 srcKey → 1; 不改輸入', function() {
             cells.CR++
-            let old = deepFreeze([g('a', 'N'), g('b', 'N')])
-            let rows = deepFreeze([g('c', 'N')])
-            assert.strict.equal(countIdRenumber(old, rows), 1)
+            let old = deepFreeze([g('i1', 'a', 'N'), g('i2', 'b', 'N')])
+            let rows = deepFreeze([h('c', 'N')])
+            assert.strict.equal(countSrcKeyRenumber(old, rows), 1)
+        })
+
+        //遷移前資料(perm-run03 新增兩格): 庫內既有外部列若無 srcKey(舊同步寫入), 以其 id 為身分候選——syncCore 於首次匯入時, 批次 srcKey 等於其 id 者視為同一列並補 srcKey
+        it('SK-062 遷移前資料(庫內列無 srcKey): 批次 srcKey 等於其 id → 視為同一列(補 srcKey), 同名亦不計(0); 庫內 srcKey 為空字串者同視為無 srcKey', function() {
+            cells.CR++
+            assert.strict.equal(countSrcKeyRenumber([gLegacy('7', 'N')], [h('7', 'N')]), 0)
+            assert.strict.equal(countSrcKeyRenumber([{ id: '7', srcKey: '', name: 'N' }], [h('7', 'N')]), 0, 'srcKey 空字串＝無 srcKey, 以 id 為候選')
+            assert.strict.equal(countSrcKeyRenumber([{ id: '7', srcKey: null, name: 'N' }], [h('7', 'N')]), 0, 'srcKey null＝無 srcKey')
+        })
+
+        it('SK-063 遷移前資料(庫內列無 srcKey): 批次 srcKey 不等於其 id 而同名 → 計入(1); 混合庫內(有 srcKey 者與遷移前者並存)各依自身身分判定', function() {
+            cells.CR++
+            assert.strict.equal(countSrcKeyRenumber([gLegacy('6', 'N')], [h('7', 'N')]), 1)
+            let old = [gLegacy('L1', 'A'), g('i2', 'k2', 'B'), gLegacy('L3', 'C')]
+            //A: 批次 srcKey L1 → 同一列(遷移); B: 批次 srcKey k2 → 同一列; C: 批次改以 z3 → 同名異身分, 計入; 另 D 為新增(無同名舊列)不計
+            assert.strict.equal(countSrcKeyRenumber(old, [h('L1', 'A'), h('k2', 'B'), h('z3', 'C'), h('d4', 'D')]), 1)
         })
 
     })
@@ -658,7 +689,7 @@ describe('unit-syncKeep (外部同步保留指派欄與 id 重編偵測, F-23)',
             if (process.argv.some((a) => a === '--grep' || a === '-g' || a.startsWith('--grep='))) {
                 this.skip() //--grep 只跑部分案例時計數必不全, 不核對
             }
-            assert.strict.deepEqual(cells, { MH: 16, KA: 56, CR: 12, R3: 19, R4: 14 })
+            assert.strict.deepEqual(cells, { MH: 16, KA: 56, CR: 14, R3: 19, R4: 14 })
         })
 
     })

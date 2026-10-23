@@ -2,7 +2,8 @@
 //
 //受測: src/js/rowDigest.mjs(轉接 w-serv-orm/src/baseline.mjs: makeBaseline／compareBaseline／isBaselineStale／checkBaseline／getContract)與 src/schema/contracts/*.mjs.
 //摘要、基準、比對之演算法與型別規則由 w-serv-orm 自己的 unit-baseline 覆蓋; 本檔只驗「套內怎麼用它」:
-//  - 契約: 四表各一份、通過核心 checkContract; 每個 schema 欄位恰好歸屬 主鍵／名次欄／fields／serverOnly 其一(盤點表, 規格第 9 節); from 為外部列身分須入 fields;
+//  - 契約: 四表各一份、通過核心 checkContract; 每個 schema 欄位恰好歸屬 主鍵／名次欄／fields／serverOnly 其一(盤點表, 規格第 9 節); from 與 srcKey(perm-run03 新增之外部匯入來源鍵)為外部列身分須入 fields;
+//    升版新增 srcKey 使舊契約算出之基準一律與升版後整表不符(RD-C6: 持舊畫面者過期,非 baselineFormat), 凍結向量(RD-V1)隨之更新, 舊契約重算仍等於升版前凍結值(RD-V2);
 //  - 套內不再自帶指紋演算法(舊 rowDigest.mjs 之 cyrb53／getDigestFields／rowDigest 已刪除); 前後端與伺服端 import 同一份契約;
 //  - 已知缺口 (d) 空值等價: undefined／null／'' 同一空值, 不誤擋; (e) 名次入基準: 他人重排被偵測, 系統重編號(名次不變)不誤擋;
 //  - 舊格式(套內版、無 'h1:' 前綴)或不識版本之基準 → baselineFormat(伺服端 saveBaselineFormat, 提示重新載入), 不降級為未帶基準;
@@ -47,18 +48,43 @@ describe('unit-rowDigest (載入基準轉接層與寫入契約, perm-run01)', fu
                 assert.strict.deepEqual([...all].sort(), [...ds[t].keys].sort(), '契約欄位全集須等於 schema 欄位全集(新增欄位未歸類即缺口)')
             })
 
-            it(`RD-C3 ${t}: serverOnly 即四個伺服器專有欄(與 externalRows.SERVER_FIELDS 同一組); from 為外部列身分須入 fields(外部同步改 from 即使持舊畫面者過期)  [規格第 3、4 節]`, function() {
+            it(`RD-C3 ${t}: serverOnly 即四個伺服器專有欄(與 externalRows.SERVER_FIELDS 同一組); from 與 srcKey 為外部列身分欄須入 fields(外部同步改 from／補上或改變 srcKey 即使持舊畫面者過期)  [規格第 3、4 節]`, function() {
                 assert.strict.deepEqual([...c.serverOnly].sort(), [...SERVER_FIELDS].sort())
                 assert.strict.ok(c.fields.indexOf('from') >= 0)
+                assert.strict.ok(c.fields.indexOf('srcKey') >= 0, 'srcKey(perm-run03 新增之身分欄)須入 fields')
             })
         }
 
-        it('RD-C4 四表之 fields 內容(白名單明列, 不以排除推得; 變動即升版或影響舊頁面, 須同步 README Upgrade Notes)  [規格第 3 節]', function() {
-            assert.strict.deepEqual(contracts.users.fields, ['name', 'email', 'description', 'from', 'cgrups', 'isAdmin', 'isActive'])
-            assert.strict.deepEqual(contracts.grups.fields, ['name', 'description', 'from', 'cpemis'])
-            assert.strict.deepEqual(contracts.pemis.fields, ['name', 'description', 'from', 'crules'])
-            assert.strict.deepEqual(contracts.targets.fields, ['description', 'from'])
+        it('RD-C4 四表之 fields 內容(白名單明列, 不以排除推得; 變動即升版或影響舊頁面, 須同步 README Upgrade Notes; perm-run03: 四表皆於 from 之後新增 srcKey〔外部匯入之來源鍵, 身分欄〕)  [規格第 3 節]', function() {
+            assert.strict.deepEqual(contracts.users.fields, ['name', 'email', 'description', 'from', 'srcKey', 'cgrups', 'isAdmin', 'isActive'])
+            assert.strict.deepEqual(contracts.grups.fields, ['name', 'description', 'from', 'srcKey', 'cpemis'])
+            assert.strict.deepEqual(contracts.pemis.fields, ['name', 'description', 'from', 'srcKey', 'crules'])
+            assert.strict.deepEqual(contracts.targets.fields, ['description', 'from', 'srcKey'])
         })
+
+        for (let t of TABLES) {
+            it(`RD-C6 ${t}: 升版新增 srcKey 欄——同一列相對「舊契約〔無 srcKey〕」與新契約之摘要不同(升版前開啟之頁面持舊基準,升版後一律過期、提示重新載入); 舊契約之摘要與升版前凍結值相同(其餘欄位編碼未變); srcKey 為空值時新契約之摘要等價於缺欄`, function() {
+                let c = contracts[t]
+                let legacy = { ...c, fields: c.fields.filter((f) => f !== 'srcKey') }
+                assert.strict.equal(checkContract(legacy), true)
+                let base = mkRow(t, { id: 'r1', order: 1 })
+                //新增欄位使摘要不同(欄位序列多一格)——即使 srcKey 為空值
+                assert.strict.notEqual(digestRow(base, c), digestRow(base, legacy))
+                //舊契約算出之基準(= 升版前頁面持有者)對升版後之同一整表比對: 全部列內容摘要不同 → saveStale/rowChanged
+                let rows = [mkRow(t, { id: 'r1', order: 1 }), mkRow(t, { id: 'r2', order: 2, description: '' })]
+                let oldBl = buildBaseline(rows, legacy)
+                assert.strict.equal(isBaselineValid(oldBl), true, '格式仍為合法 h1 基準(不是 baselineFormat)')
+                assert.strict.equal(isBaselineStale({ keyTable: t, rows, baseline: oldBl }), true)
+                assert.strict.deepEqual(checkBaseline({ keyTable: t, ltdtOld: rows, baseline: oldBl }), { key: 'saveStale', reason: 'rowChanged', n: 2 })
+                //srcKey 空值三態(缺欄／null／空字串)於新契約下摘要相同(核心空值等價), 故新舊畫面一致之空 srcKey 列不因表示法不同而誤擋
+                let a = digestRow(rowWith(base, { srcKey: '' }), c)
+                assert.strict.equal(digestRow(rowWith(base, { srcKey: null }), c), a)
+                assert.strict.equal(digestRow(rowWith(base, { srcKey: undefined }), c), a)
+                assert.strict.equal(digestRow(rowWith(base, { srcKey: MISSING }), c), a)
+                //srcKey 有值則摘要不同(外部匯入補上／改變 srcKey 使持舊畫面者存檔過期, 見 RD-F1 逐欄)
+                assert.strict.notEqual(digestRow(rowWith(base, { srcKey: 'sk-1' }), c), a)
+            })
+        }
 
         it('RD-C5 getContract 拒絕未知表名與非字串(含原型鍵)', function() {
             for (let bad of ['x', '', 'constructor', '__proto__', 'toString', null, undefined, 1, {}]) {
@@ -271,16 +297,30 @@ describe('unit-rowDigest (載入基準轉接層與寫入契約, perm-run01)', fu
 
     describe('凍結向量(RD-V: 契約欄位序或政策被改動即改變摘要而使升級前開啟之頁面全數過期, 須同步 README Upgrade Notes)', function() {
 
+        //perm-run03: 契約新增 srcKey 欄(欄位序列多一格)使摘要全變, 此為預期之升版(升版前開啟之頁面一律過期, 見 RD-C6; README Upgrade Notes); 新凍結值即新契約(fields 含 srcKey)之摘要,
+        //VEC_LEGACY 為升版前之凍結值——以「舊契約〔fields 去掉 srcKey〕」重算須仍相同(證明新增欄位未改變其餘欄位之編碼與核心演算法)
         const VEC = {
+            users: [['r1', 'h1:0b4e2ec491a5f2'], ['r2', 'h1:108ee14029cf03']],
+            grups: [['r1', 'h1:10ec2d1dece75f'], ['r2', 'h1:1b7dfccf489555']],
+            pemis: [['r1', 'h1:0d77ff6a75254d'], ['r2', 'h1:1e459797ce0ab1']],
+            targets: [['r1', 'h1:041b97fc3881a0'], ['r2', 'h1:046d255e812572']],
+        }
+        const VEC_LEGACY = {
             users: [['r1', 'h1:01b8e8db455e96'], ['r2', 'h1:09417201f43f73']],
             grups: [['r1', 'h1:0d0acc22b36db2'], ['r2', 'h1:1841da7c897669']],
             pemis: [['r1', 'h1:0a106ccf30a572'], ['r2', 'h1:0ffc03080cc41f']],
             targets: [['r1', 'h1:0fdf3754416649'], ['r2', 'h1:12a9e132d30ad6']],
         }
         for (let t of TABLES) {
-            it(`RD-V1 ${t}: 固定兩列(mkRow, 第二列 description 空字串)之基準等於凍結值`, function() {
+            it(`RD-V1 ${t}: 固定兩列(mkRow, 第二列 description 空字串; srcKey 預設空字串)之基準等於凍結值`, function() {
                 let rows = [mkRow(t, { id: 'r1', order: 1 }), mkRow(t, { id: 'r2', order: 2, description: '' })]
                 assert.strict.deepEqual(makeBaseline(rows, t), VEC[t])
+            })
+
+            it(`RD-V2 ${t}: 以舊契約(fields 去掉 srcKey)重算同一固定兩列 = 升版前之凍結值(新增 srcKey 欄位未改動其餘欄位之編碼)`, function() {
+                let rows = [mkRow(t, { id: 'r1', order: 1 }), mkRow(t, { id: 'r2', order: 2, description: '' })]
+                let legacy = { ...contracts[t], fields: contracts[t].fields.filter((f) => f !== 'srcKey') }
+                assert.strict.deepEqual(buildBaseline(rows, legacy), VEC_LEGACY[t])
             })
         }
 
