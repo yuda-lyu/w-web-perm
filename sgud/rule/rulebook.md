@@ -20,4 +20,4 @@
 | 寫入取鎖與表鎖階層 | `rulebook_sync_lock.md` | R-WRITE-LOCK-01(外部同步與後台整表寫入共用互斥)、R-WRITE-LOCK-02(取鎖階層與單一取鎖函數; 2026-10-23 perm-run01 改共用核心之鎖) |
 | 外部列受保護與離線維運工具 | `rulebook_sync_external.md` | R-EXT-OWN-01(外部列守門; run07, ADR-037)、R-SHIP-TOOLS-01(離線維運工具核心須在出貨位置; run08) |
 | 載入基準、草稿保留與重載旗標 | `rulebook_sync_baseline.md` | R-BASELINE-01(載入基準; run07／run11, 2026-10-23 perm-run01 改用共用核心 h1)、R-DRAFT-KEEP-01(草稿保留; 增編輯器草稿與對話框重建)、R-RELOAD-GUARD-01(程式端重載旗標; 2026-10-23 run12) |
-| 多人同時編輯之落地規則 | `rulebook_concurrent.md` | 2026-10-23 perm-run01 新增: 寫入契約(欄位白名單、名次、空值等價)、全部寫入入口共用同一鎖、存檔回傳列即時更新基準、對話框主體身分驗證等 |
+| 多人同時編輯之落地規則 | `rulebook_concurrent.md` | 2026-10-23 perm-run01 新增: 寫入契約(欄位白名單、名次、空值等價)、全部寫入入口共用同一鎖、存檔回傳列即時更新基準、對話框主體身分驗證(R-SUBJECT-ID-01; perm-run02 起伺服端強制)等; perm-run02 增: 被引用實體身分(R-REF-IDENTITY-01: 清單頁指派欄之正向引用宣告 `opt.refs`、被引用表鎖在本表外層、targets 以 id 為身分) |

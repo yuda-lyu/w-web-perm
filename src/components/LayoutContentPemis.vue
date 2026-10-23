@@ -310,6 +310,7 @@ import { isExternalRow } from '../js/externalRows.mjs'
 import { makeBaseline } from '../js/rowDigest.mjs'
 import { refsChanged, planDraftSync, isDraftStale, hasDraftNow } from '../js/draftSync.mjs'
 import { applySavedRows } from '../js/applySaved.mjs'
+import { snapRefIds, recordPicks, buildRefDecl, parseRefDecl, countRefMismatch } from '../js/refIdentity.mjs'
 import { isCellEditing, bindCellEditingStopRetry } from '../js/cellEditing.mjs'
 import { fmtVars, getBannerLines, splitCheckedRows, getExternalEdits } from '../js/externalUi.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
@@ -413,6 +414,8 @@ export default {
         this.syncMark = { refs: null, editable: undefined, dirty: false, baseline: [], tick: 0 }
         //saveMark(非響應式, 同 syncMark 之理由): saving 為「自己之存檔請求進行中」(送出前設真, 回應〔成功或失敗〕一到歸零)——此期間伺服端寫入所致之推播若先於回應抵達, 不是他人更新(planDraftSync 回 'keepQuiet': 保留草稿但不顯示過期橫幅; run12)
         this.saveMark = { saving: false }
+        //refPicks(非響應式): 草稿內「使用者在編輯器選取的啟用引用項(標的 id) → 選取當時對應之標的 id 陣列」(src/js/refIdentity.mjs; R-REF-IDENTITY-01), 存檔時據以組引用身分宣告 opt.refs; 重建草稿時歸零
+        this.refPicks = new Map()
     },
     mounted: function() {
         // console.log('mounted')
@@ -793,6 +796,7 @@ export default {
             vo.isModified = false
             vo.staleNotice = false
             vo.syncMark = { refs: [rows, kpUse], editable: isEditable, dirty: false, baseline, tick: vo.syncTick }
+            vo.refPicks = new Map() //重建即放棄未存編輯, 其選取記錄一併歸零
 
             //genOpt
             vo.genOpt({ isEditable })
@@ -1418,6 +1422,8 @@ export default {
             //編輯器回傳之字串仍是舊版內容, 回填後存檔會以「新基準」證明過期內容新鮮(還原已被撤銷之授權, 或繞過同表別列已被改動之整表比對); 故回填前比對「草稿現所依據之那份表」與開框時之基準, 有異即放棄回填並提示重新載入.
             //父頁已有未存編輯時推播只保留草稿與其基準(baseRows 不變), 此比對不誤擋, 存檔時由伺服端表級比對拒收
             let baseline0 = cloneDeep(vo.baseline)
+            //refSnap: 開啟編輯器當下之「標的名稱 → 標的 id 陣列」快照(R-REF-IDENTITY-01): 編輯器列出的標的即此刻 store 之標的, 使用者選取的是這些實體; 回填時據以記下新增之啟用引用項選取當時對應的 id, 存檔時送伺服端驗證其仍存在(標的 id 即名稱, 被刪除即拒收)
+            let refSnap = snapRefIds('pemis', vo.targets)
             //showVeCrules
             vo.$dg.showVeCrules({
                 isEditable: vo.isEditable,
@@ -1444,6 +1450,9 @@ export default {
                         vo.$alert(`${vo.$t('saveStale')}`, { type: 'warning' })
                         return
                     }
+
+                    //選取記錄: 本次新增之啟用引用項(標的 id)在編輯器開啟當下對應之標的 id(查無記空陣列)
+                    recordPicks({ keyTable: 'pemis', strOld: get(vo, `opt.rows[${krNow}].crules`, ''), strNew: crules, snap: refSnap, picks: vo.refPicks })
 
                     //set
                     set(vo, `opt.rows[${krNow}].crules`, crules)
@@ -1501,6 +1510,15 @@ export default {
                     return
                 }
 
+                //正向引用身分(perm-run02 範圍一; R-REF-IDENTITY-01; 使用者 2026-10-23 裁示前後端都要做): 本次新增之啟用引用項(標的 id)所指之標的,須仍存在(標的 id 即名稱,身分定義即 id,見 R-REF-IDENTITY-01 規則 5);
+                //已被刪除即不送出(零寫入)並提示重新載入. 與伺服端 checkRefIdentity 同一判準(src/js/refIdentity.mjs); 宣告 refs 隨存檔送伺服端於標的表鎖內以新鮮讀取再驗一次
+                let refs = parseRefDecl(buildRefDecl({ keyTable: 'pemis', rowsNew: rows, rowsOld: vo.baseRows, picks: vo.refPicks, refRows: vo.targets }))
+                if (countRefMismatch({ keyTable: 'pemis', decl: refs, refRows: vo.targets }) > 0) {
+                    unlockBtn()
+                    await vo.$dg.showCheckYes(vo.$t('saveRefChanged'), { type: 'warning' })
+                    return
+                }
+
                 //新增列之 transient 欄位 _isNew(addItem / copyItem 標記)隨列送後端: 後端據以拒絕「標為新增但 id 已存在」之列
                 //(同一包重送時不把剛建立之列當修改覆寫, 回 saveNewRowExists), 檢查後由 ltdtmapping 依 schema 取欄時剝除不入庫 (ADR-025)
 
@@ -1546,7 +1564,7 @@ export default {
                 let okSave = false
                 let savedRes = null //伺服端回傳(成功 msg key 字串, 或 { msg, rows, others }: 寫入後之列, 鎖內新鮮讀取; 規格第 8 節)
                 vo.saveMark.saving = true //自己之存檔請求進行中: 此期間之推播不是他人更新(changeParams 的 planDraftSync 回 'keepQuiet'); 回應(成功或失敗)一到即歸零
-                await vo.$fapi.updatePemis(rows, { baseline, returnRows: true })
+                await vo.$fapi.updatePemis(rows, { baseline, returnRows: true, refs })
                     .then((res) => {
                         okSave = true
                         savedRes = res

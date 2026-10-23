@@ -184,6 +184,19 @@ async function readDlgRows(page, nameCol) {
     }, [SEL_MODAL, nameCol])
 }
 
+//perm-run02: 等對話框(無未存修改者, 推播使其以新資料重建, R-DRAFT-KEEP-01 規則 11)內各列之名稱序等於 names(偵測式; 回傳重建後之 readDlgRows)
+async function waitDlgReorder(page, names) {
+    await waitUntilExist(page, '對話框已依新列序重建', ([sd, ns]) => {
+        const got = [...document.querySelectorAll(`${sd} .ag-row[row-index]`)]
+            .map((r) => ({ i: Number(r.getAttribute('row-index')), n: ((r.querySelector('.ag-cell[col-id="name"]') || {}).textContent || '').trim(), c: !!r.querySelector('.ag-cell[col-id="enable"] input[type="checkbox"]') }))
+            .filter((v) => v.c)
+            .sort((a, b) => a.i - b.i)
+            .map((v) => v.n)
+        return got.length === ns.length && got.every((n, i) => n === ns[i])
+    }, { timeout: 30000, arg: [SEL_MODAL, names] })
+    return await readDlgRows(page, 'name')
+}
+
 //讀庫內某表某 id 之欄位(經資料通道 select; 不經瀏覽器狀態)
 async function readDbField(kt, id, field) {
     const r = await callRpc(`${kt}.select`, [], TOKEN_ADMIN)
@@ -658,7 +671,10 @@ describe('e2e-array-form (陣列形式授權資料: 編輯器顯示與存檔, �
     //get(users, kr) 取到另一個使用者 → 關聯寫到錯的使用者(授權由 {a:[],b:[T]} 變 {b:[],a:[T]} 一類)。revRows 的 rows[ku] ↔ users[ku] 同型。
     //本案: 開「所屬使用者」對話框 → 另一端(資料通道)把 users 整表反序 → 等 store 更新 → 切換 peter 為歸屬 arr-g → 儲存 → 庫內僅 peter 的有效歸屬多了 arr-g, 其餘使用者之有效歸屬不變(以授權等價 effectiveSet 比對)。
 
-    it('AF-014a-reorder-while-open-users: 「所屬使用者」對話框開啟期間 users 被另一端反序, 切換 peter 並儲存 → 只有 peter 多歸屬 arr-g, 其他使用者之有效歸屬不變(修前寫到錯位的使用者)', async function() {
+    //perm-run02(使用者 2026-10-22 裁示原則 10; R-DRAFT-KEEP-01 規則 11): AF-014a～e 之前提隨「對話框／清單頁無未存修改時收到推播即以新資料重建並更新基準」而改寫(產品行為不變, 不放寬斷言):
+    //  a／b: 等對話框依新列序重建後依名稱重找列次再切換(舊列次已不指向原列); c／d: 先切換一列形成草稿, 再讓另一端刪列(有草稿才保留孤兒列與基準; 存檔前仍由列身分配對找不到被刪列 → relationRowsStale);
+    //  e: 清單頁當時無未存編輯, 整表重排之推播已重建草稿與基準, 編輯器回填前之過期比對不符 → 放棄回填(不得回填到錯位之使用者), 改驗「無任何使用者被寫入、無儲存鈕、庫內逐位不變」。
+    it('AF-014a-reorder-while-open-users: 「所屬使用者」對話框開啟期間 users 被另一端反序(對話框無草稿 → 依新資料重建), 依名稱重找 peter 並切換儲存 → 只有 peter 多歸屬 arr-g, 其他使用者之有效歸屬不變(修前寫到錯位的使用者)', async function() {
         try {
             await withPage(async (page) => {
                 await gotoGrups(page)
@@ -667,15 +683,18 @@ describe('e2e-array-form (陣列形式授權資料: 編輯器顯示與存檔, �
                 const rows = await readDlgRows(page, 'name')
                 assert.strict.equal(rows['peter']?.enable, false, '前提: peter 尚未歸屬 arr-g')
                 //另一端重排: 把現有 users 整表反序(後台列走 updateUsers、外部列走同步端點重送並給反序 order; run07 外部列 order 由外部擁有, 見 reverseTableByOtherEnd)
+                const names0 = Object.entries(rows).sort((a, b) => a[1].idx - b[1].idx).map((e) => e[0])
                 const reversed = await reverseTableByOtherEnd('users')
                 const expectIds = reversed.map((v) => v.id).join(',')
                 await waitUntilExist(page, 'store 內 users 已依新 order 重排', (ids) => {
                     const us = (window.$vo.$store.state.users || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0))
                     return us.map((v) => v.id).join(',') === ids
                 }, { timeout: 30000, arg: expectIds })
+                //perm-run02: 對話框無未存修改 → 推播使其以新資料重建並更新基準(R-DRAFT-KEEP-01 規則 11, 原則 10); 等對話框依新列序(原列序之反序)重建後, 依名稱重找 peter 之列次(舊列次已不指向 peter)
+                const rows2 = await waitDlgReorder(page, names0.slice().reverse())
                 const before = (await readTables()).users
                 const tBefore = await resolvedTargetsOf(page, before.map((v) => v.id))
-                await toggleDialogEnable(page, rows['peter'].idx)
+                await toggleDialogEnable(page, rows2['peter'].idx)
                 await saveBelongAndWaitModal(page)
                 await assertModalMsg(page, 'userSaveUsersSuccess')
                 await dismissResultModal(page)
@@ -701,7 +720,7 @@ describe('e2e-array-form (陣列形式授權資料: 編輯器顯示與存檔, �
         }
     })
 
-    it('AF-014b-reorder-while-open-grups: 「所屬群組」對話框開啟期間 grups 被另一端反序, 切換 M1 並儲存 → 只有 M1 的 cpemis 多了 arr-p, 其他群組之有效權限不變', async function() {
+    it('AF-014b-reorder-while-open-grups: 「所屬群組」對話框開啟期間 grups 被另一端反序(對話框無草稿 → 依新資料重建), 依名稱重找 M1 並切換儲存 → 只有 M1 的 cpemis 多了 arr-p, 其他群組之有效權限不變', async function() {
         try {
             await withPage(async (page) => {
                 await gotoPemis(page)
@@ -710,14 +729,17 @@ describe('e2e-array-form (陣列形式授權資料: 編輯器顯示與存檔, �
                 const rows = await readDlgRows(page, 'name')
                 assert.strict.equal(rows['權限群組M1']?.enable, false, '前提: M1 不含 arr-p')
                 //另一端重排: 同 AF-014a(整表反序; 後台列走 updateGrups、外部列走同步端點)
+                const names0 = Object.entries(rows).sort((a, b) => a[1].idx - b[1].idx).map((e) => e[0])
                 const reversed = await reverseTableByOtherEnd('grups')
                 const expectIds = reversed.map((v) => v.id).join(',')
                 await waitUntilExist(page, 'store 內 grups 已依新 order 重排', (ids) => {
                     const gs = (window.$vo.$store.state.grups || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0))
                     return gs.map((v) => v.id).join(',') === ids
                 }, { timeout: 30000, arg: expectIds })
+                //perm-run02: 對話框無未存修改 → 以新資料重建(同 AF-014a); 等對話框依新列序重建後, 依名稱重找 M1 之列次
+                const rows2 = await waitDlgReorder(page, names0.slice().reverse())
                 const before = (await readTables()).grups
-                await toggleDialogEnable(page, rows['權限群組M1'].idx)
+                await toggleDialogEnable(page, rows2['權限群組M1'].idx)
                 await saveBelongAndWaitModal(page)
                 await assertModalMsg(page, 'grupSaveGrupsSuccess')
                 await dismissResultModal(page)
@@ -741,20 +763,21 @@ describe('e2e-array-form (陣列形式授權資料: 編輯器顯示與存檔, �
         }
     })
 
-    it('AF-014c-row-deleted-while-open: 對話框開啟期間 peter 被另一端刪除, 切換 peter 並儲存 → 整次拒存(relationRowsStale), 沒有任何使用者被改寫', async function() {
+    it('AF-014c-row-deleted-while-open: 對話框先切換 peter(草稿)、開啟期間 peter 被另一端刪除, 儲存 → 整次拒存(relationRowsStale), 沒有任何使用者被改寫', async function() {
         try {
             await withPage(async (page) => {
                 await gotoGrups(page)
                 const k = await rowIndexByName(page, 'arr-g')
                 await openColDialog(page, k, 'belongUsers', 'grupBlngEditUsers')
                 const rows = await readDlgRows(page, 'name')
+                //perm-run02: 對話框須先有未存修改(形成草稿)——無草稿時 peter 被刪之推播會使對話框重建而 peter 之列消失(R-DRAFT-KEEP-01 規則 11, 原則 10); 有草稿則保留列與基準, 存檔時以列身分配對找不到 peter → relationRowsStale
+                await toggleDialogEnable(page, rows['peter'].idx)
                 const cur = (await readTables()).users
                 const without = cur.filter((v) => v.id !== 'id-for-peter')
                 const resp = await callRpc('updateUsers', [without], TOKEN_ADMIN)
                 assert.ok(resp.ok, `另一端刪除 peter 應成功, 實得 ${JSON.stringify(resp)}`)
                 await waitUntilExist(page, 'store 內已無 peter', () => !(window.$vo.$store.state.users || []).some((v) => v.id === 'id-for-peter'), { timeout: 30000 })
                 const before = (await readTables()).users
-                await toggleDialogEnable(page, rows['peter'].idx)
                 await clickDialogSave(page)
                 await waitUntilExist(page, '結果 modal 出現', () => (document.body.innerText || '').includes(window.$vo.$t('systemMessage')), { timeout: 20000 })
                 await page.waitForTimeout(500)
@@ -820,7 +843,7 @@ describe('e2e-array-form (陣列形式授權資料: 編輯器顯示與存檔, �
     })
 
     //外審 sol R4: 配不到之列夾在中間時, revRows 之索引還原(krs)須正確——孤兒列之後的列, 其標籤顯示不得錯位到別列(靜態不變式抓不到 `let kr = k` 之類的接線錯誤)
-    it('AF-014d-deleted-row-in-the-middle-display: 對話框開啟期間第 1 列之使用者被另一端刪除, 切換其後第 2 列之使用者 → 第 2 列自己的標籤列更新、已被刪除之第 1 列之顯示不變(不得錯位)', async function() {
+    it('AF-014d-deleted-row-in-the-middle-display: 對話框先切換第 3 列(草稿)、開啟期間第 1 列之使用者被另一端刪除, 切換其後第 2 列之使用者 → 第 2 列自己的標籤列更新、已被刪除之第 1 列之顯示不變(不得錯位)', async function() {
         try {
             await withPage(async (page) => {
                 await gotoGrups(page)
@@ -830,7 +853,10 @@ describe('e2e-array-form (陣列形式授權資料: 編輯器顯示與存檔, �
                 const byIdx = Object.entries(rows).sort((a, b) => a[1].idx - b[1].idx)
                 const [victimName, victim] = byIdx[0]
                 const [targetName, target] = byIdx[1]
-                assert.ok(victim.enable === false && target.enable === false, `前提: 第 1、2 列(${victimName}、${targetName})皆未歸屬 arr-g`)
+                const [draftName, draft] = byIdx[2]
+                assert.ok(victim.enable === false && target.enable === false && draft.enable === false, `前提: 第 1、2、3 列(${victimName}、${targetName}、${draftName})皆未歸屬 arr-g`)
+                //perm-run02: 先切換第 3 列形成草稿——無草稿時第 1 列被刪之推播會使對話框重建而該列消失(R-DRAFT-KEEP-01 規則 11, 原則 10), 就無「配不到之列夾在中間」可驗; 有草稿則保留列(孤兒列仍在對話框內)與基準
+                await toggleDialogEnable(page, draft.idx)
                 const cur = (await readTables()).users
                 const victimId = cur.find((v) => v.name === victimName)?.id
                 assert.ok(victimId, `庫內應有 ${victimName}`)
@@ -850,7 +876,7 @@ describe('e2e-array-form (陣列形式授權資料: 編輯器顯示與存檔, �
     })
 
     //外審 sol R1: 三個清單頁開直接編輯器(VeCgrups／VeCpemis／VeCrules)後, .then 以開框時之列索引回填; 對話框開啟期間 store 更新會重建 opt.rows, 索引錯位 → 回填到另一個使用者
-    it('AF-014e-parent-page-fill-by-id: 使用者頁開 arr-u 之「cgrups」對話框後, 另一端把 users 整表反序, 於對話框勾選 M1 並儲存、再存使用者頁 → 只有 arr-u 多了 M1, 其他使用者之有效歸屬(含順序)不變(修前回填到錯位的使用者)', async function() {
+    it('AF-014e-parent-page-fill-by-id: 使用者頁(無未存編輯)開 arr-u 之「cgrups」對話框後, 另一端把 users 整表反序, 於對話框勾選 M1 並儲存 → 回填被放棄(草稿已依新資料重建、過期比對不符), 沒有任何使用者被寫入 M1、無儲存鈕、庫內逐位不變(修前回填到錯位的使用者)', async function() {
         try {
             await withPage(async (page) => {
                 await gotoUsers(page)
@@ -869,20 +895,16 @@ describe('e2e-array-form (陣列形式授權資料: 編輯器顯示與存檔, �
                 await toggleDialogEnable(page, rows['權限群組M1'].idx)
                 await clickDialogSave(page)
                 await waitDialogClosed(page, 'userEditCgrups')
-                await saveAndWaitModal(page)
-                await assertModalMsg(page, 'userSaveUsersSuccess')
-                await dismissResultModal(page)
+                //perm-run02: 清單頁當時無未存編輯 → 他人整表重排之推播已使草稿與基準以新列序重建; 編輯器回填前之過期比對(isDraftStale: 草稿現所依據之表 vs 開框時基準)不符 → 放棄回填、提示 saveStale(R-DRAFT-KEEP-01、LayoutContentUsers.showVeCgrupsById), 不得回填到錯位之使用者。
+                //原斷言「只有 arr-u 多了 M1」不成立(回填被放棄); 此案改驗修前缺陷之核心不變式——沒有任何使用者(含 arr-u)被寫入 M1、清單頁不出現儲存鈕、庫內逐位不變。(負向觀察窗: 等回填流程結束, 此後仍無儲存鈕)
+                await page.waitForTimeout(1500)
+                assert.strict.equal(await pageSaveShown(page), false, '回填被放棄: 清單頁不出現儲存鈕(沒有未存之編輯)')
                 const after = (await readTables()).users
                 assert.strict.equal(after.length, before.length, '使用者筆數不變')
+                assert.deepStrictEqual(after.map((v) => [v.id, v.cgrups]), before.map((v) => [v.id, v.cgrups]), '庫內任何使用者之 cgrups 皆不得被改寫(修前回填到錯位的使用者)')
                 for (const u of after) {
                     const b = before.find((v) => v.id === u.id)
-                    assert.ok(b, `存檔後不應多出使用者 ${u.id}`)
-                    if (u.id === U_ID) {
-                        assert.deepStrictEqual(effectiveList(u.cgrups), [...effectiveList(b.cgrups), '權限群組M1:OR'].sort(), 'arr-u 只多了 M1(OR)')
-                    }
-                    else {
-                        assert.deepStrictEqual(effectiveList(u.cgrups), effectiveList(b.cgrups), `${u.name} 之有效歸屬須不變(修前回填到錯位的使用者)`)
-                    }
+                    assert.deepStrictEqual(effectiveList(u.cgrups), effectiveList(b.cgrups), `${u.name} 之有效歸屬須不變`)
                 }
             })
         }

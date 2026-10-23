@@ -108,7 +108,8 @@ describe('unit-applySaved (存檔成功後以回傳之寫入後之列更新 stor
 
             it(`AS-S1 ${p.fn}: 存檔帶 returnRows:true; 成功(then)取回傳 res, 以 applySavedRows('${p.t}', …) 把寫入後之列 commit 進 store(UpdateTableData)  [A1]`, function() {
                 assert.strict.ok(code.includes(`import { applySavedRows } from '../js/applySaved.mjs'`))
-                assert.strict.ok(new RegExp(`\\$fapi\\.${p.api}\\([^)]*\\{ baseline, returnRows: true \\}\\)`).test(code))
+                //perm-run02: 第 3 參(RPC opt)後可再帶 refs(三清單頁)或 subject(兩對話框), 其餘不變
+                assert.strict.ok(new RegExp(`\\$fapi\\.${p.api}\\([^)]*\\{ baseline, returnRows: true(, (refs|subject))? \\}\\)`).test(code))
                 assert.strict.ok(code.includes('.then((res) => {'))
                 //source: 'savedRows' 為 e2e 手段用之標記(e2e 只攔網路推播、放行自己存檔之 commit, 以固定「推播尚未抵達」之窗口); Vuex mutation 不讀它
                 let m = /applySavedRows\('(\w+)', (\w+), \(t, rs\) => vo\.\$store\.commit\(vo\.\$store\.types\.UpdateTableData, \{ tableName: t, data: rs, source: 'savedRows' \}\)\)/.exec(code)

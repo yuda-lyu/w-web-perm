@@ -255,7 +255,7 @@ describe('unit-draftSync (清單頁草稿對推播之處置, R-PRINCIPLE-00 原�
             it(`DS-4g ${p.fn}: 存檔仍隨 RPC 送草稿載入時之基準(cloneDeep(vo.baseline)), 不因保留草稿而改送最新基準  [D1]`, function() {
                 cells.DS4++
                 assert.strict.ok(/let baseline = cloneDeep\(vo\.baseline\)/.test(src))
-                assert.strict.ok(new RegExp(`\\$fapi\\.update${p.t[0].toUpperCase()}${p.t.slice(1)}\\([^)]*\\{ baseline, returnRows: true \\}\\)`).test(src), 'perm-run01: 存檔帶 returnRows:true 取回寫入後之列')
+                assert.strict.ok(new RegExp(`\\$fapi\\.update${p.t[0].toUpperCase()}${p.t.slice(1)}\\([^)]*\\{ baseline, returnRows: true(, refs)? \\}\\)`).test(src), 'perm-run01: 存檔帶 returnRows:true 取回寫入後之列(perm-run02: 三清單頁另帶 refs)')
             })
 
             it(`DS-4l ${p.fn}: watch isModified 維護 syncMark.dirty 鏡像; 旗標歸零而 store 於保留草稿期間已變新者立即 reloadDraft(儲存成功之推播先於回應抵達之競爭); curRefs 與 changeParams 之 refs 同一組  [D4]`, function() {

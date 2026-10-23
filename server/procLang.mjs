@@ -450,6 +450,22 @@ let kpLang = {
         eng: `Not saved: the permission "{name}" this window was opened for has been deleted, renamed or replaced by another permission since then. Nothing was changed. Please close this window, reload the page and try again.`,
         cht: `未儲存：本視窗所編輯的權限「{name}」自開啟後已被刪除、改名或被另一個權限取代。資料未變更，請關閉本視窗並重新整理頁面後再操作。`,
     },
+    //perm-run02 範圍一(被引用實體身分; 規則帳本 R-SUBJECT-ID-01、R-REF-IDENTITY-01; ADR-037 Update(perm-run02)):
+    //  saveSubjectChanged 反向關聯對話框存檔時, 伺服端於引用表鎖內新鮮讀取發現主體(群組／權限)已被刪除、改名或刪除後以同名重建(id 不同)→ 拒收、零寫入、提示重新載入(原則 3、4、6; 前端同判準先擋, 此為伺服端強制之固定訊息, 不含名稱);
+    //  saveRefChanged 清單頁存檔時, 新增之啟用引用項所指的群組／權限／標的已被刪除、刪除後以同名重建(id 不同)、新增了同名實體, 或引用宣告不完整 → 拒收、零寫入、提示重新載入(不得把授權寫到同名新實體);
+    //  saveIdentityFormat 身分宣告格式不合或該表無授權引用欄 → 拒收(不降級為不帶宣告)
+    saveSubjectChanged: {
+        eng: `Not saved: the group or permission this window was opened for has been deleted, renamed or replaced by another one since then. Nothing was changed. Please close this window, reload the page and try again.`,
+        cht: `未儲存：本視窗所編輯的群組或權限自開啟後已被刪除、改名或被另一個取代。資料未變更，請關閉本視窗並重新整理頁面後再操作。`,
+    },
+    saveRefChanged: {
+        eng: `Not saved: a group, permission or target you just assigned has been deleted or replaced by another one with the same name since this page was loaded. Nothing was changed. Please reload the page and try again.`,
+        cht: `未儲存：您剛指派的群組、權限或標的在載入此頁面後已被刪除，或被同名的另一個取代。資料未變更，請重新整理頁面後再操作。`,
+    },
+    saveIdentityFormat: {
+        eng: `Not saved: the identity information carried by this request is invalid. Nothing was changed. Please reload the page and try again.`,
+        cht: `未儲存：此次請求所附之身分資訊無效。資料未變更，請重新整理頁面後再操作。`,
+    },
     cannotGetUserId: {
         eng: `Cannot get the user id`,
         cht: `無法取得使用者 Id`,

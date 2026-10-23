@@ -1108,7 +1108,7 @@ export default {
             }
         },
 
-        saveGrups: async function(rows, baseline) {
+        saveGrups: async function(rows, baseline, subject) {
             // console.log('method saveGrups', rows, baseline)
 
             let vo = this
@@ -1118,7 +1118,8 @@ export default {
             //returnRows: 成功時回傳寫入後之列(鎖內新鮮讀取), 立即 commit 進 store(規格第 8 節; R-SAVED-ROWS-01), 其後再開此視窗時基準即為最新, 不會被自己上一次之存檔誤擋
             let okSave = false
             vo.ownSaving = true //自己之寫入所致之推播不提示(成功路徑維持至視窗關閉; show() 歸零)
-            await vo.$fapi.updateGrups(rows, { baseline, returnRows: true })
+            //subject: 開框時之主體(權限)摘要 { id, name, saved }(由 doSave 於流程開頭取得並傳入): 伺服端於權限表鎖內新鮮讀取後以同一判準(draftSync.checkSubject)再驗一次, 被刪除、改名、刪除後同名重建一律拒收 saveSubjectChanged(R-SUBJECT-ID-01 規則 4; 前端自檢先擋, 此為推播未抵達時之伺服端強制)
+            await vo.$fapi.updateGrups(rows, { baseline, returnRows: true, subject })
                 .then((res) => {
                     okSave = true
                     applySavedRows('grups', res, (t, rs) => vo.$store.commit(vo.$store.types.UpdateTableData, { tableName: t, data: rs, source: 'savedRows' }))
@@ -1314,7 +1315,7 @@ export default {
                 // }
 
                 //saveGrups, 失敗時回 false: 失敗提示已由 saveGrups 顯示, 此處不關閉對話框(保留未存變更供重按儲存)
-                let okSave = await vo.saveGrups(grupsNew, baseline)
+                let okSave = await vo.saveGrups(grupsNew, baseline, subject)
                 if (!okSave) {
                     return false
                 }

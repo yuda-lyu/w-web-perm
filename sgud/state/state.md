@@ -2,6 +2,18 @@
 
 本檔記本套件**當前已開發功能之最新狀態**;與規則帳本(`sgud/rule/rulebook.md`,藍圖)比對即知尚未做到者,接續工作先讀此檔.2026-10-22 主控遷移為 sgud 配置時建立,先移入原帳本之「已知缺口 / 待辦」;**各功能之完成狀態整理為下一次派工之待辦**(主責 agent 依規則帳本各節之「狀態」行與近期報告彙整至本檔).
 
+## 近期進度(2026-10-23, perm-run02:正反關聯與主體身分檢查前後端皆做＋改寫 external-rows E2E-011／012／013 並重產 4 張標準圖;修正輪,未發布,待主控全套)
+
+- **範圍一(使用者 2026-10-23 裁示「正反關聯與主體身份檢查,應該是前後端都要做」; R-SUBJECT-ID-01 規則 4 改寫、R-REF-IDENTITY-01 新增; ADR-037 Update(perm-run02) 決定 42～48)**:
+  - 新純函式模組 `src/js/refIdentity.mjs`(前後端單一判準); 伺服端 `server/procCore.mjs:updateTabItems` 於 `lockSave` 內、本表 `guardWrite` 外層以 `withRefLock` 先取**被引用表鎖**(users→grups、grups→pemis、pemis→targets; 由伺服端依 keyTable 自組)並新鮮讀取: ①`opt.subject={id,name,saved}`(兩反向對話框)以 `checkSubject` 同判準驗, 不符 `saveSubjectChanged`(先於基準比對); ②`opt.refs=[{name,ids}]`(三清單頁指派欄)驗「本次新增之啟用引用項」名稱對應之實體 id 與選取當時相同且宣告完整, 不符 `saveRefChanged`; 格式不合 `saveIdentityFormat`(不降級); 不帶者維持原行為(外部應用相容, 不擴權; `requireSubject/requireRefIds` 下版再議).
+  - 前端: 三清單頁於編輯器開啟時 `snapRefIds`、回填時 `recordPicks`(身分以**選取當時**為準)、存檔前 `countRefMismatch` 自檢(不符→不送出, `saveRefChanged` 警告框)、送 `refs`; 兩對話框送 `subject`.
+  - targets 的身分定義即 id(外部同步每次同 id 重寫列, 不可用建立時間): crules 欄只驗「已被刪除」, 刪後同 id 重建依定義是同一實體(設計事實, R-REF-IDENTITY-01 規則 5).
+  - 測試: 新增 `unit-refIdentity`(280)、`unit-procCore-identity`(197; 含 V14 人為延遲、取鎖軌跡、四表隨機併發 60 輪)、`unit-refIdentityWiring`(12; 前端接線靜態)、`api-identity`(47; 真後端)、`e2e-concurrent-edit` E2E-025～036(12 案×2 語系); 更新 5 個既有靜態站點守護(結構必然變更). 變異驗證 4 組(伺服端 subject／refs、前端 refs／subject 自檢)皆被抓到(`spec/evidence/perm-run02/mutation-results.md`).
+- **補充(範圍三發現)**: `e2e-array-form` 整檔實跑 78 過／5 敗, 5 敗皆 AF-014a～e——前提(對話框／清單頁無草稿時他人改表, 畫面仍停在舊資料)與原則 10 行為相左(無草稿即重建), 非產品缺陷; 已改寫測試前提(a／b 等對話框重建後依名稱重找列次、c／d 先切換一列形成草稿再讓他人刪列、e 回填被放棄改驗『無任何使用者被寫入、無儲存鈕、庫內不變』), 保留各案不變式、不放寬斷言, 5／5 通過; 此改寫不在主控授權清單, 已記入 decision-log 並於報告揭露.
+- **範圍二**: spec 先改, `e2e-external-rows` E2E-011 改為「先勾選形成草稿 → 他人改 mary → 等過期提示 → 存檔被拒」, E2E-012／013 調整次序; 只重產 `external-rows-{eng,cht}-E2E-011-{1-click-save,2-stale-box}.png` 共 4 張(逐張審圖紀錄 `spec/evidence/perm-run02/image-review-E2E-011.md`); 其餘既有標準圖 0 張改變.
+- **範圍三(凍結碼驗證)**: 〔回填: 見報告 `C:\opensrcOper\dnow\20261022221854\agent-out\perm-run02-修正報告.md`〕
+- **未做**: 外部匯入 `srcKey` 差異同步(R-IMPORT-01, 下一輪).
+
 ## 近期進度(2026-10-23, perm-run01:改用 w-serv-orm 共用核心＋修 1.1.13 已知缺口〔第三波〕;未發布,待主控全套)
 
 - 依賴 `w-serv-orm ^1.1.17`.**基準**改用共用核心 `w-serv-orm/src/baseline.mjs`(h1;名次入基準、空值等價),每表一份寫入契約 `src/schema/contracts/*.mjs`(R-CONTRACT-01);套內 `src/js/rowDigest.mjs` 縮為轉接層.**鎖**:後台整表存檔 `lockSave → guardWrite`、外部同步與引用端 `keyCheck.withTabLocks(lockTabs,…)`(階層巢狀,單一鎖管理器=w-serv-orm 實例;套內無 `pmKeyMutex`/`kmx`/`tabWriteKey`;R-LOCK-CORE-01).**只改不增**(`procOrm` `mustExist`)、伺服器專有欄位不採客戶端值(`all:true`).**舊格式基準**→ `saveBaselineFormat`.
@@ -29,9 +41,9 @@
 ## 已知缺口 / 待辦
 
 - **外部匯入(R-IMPORT-01,原則 11;`rulebook_sync.md`)**:**部分**.入口、權杖、表鎖、整批驗證、引用連帶已有.**未做** `srcKey` 差異同步:現為 `delAll({ from })`＋insert,未帶 id 者每次換新 id.排程:改用 w-serv-orm 共用核心之輪(opensrcOper 任務 `20261022221854`).
-- **反向對話框主體身分之驗證在前端、不在伺服端(perm-run01 待裁示)**:現況已驗(存檔流程開頭與等待後各比對一次存檔當下之群組／權限表,被刪、改名、同名重建一律拒存),但對象是 store(與伺服端至多一個推播間隔之差);伺服端不知「主體」.若要伺服端強制,須另設 `opt.subject` 並對主體表取鎖驗證(R-SUBJECT-ID-01 規則 4).
-- **【待辦·最優先】`test/e2e-external-rows.test.mjs` 的 E2E-011／012／013 預期過時(2026-10-23 perm-run01 驗證發現;eng 實測 27 過／3 敗,cht 未跑)**:三案皆為『開反向關聯對話框(不編輯)→ 他人改表 → 才勾選並存檔 → 預期 saveStale』,與本輪規定(對話框未編輯時收到推播:重建並更新基準,R-DRAFT-KEEP-01 規則 11)相左——推播到達時對話框已重建,其後存檔成功。**非程式缺陷**。處置:先改 spec `流程_外部列保護與過期快照.md` 之 E2E-011～013(建議改為『先勾選形成草稿 → 他人改 → 存檔被拒』,並補〈已知落差〉留痕),再改測試;E2E-011 之 4 張標準圖(`external-rows-{eng,cht}-E2E-011-{1-click-save,2-stale-box}.png`)畫面會變,**須授權後重產並逐張審圖**(既有標準圖不得自行更動)。`e2e-array-form` 可能有同類案例(本輪未跑)。
-- **本輪未於凍結碼重跑**:`e2e-external-rows` 整檔(僅 eng 跑過)、`e2e-concurrent-edit` 整檔(最後整檔全綠為前端兩檔改動之前)、`e2e-array-form` 子集(AF-014[a-e]/026/027/037)、api 檔除 `api-externalRows`／`api-baseline` 外 13 檔。
+- **【已解除 2026-10-23 perm-run02: 伺服端於主體表鎖內新鮮讀取後強制驗證(`opt.subject`, R-SUBJECT-ID-01 規則 4), 前端自檢保留; 剩餘限制: 不帶 `subject` 之外部呼叫端(直打 RPC、舊客戶端)仍是名稱引用、不受此保護(相容保留; `requireSubject／requireRefIds` 比照 `requireBaseline` 下版再議)】(以下為 perm-run01 原文,留痕)反向對話框主體身分之驗證在前端、不在伺服端(perm-run01 待裁示)**:現況已驗(存檔流程開頭與等待後各比對一次存檔當下之群組／權限表,被刪、改名、同名重建一律拒存),但對象是 store(與伺服端至多一個推播間隔之差);伺服端不知「主體」.若要伺服端強制,須另設 `opt.subject` 並對主體表取鎖驗證(R-SUBJECT-ID-01 規則 4).
+- **【已處理 2026-10-23 perm-run02: spec 先改、三案改為「先勾選形成草稿 → 他人改表 → 存檔被拒」, 只重產 E2E-011 之 4 張標準圖並逐張審圖(`spec/evidence/perm-run02/image-review-E2E-011.md`), 兩語系比對模式通過; `e2e-array-form` 整檔結果見 perm-run02 報告】(以下為 perm-run01 原文,留痕)`test/e2e-external-rows.test.mjs` 的 E2E-011／012／013 預期過時(2026-10-23 perm-run01 驗證發現;eng 實測 27 過／3 敗,cht 未跑)**:三案皆為『開反向關聯對話框(不編輯)→ 他人改表 → 才勾選並存檔 → 預期 saveStale』,與本輪規定(對話框未編輯時收到推播:重建並更新基準,R-DRAFT-KEEP-01 規則 11)相左——推播到達時對話框已重建,其後存檔成功。**非程式缺陷**。處置:先改 spec `流程_外部列保護與過期快照.md` 之 E2E-011～013(建議改為『先勾選形成草稿 → 他人改 → 存檔被拒』,並補〈已知落差〉留痕),再改測試;E2E-011 之 4 張標準圖(`external-rows-{eng,cht}-E2E-011-{1-click-save,2-stale-box}.png`)畫面會變,**須授權後重產並逐張審圖**(既有標準圖不得自行更動)。`e2e-array-form` 可能有同類案例(本輪未跑)。
+- **【perm-run02 補驗結果見報告〈完成條件〉3】(以下為 perm-run01 原文,留痕)本輪未於凍結碼重跑**:`e2e-external-rows` 整檔(僅 eng 跑過)、`e2e-concurrent-edit` 整檔(最後整檔全綠為前端兩檔改動之前)、`e2e-array-form` 子集(AF-014[a-e]/026/027/037)、api 檔除 `api-externalRows`／`api-baseline` 外 13 檔。
 - **users `email`／對應鍵之「是否觸及」判定仍為嚴格相等(增量外審 sol#1,2026-10-23;既有行為、非本輪引入)**:`server/keyCheck.mjs:checkUsersWrite` 之 `findBad`(`v !== o[key]`)與前端 `src/js/getNameErrs.mjs`(`kpOldVal.get(id) === raw`)把歷史 `email: null` 與送入 `''` 視為「觸及」而要求有效值;基準比對已視 `null≡''`。實務上僅在使用者實際動過該儲存格並清成 `''` 時才會發生(結果:須補有效 email 才能存,fail-closed,不致資料錯寫)。若要與空值等價對齊,須同改伺服端與前端並補 e2e;未排程。
 - **存檔回傳列讀回失敗時(寫入已生效)回字串,前端退回等推播**:此時「存檔後立即再存」之窗口仍在(讀回與寫入同一表鎖內,機率極低);網路推播恰於存檔後以存檔前舊內容抵達者,store 暫回舊內容至下一輪推播(未實測).見 R-BASELINE-01 已知限制 ⑤⑥.
 

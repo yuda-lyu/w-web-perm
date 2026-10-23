@@ -16,6 +16,7 @@ import validateRowsBeforeWrite from './validateRows.mjs'
 import planRefChanges, { REF_OF, diffRefTargets, fillIdlessIds } from '../src/js/refCascade.mjs'
 import { restoreExternalOrder, dropServerOnlyDiff, restoreServerFields, checkExternalWrite, hasExternalDiff } from '../src/js/externalRows.mjs'
 import { isBaselineValid, getContract } from '../src/js/rowDigest.mjs'
+import { getRefTarget, parseSubject, parseRefDecl, checkSubjectIdentity, checkRefIdentity } from '../src/js/refIdentity.mjs'
 import { getRejectKey } from 'w-serv-orm/src/baseline.mjs'
 import { findTouchedDup, findDupIndex, withTabLocks, checkUsersWrite } from './keyCheck.mjs'
 import { checkCascadePlan, writeWithCascade } from './cascadeWrite.mjs'
@@ -74,11 +75,13 @@ let kpRejectKey = {
 
 
 /**
- * 用戶端(kpFunExt 第 3 參)的 opt 只採納 baseline 與 returnRows(是否於回傳附寫入後之列, 布林), 不接受 pickKeysOnly 等伺服端設定, 更不轉給 procOrm 之 opt(規格第 6 節: procOrm 之 opt 只能由伺服端程式自組);
- * 未給(undefined／null)之 baseline 視為舊客戶端／外部應用(不帶基準, 本 major 允許), 給了則一律比對, 格式不合即 baselineFormat(不降級為不帶基準)
+ * 用戶端(kpFunExt 第 3 參)的 opt 只採納 baseline、returnRows(是否於回傳附寫入後之列, 布林)、subject(反向對話框之主體身分摘要)與 refs(清單頁新增引用之被引用實體身分宣告),
+ * 不接受 pickKeysOnly 等伺服端設定, 更不轉給 procOrm 之 opt(規格第 6 節: procOrm 之 opt 只能由伺服端程式自組);
+ * 未給(undefined／null)之 baseline／subject／refs 視為舊客戶端／外部應用(不帶, 本 major 允許; 不比原行為多放行任何寫入), 給了則一律驗證, 格式不合即拒收(baselineFormat／identityFormat; 不降級為不帶, R-SUBJECT-ID-01、R-REF-IDENTITY-01).
+ * subject／refs 在此原樣轉出(不信任其內容), 由 updateTabItems 解析驗證; 驗證所需之表與鎖皆由伺服端依 keyTable 自組(getRefTarget), 用戶端不得指定
  *
  * @param {*} opt 輸入用戶端給之 opt(任何值)
- * @returns {Object} 回傳 { baseline?, returnRows? }
+ * @returns {Object} 回傳 { baseline?, returnRows?, subject?, refs? }
  */
 function pickClientOpt(opt) {
     let o = (opt !== null && typeof opt === 'object') ? opt : {}
@@ -88,6 +91,12 @@ function pickClientOpt(opt) {
     }
     if (o.returnRows === true) {
         out.returnRows = true
+    }
+    if (o.subject !== undefined && o.subject !== null) {
+        out.subject = o.subject
+    }
+    if (o.refs !== undefined && o.refs !== null) {
+        out.refs = o.refs
     }
     return out
 }
@@ -142,6 +151,26 @@ function proc(woItems, procOrm, { srLog, withTabLocks: lockTabs, guardWrite, loc
         if (baseline !== null && !isBaselineValid(baseline)) {
             srLog.error({ event: 'updateTabItems-stale-error', keyTable, userId, msg: 'saveBaselineFormat', reason: 'baselineFormat', n: 0 })
             return Promise.reject('saveBaselineFormat')
+        }
+
+        //被引用實體身分(perm-run02 範圍一; R-SUBJECT-ID-01、R-REF-IDENTITY-01; 使用者 2026-10-23 裁示「正反關聯與主體身份檢查, 前後端都要做」; 原則 4: 檢查與寫入同一把鎖、原則 6: 引用不得被同名新資料接管):
+        //  subject: 反向關聯對話框(users 之主體為 grups、grups 之主體為 pemis)開框時之主體摘要 { id, name, saved }; refs: 清單頁新增之啟用引用項其名稱在選取當時對應之實體 id 宣告 [{ name, ids }].
+        //  被引用表由伺服端依 keyTable 自組(getRefTarget, 用戶端不得指定), 於本表鎖之外層取其表鎖(階層: 被引用者先、引用端後, R-WRITE-LOCK-02)並新鮮讀取後驗證;
+        //  未給(undefined／null)＝外部應用／舊客戶端, 維持名稱引用原行為(不驗身分, 不擴權); 給了但格式不合或該表無授權引用欄 → 拒收 saveIdentityFormat(不降級), 於任何讀寫之前
+        let subjectRaw = get(opt, 'subject', null)
+        let refsRaw = get(opt, 'refs', null)
+        let refTarget = null
+        let subject = null
+        let refDecl = null
+        if (subjectRaw !== null || refsRaw !== null) {
+            refTarget = getRefTarget(keyTable)
+            subject = subjectRaw === null ? null : parseSubject(subjectRaw)
+            refDecl = refsRaw === null ? null : parseRefDecl(refsRaw)
+            //主體摘要只用於反向對話框(主體表 grups／pemis, 有 name 欄); pemis 之被引用表為 targets(無 name、無反向對話框), 帶 subject 屬格式錯誤
+            if (refTarget === null || (subjectRaw !== null && (subject === null || refTarget.table === 'targets')) || (refsRaw !== null && refDecl === null)) {
+                srLog.error({ event: 'updateTabItems-identity-error', keyTable, userId, msg: 'saveIdentityFormat', reason: 'format', n: 0 })
+                return Promise.reject('saveIdentityFormat')
+            }
         }
 
         //returnRows: 存檔成功後於同一表鎖內新鮮讀回該表全部列隨回傳附上(規格第 8 節): 前端立即以之更新畫面與基準, 不必等推播／輪詢; 不以前端送出之值當新基準(寫入時 clearXSS 等會改寫字串)
@@ -258,7 +287,28 @@ function proc(woItems, procOrm, { srLog, withTabLocks: lockTabs, guardWrite, loc
         //占位包在表鎖之外層, 不同操作者之並行寫入仍由表鎖序列化、各自成功(ADR-012)
         //表鎖＝w-serv-orm 實例之 guardWrite(withTabLocks): 取鎖 → 新鮮讀取 → 載入基準比對 → write 於**同一把表鎖內**(規格第 6、7 節; R-LOCK-CORE-01), 防 lost update 與唯一性檢查被交錯略過;
         //與外部同步(WWebPerm.syncAndReplaceTabs)共用同一個鎖管理器(外審 sol R10). 本表有改名或刪除而須改寫引用端時, 才於 write 內依階層再取引用端表之鎖(見下方「引用連帶」段, R-WRITE-LOCK-02)
-        return await lockSave(`updateTabItems:${keyTable}`, userId, () => guardWrite({
+        //refRows: 被引用表(grups／pemis／targets)於引用表鎖內之新鮮讀取(僅帶 subject／refs 時; 其餘為 null), 供 subject 事前驗證與 write 內之 refs 驗證共用——兩者與本表寫入在同一段持鎖期間, 其間被引用表不會被任何入口改動(R-LOCK-CORE-01)
+        let refRows = null
+
+        //withRefLock: 未帶 subject／refs 者同修正前(僅本表鎖); 帶了: 先取被引用表鎖(外層, 階層較低)、新鮮讀取、驗主體身分(先於基準比對, 使「主體已被取代」優先於泛稱之 saveStale), 再進本表之 guardWrite
+        let withRefLock = (fn) => {
+            if (refTarget === null) {
+                return fn()
+            }
+            return withTabLocks(lockTabs, [refTarget.table], async () => {
+                refRows = await woItems[refTarget.table].select()
+                if (subject !== null) {
+                    let si = checkSubjectIdentity({ subject, refRows })
+                    if (si !== null) {
+                        srLog.error({ event: 'updateTabItems-identity-error', keyTable, userId, msg: si.key, reason: si.reason, n: 1 })
+                        return Promise.reject(si.key)
+                    }
+                }
+                return await fn()
+            })
+        }
+
+        return await lockSave(`updateTabItems:${keyTable}`, userId, () => withRefLock(() => guardWrite({
             tables: [keyTable],
 
             //新鮮讀取: 直讀 woItems(WServOrm 未開 useCache), 不經任何快取(規格第 12 節)
@@ -357,6 +407,16 @@ function proc(woItems, procOrm, { srLog, withTabLocks: lockTabs, guardWrite, loc
         let keysTab = ds[keyTable].keys
         r = dropServerOnlyDiff({ keys: keysTab, r, ltdtOld, all: true })
         r = restoreServerFields({ r, ltdtOld, all: true }) //改動之列帶庫內之伺服器管理欄: 持舊草稿(保留未存編輯期間外部同步重寫了該列)不得把較新之建立者／建立時間回退(外審 sol 第 3 點)
+
+        //正向引用身分(perm-run02 範圍一; R-REF-IDENTITY-01): 本次寫入之列(新增＋改動)相對庫內舊列新增之啟用引用項, 其名稱對應之被引用實體須與選取當時同一身分(同 id), 且宣告須完整;
+        //被刪除、刪除後同名重建(id 不同)、同名新增實體皆整次拒收 saveRefChanged(零寫入): 不得把授權寫到同名新實體(原則 6). refRows 為被引用表鎖內之新鮮讀取
+        if (refDecl !== null) {
+            let ri = checkRefIdentity({ keyTable, decl: refDecl, rowsNew: [...r.add, ...r.diff], rowsOld: ltdtOld, refRows })
+            if (ri !== null) {
+                srLog.error({ event: 'updateTabItems-identity-error', keyTable, userId, msg: ri.key, reason: ri.reason, n: ri.n })
+                return Promise.reject(ri.key)
+            }
+        }
         let ex =checkExternalWrite({ keyTable, keys: keysTab, r, ltdtOld, lockExternalRows })
         if (ex !== null) {
             srLog.error({ event: 'updateTabItems-external-error', keyTable, userId, msg: ex.key, reason: ex.reason, n: ex.n, froms: ex.froms })
@@ -463,7 +523,7 @@ function proc(woItems, procOrm, { srLog, withTabLocks: lockTabs, guardWrite, loc
         return await readAfter()
 
             },
-        }).catch(mapGuardErr(keyTable, userId)))
+        }).catch(mapGuardErr(keyTable, userId))))
     }
 
 

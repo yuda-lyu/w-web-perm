@@ -1,0 +1,51 @@
+[
+  {
+    "name": "unitapi",
+    "files": [
+      "test/unit-*.test.mjs",
+      "test/api-*.test.mjs"
+    ],
+    "exit": 0,
+    "pass": 4034,
+    "fail": 0,
+    "pending": 1,
+    "sec": 521,
+    "log": "C:\\opensrc\\開源-JS-411-8-w-web-perm\\w-web-perm\\tmp\\perm-run02\\chain-unitapi.log"
+  },
+  {
+    "name": "concurrent",
+    "files": [
+      "test/e2e-concurrent-edit.test.mjs"
+    ],
+    "exit": 0,
+    "pass": 74,
+    "fail": 0,
+    "pending": 0,
+    "sec": 918,
+    "log": "C:\\opensrc\\開源-JS-411-8-w-web-perm\\w-web-perm\\tmp\\perm-run02\\chain-concurrent.log"
+  },
+  {
+    "name": "ext-rows",
+    "files": [
+      "test/e2e-external-rows.test.mjs"
+    ],
+    "exit": 0,
+    "pass": 60,
+    "fail": 0,
+    "pending": 0,
+    "sec": 792,
+    "log": "C:\\opensrc\\開源-JS-411-8-w-web-perm\\w-web-perm\\tmp\\perm-run02\\chain-ext-rows.log"
+  },
+  {
+    "name": "array-form",
+    "files": [
+      "test/e2e-array-form.test.mjs"
+    ],
+    "exit": 5,
+    "pass": 78,
+    "fail": 5,
+    "pending": 0,
+    "sec": 968,
+    "log": "C:\\opensrc\\開源-JS-411-8-w-web-perm\\w-web-perm\\tmp\\perm-run02\\chain-array-form.log"
+  }
+]

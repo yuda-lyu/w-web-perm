@@ -1,0 +1,38 @@
+[
+  {
+    "name": "array-form",
+    "files": [
+      "test/e2e-array-form.test.mjs"
+    ],
+    "exit": 0,
+    "pass": 83,
+    "fail": 0,
+    "pending": 0,
+    "sec": 944,
+    "log": "C:\\opensrc\\開源-JS-411-8-w-web-perm\\w-web-perm\\tmp\\perm-run02\\chain-array-form.log"
+  },
+  {
+    "name": "users",
+    "files": [
+      "test/e2e-users.test.mjs"
+    ],
+    "exit": 0,
+    "pass": 24,
+    "fail": 0,
+    "pending": 0,
+    "sec": 620,
+    "log": "C:\\opensrc\\開源-JS-411-8-w-web-perm\\w-web-perm\\tmp\\perm-run02\\chain-users.log"
+  },
+  {
+    "name": "grups",
+    "files": [
+      "test/e2e-grups.test.mjs"
+    ],
+    "exit": 0,
+    "pass": 20,
+    "fail": 0,
+    "pending": 0,
+    "sec": 608,
+    "log": "C:\\opensrc\\開源-JS-411-8-w-web-perm\\w-web-perm\\tmp\\perm-run02\\chain-grups.log"
+  }
+]
