@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    
+    <meta charset="utf-8">
+    <title>src/js/fromAudit.mjs - Documentation</title>
+    
+    
+    <script src="scripts/prettify/prettify.js"></script>
+    <script src="scripts/prettify/lang-css.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc.css">
+    <script src="scripts/nav.js" defer></script>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+<input type="checkbox" id="nav-trigger" class="nav-trigger" />
+<label for="nav-trigger" class="navicon-button x">
+  <div class="navicon"></div>
+</label>
+
+<label for="nav-trigger" class="overlay"></label>
+
+<nav >
+    
+    
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="WWebPerm.html">WWebPerm</a></li></ul><h3>Global</h3><ul><li><a href="global.html#applyPurgePlan">applyPurgePlan</a></li><li><a href="global.html#auditFrom">auditFrom</a></li><li><a href="global.html#auditRefs">auditRefs</a></li><li><a href="global.html#buildReport">buildReport</a></li><li><a href="global.html#buildRowsSend">buildRowsSend</a></li><li><a href="global.html#buildSyncRowsNew">buildSyncRowsNew</a></li><li><a href="global.html#checkBaseline">checkBaseline</a></li><li><a href="global.html#checkCascadePlan">checkCascadePlan</a></li><li><a href="global.html#checkDbNotInUse">checkDbNotInUse</a></li><li><a href="global.html#checkExternalWrite">checkExternalWrite</a></li><li><a href="global.html#checkMapKeyBatch">checkMapKeyBatch</a></li><li><a href="global.html#checkUsersWrite">checkUsersWrite</a></li><li><a href="global.html#cleanOutOf">cleanOutOf</a></li><li><a href="global.html#compareBaseline">compareBaseline</a></li><li><a href="global.html#countAndRefs">countAndRefs</a></li><li><a href="global.html#countExternalRows">countExternalRows</a></li><li><a href="global.html#countIdRenumber">countIdRenumber</a></li><li><a href="global.html#createAuthorizeExec">createAuthorizeExec</a></li><li><a href="global.html#createLegendMeasurer">createLegendMeasurer</a></li><li><a href="global.html#createLockSave">createLockSave</a></li><li><a href="global.html#cvKpToArr">cvKpToArr</a></li><li><a href="global.html#cvKpToObj">cvKpToObj</a></li><li><a href="global.html#decideLegendType">decideLegendType</a></li><li><a href="global.html#describeUpstream">describeUpstream</a></li><li><a href="global.html#diffRefTargets">diffRefTargets</a></li><li><a href="global.html#dropServerOnlyDiff">dropServerOnlyDiff</a></li><li><a href="global.html#eachOwn">eachOwn</a></li><li><a href="global.html#fetchJson">fetchJson</a></li><li><a href="global.html#fillIdlessIds">fillIdlessIds</a></li><li><a href="global.html#findDupIndex">findDupIndex</a></li><li><a href="global.html#findKeyOtherFrom">findKeyOtherFrom</a></li><li><a href="global.html#findRefRows">findRefRows</a></li><li><a href="global.html#findTouchedDup">findTouchedDup</a></li><li><a href="global.html#fmtLossyMsg">fmtLossyMsg</a></li><li><a href="global.html#fmtVars">fmtVars</a></li><li><a href="global.html#fmtWarn">fmtWarn</a></li><li><a href="global.html#formatFixReport">formatFixReport</a></li><li><a href="global.html#formatFromAudit">formatFromAudit</a></li><li><a href="global.html#formatPurgeReport">formatPurgeReport</a></li><li><a href="global.html#genLegend">genLegend</a></li><li><a href="global.html#getAddConfirmText">getAddConfirmText</a></li><li><a href="global.html#getAddImpact">getAddImpact</a></li><li><a href="global.html#getBannerLines">getBannerLines</a></li><li><a href="global.html#getBaselineDigest">getBaselineDigest</a></li><li><a href="global.html#getCascadePreview">getCascadePreview</a></li><li><a href="global.html#getChangedIdx">getChangedIdx</a></li><li><a href="global.html#getDelConfirmText">getDelConfirmText</a></li><li><a href="global.html#getDelImpact">getDelImpact</a></li><li><a href="global.html#getDelRefCount">getDelRefCount</a></li><li><a href="global.html#getDigestFields">getDigestFields</a></li><li><a href="global.html#getDupRowsInconsistent">getDupRowsInconsistent</a></li><li><a href="global.html#getEffMode">getEffMode</a></li><li><a href="global.html#getExternalEdits">getExternalEdits</a></li><li><a href="global.html#getItemWarnText">getItemWarnText</a></li><li><a href="global.html#getKpLossy">getKpLossy</a></li><li><a href="global.html#getLockFields">getLockFields</a></li><li><a href="global.html#getNameErrs">getNameErrs</a></li><li><a href="global.html#getOwn">getOwn</a></li><li><a href="global.html#getPropKey">getPropKey</a></li><li><a href="global.html#getRawModeMap">getRawModeMap</a></li><li><a href="global.html#getRefRowsExtra">getRefRowsExtra</a></li><li><a href="global.html#getRefState">getRefState</a></li><li><a href="global.html#getRefWarnText">getRefWarnText</a></li><li><a href="global.html#getRefWarns">getRefWarns</a></li><li><a href="global.html#getRowIdxs">getRowIdxs</a></li><li><a href="global.html#getRowState">getRowState</a></li><li><a href="global.html#getRuleEnable">getRuleEnable</a></li><li><a href="global.html#getRuleWarnText">getRuleWarnText</a></li><li><a href="global.html#getRuleWarns">getRuleWarns</a></li><li><a href="global.html#getSavePreview">getSavePreview</a></li><li><a href="global.html#getSyncWarnLines">getSyncWarnLines</a></li><li><a href="global.html#hasDupKey">hasDupKey</a></li><li><a href="global.html#hasExternalDiff">hasExternalDiff</a></li><li><a href="global.html#isAuthMode">isAuthMode</a></li><li><a href="global.html#isBaselineStale">isBaselineStale</a></li><li><a href="global.html#isBaselineValid">isBaselineValid</a></li><li><a href="global.html#isDraftStale">isDraftStale</a></li><li><a href="global.html#isExternalRow">isExternalRow</a></li><li><a href="global.html#isJsonLossy">isJsonLossy</a></li><li><a href="global.html#isMain">isMain</a></li><li><a href="global.html#joinList">joinList</a></li><li><a href="global.html#joinNames">joinNames</a></li><li><a href="global.html#keepAssignByEntity">keepAssignByEntity</a></li><li><a href="global.html#keepAssignOnMissing">keepAssignOnMissing</a></li><li><a href="global.html#makeBaseline">makeBaseline</a></li><li><a href="global.html#makeRowStates">makeRowStates</a></li><li><a href="global.html#mapKeyOf">mapKeyOf</a></li><li><a href="global.html#mapNameKp">mapNameKp</a></li><li><a href="global.html#markDataReload">markDataReload</a></li><li><a href="global.html#markHasKey">markHasKey</a></li><li><a href="global.html#maskQuery">maskQuery</a></li><li><a href="global.html#maskTok">maskTok</a></li><li><a href="global.html#maskUrl">maskUrl</a></li><li><a href="global.html#mergePickKeysOnly">mergePickKeysOnly</a></li><li><a href="global.html#pairRowsToSnapshot">pairRowsToSnapshot</a></li><li><a href="global.html#pickUniqueUser">pickUniqueUser</a></li><li><a href="global.html#planDraftSync">planDraftSync</a></li><li><a href="global.html#planFixFromType">planFixFromType</a></li><li><a href="global.html#planPurgeChain">planPurgeChain</a></li><li><a href="global.html#planPurgeFrom">planPurgeFrom</a></li><li><a href="global.html#planRefChanges">planRefChanges</a></li><li><a href="global.html#putRefEntry">putRefEntry</a></li><li><a href="global.html#putRowsToKp">putRowsToKp</a></li><li><a href="global.html#refsChanged">refsChanged</a></li><li><a href="global.html#resolveShellWorker">resolveShellWorker</a></li><li><a href="global.html#restoreExternalOrder">restoreExternalOrder</a></li><li><a href="global.html#restoreServerFields">restoreServerFields</a></li><li><a href="global.html#reuseDeletedIds">reuseDeletedIds</a></li><li><a href="global.html#rewriteRefs">rewriteRefs</a></li><li><a href="global.html#rowDigest">rowDigest</a></li><li><a href="global.html#runAuditFrom">runAuditFrom</a></li><li><a href="global.html#runClean">runClean</a></li><li><a href="global.html#runFixFromType">runFixFromType</a></li><li><a href="global.html#runPurgeFrom">runPurgeFrom</a></li><li><a href="global.html#splitCheckedRows">splitCheckedRows</a></li><li><a href="global.html#submitGuard">submitGuard</a></li><li><a href="global.html#tabWriteKey">tabWriteKey</a></li><li><a href="global.html#validateRowsBeforeWrite">validateRowsBeforeWrite</a></li><li><a href="global.html#withTabLocks">withTabLocks</a></li><li><a href="global.html#wrapInjected">wrapInjected</a></li><li><a href="global.html#wrapOperOrm">wrapOperOrm</a></li><li><a href="global.html#writeWithCascade">writeWithCascade</a></li></ul>
+    
+</nav>
+
+<div id="main">
+    
+    <h1 class="page-title">src/js/fromAudit.mjs</h1>
+    
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import { isExternalRow } from './externalRows.mjs'
+import { REF_OF, planRefChanges } from './refCascade.mjs'
+import { getDelImpact } from './getDelRefCount.mjs'
+
+
+//來源欄 from 之稽核、型別正規化與「整來源清除」規劃(run07 升版維運工具之核心; F-23 外部列受保護、規則帳本 R-PRINCIPLE-00 原則 5):
+//  外部列＝from 為非空字串者(externalRows.isExternalRow, 單一擁有者, 本檔不另寫判準); from 為 ''、缺欄、非字串(null／數字／布林／物件)者為後台列.
+//  升版後外部列於後台唯讀(不得改、不得刪), 故升版前舊資料之「非空 from」列將成為唯讀; 非字串 from 後台寫入起被拒收.
+//本檔為純函數(不依賴 Vue／DOM／ORM／fs), 供離線維運腳本 g_fixFromType.mjs／g_purgeFrom.mjs(經 server/tools/fromTools.mjs)與單元測試共用;
+//所有函數不改輸入; 輸出之 id 與名稱僅供離線工具列印於 stdout, 不得寫入 srLog(規則帳本: 日誌不記 id／個資).
+
+
+//TABLE_ORDER: 四表依引用鏈序(被引用者先、引用端後; 同 server/keyCheck.mjs 之 TAB_LOCK_RANK): 標的 → 權限 → 群組 → 使用者
+const TABLE_ORDER = ['targets', 'pemis', 'grups', 'users']
+
+//NON_STRING_KINDS: 非字串 from 之型別分類(null／number／boolean／object／array／other)
+const NON_STRING_KINDS = ['null', 'number', 'boolean', 'object', 'array', 'other']
+
+//KIND_ORDER: 稽核結果內 from 值分類之固定輸出次序(empty: ''、missing: 缺欄(視同 '')、非字串各型、notObject: 列本身非物件, 最後為非空字串依值分組)
+const KIND_ORDER = ['empty', 'missing', ...NON_STRING_KINDS, 'notObject']
+
+//IMPACT_KIND: 清除之表 → getDelImpact 之種類(AND 引用者數之口徑, 同清單頁刪除確認框); targets 之 crules 無 mode、users 無引用端, 不適用
+const IMPACT_KIND = { grups: 'Grup', pemis: 'Pemi' }
+
+
+let isStr = (v) => typeof v === 'string'
+let hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k)
+let isObj = (v) => v !== null &amp;&amp; typeof v === 'object'
+let arr = (v) => (Array.isArray(v) ? v : [])
+let hasId = (r) => isObj(r) &amp;&amp; isStr(r.id) &amp;&amp; r.id !== '' //可寫回／可刪除之列須有非空字串主鍵(ORM 以字串主鍵定位)
+let strCmp = (a, b) => (a &lt; b ? -1 : (a > b ? 1 : 0)) //依 UTF-16 碼元之確定性比較(不隨 locale)
+
+
+//fromKind: 列之 from 值分類 { kind, from? }; 非空字串之判準經 isExternalRow(單一擁有者), from 僅 kind 為 'string' 時給
+let fromKind = (row) => {
+    if (!isObj(row)) {
+        return { kind: 'notObject' }
+    }
+    if (isExternalRow(row)) {
+        return { kind: 'string', from: row.from }
+    }
+    let v = row.from
+    if (v === undefined) {
+        return { kind: 'missing' }
+    }
+    if (v === '') {
+        return { kind: 'empty' }
+    }
+    if (v === null) {
+        return { kind: 'null' }
+    }
+    if (typeof v === 'number') {
+        return { kind: 'number' }
+    }
+    if (typeof v === 'boolean') {
+        return { kind: 'boolean' }
+    }
+    if (Array.isArray(v)) {
+        return { kind: 'array' }
+    }
+    if (typeof v === 'object') {
+        return { kind: 'object' }
+    }
+    return { kind: 'other' }
+}
+
+
+//newKinds: 非字串各型之計數容器
+let newKinds = () => Object.fromEntries(NON_STRING_KINDS.map((k) => [k, 0]))
+
+
+/**
+ * 稽核四表 from 欄之分佈(純函數, 不讀寫任何資料)
+ *
+ * from 值分類: ''(empty)、缺欄(missing, 視同 '')、非字串(null／number／boolean／object／array／other, 各記型別)、非空字串(string, 依值分組, 精確 ===, 不 trim、不分大小寫);
+ * 列本身非物件者記 notObject. 非空字串者為「升版後將成為外部列(唯讀)」, 列入 external.
+ *
+ * @param {Object} d 輸入 { users, grups, pemis, targets }(各為列陣列, 缺者視為空)
+ * @returns {Object} 回傳 { entries, external, counts }:
+ *   entries   [{ table, kind, n }]（kind 為 'string' 者另帶 from 值）, 依 TABLE_ORDER 與 KIND_ORDER 輸出, 非空字串依 from 值升冪; 只列 n 大於 0 者
+ *   external  [{ table, from, n }] 升版後將成為外部列(唯讀)之(表, from)與筆數
+ *   counts    { nRows, nEmpty, nMissing, nNonString, nExternal, nNotObject, nSources, byTable: { 表: { nRows, nEmpty, nMissing, nNonString, nExternal, nNotObject, nSources, kinds } } }
+ * @example
+ *
+ * let r = auditFrom({ users: [{ id: 'u1', from: '' }, { id: 'u2', from: 'pd' }, { id: 'u3', from: null }] })
+ * console.log(r.external, r.counts.nNonString)
+ * // => [ { table: 'users', from: 'pd', n: 1 } ] 1
+ *
+ */
+function auditFrom(d) {
+    let data = isObj(d) ? d : {}
+    let entries = []
+    let external = []
+    let byTable = {}
+    let counts = { nRows: 0, nEmpty: 0, nMissing: 0, nNonString: 0, nExternal: 0, nNotObject: 0, nSources: 0, byTable }
+
+    for (let t of TABLE_ORDER) {
+        let rows = arr(data[t])
+        let tab = { nRows: rows.length, nEmpty: 0, nMissing: 0, nNonString: 0, nExternal: 0, nNotObject: 0, nSources: 0, kinds: newKinds() }
+        let nOf = new Map() //kind → 筆數
+        let srcs = new Map() //from 值 → 筆數(Map: 值可為 __proto__ 等任意字串)
+        for (let row of rows) {
+            let k = fromKind(row)
+            if (k.kind === 'string') {
+                srcs.set(k.from, (srcs.get(k.from) || 0) + 1)
+            }
+            else {
+                nOf.set(k.kind, (nOf.get(k.kind) || 0) + 1)
+            }
+        }
+        for (let kind of KIND_ORDER) {
+            let n = nOf.get(kind) || 0
+            if (n === 0) {
+                continue
+            }
+            entries.push({ table: t, kind, n })
+            if (kind === 'empty') {
+                tab.nEmpty = n
+            }
+            else if (kind === 'missing') {
+                tab.nMissing = n
+            }
+            else if (kind === 'notObject') {
+                tab.nNotObject = n
+            }
+            else {
+                tab.kinds[kind] = n
+                tab.nNonString += n
+            }
+        }
+        for (let from of [...srcs.keys()].sort(strCmp)) {
+            let n = srcs.get(from)
+            entries.push({ table: t, kind: 'string', from, n })
+            external.push({ table: t, from, n })
+            tab.nExternal += n
+            tab.nSources++
+        }
+        byTable[t] = tab
+        for (let key of ['nRows', 'nEmpty', 'nMissing', 'nNonString', 'nExternal', 'nNotObject', 'nSources']) {
+            counts[key] += tab[key]
+        }
+    }
+    return { entries, external, counts }
+}
+
+
+/**
+ * 規劃「把非字串 from 正規化為 ''」(g_fixFromType 之核心; 純函數, 不改輸入)
+ *
+ * 待改列: from 為 null／數字／布林／物件／陣列等非字串者, 改為 ''(後台列; 與缺欄、'' 同為後台列, 故不改變任何列是否為外部列).
+ * 缺欄視同 ''(已是後台列), 不改, 只列出其 id; 非空字串為外部列, 不動; 缺非空字串主鍵而無從寫回者列入 noId(不改, 須人工處理).
+ *
+ * @param {Array} rows 輸入某一表之全部列
+ * @returns {Object} 回傳 { changes, missing, noId, counts }:
+ *   changes  [{ id, kind, before, after }] 待改列, after 恆為 ''; before 為原 from 值(原樣, 同輸入之參考)
+ *   missing  缺 from 欄之列之 id 陣列(只列出, 不改)
+ *   noId     [{ idx, kind }] 非字串 from 而缺非空字串主鍵者(idx 為其於輸入陣列之索引)
+ *   counts   { nRows, nEmpty, nMissing, nNonString, nExternal, nNotObject, nNoId, kinds }
+ * @example
+ *
+ * let r = planFixFromType([{ id: 'a', from: null }, { id: 'b', from: 'pd' }, { id: 'c' }])
+ * console.log(r.changes, r.missing)
+ * // => [ { id: 'a', kind: 'null', before: null, after: '' } ] [ 'c' ]
+ *
+ */
+function planFixFromType(rows) {
+    let src = arr(rows)
+    let res = { changes: [], missing: [], noId: [], counts: { nRows: src.length, nEmpty: 0, nMissing: 0, nNonString: 0, nExternal: 0, nNotObject: 0, nNoId: 0, kinds: newKinds() } }
+    let c = res.counts
+    src.forEach((row, idx) => {
+        let k = fromKind(row)
+        if (k.kind === 'empty') {
+            c.nEmpty++
+        }
+        else if (k.kind === 'string') {
+            c.nExternal++
+        }
+        else if (k.kind === 'notObject') {
+            c.nNotObject++
+        }
+        else if (k.kind === 'missing') {
+            c.nMissing++
+            if (hasId(row)) {
+                res.missing.push(row.id)
+            }
+        }
+        else {
+            c.nNonString++
+            c.kinds[k.kind]++
+            if (hasId(row)) {
+                res.changes.push({ id: row.id, kind: k.kind, before: row.from, after: '' })
+            }
+            else {
+                c.nNoId++
+                res.noId.push({ idx, kind: k.kind })
+            }
+        }
+    })
+    return res
+}
+
+
+//rowName: 列之顯示名稱(僅供離線輸出; targets 之 id 即名稱; users 不輸出名稱——姓名為個資, 同 authRefsAudit 不回顯 email／name 之慣例)
+let rowName = (keyTable, r) => {
+    if (keyTable === 'users') {
+        return undefined
+    }
+    if (keyTable === 'targets') {
+        return isStr(r.id) ? r.id : ''
+    }
+    return isStr(r.name) ? r.name : ''
+}
+
+
+//similarFroms: 與指定 from 不相同但「去前後空白並忽略大小寫後相同」之來源(僅提示, 不納入清除; 防手誤, 如 'PD' 與 'pd'、'pd ' 與 'pd')
+let similarFroms = (rows, from) => {
+    let want = from.trim().toLowerCase()
+    let m = new Map()
+    for (let r of rows) {
+        if (isExternalRow(r) &amp;&amp; r.from !== from &amp;&amp; r.from.trim().toLowerCase() === want) {
+            m.set(r.from, (m.get(r.from) || 0) + 1)
+        }
+    }
+    return [...m.keys()].sort(strCmp).map((f) => ({ from: f, n: m.get(f) }))
+}
+
+
+/**
+ * 規劃「整來源清除」: 某表 from 精確等於指定值之全部列, 連同同一次清理引用之計畫(g_purgeFrom 之核心; 純函數, 不改輸入, 不讀寫任何資料)
+ *
+ * 被清除列 ＝ 該表 `row.from === from`(精確 ===, 不 trim、不忽略大小寫、不模糊); from 須為非空字串, 拒絕 ''、非字串(err 'invalidFrom'); 表名須為 targets／pemis／grups／users(err 'invalidTable').
+ * 被清除列缺非空字串主鍵而無從刪除者整體拒絕(err 'purgeRowNoId', 零寫入, 不做部分清除).
+ * targets／pemis／grups 之清除另以 refCascade.planRefChanges 規劃「同一次清理引用」(引用端 pemis.crules／grups.cpemis／users.cgrups; rowsNew ＝ 該表扣除被清除列, holdersOld 為引用端全表),
+ * 效果同後台刪除該些列(身分以主鍵 id; 歷史同名仍有存續列者不清理); 計畫有 err(如 renameCascadeUnsupported: 引用端含無法安全重新編碼之內容)則整體拒絕、零寫入.
+ * users 之清除無引用清理.
+ *
+ * @param {Object} p 輸入參數物件
+ * @param {String} p.keyTable 輸入被清除之表('targets'、'pemis'、'grups' 或 'users')
+ * @param {String} p.from 輸入來源名稱(非空字串, 精確比對)
+ * @param {Object} p.tables 輸入 { users, grups, pemis, targets }(各為該表全部列; 引用端表須一併給)
+ * @returns {Object} 回傳 { err, keyTable, from, holder, field, rows, delIds, nRows, nAdmin, nNoId, changes, delNames, nHolders, nDelHolders, nExternal, impact, similar }:
+ *   err        null 或拒絕原因鍵(invalidTable／invalidFrom／purgeRowNoId／planRefChanges 之 err, 如 renameCascadeUnsupported); 非 null 時 changes 為空(零寫入)
+ *   rows       [{ id, name? }] 被清除列(id 與名稱僅供離線輸出; users 無 name); delIds 為其 id 陣列; nRows 為其筆數; nAdmin 為其中 isAdmin 為 'y' 者(僅 users)
+ *   changes    引用端改寫 [{ id, field, before, after, nRename, nDel, from }](依 planRefChanges); holder／field 為引用端表與欄位(users 清除為空字串)
+ *   delNames   須清理之被清除名稱(planRefChanges.delNames); nHolders 為須改寫之引用端列數; nDelHolders 為受刪除影響之列數; nExternal 為其中來源非空者
+ *   impact     { nRefs, nAnd, nWiden }: nRefs 同 nDelHolders; nAnd 為以 AND 引用者(同清單頁刪除確認框 getDelImpact; targets／users 不適用恆 0); nWiden 為歷史同名只刪其一致授權可能變多者
+ *   similar    [{ from, n }] 與指定 from 去空白忽略大小寫後相同而不相同之來源(僅提示, 不清除)
+ * @example
+ *
+ * let r = planPurgeFrom({ keyTable: 'grups', from: 'pd', tables: {
+ *     users: [{ id: 'u1', cgrups: '{"A":{"mode":"OR","isActive":"y"}}' }],
+ *     grups: [{ id: 'g1', name: 'A', from: 'pd' }],
+ * } })
+ * console.log(r.nRows, r.changes[0].after)
+ * // => 1 {}
+ *
+ */
+function planPurgeFrom(p) {
+    let keyTable = isObj(p) ? p.keyTable : ''
+    let from = isObj(p) ? p.from : undefined
+    let plan = {
+        err: null,
+        keyTable,
+        from,
+        holder: '',
+        field: '',
+        rows: [],
+        delIds: [],
+        nRows: 0,
+        nAdmin: 0,
+        nNoId: 0,
+        changes: [],
+        delNames: [],
+        nHolders: 0,
+        nDelHolders: 0,
+        nExternal: 0,
+        impact: { nRefs: 0, nAnd: 0, nWiden: 0 },
+        similar: [],
+    }
+    if (!TABLE_ORDER.includes(keyTable)) {
+        plan.err = 'invalidTable'
+        return plan
+    }
+    if (!isStr(from) || from === '') {
+        plan.err = 'invalidFrom'
+        return plan
+    }
+    let tables = isObj(p.tables) ? p.tables : {}
+    let rowsOld = arr(tables[keyTable])
+    let isHit = (r) => isObj(r) &amp;&amp; r.from === from //精確 ===: from 為非空字串, 故命中者必為外部列
+    let hit = rowsOld.filter(isHit)
+    plan.similar = similarFroms(rowsOld, from)
+    plan.nRows = hit.length
+    plan.nNoId = hit.filter((r) => !hasId(r)).length
+    plan.rows = hit.filter(hasId).map((r) => {
+        let o = { id: r.id }
+        let name = rowName(keyTable, r)
+        if (name !== undefined) {
+            o.name = name
+        }
+        return o
+    })
+    plan.delIds = plan.rows.map((r) => r.id)
+    if (keyTable === 'users') {
+        plan.nAdmin = hit.filter((r) => r.isAdmin === 'y').length
+    }
+    let ref = hasOwn(REF_OF, keyTable) ? REF_OF[keyTable] : null //users 無引用端
+    if (ref !== null) {
+        plan.holder = ref.holder
+        plan.field = ref.field
+    }
+    if (plan.nNoId > 0) {
+        plan.err = 'purgeRowNoId'
+        return plan
+    }
+    if (hit.length === 0 || ref === null) {
+        return plan
+    }
+
+    //引用清理: 與伺服端刪除同一純函數(R-REF-CASCADE-01), rowsNew ＝ 該表扣除被清除列
+    let rowsNew = rowsOld.filter((r) => !isHit(r))
+    let holders = arr(tables[ref.holder])
+    let rp = planRefChanges({ keyTable, rowsOld, rowsNew, holdersOld: holders })
+    if (rp.err !== null) {
+        plan.err = rp.err
+        return plan
+    }
+    plan.changes = rp.changes
+    plan.delNames = rp.delNames
+    plan.nHolders = rp.nHolders
+    plan.nDelHolders = rp.nDelHolders
+    plan.nExternal = rp.nExternal
+    plan.impact.nRefs = rp.nDelHolders
+    if (hasOwn(IMPACT_KIND, keyTable)) {
+        let im = getDelImpact(plan.delIds, rowsOld, holders, IMPACT_KIND[keyTable], rowsNew)
+        plan.impact.nAnd = Math.min(im.nAnd, rp.nDelHolders)
+        plan.impact.nWiden = im.nWiden
+    }
+    return plan
+}
+
+
+/**
+ * 套用清除計畫於四表(回傳新之 tables, 不改輸入; 用於 --table all 之逐表模擬與寫後預測): 移除被清除列、引用端欄位換成 after
+ *
+ * @param {Object} tables 輸入 { users, grups, pemis, targets }
+ * @param {Object} plan 輸入 planPurgeFrom 之結果; err 非 null 者原樣回傳(不套用)
+ * @returns {Object} 回傳新之 tables(僅被改之表為新陣列, 其餘沿用)
+ */
+function applyPurgePlan(tables, plan) {
+    let out = { ...tables }
+    if (!isObj(plan) || plan.err !== null) {
+        return out
+    }
+    let del = new Set(plan.delIds)
+    out[plan.keyTable] = arr(tables[plan.keyTable]).filter((r) => !(isObj(r) &amp;&amp; del.has(r.id) &amp;&amp; r.from === plan.from))
+    if (plan.holder !== '') {
+        let m = new Map(plan.changes.map((c) => [c.id, c]))
+        out[plan.holder] = arr(tables[plan.holder]).map((r) => {
+            let c = isObj(r) ? m.get(r.id) : undefined
+            return c === undefined ? r : { ...r, [c.field]: c.after }
+        })
+    }
+    return out
+}
+
+
+/**
+ * 規劃多表整來源清除(--table all): 依引用鏈序 targets → pemis → grups → users 逐表規劃, 每表以「前面各表套用後」之模擬狀態計畫(與逐表真實寫入之狀態一致)
+ *
+ * 任一表之計畫有 err 則停止並整體拒絕(err 為該鍵, errTable 為該表; plans 含到失敗表為止之計畫). 純函數, 不改輸入.
+ *
+ * @param {Object} p 輸入參數物件
+ * @param {String} p.from 輸入來源名稱(非空字串, 精確比對)
+ * @param {Object} p.tables 輸入 { users, grups, pemis, targets }
+ * @param {Array} [p.keyTables=TABLE_ORDER] 輸入要清除之表(可為子集; 一律依 TABLE_ORDER 之序處理並去重)
+ * @returns {Object} 回傳 { err, errTable, from, plans, tablesAfter, totals }: tablesAfter 為全部套用後之預測狀態(err 非 null 時無意義);
+ *   totals 為各表加總 { nRows, nHolders, nDelHolders, nAnd, nWiden, nExternal, nAdmin }
+ */
+function planPurgeChain(p) {
+    let from = isObj(p) ? p.from : undefined
+    let tables = isObj(p) &amp;&amp; isObj(p.tables) ? p.tables : {}
+    let want = isObj(p) &amp;&amp; Array.isArray(p.keyTables) ? p.keyTables : TABLE_ORDER
+    let res = { err: null, errTable: '', from, plans: [], tablesAfter: { ...tables }, totals: { nRows: 0, nHolders: 0, nDelHolders: 0, nAnd: 0, nWiden: 0, nExternal: 0, nAdmin: 0 } }
+    if (!isStr(from) || from === '') {
+        res.err = 'invalidFrom'
+        return res
+    }
+    if (want.length === 0 || want.some((t) => !TABLE_ORDER.includes(t))) {
+        res.err = 'invalidTable'
+        return res
+    }
+    let cur = tables
+    for (let t of TABLE_ORDER.filter((x) => want.includes(x))) {
+        let plan = planPurgeFrom({ keyTable: t, from, tables: cur })
+        res.plans.push(plan)
+        if (plan.err !== null) {
+            res.err = plan.err
+            res.errTable = t
+            return res
+        }
+        res.totals.nRows += plan.nRows
+        res.totals.nHolders += plan.nHolders
+        res.totals.nDelHolders += plan.nDelHolders
+        res.totals.nAnd += plan.impact.nAnd
+        res.totals.nWiden += plan.impact.nWiden
+        res.totals.nExternal += plan.nExternal
+        res.totals.nAdmin += plan.nAdmin
+        cur = applyPurgePlan(cur, plan)
+    }
+    res.tablesAfter = cur
+    return res
+}
+
+
+export { TABLE_ORDER, NON_STRING_KINDS, KIND_ORDER, fromKind, auditFrom, planFixFromType, planPurgeFrom, applyPurgePlan, planPurgeChain }
+export default auditFrom
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+    
+    
+</div>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Fri Oct 23 2026 10:56:39 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+</footer>
+
+<script>prettyPrint();</script>
+<script src="scripts/polyfill.js"></script>
+<script src="scripts/linenumber.js"></script>
+
+
+
+</body>
+</html>

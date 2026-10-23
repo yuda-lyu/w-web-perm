@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    
+    <meta charset="utf-8">
+    <title>src/js/pairRowsToSnapshot.mjs - Documentation</title>
+    
+    
+    <script src="scripts/prettify/prettify.js"></script>
+    <script src="scripts/prettify/lang-css.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc.css">
+    <script src="scripts/nav.js" defer></script>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+<input type="checkbox" id="nav-trigger" class="nav-trigger" />
+<label for="nav-trigger" class="navicon-button x">
+  <div class="navicon"></div>
+</label>
+
+<label for="nav-trigger" class="overlay"></label>
+
+<nav >
+    
+    
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="WWebPerm.html">WWebPerm</a></li></ul><h3>Global</h3><ul><li><a href="global.html#applyPurgePlan">applyPurgePlan</a></li><li><a href="global.html#auditFrom">auditFrom</a></li><li><a href="global.html#auditRefs">auditRefs</a></li><li><a href="global.html#buildReport">buildReport</a></li><li><a href="global.html#buildRowsSend">buildRowsSend</a></li><li><a href="global.html#buildSyncRowsNew">buildSyncRowsNew</a></li><li><a href="global.html#checkBaseline">checkBaseline</a></li><li><a href="global.html#checkCascadePlan">checkCascadePlan</a></li><li><a href="global.html#checkDbNotInUse">checkDbNotInUse</a></li><li><a href="global.html#checkExternalWrite">checkExternalWrite</a></li><li><a href="global.html#checkMapKeyBatch">checkMapKeyBatch</a></li><li><a href="global.html#checkUsersWrite">checkUsersWrite</a></li><li><a href="global.html#cleanOutOf">cleanOutOf</a></li><li><a href="global.html#compareBaseline">compareBaseline</a></li><li><a href="global.html#countAndRefs">countAndRefs</a></li><li><a href="global.html#countExternalRows">countExternalRows</a></li><li><a href="global.html#countIdRenumber">countIdRenumber</a></li><li><a href="global.html#createAuthorizeExec">createAuthorizeExec</a></li><li><a href="global.html#createLegendMeasurer">createLegendMeasurer</a></li><li><a href="global.html#createLockSave">createLockSave</a></li><li><a href="global.html#cvKpToArr">cvKpToArr</a></li><li><a href="global.html#cvKpToObj">cvKpToObj</a></li><li><a href="global.html#decideLegendType">decideLegendType</a></li><li><a href="global.html#describeUpstream">describeUpstream</a></li><li><a href="global.html#diffRefTargets">diffRefTargets</a></li><li><a href="global.html#dropServerOnlyDiff">dropServerOnlyDiff</a></li><li><a href="global.html#eachOwn">eachOwn</a></li><li><a href="global.html#fetchJson">fetchJson</a></li><li><a href="global.html#fillIdlessIds">fillIdlessIds</a></li><li><a href="global.html#findDupIndex">findDupIndex</a></li><li><a href="global.html#findKeyOtherFrom">findKeyOtherFrom</a></li><li><a href="global.html#findRefRows">findRefRows</a></li><li><a href="global.html#findTouchedDup">findTouchedDup</a></li><li><a href="global.html#fmtLossyMsg">fmtLossyMsg</a></li><li><a href="global.html#fmtVars">fmtVars</a></li><li><a href="global.html#fmtWarn">fmtWarn</a></li><li><a href="global.html#formatFixReport">formatFixReport</a></li><li><a href="global.html#formatFromAudit">formatFromAudit</a></li><li><a href="global.html#formatPurgeReport">formatPurgeReport</a></li><li><a href="global.html#genLegend">genLegend</a></li><li><a href="global.html#getAddConfirmText">getAddConfirmText</a></li><li><a href="global.html#getAddImpact">getAddImpact</a></li><li><a href="global.html#getBannerLines">getBannerLines</a></li><li><a href="global.html#getBaselineDigest">getBaselineDigest</a></li><li><a href="global.html#getCascadePreview">getCascadePreview</a></li><li><a href="global.html#getChangedIdx">getChangedIdx</a></li><li><a href="global.html#getDelConfirmText">getDelConfirmText</a></li><li><a href="global.html#getDelImpact">getDelImpact</a></li><li><a href="global.html#getDelRefCount">getDelRefCount</a></li><li><a href="global.html#getDigestFields">getDigestFields</a></li><li><a href="global.html#getDupRowsInconsistent">getDupRowsInconsistent</a></li><li><a href="global.html#getEffMode">getEffMode</a></li><li><a href="global.html#getExternalEdits">getExternalEdits</a></li><li><a href="global.html#getItemWarnText">getItemWarnText</a></li><li><a href="global.html#getKpLossy">getKpLossy</a></li><li><a href="global.html#getLockFields">getLockFields</a></li><li><a href="global.html#getNameErrs">getNameErrs</a></li><li><a href="global.html#getOwn">getOwn</a></li><li><a href="global.html#getPropKey">getPropKey</a></li><li><a href="global.html#getRawModeMap">getRawModeMap</a></li><li><a href="global.html#getRefRowsExtra">getRefRowsExtra</a></li><li><a href="global.html#getRefState">getRefState</a></li><li><a href="global.html#getRefWarnText">getRefWarnText</a></li><li><a href="global.html#getRefWarns">getRefWarns</a></li><li><a href="global.html#getRowIdxs">getRowIdxs</a></li><li><a href="global.html#getRowState">getRowState</a></li><li><a href="global.html#getRuleEnable">getRuleEnable</a></li><li><a href="global.html#getRuleWarnText">getRuleWarnText</a></li><li><a href="global.html#getRuleWarns">getRuleWarns</a></li><li><a href="global.html#getSavePreview">getSavePreview</a></li><li><a href="global.html#getSyncWarnLines">getSyncWarnLines</a></li><li><a href="global.html#hasDupKey">hasDupKey</a></li><li><a href="global.html#hasExternalDiff">hasExternalDiff</a></li><li><a href="global.html#isAuthMode">isAuthMode</a></li><li><a href="global.html#isBaselineStale">isBaselineStale</a></li><li><a href="global.html#isBaselineValid">isBaselineValid</a></li><li><a href="global.html#isDraftStale">isDraftStale</a></li><li><a href="global.html#isExternalRow">isExternalRow</a></li><li><a href="global.html#isJsonLossy">isJsonLossy</a></li><li><a href="global.html#isMain">isMain</a></li><li><a href="global.html#joinList">joinList</a></li><li><a href="global.html#joinNames">joinNames</a></li><li><a href="global.html#keepAssignByEntity">keepAssignByEntity</a></li><li><a href="global.html#keepAssignOnMissing">keepAssignOnMissing</a></li><li><a href="global.html#makeBaseline">makeBaseline</a></li><li><a href="global.html#makeRowStates">makeRowStates</a></li><li><a href="global.html#mapKeyOf">mapKeyOf</a></li><li><a href="global.html#mapNameKp">mapNameKp</a></li><li><a href="global.html#markDataReload">markDataReload</a></li><li><a href="global.html#markHasKey">markHasKey</a></li><li><a href="global.html#maskQuery">maskQuery</a></li><li><a href="global.html#maskTok">maskTok</a></li><li><a href="global.html#maskUrl">maskUrl</a></li><li><a href="global.html#mergePickKeysOnly">mergePickKeysOnly</a></li><li><a href="global.html#pairRowsToSnapshot">pairRowsToSnapshot</a></li><li><a href="global.html#pickUniqueUser">pickUniqueUser</a></li><li><a href="global.html#planDraftSync">planDraftSync</a></li><li><a href="global.html#planFixFromType">planFixFromType</a></li><li><a href="global.html#planPurgeChain">planPurgeChain</a></li><li><a href="global.html#planPurgeFrom">planPurgeFrom</a></li><li><a href="global.html#planRefChanges">planRefChanges</a></li><li><a href="global.html#putRefEntry">putRefEntry</a></li><li><a href="global.html#putRowsToKp">putRowsToKp</a></li><li><a href="global.html#refsChanged">refsChanged</a></li><li><a href="global.html#resolveShellWorker">resolveShellWorker</a></li><li><a href="global.html#restoreExternalOrder">restoreExternalOrder</a></li><li><a href="global.html#restoreServerFields">restoreServerFields</a></li><li><a href="global.html#reuseDeletedIds">reuseDeletedIds</a></li><li><a href="global.html#rewriteRefs">rewriteRefs</a></li><li><a href="global.html#rowDigest">rowDigest</a></li><li><a href="global.html#runAuditFrom">runAuditFrom</a></li><li><a href="global.html#runClean">runClean</a></li><li><a href="global.html#runFixFromType">runFixFromType</a></li><li><a href="global.html#runPurgeFrom">runPurgeFrom</a></li><li><a href="global.html#splitCheckedRows">splitCheckedRows</a></li><li><a href="global.html#submitGuard">submitGuard</a></li><li><a href="global.html#tabWriteKey">tabWriteKey</a></li><li><a href="global.html#validateRowsBeforeWrite">validateRowsBeforeWrite</a></li><li><a href="global.html#withTabLocks">withTabLocks</a></li><li><a href="global.html#wrapInjected">wrapInjected</a></li><li><a href="global.html#wrapOperOrm">wrapOperOrm</a></li><li><a href="global.html#writeWithCascade">writeWithCascade</a></li></ul>
+    
+</nav>
+
+<div id="main">
+    
+    <h1 class="page-title">src/js/pairRowsToSnapshot.mjs</h1>
+    
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>//反向關聯對話框(VeGrupBlngUsers／VePemiBlngGrups)之「列 ↔ 資料快照」身分配對
+//規則見 sgud/rule/rulebook.md「關聯對話框容錯、以身分配對、資料驅動屬性鍵」之 R-REL-PAIR-01
+//本檔無外部相依
+
+
+//toId: 身分值正規化——非空字串，或有限數字(ADR-028: 數字主鍵以其字串形式處置)；其餘(空字串、NaN、物件、null、undefined)視為無身分
+function toId(v) {
+    if (typeof v === 'string' &amp;&amp; v !== '') {
+        return v
+    }
+    if (typeof v === 'number' &amp;&amp; Number.isFinite(v)) {
+        return String(v)
+    }
+    return null
+}
+
+
+/**
+ * 把對話框之列以「列身分」配對到存檔當下取得之資料快照(不用列索引)
+ *
+ * 反向關聯對話框(群組頁「所屬使用者」、權限頁「所屬群組」)開啟時依 store 當時的列序產生對話框的列; 存檔時重新取 store 快照.
+ * 兩者以列索引配對時, store 於開框期間被更新(另一位管理者增刪列或改 order)即錯位, 關聯寫到另一個使用者／群組(規則帳本 R-REL-PAIR-01).
+ * 本函數以身分欄位(預設 id)配對: 每列配到快照中身分相同(且 verifyKeys 欄位值全相等)的列; 配不到者列入 missing,
+ * 由呼叫端整次拒存並提示重新整理, 不得退而配到其他列.
+ *
+ * @param {Array} rows 輸入對話框之列, 每列帶身分欄位(opt.idKey); 非陣列時回傳空結果
+ * @param {Array} snapshot 輸入存檔當下取得之資料表快照(列物件陣列); 缺身分欄位之快照列不參與配對, 身分重複者取第一筆
+ * @param {Object} [opt={}] 輸入設定物件
+ * @param {String} [opt.idKey='id'] 輸入身分欄位名稱, 預設'id'
+ * @param {Array} [opt.verifyKeys=[]] 輸入除身分外另須與快照相等之欄位名稱陣列(如群組之 'name': 改名視為過期), 預設[]
+ * @returns {Object} 回傳 { pairs, missing, krs, matched }; pairs 與 rows 等長, pairs[kr] 為配到之快照列(同一個物件參考)，配不到為 null;
+ *   missing 為配不到之列(原物件)陣列; krs 為配得到之列的列索引(依列序), matched[i] 為 krs[i] 那一列配到之快照列(兩者等長、同序, 供「只處理配得到者」之顯示重算用, 免呼叫端自行壓縮索引)
+ * @example
+ *
+ * let snapshot = [{ id: 'u2', name: 'b' }, { id: 'u1', name: 'a' }]
+ * let rows = [{ id: 'u1', name: 'a' }, { id: 'u3', name: 'c' }]
+ * let { pairs, missing, krs } = pairRowsToSnapshot(rows, snapshot)
+ * console.log(pairs[0].name, pairs[1], missing.length, krs)
+ * // => 'a' null 1 [0]
+ *
+ */
+function pairRowsToSnapshot(rows, snapshot, opt = {}) {
+    let pairs = []
+    let missing = []
+    let krs = []
+    let matched = []
+    if (!Array.isArray(rows)) {
+        return { pairs, missing, krs, matched }
+    }
+    let idKey = (opt !== null &amp;&amp; typeof opt === 'object' &amp;&amp; typeof opt.idKey === 'string' &amp;&amp; opt.idKey !== '') ? opt.idKey : 'id'
+    let verifyKeys = (opt !== null &amp;&amp; typeof opt === 'object' &amp;&amp; Array.isArray(opt.verifyKeys)) ? opt.verifyKeys : []
+
+    //kp: 身分 → 快照列(Map: 身分為 __proto__／constructor 等字串時亦精確)
+    let kp = new Map()
+    if (Array.isArray(snapshot)) {
+        for (let it of snapshot) {
+            let id = (it !== null &amp;&amp; typeof it === 'object') ? toId(it[idKey]) : null
+            if (id !== null &amp;&amp; !kp.has(id)) {
+                kp.set(id, it)
+            }
+        }
+    }
+
+    for (let kr = 0; kr &lt; rows.length; kr++) { //索引迴圈(不用 forEach: 稀疏陣列之空洞須視為無身分列入 missing, pairs 與 rows 等長)
+        let r = rows[kr]
+        let id = (r !== null &amp;&amp; typeof r === 'object') ? toId(r[idKey]) : null
+        let it = (id === null) ? undefined : kp.get(id)
+        if (it !== undefined &amp;&amp; verifyKeys.every((k) => r[k] === it[k])) {
+            pairs.push(it)
+            krs.push(kr)
+            matched.push(it)
+        }
+        else {
+            pairs.push(null)
+            missing.push(r)
+        }
+    }
+
+    return { pairs, missing, krs, matched }
+}
+
+
+export { toId }
+export default pairRowsToSnapshot
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+    
+    
+</div>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Fri Oct 23 2026 10:56:39 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+</footer>
+
+<script>prettyPrint();</script>
+<script src="scripts/polyfill.js"></script>
+<script src="scripts/linenumber.js"></script>
+
+
+
+</body>
+</html>
