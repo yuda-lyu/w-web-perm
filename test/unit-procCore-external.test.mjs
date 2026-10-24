@@ -1668,8 +1668,9 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
                 let mDef = /let requireAdmin = async \(userId, funcName\) => \{([\s\S]*?)\n    \}\n/.exec(wcode)
                 assert.strict.ok(mDef, '應有 requireAdmin 定義')
                 //perm-run01(R-ADMIN-ONLY-01): 角色判準改由單一擁有者 adminCheck.isAdminRow 承擔(isActive＝y 且 isAdmin＝y; unit-adminOnlySite AOS-001 驗其真值表), requireAdmin 經它判定並 reject userNotAdmin
-                assert.strict.ok(/!isAdminRow\(u\)/.test(mDef[1]) && /Promise\.reject\('userNotAdmin'\)/.test(mDef[1]), 'requireAdmin 須以 isAdminRow 判定並 reject userNotAdmin')
-                assert.strict.ok(/catch \(err\) \{\s*u = null\s*\}/.test(mDef[1]), '讀取失敗須視同不符(fail-closed)')
+                //perm-run01 本輪(R-APP-TOKEN-01): requireAdmin 改為「在表者(不論 isActive)以該列 isAdminRow 為準, 不在表者須為 getUserIdByToken 登錄之系統服務用途 id」, 結果存 ok(結構改變, 判準仍經 isAdminRow、拒絕鍵仍 userNotAdmin; 行為面見 api-callerMatrix MX-D 與 unit-appToken AT-S5)
+                assert.strict.ok(/\(u !== null\) \? isAdminRow\(u\) : isSystemAppIdRecent\(userId\)/.test(mDef[1]) && /if \(!ok\) \{/.test(mDef[1]) && /Promise\.reject\('userNotAdmin'\)/.test(mDef[1]), 'requireAdmin 須以 isAdminRow 判定(不在表者以系統服務用途登錄)並 reject userNotAdmin')
+                assert.strict.ok(/catch \(err\) \{\s*ok = false\s*\}/.test(mDef[1]), '讀取失敗須視同不符(fail-closed)')
             })
 
         })

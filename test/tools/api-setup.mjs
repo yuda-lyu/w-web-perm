@@ -43,6 +43,18 @@ export const TOKEN_ADMIN2 = '{token-for-admin2}'       // → id-for-admin2（pe
 export const TOKEN_MEMBER = '{token-for-member}'       // → id-for-member（perm-run03 範圍四：perm users 列〔測試自建〕isAdmin='n'，但 srv.mjs 之 verifyClientUser 放行 → 通過連線閘之非管理員）
 export const TOKEN_MUTATE = '{token-for-mutate}'       // → id-for-mutate（perm-run01 外審 sol#2：perm 列〔測試自建〕為管理員, 但 srv.mjs 之 verifyClientUser 會改寫其收到之 user 物件〔id→id-for-peter、isAdmin→n〕後放行；套件傳副本, 改寫不得影響執行身分與角色）
 export const TOKEN_SLOW = '{token-for-slow}'           // → id-for-slow（perm-run01 外審 sol#3：perm 列〔測試自建〕isAdmin='n', verifyClientUser 為 async 並等待約 1.5 秒, 供 /api/getPerm「驗證後該列被改動」案例）
+//應用系統 token 測試權杖(perm-run01 本輪, R-APP-TOKEN-01; 對照 dspec/w-web存取管控表.md 第二節 AU／AS)。TOKEN_APP 即系統服務用途(isApp='y'、isAdmin='y'、不在 perm users 表)。
+export const TOKEN_AS = '{token-for-app-system}'              // → id 'app:key-sys'、email 空、isApp y、isAdmin y（系統服務用途真實形狀, 不在 perm users 表）
+export const TOKEN_AS_N = '{token-for-app-system-n}'          // → 同上但 isAdmin n（不屬系統服務用途）
+export const TOKEN_NOFLAG = '{token-for-app-noflag}'          // → AS 形狀但 getUserByToken 未轉傳 isApp（視同 n; 舊版 TOKEN_APP 之語意: 不在 perm users 表、非應用系統）
+export const TOKEN_AU_ADMIN = '{token-for-app-bind-admin}'    // → 使用者用途綁管理員（base seed admin 之實際資料 + isApp y）
+export const TOKEN_AU_MEMBER = '{token-for-app-bind-member}'  // → 使用者用途綁一般使用者（base seed peter 之實際資料 + isApp y）
+export const TOKEN_AU_DISABLED = '{token-for-app-bind-disabled}' // → 使用者用途綁定之使用者在 perm users 表但停用（列由測試自建; 上游 isAdmin y）
+export const TOKEN_DENY = '{token-for-deny}'                  // → perm 列〔測試自建〕為管理員, 但 srv.mjs 之 verifyClientUser 因非角色因素否決
+export const TOKEN_AU_DISABLED_ALT = '{token-for-app-bind-disabled-alt}' // → 使用者用途綁停用之使用者, 外部 id 'sso-appdis-9'≠perm 主鍵 id-for-appdis（僅 mappingBy=email 以 email 找到該列; 停用之列也算在表中）
+export const TOKEN_ALT_ADMIN = '{token-for-alt-admin}'        // → 外部 id 'sso-admin-9'、email 同 admin（僅 mappingBy=email 時對應 perm 列 id-for-admin; 外審 sol F02: 稽核欄須記 perm 內之 id）
+export const TOKEN_AS_DENY = '{token-for-app-deny}'           // → 系統服務用途, 但 srv.mjs 之 verifyAppUser 因非角色因素否決
+export const TOKEN_AS_MUTATE = '{token-for-app-mutate}'       // → 系統服務用途, verifyAppUser 會改寫其收到之 user 物件（id→id-for-peter、isAdmin→n）後放行
 export const TOKEN_BAD = 'nope-invalid'               // → getUserByToken 回 {} → 守門 reject
 export const TOKEN_REJECT = '{token-for-reject}' // → getUserByToken reject 上游原文(含合成秘密)；W 契約視同查無
 export const TOKEN_VERIFY_THROW = '{token-for-verify-throw}' // → verifyClientUser / verifyAppUser 拋錯；W 契約視同無權限
@@ -296,7 +308,8 @@ export async function markSrLog() {
     return await markAfterSentinel({
         dir: srLogDir(),
         send: async () => {
-            const r = await fetch(`${apiBaseUrl}/syncAndReplaceTabs?keyTable=${sentinel}&token=x`, { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: '{}' })
+            //應用系統路由先驗身分再驗參數(perm-run01 P-5): 哨兵須帶有效之管理員等級 token 才會走到 keyTable 檢查並記 srLog(event api/syncAndReplaceTabs-error、keyTable 為哨兵)
+            const r = await fetch(`${apiBaseUrl}/syncAndReplaceTabs?keyTable=${sentinel}&token=${encodeURIComponent(TOKEN_APP)}`, { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: '{}' })
             await r.text()
         },
         isSentinel: (o) => o.keyTable === sentinel,

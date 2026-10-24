@@ -33,7 +33,7 @@ import fs from 'fs'
 import path from 'path'
 import { cleanup, launchBrowser, captureStableWithBox, apiBaseUrl, genTempSettings, restartBackend, assertBaselineMatch } from './tools/e2e-setup.mjs'
 import { runBaselineCase, createBaselineGate, openCasePage, itemsUnionBox } from './tools/e2eLib.mjs'
-import { urlSync, TOKEN_APP, TOKEN_MEMBER, readTables, restoreTables, editTableRows, cleanExternalFixtures } from './tools/api-setup.mjs'
+import { urlSync, TOKEN_APP, TOKEN_MEMBER, TOKEN_PETER, TOKEN_DENY, readTables, restoreTables, editTableRows, cleanExternalFixtures } from './tools/api-setup.mjs'
 
 
 const baselineDir = './test/pics/init'
@@ -416,16 +416,24 @@ else {
         //  資料前置（非使用者操作）: 管理員(sys)經資料通道把 member(TOKEN_MEMBER: srv.mjs 之 verifyClientUser 放行、perm 列 isAdmin='n' 且啟用)加入 users。
         //  開啟網址用 127.0.0.1（非開發環境）: 其他登入失敗在非開發環境會立即轉址 urlRedirect, 本案證明一般使用者被拒時改為停在提示畫面（不轉址）, 使用者才看得到原因。
         //  清理: restoreTables(擷取快照)移除 member 並還原三表、還原 ./settings.json。
-        for (const lang of langs) {
-            it(`E2E-007-not-admin [${lang}]: 一般使用者(部署方放行)登入 → 後端 userNotAdmin、畫面停在「${expectedText[lang].notAdmin}」(csErrNotAdmin)、不轉址、不進殼層、未發資料通道請求、權杖清空`, async function() {
+        //perm-run01 本輪(P-7): 變體 peter＝base seed 之一般使用者（perm 列 isAdmin n; 原 srv.mjs 之 verifyClientUser 以 isAdmin 先否決而走「拒絕登入」並轉址, 現範例不再否決, 與 member 同樣看到「無權進入權限後台」）;
+        //  變體 member＝本案原夾具（另加入 users 之後台列, 其 id 於 srv.mjs 之 verifyClientUser 有明確放行鉤子）。兩者皆不改既有標準圖（語意斷言）。
+        const NOT_ADMIN_VARIANTS = [
+            { tag: 'member', token: TOKEN_MEMBER, row: { id: 'id-for-member', order: 50, name: 'member', email: 'member@example.com', description: '', from: '', cgrups: '{}', isAdmin: 'n', isActive: 'y' } },
+            { tag: 'peter', token: TOKEN_PETER, row: null },
+        ]
+        for (const { lang, variant } of langs.flatMap((lang) => NOT_ADMIN_VARIANTS.map((variant) => ({ lang, variant })))) {
+            it(`E2E-007-not-admin${variant.tag === 'member' ? '' : `-${variant.tag}`} [${lang}]: 一般使用者(${variant.tag}; 部署方放行)登入 → 後端 userNotAdmin、畫面停在「${expectedText[lang].notAdmin}」(csErrNotAdmin)、不轉址、不進殼層、未發資料通道請求、權杖清空`, async function() {
                 this.timeout(300000)
                 let snap = null
                 try {
                     await restartBackend(genTempSettings({ language: lang, urlRedirect: `${apiBaseUrl}/__e2e-redirect-007__` }))
                     snap = await readTables() //擷取收尾用快照(與 restoreTables 對稱; 不使用 callRpc('updateUsers')——LC-005 禁 e2e-init 以管理者寫入收尾外部列夾具, 本案夾具為後台列, 走共用層)
-                    await editTableRows('users', (rows) => {
-                        rows.push({ id: 'id-for-member', order: 50, name: 'member', email: 'member@example.com', description: '', from: '', cgrups: '{}', isAdmin: 'n', isActive: 'y' })
-                    })
+                    if (variant.row !== null) {
+                        await editTableRows('users', (rows) => {
+                            rows.push({ ...variant.row })
+                        })
+                    }
                     const browser = await launchBrowser()
                     try {
                         const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage()
@@ -436,7 +444,7 @@ else {
                             }
                         })
                         const respP = page.waitForResponse((r) => r.url().includes('getUserByToken'), { timeout: 60000 })
-                        await page.goto(`${apiBaseUrl}/?token=${encodeURIComponent(TOKEN_MEMBER)}`, { waitUntil: 'domcontentloaded', timeout: 60000 })
+                        await page.goto(`${apiBaseUrl}/?token=${encodeURIComponent(variant.token)}`, { waitUntil: 'domcontentloaded', timeout: 60000 })
                         //①後端回應: 登入檢查 /api/getUserByToken → state=error、msg=userNotAdmin(固定語系鍵)
                         const body = await (await respP).json()
                         assert.strictEqual(body.state, 'error', `getUserByToken 應拒絕一般使用者, 實得 ${JSON.stringify(body)}`)
@@ -477,6 +485,42 @@ else {
                 finally {
                     if (snap !== null) {
                         await restoreTables(snap) //移除 member 並還原三表原文(不留測試加入之列)
+                    }
+                    await restartBackend('./settings.json')
+                }
+            })
+        }
+
+        //E2E-008（perm-run01 本輪, P-7; spec 流程_應用啟動與登入 E2E-008）: 部署方因非角色因素否決（srv.mjs 之 verifyClientUser 對 id-for-deny 回 false）→ 後端 userNoPermission、畫面為一般的拒絕登入流程（非開發環境立即轉址至 urlRedirect）;
+        //  對照 E2E-007: 角色因素（非管理員）由本套件拒絕並停在「無權進入權限後台」, 非角色因素由部署方否決並走拒絕登入＋轉址。語意斷言, 不產標準圖（拒絕登入畫面見 E2E-004）。
+        //  資料前置（非使用者操作）: 管理員經共用層把 deny（isAdmin y、啟用）加入 users。
+        for (const lang of langs) {
+            it(`E2E-008-veto-by-deployer [${lang}]: 管理員之 perm 列因非角色因素被部署方 verifyClientUser 否決 → 後端 userNoPermission、轉址至 urlRedirect（非「無權進入權限後台」）`, async function() {
+                this.timeout(300000)
+                let snap = null
+                try {
+                    await restartBackend(genTempSettings({ language: lang, urlRedirect: `${apiBaseUrl}/__e2e-redirect-008__` }))
+                    snap = await readTables()
+                    await editTableRows('users', (rows) => {
+                        rows.push({ id: 'id-for-deny', order: 51, name: 'deny', email: 'deny@example.com', description: '', from: '', cgrups: '{}', isAdmin: 'y', isActive: 'y' })
+                    })
+                    const browser = await launchBrowser()
+                    try {
+                        const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage()
+                        const respP = page.waitForResponse((r) => r.url().includes('getUserByToken'), { timeout: 60000 })
+                        await page.goto(`${apiBaseUrl}/?token=${encodeURIComponent(TOKEN_DENY)}`, { waitUntil: 'domcontentloaded', timeout: 60000 })
+                        const body = await (await respP).json()
+                        assert.strictEqual(body.state, 'error', `getUserByToken 應拒絕, 實得 ${JSON.stringify(body)}`)
+                        assert.strictEqual(body.msg, 'userNoPermission', `部署方否決應回固定語系鍵 userNoPermission, 實得 ${JSON.stringify(body.msg)}`)
+                        await page.waitForURL((u) => u.href.includes('__e2e-redirect-008__'), { timeout: 30000 }) //非開發環境之登入失敗立即轉址
+                    }
+                    finally {
+                        await browser.close().catch(() => {})
+                    }
+                }
+                finally {
+                    if (snap !== null) {
+                        await restoreTables(snap)
                     }
                     await restartBackend('./settings.json')
                 }

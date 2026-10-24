@@ -115,7 +115,8 @@ describe('unit-adminOnlySite (權限後台與資料通道只限系統管理員�
             A.equal(count(code, /\bgetAndVerifyClientUser\(/g), 2, 'getAndVerifyClientUser( 呼叫點: getAndVerifyAdminUser＋/api/getPerm')
             //getAndVerifyAdminUser( 呼叫點: checkToken 1＋getUserIdByToken 1＋/api/getUserByToken 1 = 3
             A.equal(count(code, /\bgetAndVerifyAdminUser\(/g), 3, 'getAndVerifyAdminUser( 呼叫點: 連線閘、執行身分、後台登入檢查')
-            A.ok(/getAndVerifyClientUser\(token, from, \{ adminOnly: true \}\)/.test(takeBody(code, /let getAndVerifyAdminUser = async/)), 'getAndVerifyAdminUser 須以 { adminOnly: true } 轉呼叫')
+            //perm-run01 本輪(R-APP-TOKEN-01): 外部反查結果 userExt 由 getAndVerifyAdminUser 先取得並共用(一次請求只呼叫一次部署方 getUserByToken), 故轉呼叫多帶 userExt
+            A.ok(/getAndVerifyClientUser\(token, from, \{ adminOnly: true, userExt \}\)/.test(takeBody(code, /let getAndVerifyAdminUser = async/)), 'getAndVerifyAdminUser 須以 { adminOnly: true, userExt } 轉呼叫')
         })
 
         it('AOS-S5 角色於部署方 verifyClientUser 之前判定(isAdminRow 先於 verifyClientUser(), adminOnly 檢查在其後)', function() {

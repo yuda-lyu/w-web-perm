@@ -4,6 +4,16 @@
 
 - **2026-10-22 抽出歷史經驗**:2026-10-20 以前之各節(e2e 側欄位移、統計頁、升版、授權存檔不變等)移至 `experience_20261022.md`(標題與內容不變);查久遠經驗時再調閱.
 
+## 應用系統 token 之配合、應用系統路由管理員等級、Bearer、路由失敗不回原文(2026-10-24 第三輪 perm-run01〔任務 20261024182735〕; 帳本 R-APP-TOKEN-01／R-BEARER-01／R-ROUTE-MSG-01; ADR-040; 報告 `C:\opensrcOper\dnow\20261024182735\agent-out\perm-run01-修正報告.md`)
+- **「不在 perm 表」不能用登入反查的結果判斷**: `keyCheck.findLoginUsers` 對「恰 1 筆但停用」回 `{ user:null, count:0 }`(登入視同查無, perm-run05); 若拿 `count===0` 當「不在表」, 使用者用途之應用系統 token 綁定的使用者在 perm 被停用時, 會落入系統服務用途而取得管理員服務(上游 `isApp='y'`＋`isAdmin='y'` 形狀與系統服務用途完全相同). 另立 `countLoginRows`(同對應規則、不篩 isActive)當「是否在表」之單一判準; 凡「查無」語意被拿來做授權放行的判斷, 先問『停用／刪除／重複』三種狀態各算查無還是在表.
+- **兩種用途靠『是否在 perm 表』區分, 不靠欄位**: 使用者用途(AU)與系統服務用途(AS)在 sso 反查形狀上只差 id 與 email/name 是否為真實使用者; perm 無從直接分辨, 以『在表者一律以 perm 列為準』收斂, 代價是『綁定了不在 perm 表之 sso 管理員』的 AU 會被當成 AS(ADR-040 待裁示 ③; 可選收緊 `id` 以 `app:` 開頭).
+- **只拿 userId 字串的縱深防禦(`requireAdmin`)要有『誰驗證過』的憑據**: 框架只把 `getUserIdByToken` 回的 id 交給 kpFunExt; AS 的 id 不在 perm 表, 若以『不在表』當放行會讓『連線後被刪列之管理員』退化為放行. 作法: `getUserIdByToken` 對 `verifySystemApp` 產生之物件(WeakSet 憑據, 不憑欄位值)登錄 id, `requireAdmin` 在表者以列為準、不在表者須在登錄中.
+- **改『驗證先於參數』會連帶弄壞以『無效 token＋未知參數』觸發 log 的測試哨兵**: `markSrLog`(`api-setup.mjs`)與 `api-tokenSafety` TS-003 原靠 `/syncAndReplaceTabs?keyTable=<哨兵>&token=x` 令後端記一行含 `keyTable` 之 log; P-5 之後須帶有效之管理員等級 token(`TOKEN_APP`)才走得到 keyTable 檢查. 動入口檢查次序前先 `grep -rn "token=x"`／「哨兵」找這類依賴驗證前行為的測試輔助.
+- **範例部署的驗證函數是契約測試的隱含前提**: `srv.mjs` 之 `verifyClientUser` 原以 `isAdmin==='y'` 否決一般使用者, `TOKEN_PETER`／`TOKEN_APP` 在 6 個測試檔被當成『部署方拒絕者』『不在表者』的代表; P-7 與 P-2 同時改變兩者語意後, 逐檔改用 `TOKEN_NOFLAG`(isApp 未轉傳)、`TOKEN_DENY`(非角色因素否決)代表; 新增權杖常數集中在 `api-setup.mjs`, 權杖含義寫在 `srv.mjs` 註解.
+- **Bearer 正規式**: 任務明定『單一空白、大小寫不敏感』, 與 w-web-api 1.1.16 之 `/^Bearer +(\S.*)$/i`(收多空白、憑證可含空白)不同, 採 `/^Bearer (\S+)$/i`; 變異 M3a～M3d 分別守『舊作法截 7 字元』『大小寫』『多空白』『結尾錨』四個面向.
+- **外審額度**: nemotron-3.5-super-vl-free 與 beam-free 於 2026-10-24 18:51 皆回 `AI_APICallError: Free usage limit reached`(`--print-logs --log-level ERROR` 之 stderr 立即可見, 不必等 10 分鐘), 依指示不再派; 同日 sol(gpt-6.1-sol, read-only, `--json --output-last-message`)正常, 17 分鐘內 906KB 事件流, 以 `grep -c agent_message` 與 `tail` 看進度.
+- **測試鎖**: 兩槽被他套件長跑(npm test 約 86 分、變異鏈)占用時, 純 unit 不加 `--lock`(無共享資源); api／e2e 加 `--lock` 排隊. 把『需要後端之全部工作』(base api 全跑／修前紅＋變異／e2e 選測)各合成單一腳本於單次取鎖內循序執行, 避免多次排隊; 變異腳本以 `tmp/perm-run01/evidence/orig/` 備份、`exit` 事件還原、結束再以 `git diff --stat` 與開始時比對.
+
 ## 授權合併現況刻畫與改法比較(2026-10-21 run01, 第 101 項; 不改產品程式, 報告 `C:\opensrcOper\dnow\20261021095534\agent-out\run01-刻畫與比較報告.md`)
 - **合併對每個管理對象獨立, 先用它縮空間**: 「第一個 AND 項」由項目順序決定、與鍵無關, 其餘運算逐鍵——故單一管理對象(狀態 y／n／未列 × 模式)的窮舉涵蓋任意個管理對象; 以真函數驗證投影性質(CH-PROJ-001)後, 3 管理對象只窮舉到 3 項、更深結構用 1 管理對象窮舉. 順序相依的精確判據: 某對象上「無 OR ∧ 無 n ∧ ≥1 個 AND 為 y ∧ ≥1 個 AND 未列」.
 - **候選語意不重寫解碼流程, 取真函數回傳的 `grups` 樹重新合併**: `getUserRules` 回傳的 `grups[].data._pemis[].data._rules` 已是解碼＋濾除後的樹; 候選只換 `mergeRules` 並依同一方式展開, 候選 S0(複製的 mergeRules)必須在每一格等於真函數(保真檢查), 比較才在同一棵樹上. 注意 `getUserRules` 會就地寫入傳入的表列(`_pemis`／`_rules`), 每格要用全新物件.

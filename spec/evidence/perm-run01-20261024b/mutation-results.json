@@ -1,0 +1,245 @@
+[
+  {
+    "id": "M1a",
+    "desc": "P-1 拿掉等級檢查(!isLevel 永不成立)",
+    "file": "server/WWebPerm.mjs",
+    "caught": true,
+    "passing": 3,
+    "failing": 1,
+    "firstFail": "MX-H4 GET /api/getPermUserInfor(查他人權限樹): 管理員等級(A／AUA／AS／APP)通過; 其餘拒  [P-1: 套件自行要求管理員等級]",
+    "sec": 4
+  },
+  {
+    "id": "M1b",
+    "desc": "P-1 在表者不判 isAdminRow(isLevel 恆真)",
+    "file": "server/WWebPerm.mjs",
+    "caught": true,
+    "passing": 3,
+    "failing": 1,
+    "firstFail": "MX-H4 GET /api/getPermUserInfor(查他人權限樹): 管理員等級(A／AUA／AS／APP)通過; 其餘拒  [P-1: 套件自行要求管理員等級]",
+    "sec": 4
+  },
+  {
+    "id": "M1c",
+    "desc": "P-1 不在表者不判 isSystemAppUser(isLevel 恆真)",
+    "file": "server/WWebPerm.mjs",
+    "caught": true,
+    "passing": 3,
+    "failing": 1,
+    "firstFail": "MX-H4 GET /api/getPermUserInfor(查他人權限樹): 管理員等級(A／AUA／AS／APP)通過; 其餘拒  [P-1: 套件自行要求管理員等級]",
+    "sec": 4
+  },
+  {
+    "id": "M2a",
+    "desc": "P-2 拿掉系統服務用途放行",
+    "file": "server/WWebPerm.mjs",
+    "caught": true,
+    "passing": 1,
+    "failing": 1,
+    "firstFail": "MX-H2 GET /api/getUserByToken(後台登入檢查): 管理員等級(A／AUA／AS／APP)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料  [P-2: AS 放行]",
+    "sec": 4
+  },
+  {
+    "id": "M2b",
+    "desc": "P-2 系統服務用途不要求「不在表」",
+    "file": "server/WWebPerm.mjs",
+    "caught": true,
+    "passing": 1,
+    "failing": 1,
+    "firstFail": "MX-H2 GET /api/getUserByToken(後台登入檢查): 管理員等級(A／AUA／AS／APP)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料  [P-2: AS 放行]",
+    "sec": 4
+  },
+  {
+    "id": "M2c",
+    "desc": "P-2 countLoginRows 只計有效列(停用者視同不在表)",
+    "file": "server/keyCheck.mjs",
+    "caught": true,
+    "passing": 43,
+    "failing": 1,
+    "firstFail": "AT-002a mappingBy=id: 後台列對 id、外部列對 srcKey、舊外部列對 id; 停用之列也算在表中",
+    "sec": 18,
+    "note": "補跑(錨點更新或新增測試後)"
+  },
+  {
+    "id": "M2d",
+    "desc": "P-2 requireAdmin 不認系統服務用途登錄",
+    "file": "server/WWebPerm.mjs",
+    "caught": true,
+    "passing": 20,
+    "failing": 1,
+    "firstFail": "MX-D updateUsers: 管理員等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2]",
+    "sec": 9
+  },
+  {
+    "id": "M2e",
+    "desc": "P-2 getUserIdByToken 不登錄系統服務用途 id",
+    "file": "server/WWebPerm.mjs",
+    "caught": true,
+    "passing": 20,
+    "failing": 1,
+    "firstFail": "MX-D updateUsers: 管理員等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2]",
+    "sec": 8
+  },
+  {
+    "id": "M10",
+    "desc": "F03 「在表」不含外部 id 等於表中某列主鍵",
+    "file": "server/WWebPerm.mjs",
+    "caught": true,
+    "passing": 32,
+    "failing": 1,
+    "firstFail": "MX-M2 [email] 外部 id 與 perm 主鍵衝突之服務身分(users 另有 id 同為 app:key-sys 之一般使用者列): 各入口一致被拒, 零寫入  [外審 sol F03]",
+    "sec": 12
+  },
+  {
+    "id": "M11",
+    "desc": "F05 getExtUser 不回淺層快照",
+    "file": "server/WWebPerm.mjs",
+    "caught": true,
+    "passing": 46,
+    "failing": 1,
+    "firstFail": "AT-S1 P-2: getAndVerifyAdminUser 只在 isSystemAppUser 且不在 perm 表時走系統服務用途, 外部反查結果共用",
+    "sec": 18
+  },
+  {
+    "id": "M12",
+    "desc": "F06 系統服務用途 id 登錄無 TTL(永久)",
+    "file": "server/WWebPerm.mjs",
+    "caught": true,
+    "passing": 50,
+    "failing": 1,
+    "firstFail": "AT-S5 requireAdmin: 在表者(不論 isActive)以列為準, 不在表者須為已登錄之系統服務用途 id; 只對 verifySystemApp 產生之物件登錄",
+    "sec": 18
+  },
+  {
+    "id": "M13",
+    "desc": "F02 應用路由稽核 id 取外部 id 而非 perm 主鍵",
+    "file": "server/WWebPerm.mjs",
+    "caught": true,
+    "passing": 35,
+    "failing": 1,
+    "firstFail": "MX-M3 外部 id(sso-admin-9)與 perm 主鍵(id-for-admin)不同之管理員: 資料通道與應用路由之稽核欄皆記 perm 內 id; 後台登入檢查回 perm 列  [外審 sol F02]",
+    "sec": 17
+  },
+  {
+    "id": "M14",
+    "desc": "F08 routeResult 診斷字串化拋錯不攔截",
+    "file": "server/routeResult.mjs",
+    "caught": true,
+    "passing": 58,
+    "failing": 1,
+    "firstFail": "RR-006 診斷字串化本身拋錯(null 原型物件、toString 非函數、會拋錯之 toString)時仍回固定鍵, srLog 記 [unprintable]  [外審 sol F08]",
+    "sec": 18
+  },
+  {
+    "id": "M2f",
+    "desc": "P-2 系統服務用途不套用部署方 verifyAppUser",
+    "file": "server/WWebPerm.mjs",
+    "caught": true,
+    "passing": 26,
+    "failing": 1,
+    "firstFail": "MX-P3 AS 被部署方 verifyAppUser 因非角色因素否決: 後台登入、應用路由、資料通道(標頭 permission denied／本體 userNoPermission)皆拒且零寫入  [部署方可再收緊]",
+    "sec": 10
+  },
+  {
+    "id": "M3a",
+    "desc": "P-3 還原舊作法(固定截前 7 字元)",
+    "file": "server/WWebPerm.mjs",
+    "caught": true,
+    "passing": 36,
+    "failing": 1,
+    "firstFail": "MX-B1 Bearer 方案(大小寫不敏感、單一空白)通過; Basic／Token／無方案／多空白／Tab／缺憑證／無標頭 → 視同無 token(permission denied)",
+    "sec": 18
+  },
+  {
+    "id": "M3b",
+    "desc": "P-3 Bearer 正規式改為大小寫敏感",
+    "file": "server/WWebPerm.mjs",
+    "caught": true,
+    "passing": 36,
+    "failing": 1,
+    "firstFail": "MX-B1 Bearer 方案(大小寫不敏感、單一空白)通過; Basic／Token／無方案／多空白／Tab／缺憑證／無標頭 → 視同無 token(permission denied)",
+    "sec": 17
+  },
+  {
+    "id": "M3c",
+    "desc": "P-3 Bearer 正規式容許多個空白",
+    "file": "server/WWebPerm.mjs",
+    "caught": true,
+    "passing": 36,
+    "failing": 1,
+    "firstFail": "MX-B1 Bearer 方案(大小寫不敏感、單一空白)通過; Basic／Token／無方案／多空白／Tab／缺憑證／無標頭 → 視同無 token(permission denied)",
+    "sec": 17
+  },
+  {
+    "id": "M3d",
+    "desc": "P-3 Bearer 正規式去掉結尾錨(後接多餘字元仍通過)",
+    "file": "server/WWebPerm.mjs",
+    "caught": true,
+    "passing": 36,
+    "failing": 1,
+    "firstFail": "MX-B1 Bearer 方案(大小寫不敏感、單一空白)通過; Basic／Token／無方案／多空白／Tab／缺憑證／無標頭 → 視同無 token(permission denied)",
+    "sec": 18
+  },
+  {
+    "id": "M5",
+    "desc": "P-5 在身分驗證前先驗 keyTable",
+    "file": "server/WWebPerm.mjs",
+    "caught": true,
+    "passing": 26,
+    "failing": 1,
+    "firstFail": "MX-P3 AS 被部署方 verifyAppUser 因非角色因素否決: 後台登入、應用路由、資料通道(標頭 permission denied／本體 userNoPermission)皆拒且零寫入  [部署方可再收緊]",
+    "sec": 40
+  },
+  {
+    "id": "M6",
+    "desc": "sol#5 /api/getPerm 路由改回取 Error.message 原樣",
+    "file": "server/WWebPerm.mjs",
+    "caught": true,
+    "passing": 51,
+    "failing": 1,
+    "firstFail": "AT-S6 R-ROUTE-MSG-01: 四條 hapi 路由皆經 routeResult, 不得再取 Error.message 原樣回傳",
+    "sec": 18
+  },
+  {
+    "id": "M7",
+    "desc": "sol#5 routeResult 不收斂(key = raw)",
+    "file": "server/routeResult.mjs",
+    "caught": true,
+    "passing": 55,
+    "failing": 1,
+    "firstFail": "RR-002 ORM／I/O 原文(Error 或字串)一律改回 anUnexpectedErrorOccurred, 原文只入 srLog  [修前: r.msg = r.msg.message 回原文]",
+    "sec": 18
+  },
+  {
+    "id": "M8",
+    "desc": "檢查之值即使用之值: getAndVerifyAppUser 把原物件交部署方並回傳原物件",
+    "file": "server/WWebPerm.mjs",
+    "caught": true,
+    "passing": 29,
+    "failing": 1,
+    "firstFail": "MX-P5 檢查之值即使用之值: verifyAppUser 改寫其收到之 user 物件(id→id-for-peter、isAdmin→n)後放行, 稽核欄與回傳身分仍為交給部署方之前取得者(app:key-mutate)",
+    "sec": 10,
+    "note": "補跑(錨點更新或新增測試後)"
+  },
+  {
+    "id": "M9",
+    "desc": "P-7 範例 verifyClientUser 還原以 isAdmin 否決",
+    "file": "srv.mjs",
+    "caught": true,
+    "passing": 1,
+    "failing": 1,
+    "firstFail": "MX-H2 GET /api/getUserByToken(後台登入檢查): 管理員等級(A／AUA／AS／APP)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料  [P-2: AS 放行]",
+    "sec": 4
+  },
+  {
+    "id": "M15",
+    "desc": "P-2 countLoginRows(email／name 路徑)只計有效列(停用者視同不在表)",
+    "file": "server/keyCheck.mjs",
+    "caught": true,
+    "passing": 36,
+    "failing": 1,
+    "firstFail": "MX-M4 使用者用途綁定之使用者在 perm 表但停用、外部 id(sso-appdis-9)與 perm 主鍵不同(只能靠對應鍵 email 找到該列): 不得因「停用視同查無」落入系統服務用途; 啟用後以該列為準  [P-2 核心: 在表含停用]",
+    "sec": 18,
+    "note": "補跑(錨點更新或新增測試後)"
+  }
+]

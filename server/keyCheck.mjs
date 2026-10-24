@@ -331,6 +331,38 @@ async function findLoginUsers(tabUsers, mappingBy, vSelf) {
 
 
 /**
+ * 外部身分在 perm users 表中對得到幾列(不論 isActive; perm-run01 本輪 R-APP-TOKEN-01): 供「不在 perm users 表者才可能是系統服務用途之應用系統 token」之判斷.
+ * 對應規則與 findLoginUsers 同(mappingBy 為 'email'／'name' 以該欄位查; 其餘〔含預設 'id'〕後台列對 id、外部列對 srcKey, 以 loginIdOf 複判), 差別只在不帶 isActive:
+ * 停用之列也算「在表中」——使用者用途之應用系統 token 綁定之使用者在 perm 被停用時, 不得因此被當成「不在表」而落入系統服務用途.
+ * ORM 讀取失敗原樣拋出(不吞成 0 筆; 呼叫端 fail-closed).
+ *
+ * @param {Object} tabUsers 輸入 users 表之 ORM 物件(select)
+ * @param {String} mappingBy 'id'｜'email'｜'name'(其他值視同 'id')
+ * @param {String} vSelf 外部 token 之使用者對應值(須為非空字串; 否則回 0)
+ * @returns {Promise<Number>} 對得到之列數(0＝不在 perm users 表)
+ */
+async function countLoginRows(tabUsers, mappingBy, vSelf) {
+    if (!isEStr(vSelf)) {
+        return 0
+    }
+    let key = mapKeyOf(mappingBy)
+    if (key !== null) {
+        let rs = await tabUsers.select({ [key]: vSelf })
+        return Array.isArray(rs) ? rs.filter((r) => isObj(r)).length : 0
+    }
+    let rsId = await tabUsers.select({ id: vSelf })
+    let rsSrc = await tabUsers.select({ srcKey: vSelf })
+    let kp = new Map()
+    for (let r of [...(Array.isArray(rsId) ? rsId : []), ...(Array.isArray(rsSrc) ? rsSrc : [])]) {
+        if (isObj(r) && isEStr(r.id)) {
+            kp.set(r.id, r)
+        }
+    }
+    return [...kp.values()].filter((r) => loginIdOf(r) === vSelf).length
+}
+
+
+/**
  * 登入識別撞值(mappingBy='id'): 回傳寫入後之表 rowsAfter 中第一個「被本次觸及」之列, 其登入識別值(loginIdOf)與另一列相同且屬撞值組合者之細節, 無則 null.
  * 「不論 isActive」「含他來源」(perm-run05): 撞值組合＝同一登入識別值出現在兩列, 且該對不是下列三種不屬登入識別撞值者:
  *  - 兩後台列(登入識別值＝主鍵 id, 同一主鍵於表中不可並存);
@@ -405,4 +437,4 @@ function findLoginIdClash(rowsAfter, isTouched) {
 }
 
 
-export { findDupIndex, hasDupKey, findKeyOtherFrom, findTouchedDup, withTabLocks, mapKeyOf, checkMapKeyBatch, checkUsersWrite, pickUniqueUser, loginIdOf, findLoginUsers, findLoginIdClash, findLoginIdClashDetail }
+export { findDupIndex, hasDupKey, findKeyOtherFrom, findTouchedDup, withTabLocks, mapKeyOf, checkMapKeyBatch, checkUsersWrite, pickUniqueUser, loginIdOf, findLoginUsers, countLoginRows, findLoginIdClash, findLoginIdClashDetail }

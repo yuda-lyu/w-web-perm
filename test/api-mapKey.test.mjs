@@ -15,7 +15,7 @@ import assert from 'assert'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { startApi, TOKEN_ADMIN, TOKEN_APP, getWoItems, callRpc, urlSync, cleanExternalFixtures } from './tools/api-setup.mjs'
+import { startApi, TOKEN_ADMIN, TOKEN_APP, TOKEN_NOFLAG, getWoItems, callRpc, urlSync, cleanExternalFixtures } from './tools/api-setup.mjs'
 import { restartBackend, genTempSettings, apiBaseUrl } from './tools/e2e-setup.mjs'
 
 //run07(F-23 外部列守門)調整說明: MK-020／021 測的是「後台 updateUsers 對歷史重複／空對應鍵只擋本次造成或觸及者」(R-MAPKEY-03), 其「歷史資料」原以外部同步(from=appMk-9／appMk-10)造出,
@@ -112,8 +112,9 @@ describe('api-mapKey (F-14: 使用者對應鍵之外部同步檢查與登入多�
         assert.strict.equal(rc.ok, true, `資料通道應通過，實得: ${JSON.stringify(rc).slice(0, 300)}`)
         let rp = await fetch(`${apiBaseUrl}/api/getPerm?token=sys`).then((r) => r.json())
         assert.strict.equal(rp.state, 'success', `getPerm 恰 1 筆應成功，實得: ${JSON.stringify(rp).slice(0, 300)}`)
-        //0 筆: app 使用者(不在 perm users 表)以 client 通道登入 → cannotGetUserFromPerm(不變)
-        let r0 = await getUserByTokenApi(TOKEN_APP)
+        //0 筆: 不在 perm users 表之外部使用者以 client 通道登入 → cannotGetUserFromPerm(不變)
+        //  perm-run01 第三輪(R-APP-TOKEN-01): 原用 TOKEN_APP; 其 getUserByToken 現轉傳 isApp='y'(系統服務用途, 可登入後台), 故改用 isApp 未轉傳之 TOKEN_NOFLAG 代表『不在表且非應用系統』
+        let r0 = await getUserByTokenApi(TOKEN_NOFLAG)
         assert.strict.equal(r0.state, 'error')
         assert.strict.equal(r0.msg, 'cannotGetUserFromPerm', `0 筆須維持 cannotGetUserFromPerm，實得: ${JSON.stringify(r0.msg)}`)
     })

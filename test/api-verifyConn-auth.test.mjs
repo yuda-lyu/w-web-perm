@@ -12,7 +12,9 @@
 //AUTH-003 需把 admin 自己停用, 停用後所有通道皆拒、無法經 RPC 還原, 故 after 以 restartBackend(reseed) 重建 base seed。
 
 import assert from 'assert'
-import { startApi, TOKEN_ADMIN, TOKEN_ADMIN2, TOKEN_APP, TOKEN_PETER, TOKEN_BAD, getWoItems, callRpc } from './tools/api-setup.mjs'
+import { startApi, TOKEN_ADMIN, TOKEN_ADMIN2, TOKEN_NOFLAG, TOKEN_PETER, TOKEN_BAD, getWoItems, callRpc } from './tools/api-setup.mjs'
+//perm-run01 本輪(R-APP-TOKEN-01、P-7): 原以 TOKEN_APP 代表「外部有效但不在 perm users 表」; TOKEN_APP 現轉傳 isApp='y' 屬系統服務用途(可用管理員之服務, 見 api-callerMatrix),
+//  故此處改用 TOKEN_NOFLAG(isApp 未轉傳, 視同非應用系統: 不在表一律被拒). srv.mjs 之 verifyClientUser 不再以 isAdmin 否決, peter(一般使用者)通過部署方、由本套件以 userNotAdmin 拒絕.
 import { restartBackend } from './tools/e2e-setup.mjs'
 
 //callRpc：本檔原一份局部實作，與 test/tools/api-setup.mjs 匯出版之邏輯逐式相同（僅缺 raw 欄位與 opt 參數，
@@ -67,19 +69,19 @@ describe('api-verifyConn-auth', function() {
 
     //spec: 外部 token 有效但不在 perm users 表 → 拒(讀與寫皆拒, DB 不變)
     it('AUTH-002-app-token-not-in-perm-users-rejected', async function() {
-        let rRead = await callRpc('getWebInfor', [], TOKEN_APP)
+        let rRead = await callRpc('getWebInfor', [], TOKEN_NOFLAG)
         assert.strict.equal(rRead.ok, false, `不在 perm users 表之外部使用者不得讀資料通道, 實得 ${JSON.stringify(rRead)}`)
         assert.strict.equal(rRead.msg, 'permission denied')
 
         let rowsMod = grupsBase.map((g, k) => (k === 0 ? { ...g, description: String(g.description || '') + '_AUTH002' } : { ...g }))
-        let rWrite = await callRpc('updateGrups', [rowsMod], TOKEN_APP)
+        let rWrite = await callRpc('updateGrups', [rowsMod], TOKEN_NOFLAG)
         assert.strict.equal(rWrite.ok, false, `不在 perm users 表之外部使用者不得寫資料通道, 實得 ${JSON.stringify(rWrite)}`)
         let after = sortByOrder(await readTable('grups'))
         assert.strict.equal(after[0].description, grupsBase[0].description, 'DB grups 不得被改')
     })
 
-    //spec: 在表、有效、但 verifyClientUser 拒(開發樣本限 isAdmin='y') → 拒
-    it('AUTH-004-peter-in-table-active-but-verifyClientUser-rejects', async function() {
+    //spec: 在表、有效、通過部署方、但非系統管理員(perm-run01 P-7: 範例 verifyClientUser 不再以 isAdmin 否決, 由套件於連線閘以 userNotAdmin 拒絕) → 拒
+    it('AUTH-004-peter-in-table-active-but-not-admin-rejects', async function() {
         let users = await readTable('users')
         let peter = users.find((u) => u.id === 'id-for-peter')
         assert.strict.ok(peter && peter.isActive === 'y' && peter.isAdmin === 'n', 'base seed peter 應為有效非管理者')
@@ -158,8 +160,8 @@ describe('api-verifyConn-auth', function() {
     it('AUTH-BODY-001-body-token-fully-validated-rejected：標頭 token 有效(admin)、本體 token 無效／外部有效但不在 perm users／在表啟用但 verifyClientUser 拒 → 讀與寫皆拒、回固定語系鍵、函數不執行(DB 不變)', async function() {
         let cases = [
             { label: '本體 token 無效', sysToken: TOKEN_BAD, key: 'cannotFindUserFromToken' },
-            { label: '本體 token 為外部有效但不在 perm users 表者(app token)', sysToken: TOKEN_APP, key: 'cannotGetUserFromPerm' },
-            { label: '本體 token 為在表、啟用但 verifyClientUser 拒者(peter)', sysToken: TOKEN_PETER, key: 'userNoPermission' },
+            { label: '本體 token 為外部有效但不在 perm users 表者(isApp 未轉傳)', sysToken: TOKEN_NOFLAG, key: 'cannotGetUserFromPerm' },
+            { label: '本體 token 為在表、啟用、通過部署方但非系統管理員者(peter)', sysToken: TOKEN_PETER, key: 'userNotAdmin' },
         ]
         let rowsMod = grupsBase.map((g, k) => (k === 0 ? { ...g, description: String(g.description || '') + '_BODY001' } : { ...g }))
         let snap0 = JSON.stringify(sortByOrder(await readTable('grups')))

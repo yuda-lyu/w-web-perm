@@ -129,6 +129,7 @@
 | `api-syncAndReplaceTabs` | `appTest-1`～`appTest-27b` | 同上 | 同上 |
 | `api-mapKey` | `appMk-*` | `cleanExternalFixtures({ kts:['users'], froms })`; 旁路後台歷史列〔`from ''`〕仍以 id `delAll` | 同上(後台列刪除屬規則 5, 不動) |
 | `api-mapKeyId`(perm-run04) | `appMi-*` | `cleanExternalFixtures({ kts:['users'], froms })`＋`restoreTables(BASE)`(`afterEach` 與 `after`; 後台夾具列隨 users 整表還原移除) | 同上 |
+| `api-callerMatrix`(perm-run01 第三輪) | `appMatrix` | 每格同步後即 `cleanExternalFixtures({ kts:['grups'], froms:[F_SYNC] })`; `after` 再清一次並 `restoreBase` | 同上(新增; LC-004 清單已登記) |
 | `api-keyProp` | `appKeyProp` | `restoreTables`(內含 `purgeExternalRows`) | 原已合規, 未動 |
 | `api-externalRows` | `appExt`／`appKeep`／`appRenum` 等 | `restoreTables`＋`purgeExternalRows` | 原已合規, 未動 |
 | `api-updateTabs` | `appTest-uk4`／`appTest-uk5` 等 | `restoreBaseSeed` → `purgeExternalRows` | 原已合規, 未動 |

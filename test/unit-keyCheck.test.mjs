@@ -464,7 +464,7 @@ describe('unit-keyCheck (名稱唯一與對應鍵檢查之純函數, F-02／F-14
             let gen = takeBody(code, /let getGenUserByKV = async/)
             assert.strict.ok(gen.includes('pickUniqueUser('), 'getGenUserByKV 須經 pickUniqueUser')
             let kc = readCode('server/keyCheck.mjs')
-            let fl = kc.slice(kc.indexOf('async function findLoginUsers'), kc.indexOf('function findLoginIdClash'))
+            let fl = kc.slice(kc.indexOf('async function findLoginUsers'), kc.indexOf('async function countLoginRows')) //countLoginRows(perm-run01 本輪, R-APP-TOKEN-01: 只計列數不取列)在其後, 另由 unit-appToken 站點守護
             assert.strict.ok((fl.match(/\.select\(/g) || []).length === 3, 'findLoginUsers 內 select 站點: email／name 一處＋id 模式 id、srcKey 兩處')
             assert.strict.equal((fl.match(/return pickUniqueUser\(/g) || []).length, 2, 'findLoginUsers 的兩個回傳點皆經 pickUniqueUser')
         })

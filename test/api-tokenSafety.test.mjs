@@ -14,7 +14,7 @@
 //述語(M 契約): verifyConn 之 srLog referer 只記 origin + pathname。
 //修正前(2026-09-24 探測 tmp/probe-v3/result-before.json 之 perm 段): 回應 msg 為上游原文、verifyConn 之 srLog msg 與 referer 皆含權杖。
 import assert from 'assert'
-import { startApi, apiBaseUrl, callRpc, markSrLog, readSrLogSince, getWoItems, cleanExternalFixtures, editTableRows, selectAllRows, TOKEN_ADMIN, TOKEN_REJECT, TOKEN_VERIFY_THROW, SEED } from './tools/api-setup.mjs'
+import { startApi, apiBaseUrl, callRpc, markSrLog, readSrLogSince, getWoItems, cleanExternalFixtures, editTableRows, selectAllRows, TOKEN_ADMIN, TOKEN_APP, TOKEN_REJECT, TOKEN_VERIFY_THROW, SEED } from './tools/api-setup.mjs'
 
 
 const SECRET_SYS = 'SYNTH-SYS-SECRET-FOR-TEST' //srv.mjs 之 '{token-for-reject}' 夾帶之合成介接權杖
@@ -159,7 +159,8 @@ describe('api-tokenSafety', function() {
 
         //哨兵: keyTable 不在白名單時 srLog 會記 keyTable(本次唯一值); 同一行程之 srLog 依呼叫序落檔, 見哨兵即前面各行已落檔
         let sentinel = `tsSentinel${process.pid}x${Date.now()}`
-        await httpText(`${apiBaseUrl}/syncAndReplaceTabs?keyTable=${sentinel}&token=x`, { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: '{}' })
+        //應用系統路由先驗身分再驗 keyTable(perm-run01 P-5): 哨兵請求須帶管理員等級之 token(TOKEN_APP＝系統服務用途)才會走到 keyTable 檢查並記 srLog
+        await httpText(`${apiBaseUrl}/syncAndReplaceTabs?keyTable=${sentinel}&token=${encodeURIComponent(TOKEN_APP)}`, { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: '{}' })
         let lines = []
         let tEnd = Date.now() + 30000
         while (Date.now() < tEnd) {

@@ -8,7 +8,6 @@ import iseobj from 'wsemi/src/iseobj.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import ispint from 'wsemi/src/ispint.mjs'
 import isearr from 'wsemi/src/isearr.mjs'
-import isErr from 'wsemi/src/isErr.mjs'
 import isfun from 'wsemi/src/isfun.mjs'
 import ispm from 'wsemi/src/ispm.mjs'
 import cint from 'wsemi/src/cint.mjs'
@@ -20,7 +19,6 @@ import pm2resolve from 'wsemi/src/pm2resolve.mjs'
 import fsIsFolder from 'wsemi/src/fsIsFolder.mjs'
 import fsIsFile from 'wsemi/src/fsIsFile.mjs'
 import replace from 'wsemi/src/replace.mjs'
-import strdelleft from 'wsemi/src/strdelleft.mjs'
 import cacheSt from 'wsemi/src/cacheSt.mjs'
 import WServHapiServer from 'w-serv-hapi/src/WServHapiServer.mjs'
 import WServOrm from 'w-serv-orm/src/WServOrm.mjs'
@@ -35,9 +33,10 @@ import srLogInit from './srLog.mjs'
 import procStaInfor from './procStaInfor.mjs'
 import { maskTok, maskQuery, maskUrl } from './maskLog.mjs'
 import wrapInjected from './wrapInjected.mjs'
-import { pickUniqueUser, findLoginUsers, mapKeyOf } from './keyCheck.mjs'
+import { pickUniqueUser, findLoginUsers, countLoginRows, mapKeyOf } from './keyCheck.mjs'
 import { createAuthorizeExec, wrapOperOrm } from './dataChannel.mjs'
-import isAdminRow from './adminCheck.mjs'
+import { isAdminRow, isSystemAppUser } from './adminCheck.mjs'
+import createRouteResult from './routeResult.mjs'
 
 
 /**
@@ -48,15 +47,20 @@ import isAdminRow from './adminCheck.mjs'
  * 本套件之落實(perm-run01 起「權限後台與資料通道只限系統管理員」, 規則帳本 R-ADMIN-ONLY-01): 資料通道之連線閘(標頭 token, 所有入口: main 之 RPC／表 select／系統函數, 上傳下載各 apiType)與執行身分(請求本體 __sysToken__)、後台登入檢查(/api/getUserByToken)皆經 getAndVerifyAdminUser
  * (外部 getUserByToken → perm users 存在且 isActive='y' → 部署方 verifyClientUser → perm users 表之列 isAdmin='y'; perm 以自身 users 表為權威, 不採 token 宣稱之 isAdmin), 任一關不過函數不執行(一般使用者即使部署方放行亦被拒, 回 userNotAdmin);
  * 一般使用者(isAdmin='n')只能經 /api/getPerm 以 token 查本人權限樹; 改變狀態之 kpFunExt 函數(updateTargets／updatePemis／updateGrups／updateUsers)另保留 perm users 表中有效且 isAdmin='y' 之縱深檢查(requireAdmin), 不符回 userNotAdmin、零寫入;
- * hapi apis 路由: getUserByToken(只限管理員)／getPerm(任何通過 verifyClientUser 之有效使用者, 回本人權限樹)驗 client 使用者, getPermUserInfor／syncAndReplaceTabs 驗 app 使用者(verifyAppUser); 無公開入口(前端靜態檔除外).
+ * hapi apis 路由: getUserByToken(只限管理員)／getPerm(任何通過 verifyClientUser 之有效使用者, 回本人權限樹)驗 client 使用者, getPermUserInfor／syncAndReplaceTabs 驗 app 使用者(套件自行要求管理員等級, 再經 verifyAppUser); 無公開入口(前端靜態檔除外).
+ *
+ * token 種類與等級(使用者 2026-10-24 定案, dspec/使用者身分驗證原則.md 二之一; 規則帳本 R-APP-TOKEN-01): 使用者 token(一般使用者／系統管理員)代表登入者, 等級以 perm users 表之列判定; 應用系統 token(部署方 getUserByToken 回傳 isApp 為 'y')分兩種用途——
+ * 使用者用途(以 userId 綁定使用者, 反查回所綁使用者之實際資料與 isApp='y'): 以所綁使用者之 perm users 列判定, 與其使用者 token 相同, 不需特別處理;
+ * 系統服務用途(不綁使用者, 代表外部應用系統本身; 反查回 id 如 'app:<金鑰主鍵>'、isApp='y'、isAdmin='y'): 不在 perm users 表者可用管理員之後端服務(後台登入檢查、資料通道、四個寫入函數、/api/getPermUserInfor、/syncAndReplaceTabs), 稽核欄記其 id; 不可用 /api/getPerm(無「本人」權限樹).
+ * 高權限功能由專案方評估與負責, 套件不另設限(部署方可於 verifyAppUser 收緊; 系統服務用途經 verifyAppUser(user, from) 判定, from 為各入口名稱).
  *
  * @class
  * @param {Function} WOrm 輸入資料庫ORM函數
  * @param {String} url 輸入資料庫連線字串，例如w-orm-lmdb為'./db'，或w-orm-mongodb為'mongodb://username:password@$127.0.0.1:27017'
  * @param {String} db 輸入資料庫名稱字串
- * @param {Function} getUserByToken 輸入處理函數，函數會傳入使用者token，通過此函數處理後並回傳使用者資訊物件，並至少須提供'id'、'email'、'name'、'isAdmin'欄位，且'isAdmin'限輸入'y'或'n'。注意: token 回傳之'isAdmin'僅供識別，權限系統一律以自身users表該使用者之'isAdmin'欄位值為權威，不會被 token 宣稱之值複寫。函數拋錯或reject時視同查無使用者(回自家錯誤key，錯誤原文不回前端、不入log，只於srLog記warn)
- * @param {Function} verifyClientUser 輸入驗證瀏覽使用者身份之處理函數，函數會傳入使用者資訊物件(perm users 表之列)與來源字串from，通過此函數識別後回傳布林值(可為Promise)，允許使用者回傳true，反之回傳false。from 值域: 'getUserByToken'(登入)、'getPerm'(api/getPerm)、以及資料通道之 apiType 'main'(RPC 與 ORM 執行; 連線閘驗標頭 token、執行身分〔getUserIdByToken〕驗請求本體 __sysToken__, 兩者各經本函數一次, 本體 token 與標頭 token 不同時兩個使用者各自驗證)、'upload-controller'、'upload-slice'、'download-get-filename'、'download-get-file'、'download'；資料通道與登入採同一授權強度(反查 perm users 且 isActive='y' 後再經本函數)；函數拋錯或reject時視同回傳false。本函數收到的是該列之淺層副本，改寫其欄位不影響本套件後續採用之執行身分與角色判定。本函數通過後，本套件另要求資料通道與後台登入(from 為 'getUserByToken'、'main'、'upload-controller' 等)限 perm users 表中 isAdmin 為 'y' 者(一般使用者即使本函數放行亦被拒，回 userNotAdmin)，故本函數不必再以 from 區分管理員與一般使用者，但可再收緊；一般使用者查本人權限樹之 /api/getPerm(from 為 'getPerm')仍會呼叫本函數，勿回傳 user.isAdmin === 'y' 而擋掉他們
- * @param {Function} verifyAppUser 輸入驗證應用程序使用者身份之處理函數，函數會傳入使用者資訊物件，通過此函數識別後回傳布林值，允許使用者回傳true，反之回傳false；函數拋錯或reject時視同回傳false
+ * @param {Function} getUserByToken 輸入處理函數，函數會傳入使用者token，通過此函數處理後並回傳使用者資訊物件，並至少須提供'id'、'email'、'name'、'isAdmin'欄位，且'isAdmin'限輸入'y'或'n'。另可選提供'isApp'欄位('y'或'n'，未給視同'n'，行為與未提供此欄位之舊版相同)：部署方**須轉傳**上游(如w-web-sso)反查結果之'isApp'，'y'代表此token為應用系統token；使用者用途者(以userId綁定使用者)反查回所綁使用者之實際資料，在權限系統users表者以該列判定；系統服務用途者(不綁使用者，反查回id如'app:<金鑰主鍵>'、'isApp'為'y'、'isAdmin'為'y'，其'email'、'name'可為空)不在users表時可使用管理員之後端服務(後台登入檢查、資料通道、/api/getPermUserInfor、/syncAndReplaceTabs)，須再經verifyAppUser；未轉傳'isApp'時應用系統token之路由(getPermUserInfor、syncAndReplaceTabs)只認users表中有效之系統管理員，不在表者一律被拒(userNotAdmin)。注意: token 回傳之'isAdmin'僅供識別，權限系統一律以自身users表該使用者之'isAdmin'欄位值為權威(系統服務用途因不在users表，以'isApp'與'isAdmin'皆為'y'認定)，不會被 token 宣稱之值複寫。函數拋錯或reject時視同查無使用者(回自家錯誤key，錯誤原文不回前端、不入log，只於srLog記warn)
+ * @param {Function} verifyClientUser 輸入驗證瀏覽使用者身份之處理函數，函數會傳入使用者資訊物件(perm users 表之列)與來源字串from，通過此函數識別後回傳布林值(可為Promise)，允許使用者回傳true，反之回傳false。from 值域: 'getUserByToken'(登入)、'getPerm'(api/getPerm)、以及資料通道之 apiType 'main'(RPC 與 ORM 執行; 連線閘驗標頭 token、執行身分〔getUserIdByToken〕驗請求本體 __sysToken__, 兩者各經本函數一次, 本體 token 與標頭 token 不同時兩個使用者各自驗證)、'upload-controller'、'upload-slice'、'download-get-filename'、'download-get-file'、'download'；資料通道與登入採同一授權強度(反查 perm users 且 isActive='y' 後再經本函數)；函數拋錯或reject時視同回傳false。本函數收到的是該列之淺層副本，改寫其欄位不影響本套件後續採用之執行身分與角色判定。本函數通過後，本套件另要求資料通道與後台登入(from 為 'getUserByToken'、'main'、'upload-controller' 等)限 perm users 表中 isAdmin 為 'y' 者(一般使用者即使本函數放行亦被拒，回 userNotAdmin)，故本函數不必再以 from 區分管理員與一般使用者，但可再收緊；一般使用者查本人權限樹之 /api/getPerm(from 為 'getPerm')仍會呼叫本函數，勿回傳 user.isAdmin === 'y' 而擋掉他們。**勿以 isAdmin 判斷角色**：非管理員由本套件統一拒絕並讓畫面顯示「無權進入權限後台」；若本函數先否決非管理員，使用者只會看到一般的「拒絕登入」並被轉址，看不到原因。本函數否決者（回傳false或拋錯，應只為非角色因素，如來源網段、系統別）一律回 userNoPermission，畫面為「拒絕登入」並轉址至opt.urlRedirect（開發環境延遲60秒）
+ * @param {Function} verifyAppUser 輸入驗證應用程序使用者身份之處理函數，函數會傳入使用者資訊物件(外部getUserByToken反查結果之淺層副本)與來源字串from，通過此函數識別後回傳布林值(可為Promise)，允許使用者回傳true，反之回傳false；函數拋錯或reject時視同回傳false。本函數通過後，本套件**另自行要求管理員等級**(應用系統路由 /api/getPermUserInfor、/syncAndReplaceTabs)：呼叫者在權限系統users表者以該列為準(須有效且isAdmin為'y')，不在表者須為系統服務用途(反查結果isApp與isAdmin皆為'y')，一般使用者、使用者用途綁一般使用者即使本函數放行亦被拒(userNotAdmin)，故本函數不必再以isAdmin判斷，但可再收緊(只能更嚴)；系統服務用途亦會經本函數用於後台登入檢查與資料通道各入口(from 為 'getUserByToken'、'main'、'upload-controller' 等)，本函數否決者回 userNoPermission
  * @param {Object} [opt={}] 輸入設定物件，預設{}
  * @param {Integer} [opt.serverPort=11006] 輸入伺服器通訊port，預設11006。註：原opt.useCheckUser、opt.getUserById、opt.useExcludeWhenNotAdmin已隨w-serv-orm 1.1.9移除，給予undefined、null、false以外之值時建構即拋錯(錯誤訊息出自w-serv-orm之checkOptRemoved，並記srLog)；資料通道之使用者授權由verifyConn(verifyClientUser)負責、表操作只開放select，刪除該三鍵即可，無須替代設定
  * @param {Object} [opt.webName={}] 輸入站台名稱物件，至少包含語系eng與cht鍵的名稱，預設{}
@@ -103,12 +107,13 @@ import isAdminRow from './adminCheck.mjs'
  *
  * let getUserByToken = async (token) => {
  *     // return {} //測試無法登入
- *     if (token === '{token-for-application}') { //提供外部應用系統作為存取使用者
+ *     if (token === '{token-for-application}') { //提供外部應用系統作為存取使用者(應用系統token・系統服務用途: 部署方須轉傳上游反查結果之isApp)
  *         return {
- *             id: 'id-for-application',
+ *             id: 'id-for-application', //如 sso 反查回 'app:<金鑰主鍵>'
  *             name: 'application',
  *             email: 'application@example.com',
  *             isAdmin: 'y',
+ *             isApp: 'y',
  *         }
  *     }
  *     if (token === 'sys') { //開發階段w-ui-loginout自動給予browser使用者(且位於localhost)的token為sys
@@ -137,7 +142,8 @@ import isAdminRow from './adminCheck.mjs'
  *     console.log('verifyAppUser/user', user)
  *     // return false //測試無法登入
  *     console.log('於生產環境時得加入限制應用程式使用者身份機制')
- *     return user.isAdmin === 'y' //測試僅系統管理者使用
+ *     //本套件於此函數通過後另自行要求管理員等級(users表有效之系統管理員，或系統服務用途之應用系統token)，一般使用者即使本函數放行亦被拒(userNotAdmin)，故不必再以isAdmin判斷；僅需放行有效之應用系統，或依from與自家政策再收緊
+ *     return true
  * }
  *
  * //WWebPerm
@@ -428,26 +434,88 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     }
 
 
-    //getTokenUser
-    let getTokenUser = async(token) => {
-        //基於token查找使用者, 會基於外部getUserByToken以及perm內部users進行查找並比對
-
-        //userSelf
-        let userSelf = null
+    //getExtUser: 取外部(部署方 getUserByToken)反查之使用者物件, 非物件(查無、失敗、逾期)一律 reject cannotFindUserFromToken; 一次請求只呼叫一次部署方的 getUserByToken(其結果交給後續各關共用, 檢查之值即使用之值)
+    //getUserByToken 可選回 isApp('y'／'n'; 未給視同 'n'): 'y' 為應用系統 token(R-APP-TOKEN-01); 本套件只在 isSystemAppUser(adminCheck.mjs)為真且不在 perm users 表時視為系統服務用途
+    let getExtUser = async(token, event) => {
+        let user = null
         if (isestr(token)) {
-            userSelf = getUserByToken(token)
-            if (ispm(userSelf)) {
-                userSelf = await userSelf
+            user = getUserByToken(token)
+            if (ispm(user)) {
+                user = await user
             }
         }
-        // console.log('userSelf', userSelf)
-
-        //check
-        if (!iseobj(userSelf)) {
+        if (!iseobj(user)) {
             console.log(`token`, maskTok(token))
-            srLog.error({ event: 'getTokenUser-error', msg: 'cannotFindUserFromToken' })
+            srLog.error({ event, msg: 'cannotFindUserFromToken' })
             return Promise.reject(`cannotFindUserFromToken`)
         }
+        return { ...user } //淺層快照: 部署方保留其回傳物件之引用時, 於其後的非同步查庫等待期間改寫它不得影響本次判定與使用(外審 sol F05)
+    }
+
+
+    //countPermRows: 外部使用者在 perm users 表對得到幾列(不論 isActive), 0＝不在表(才可能是系統服務用途); ORM 讀取失敗原樣拋出(fail-closed, 不吞成 0)
+    //「在表」＝對應鍵(mappingBy)對得到(keyCheck.countLoginRows)**或**其外部 id 等於表中某列之主鍵 id: 後者使 requireAdmin 以 id 查列之結果與共同驗證階段一致——
+    //系統服務用途之外部 id(如 'app:<金鑰主鍵>')若恰為某使用者列之主鍵(對應鍵為 email／name 而服務身分缺 email／name 時才會與對應鍵查找分歧), 視為在表(不走系統服務用途), 免同一身分在各入口被判成不同類(外審 sol F03／F04)
+    let countPermRows = async(userExt) => {
+        let n = await countLoginRows(woItems.users, mappingBy, get(userExt, mappingBy, ''))
+        if (n === 0 && isestr(get(userExt, 'id', ''))) {
+            let row = await getGenUserByKV('id', userExt.id, false)
+            n = iseobj(row) ? 1 : 0
+        }
+        return n
+    }
+
+
+    //verifyExtByDeployer: 系統服務用途(不在 perm users 表之應用系統身分)交給部署方 verifyAppUser(user, from), 只收淺層副本; 通過者回傳正規化之淺層身分物件(只含 id、name、email、isAdmin、isApp), 其值為交給部署方之前取得者.
+    //id 為稽核欄位(userId／userIdUpdate)所記之值(如 'app:<金鑰主鍵>'), 不是 perm 內之 id(不在 perm 表); 拒絕時 reject 固定鍵 userNoPermission(部署方否決或拋錯視同否決), srLog 只記 from
+    //kpSystemAppUser: 由 verifySystemApp 產生之身分物件登錄(WeakSet, 物件本身為憑據, 不憑欄位值), 供 getUserIdByToken 辨識「系統服務用途」; kpSystemAppIds: 其 id 之登錄, 供 requireAdmin 縱深防禦(見該處)
+    let kpSystemAppUser = new WeakSet()
+    //kpSystemAppIds: id → 最近一次由 getUserIdByToken 以系統服務用途登錄之時間(ms); 只認 SYSTEM_APP_TTL_MS 內(每個函數呼叫前皆先經 getUserIdByToken 重新驗證並更新登錄, requireAdmin 為函數第一個敘述, 實際間隔為毫秒級),
+    //超過即視同未登錄, 免永久登錄使「後來才建立之同 id 使用者列於連線後被刪」之競態被誤放行(外審 sol F06)
+    let SYSTEM_APP_TTL_MS = 60000
+    let kpSystemAppIds = new Map()
+    let markSystemAppId = (id) => {
+        let now = Date.now()
+        for (let [k, t] of kpSystemAppIds) {
+            if (now - t > SYSTEM_APP_TTL_MS) {
+                kpSystemAppIds.delete(k)
+            }
+        }
+        kpSystemAppIds.set(id, now)
+    }
+    let isSystemAppIdRecent = (id) => {
+        let t = kpSystemAppIds.get(id)
+        return t !== undefined && Date.now() - t <= SYSTEM_APP_TTL_MS
+    }
+    let verifySystemApp = async(userExt, from, event) => {
+        let userUse = {
+            id: userExt.id,
+            name: isestr(userExt.name) ? userExt.name : '',
+            email: isestr(userExt.email) ? userExt.email : '',
+            isAdmin: 'y',
+            isApp: 'y',
+        }
+        let b = verifyAppUser({ ...userExt }, from)
+        if (ispm(b)) {
+            b = await b
+        }
+        if (!b) {
+            srLog.error({ event, msg: 'userNoPermission', from })
+            return Promise.reject(`userNoPermission`)
+        }
+        kpSystemAppUser.add(userUse)
+        return userUse
+    }
+
+
+    //getTokenUser
+    let getTokenUser = async(token, userExt = undefined) => {
+        //基於token查找使用者, 會基於外部getUserByToken以及perm內部users進行查找並比對
+        //userExt 為呼叫端已取得之外部使用者物件(getExtUser), 給了就不再呼叫 getUserByToken
+
+        //userSelf
+        let userSelf = (userExt !== undefined) ? userExt : await getExtUser(token, 'getTokenUser-error')
+        // console.log('userSelf', userSelf)
 
         //check userSelf
         await checkUser(userSelf)
@@ -494,12 +562,13 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
 
     //getAndVerifyClientUser
-    let getAndVerifyClientUser = async (token, from = '', { adminOnly = false } = {}) => {
+    let getAndVerifyClientUser = async (token, from = '', { adminOnly = false, userExt = undefined } = {}) => {
         //基於token查找client使用者, 會基於外部getUserByToken以及perm內部users進行查找並比對
         //adminOnly 為 true 時(經 getAndVerifyAdminUser)於完整驗證通過後另要求 perm 列為有效之系統管理員(R-ADMIN-ONLY-01); 預設 false 者(/api/getPerm)一般使用者照常
+        //userExt 為 getAndVerifyAdminUser 已取得之外部使用者物件(不再呼叫 getUserByToken); /api/getPerm 不給
 
         //getTokenUser
-        let user = await getTokenUser(token)
+        let user = await getTokenUser(token, userExt)
 
         //isAdmin, 於交給部署方前判定(判準 adminCheck.isAdminRow, perm 列為權威)
         let isAdmin = isAdminRow(user)
@@ -534,34 +603,45 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     //部署方 verifyClientUser 仍照常套用(只能再收緊), 不必再以 from 區分管理員與一般使用者. 唯一不經本函數之使用者入口為 /api/getPerm(一般使用者以 token 查本人權限樹), 以及應用系統路由(verifyAppUser).
     //判準單一擁有者 adminCheck.isAdminRow(與 requireAdmin 共用)
     //角色於 getTokenUser 回傳當下判定(早於交給部署方 verifyClientUser), 使「檢查之值即使用之值」: 部署方函數即使修改其收到之 user 物件亦不影響角色判定; 但拒絕鍵次序為先 userNoPermission(部署方否決)後 userNotAdmin
+    //perm-run01(本輪, R-APP-TOKEN-01, P-2): 應用系統 token・系統服務用途(不綁使用者, 代表外部應用系統本身, 能用管理員之服務)——外部反查結果 isApp='y' 且 isAdmin='y'(isSystemAppUser)且**不在 perm users 表**(不論 isActive, keyCheck.countLoginRows)者,
+    //  不走 perm 列, 改經部署方 verifyAppUser(user, from)(可再收緊), 通過者放行(回正規化身分物件, id 如 'app:<金鑰主鍵>' 為稽核欄所記之值); 在 perm 表者(含使用者用途之應用系統 token: 反查回所綁使用者之實際資料)一律以 perm 列為準, 與其使用者 token 相同.
+    //  外部 getUserByToken 只呼叫一次(userExt 共用); 未轉傳 isApp(視同 'n')者不進系統服務用途, 行為同修正前.
     let getAndVerifyAdminUser = async (token, from = '') => {
-        return await getAndVerifyClientUser(token, from, { adminOnly: true })
+        let userExt = await getExtUser(token, 'getTokenUser-error')
+        if (isSystemAppUser(userExt) && (await countPermRows(userExt)) === 0) {
+            return await verifySystemApp(userExt, from, 'getAndVerifyAdminUser-error')
+        }
+        return await getAndVerifyClientUser(token, from, { adminOnly: true, userExt })
     }
 
 
-    //getAndVerifyAppUser
+    //getAndVerifyAppUser: 應用系統路由(/api/getPermUserInfor、/syncAndReplaceTabs)之呼叫者驗證——套件自行要求管理員等級(perm-run01 本輪, P-1, R-APP-TOKEN-01; w-web呼叫者身分驗證.md C5), 部署方 verifyAppUser 照舊套用(只能再收緊)
+    //  呼叫者在 perm users 表者(不論 isActive; 含使用者用途之應用系統 token: 反查回所綁使用者之實際資料)以該列為準: 須通過 getTokenUser(欄位齊備、對應鍵唯一、列有效)且 isAdmin='y'(isAdminRow);
+    //  不在表者須為系統服務用途(isSystemAppUser: 反查結果 isApp='y' 且 isAdmin='y'); 一般使用者、使用者用途綁一般使用者、isApp 未轉傳之虛擬應用系統使用者皆拒(固定鍵 userNotAdmin).
+    //  拒絕鍵次序同 getAndVerifyClientUser: 先 userNoPermission(部署方否決)後 userNotAdmin(等級不足); 等級於交給部署方之前判定, 部署方只收淺層副本, 回傳值為交給部署方之前取得者(檢查之值即使用之值).
     let getAndVerifyAppUser = async (token, from = '') => {
         //基於token查找app使用者, 會基於外部getUserByToken進行查找, 故只要getUserByToken提供使用者即可, 可支援getUserByToken給予針對應用程式所產生之虛擬使用者
 
         //user
-        let user = null
-        if (isestr(token)) {
-            user = getUserByToken(token)
-            if (ispm(user)) {
-                user = await user
-            }
-        }
-        // console.log('user', user)
+        let user = await getExtUser(token, 'getAndVerifyAppUser-error')
 
-        //check
-        if (!iseobj(user)) {
-            console.log(`token`, maskTok(token))
-            srLog.error({ event: 'getAndVerifyAppUser-error', msg: 'cannotFindUserFromToken' })
-            return Promise.reject(`cannotFindUserFromToken`)
+        //isLevel, 管理員等級
+        let isLevel = false
+        let userPerm = null
+        if ((await countPermRows(user)) > 0) {
+            userPerm = await getTokenUser(token, user) //在 perm 表: 以該列為準(任一關不過 reject 其固定鍵)
+            isLevel = isAdminRow(userPerm)
         }
+        else {
+            isLevel = isSystemAppUser(user)
+        }
+
+        //userUse, 交給部署方之前取得; 在 perm 表者以其 perm 列之主鍵 id 為執行身分(稽核欄 userId／userIdUpdate 所記之值, 同資料通道之 getUserIdByToken 回 perm 內 id; 使用者用途同所綁使用者,
+        //mappingBy 為 email／name 或外部列〔對 srcKey〕時外部 id 與 perm 主鍵不同; 外審 sol F02), 不在表者(系統服務用途)為其外部 id(如 'app:<金鑰主鍵>')
+        let userUse = (userPerm !== null) ? { ...user, id: userPerm.id } : { ...user }
 
         //verifyAppUser
-        let b = verifyAppUser(user, from)
+        let b = verifyAppUser({ ...user }, from)
         if (ispm(b)) {
             b = await b
         }
@@ -573,7 +653,13 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             return Promise.reject(`userNoPermission`)
         }
 
-        return user
+        //check level, 只記 from, 不記 token 與使用者資料
+        if (!isLevel) {
+            srLog.error({ event: 'getAndVerifyAppUser-error', msg: 'userNotAdmin', from })
+            return Promise.reject(`userNotAdmin`)
+        }
+
+        return userUse
     }
 
 
@@ -646,10 +732,15 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
 
     //getGenUserByKV
-    let getGenUserByKV = async(keyUser, valueUser) => {
+    let getGenUserByKV = async(keyUser, valueUser, onlyActive = true) => {
 
         //userFind, 與 getTokenUser 同一判準(pickUniqueUser): 非恰 1 筆不取首筆(目前僅以主鍵 id 呼叫, 恆 ≤ 1 筆)
-        let userRs = await woItems.users.select({ [keyUser]: valueUser, isActive: 'y' })
+        //onlyActive 為 false 時不篩 isActive(requireAdmin 判斷「是否在 perm users 表中」用, 停用之列也算在表中)
+        let cond = { [keyUser]: valueUser }
+        if (onlyActive) {
+            cond.isActive = 'y'
+        }
+        let userRs = await woItems.users.select(cond)
         let { user: userFind } = pickUniqueUser(userRs)
 
         //check
@@ -665,19 +756,23 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     //改變狀態之 kpFunExt 函數(updateTargets／updatePemis／updateGrups／updateUsers; getWebInfor、getStaEvent、getStaEventTable 為唯讀不在此列)限 perm users 表中有效(isActive='y')且 isAdmin='y' 之使用者.
     //perm 以自身 users 表為權威, 不採 token(getUserByToken)宣稱之 isAdmin(同 getTokenUser); userId 為 getUserIdByToken 回傳之 perm 內 id, 此處再新鮮讀取一次(角色可能於連線後被改, 不信任快取).
     //不符即 reject 固定錯誤鍵 userNotAdmin、零寫入(先於 lockSave／表鎖／任何讀庫), 記 srLog(只記函數名與 userId, 不記 token 與使用者資料); 讀取失敗(ORM 例外)一律視同不符(fail-closed)
+    //perm-run01(本輪, R-APP-TOKEN-01, P-2): 系統服務用途之應用系統身分不在 perm users 表, userId 為其外部 id(如 'app:<金鑰主鍵>'): 該 id 在 perm 表中對不到任何列(不論 isActive)
+    //  且於最近 SYSTEM_APP_TTL_MS(60 秒)內曾由 getUserIdByToken 以系統服務用途通過完整驗證(kpSystemAppIds)才視為有效; 在表者(含停用)一律以該列為準, 不受登錄影響; 登錄只憑 getUserIdByToken(驗證 token 後)寫入, 前端與外部無法提供.
+    //  kpSystemAppIds 僅作縱深防禦之憑據(每個函數呼叫前 getUserIdByToken 已重新驗證 token 並更新登錄, 金鑰被撤銷後無法再抵達此處); perm 管理員之列被刪除後不因此退化為系統服務用途(其 id 不在登錄中; 外部 id 等於表中某列主鍵者共同驗證階段即視為在表, 見 countPermRows).
     let requireAdmin = async (userId, funcName) => {
-        let u = null
+        let ok = false
         try {
-            u = await getGenUserByKV('id', userId)
+            let u = await getGenUserByKV('id', userId, false)
+            ok = (u !== null) ? isAdminRow(u) : isSystemAppIdRecent(userId)
         }
         catch (err) {
-            u = null
+            ok = false
         }
-        if (!isAdminRow(u)) { //縱深防禦: 資料通道已於連線閘與執行身分要求管理員(R-ADMIN-ONLY-01), 此處對新鮮讀取之列再判一次(連線後角色被降級之競態)
+        if (!ok) { //縱深防禦: 資料通道已於連線閘與執行身分要求管理員(R-ADMIN-ONLY-01), 此處對新鮮讀取之列再判一次(連線後角色被降級之競態)
             srLog.error({ event: 'requireAdmin-error', msg: 'userNotAdmin', funcName, userId })
             return Promise.reject('userNotAdmin')
         }
-        return u
+        return true
     }
 
 
@@ -805,6 +900,15 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     }
 
 
+    //reBearerAuth: 連線閘 Authorization 標頭之 Bearer 方案(見 verifyConn): `Bearer` 不分大小寫、其後恰一個空白、憑證為非空白字元序列(整段須吻合)
+    let reBearerAuth = /^Bearer (\S+)$/i
+
+
+    //routeResult: hapi 路由失敗(state 為 error)時之 msg 一律為固定語系鍵(R-ROUTE-MSG-01; perm-run01 本輪, 外審 sol#5; 判準在 routeResult.mjs):
+    //已知語系鍵原樣回傳, 其餘(Error.message、ORM／I/O 原文、非鍵字串)改回 anUnexpectedErrorOccurred, 原文只入 srLog. 四條 hapi 路由(/api/getUserByToken、/api/getPerm、/api/getPermUserInfor、/syncAndReplaceTabs)皆經此
+    let routeResult = createRouteResult({ srLog })
+
+
     //apis
     let apis = [
 
@@ -850,9 +954,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                 //pm2resolve core
                 let r = await pm2resolve(core)() //w-ui-loginout接收已預設格式用pm2resolve轉過, 須另提取state進行判斷
-                if (isErr(r.msg)) {
-                    r.msg = r.msg.message
-                }
+                r = routeResult(r, 'api/getUserByToken-error') //失敗一律固定語系鍵, 原文只入 srLog
                 // console.log('getUserByToken', r)
 
                 return r
@@ -928,9 +1030,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                 //pm2resolve core
                 let r = await pm2resolve(core)()
-                if (isErr(r.msg)) {
-                    r.msg = r.msg.message
-                }
+                r = routeResult(r, 'api/getPerm-error') //失敗一律固定語系鍵, 原文只入 srLog
                 // console.log('getPerm r', r)
 
                 return r
@@ -1006,9 +1106,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                 //pm2resolve core
                 let r = await pm2resolve(core)() //w-ui-loginout接收已預設格式用pm2resolve轉過, 須另提取state進行判斷
-                if (isErr(r.msg)) {
-                    r.msg = r.msg.message
-                }
+                r = routeResult(r, 'api/getPermUserInfor-error') //失敗一律固定語系鍵, 原文只入 srLog
                 // console.log('getPermUserInfor', r)
 
                 return r
@@ -1036,27 +1134,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                         return Promise.reject(`tokenNoPermission`)
                     }
 
-                    //keyTable
-                    let keyTable = get(req, 'query.keyTable', '')
-
-                    //check
-                    if (!isestr(keyTable)) {
-                        console.log('req.query', maskQuery(get(req, 'query')))
-                        console.log('keyTable', keyTable)
-                        console.log('[API]syncAndReplaceTabs/check keyTable: invalid keyTable')
-                        srLog.error({ event: 'api/syncAndReplaceTabs-error', msg: 'tokenNoPermission' })
-                        return Promise.reject(`tokenNoPermission`)
-                    }
-
-                    //check keyTable
-                    let allowedTables = ['targets', 'pemis', 'grups', 'users']
-                    if (!allowedTables.includes(keyTable)) {
-                        console.log('[API]syncAndReplaceTabs/check keyTable: unexpected keyTable', keyTable)
-                        srLog.error({ event: 'api/syncAndReplaceTabs-error', msg: 'invalidKeyTable', keyTable })
-                        return Promise.reject(`invalidKeyTable`)
-                    }
-
-                    //getAndVerifyAppUser
+                    //getAndVerifyAppUser, 先驗身分(含管理員等級, R-APP-TOKEN-01)再驗 keyTable 等參數(P-5): 未通過驗證者之回應與 srLog 皆與 keyTable 無關, 不得由參數錯誤鍵之差異探測表名
                     let user = await getAndVerifyAppUser(token, 'syncAndReplaceTabs')
 
                     //check user
@@ -1079,6 +1157,26 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                         return Promise.reject(`tokenNoPermission`)
                     }
 
+                    //keyTable, 已通過身分驗證者才檢查
+                    let keyTable = get(req, 'query.keyTable', '')
+
+                    //check
+                    if (!isestr(keyTable)) {
+                        console.log('req.query', maskQuery(get(req, 'query')))
+                        console.log('keyTable', keyTable)
+                        console.log('[API]syncAndReplaceTabs/check keyTable: invalid keyTable')
+                        srLog.error({ event: 'api/syncAndReplaceTabs-error', msg: 'tokenNoPermission' })
+                        return Promise.reject(`tokenNoPermission`)
+                    }
+
+                    //check keyTable
+                    let allowedTables = ['targets', 'pemis', 'grups', 'users']
+                    if (!allowedTables.includes(keyTable)) {
+                        console.log('[API]syncAndReplaceTabs/check keyTable: unexpected keyTable', keyTable)
+                        srLog.error({ event: 'api/syncAndReplaceTabs-error', msg: 'invalidKeyTable', keyTable })
+                        return Promise.reject(`invalidKeyTable`)
+                    }
+
                     //parsePayload
                     let inp = await parsePayload(req)
 
@@ -1093,9 +1191,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                 //pm2resolve core
                 let r = await pm2resolve(core)()
-                if (isErr(r.msg)) {
-                    r.msg = r.msg.message
-                }
+                r = routeResult(r, 'api/syncAndReplaceTabs-error') //失敗一律固定語系鍵, 原文只入 srLog
                 // console.log('syncAndReplaceTabs', r)
 
                 return r
@@ -1126,8 +1222,10 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             //連線閘(verifyConn)與執行身分(getUserIdByToken)皆須完整驗證(token 有效、本系統使用者存在且啟用、部署方授權); hapi apis 路由各自驗證; 函數層級另檢查角色或成員(updateXxx 限 perm users 表之 isAdmin='y', requireAdmin); 公開入口只限列名者.
             //本函數: 驗連線標頭之 token(getAndVerifyAdminUser: 外部 getUserByToken → perm users 存在且 isActive='y' → 部署方 verifyClientUser(user, apiType) → perm 列 isAdmin='y', R-ADMIN-ONLY-01: 權限後台與資料通道只限系統管理員, 一般使用者查本人權限樹走 /api/getPerm).
 
-            //token
-            let token = strdelleft(authorization, 7) //刪除Bearer
+            //token: Authorization 須為 Bearer 方案(方案名不分大小寫, 與憑證間為單一空白; perm-run01 本輪 P-3, 對照 w-web-api 1.1.16), 其餘(Basic、Token、無方案、多個空白)一律視同無 token.
+            //原以 strdelleft(authorization, 7) 無條件刪前 7 字元而從不驗方案, 'Basic <token>'、'Token <token>' 亦能通過連線閘. 憑證不另限制字元集(token 形狀屬部署方), 但不含空白.
+            let mBearer = reBearerAuth.exec(isestr(authorization) ? authorization : '')
+            let token = (mBearer === null) ? '' : mBearer[1]
             // console.log('token', token)
 
             //check
@@ -1196,6 +1294,10 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             if (!isestr(userId)) {
                 srLog.error({ event: 'getUserIdByToken-error', msg: 'cannotFindUserId' })
                 return Promise.reject(`cannotFindUserId`)
+            }
+            //系統服務用途之應用系統身分(P-2): 回其外部 id(如 'app:<金鑰主鍵>'; 稽核欄 userId／userIdUpdate 記之), 並登錄供 requireAdmin 縱深防禦(僅 verifySystemApp 產生之物件算)
+            if (kpSystemAppUser.has(user)) {
+                markSystemAppId(userId)
             }
             return userId
         },

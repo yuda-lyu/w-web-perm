@@ -13,7 +13,7 @@
 import assert from 'assert'
 import { assertPristineSeed } from './tools/baseSeed.mjs'
 import {
-    startApi, TOKEN_ADMIN, TOKEN_ADMIN2, TOKEN_MEMBER, TOKEN_PETER, TOKEN_APP, TOKEN_BAD, TOKEN_REJECT, TOKEN_VERIFY_THROW,
+    startApi, TOKEN_ADMIN, TOKEN_ADMIN2, TOKEN_MEMBER, TOKEN_PETER, TOKEN_NOFLAG, TOKEN_DENY, TOKEN_BAD, TOKEN_REJECT, TOKEN_VERIFY_THROW,
     callRpc, readTables, selectAllRows, purgeExternalRows, markSrLog, readSrLogSince,
 } from './tools/api-setup.mjs'
 import { restartBackend, genTempSettings } from './tools/e2e-setup.mjs'
@@ -100,8 +100,11 @@ describe('api-callerIdentity (資料通道執行身分完整驗證＋寫入函�
         //標頭 token 有效(TOKEN_ADMIN, 過連線閘), 本體 token 為下列各種「無法通過完整驗證」者 → 函數不執行
         //預期之固定語系鍵由 getAndVerifyClientUser 之各關決定(見 server/WWebPerm.mjs getTokenUser／getAndVerifyClientUser)
         let bodyCases = [
-            { title: '不在 perm users 表(app 權杖: 外部 getUserByToken 有效、perm 無此列)', token: TOKEN_APP, key: 'cannotGetUserFromPerm' },
-            { title: 'perm 內有效使用者但被部署方 verifyClientUser 拒絕(isAdmin n)', token: TOKEN_PETER, key: 'userNoPermission' },
+            //perm-run01 本輪(R-APP-TOKEN-01): 原用 TOKEN_APP(isApp 未轉傳)代表「不在 perm 表」; TOKEN_APP 現轉傳 isApp='y' 屬系統服務用途(可用管理員之服務, 見 api-callerMatrix), 故改用 TOKEN_NOFLAG(isApp 未轉傳, 視同非應用系統)
+            { title: '不在 perm users 表(外部 getUserByToken 有效、perm 無此列、isApp 未轉傳)', token: TOKEN_NOFLAG, key: 'cannotGetUserFromPerm' },
+            //perm-run01 本輪(P-7): srv.mjs 之 verifyClientUser 不再以 isAdmin 否決, peter(一般使用者)通過部署方、由本套件以 userNotAdmin 拒絕; 部署方因非角色因素否決者另列下一案
+            { title: 'perm 內有效使用者(一般使用者, isAdmin n)通過部署方但非系統管理員', token: TOKEN_PETER, key: 'userNotAdmin' },
+            { title: 'perm 內有效之管理員但被部署方 verifyClientUser 因非角色因素否決(TOKEN_DENY)', token: TOKEN_DENY, key: 'userNoPermission', pre: async () => addUsers([userRow('id-for-deny', 'deny', 'y', 'y', { email: 'deny@example.com' })]) },
             { title: 'getUserByToken 查無(無效 token)', token: TOKEN_BAD, key: 'cannotFindUserFromToken' },
             { title: 'getUserByToken reject 上游原文(含合成秘密; W 契約視同查無)', token: TOKEN_REJECT, key: 'cannotFindUserFromToken' },
             //perm users 內有此列且啟用(才會走到 verifyClientUser; 否則先於驗證器被 cannotGetUserFromPerm 拒收而守不到驗證器拋錯之 fail-closed; 外審 sol#5); 驗證器拋錯 ≡ 無權限
@@ -144,13 +147,13 @@ describe('api-callerIdentity (資料通道執行身分完整驗證＋寫入函�
             A.equal(await snap4(), before)
         })
 
-        it('CI-G4 perm 內 isAdmin 已被降為 n 之管理員(admin2 列 isAdmin n)之本體 token → verifyClientUser 拒絕、零寫入  [perm 以自身 users 表為權威]', async function() {
+        it('CI-G4 perm 內 isAdmin 已被降為 n 之管理員(admin2 列 isAdmin n)之本體 token → 非系統管理員被拒(userNotAdmin)、零寫入  [perm 以自身 users 表為權威; P-7: 部署方範例不再以 isAdmin 否決, 由套件拒絕]', async function() {
             await addUsers([userRow('id-for-admin2', 'admin2', 'n', 'y')])
             let before = await snap4()
             let rows = (await rowsOf('grups')).concat([grupRow('id-ci-g4', 'ci-g4')])
             let r = await callRpc('updateGrups', [rows], TOKEN_ADMIN, { sysToken: TOKEN_ADMIN2 })
             A.equal(r.ok, false)
-            A.equal(r.msg, 'userNoPermission')
+            A.equal(r.msg, 'userNotAdmin')
             A.equal(await snap4(), before)
         })
 

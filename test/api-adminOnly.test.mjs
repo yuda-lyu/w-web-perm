@@ -3,7 +3,8 @@
 //
 //定義: 系統管理員＝perm users 表中 isAdmin='y' 且 isActive='y' 之列(perm 以自身表為權威, 不採 token 宣稱值); 一般使用者＝isAdmin='n' 者。
 //角色軸: A 管理員(sys)、M 一般使用者(TOKEN_MEMBER: perm 列 isAdmin n 且啟用, srv.mjs 之 verifyClientUser 放行 → 「部署方放行」)、M+ 一般使用者被升為管理員(perm 為權威)、
-//        D 停用之管理員(TOKEN_ADMIN2, isAdmin y 但 isActive n)、P 部署方拒絕者(TOKEN_PETER)、X 不在 perm(TOKEN_APP)、B 無效 token。
+//        D 停用之管理員(TOKEN_ADMIN2, isAdmin y 但 isActive n)、P 部署方放行之一般使用者(TOKEN_PETER; perm-run01 本輪 P-7 起 srv.mjs 之 verifyClientUser 不再以 isAdmin 否決)、
+//        X 不在 perm 且 isApp 未轉傳(TOKEN_NOFLAG; 原 TOKEN_APP, 現屬系統服務用途, 見 api-callerMatrix)、B 無效 token。
 //入口軸: 資料通道 RPC(唯讀 getWebInfor／getStaEvent／getStaEventTable、寫入 updateXxx ×4)、表 select ×4、系統函數([sys:getFuncList]／[sys:getTableTags])、
 //        上傳下載入口(/api/ulctr、slc、dwgfn、dwgf、dw)、本體 __sysToken__(執行身分)、/api/getUserByToken(後台登入檢查)、/api/getPerm(查本人權限樹, 一般使用者照常開放)。
 //[A] 連線閘: 一般使用者(部署方放行)經任何入口皆被拒(傳輸層 permission denied)、回應不含資料、記 srLog verifyConn-error msg userNotAdmin(不含 token); 管理員照常。
@@ -14,7 +15,7 @@
 import assert from 'assert'
 import { assertPristineSeed } from './tools/baseSeed.mjs'
 import {
-    startApi, apiBaseUrl, TOKEN_ADMIN, TOKEN_ADMIN2, TOKEN_MEMBER, TOKEN_PETER, TOKEN_APP, TOKEN_BAD, TOKEN_MUTATE, TOKEN_SLOW, urlGetPerm, urlGetPermUserInfor,
+    startApi, apiBaseUrl, TOKEN_ADMIN, TOKEN_ADMIN2, TOKEN_MEMBER, TOKEN_PETER, TOKEN_APP, TOKEN_NOFLAG, TOKEN_DENY, TOKEN_BAD, TOKEN_MUTATE, TOKEN_SLOW, urlGetPerm, urlGetPermUserInfor,
     callRpc, readTables, selectAllRows, purgeExternalRows, markSrLog, readSrLogSince,
 } from './tools/api-setup.mjs'
 import { restartBackend } from './tools/e2e-setup.mjs'
@@ -177,7 +178,7 @@ describe('api-adminOnly (權限後台與資料通道只限系統管理員, perm-
 
         it('AO-A4 其餘角色皆拒(部署方拒絕者 P、不在 perm 者 X、無效 token B)且不含資料: 對照 M 同為 permission denied', async function() {
             await addMember()
-            for (let [label, tk] of [['P peter', TOKEN_PETER], ['X app', TOKEN_APP], ['B bad', TOKEN_BAD]]) {
+            for (let [label, tk] of [['P peter', TOKEN_PETER], ['X 不在 perm〔isApp 未轉傳〕', TOKEN_NOFLAG], ['B bad', TOKEN_BAD]]) {
                 let r = await callRpc('users.select', [], tk)
                 A.equal(r.ok, false, label)
                 A.equal(r.msg, 'permission denied', label)
@@ -298,9 +299,11 @@ describe('api-adminOnly (權限後台與資料通道只限系統管理員, perm-
         })
 
         it('AO-C3 其餘角色之既有錯誤鍵不變: 部署方拒絕者 userNoPermission、不在 perm 者 cannotGetUserFromPerm、無效 token cannotFindUserFromToken、停用之管理員 cannotGetUserFromPerm', async function() {
-            await addUsers([userRow('id-for-admin2', 'admin2', 'y', 'n', '{}')])
-            A.equal((await getUserByTokenApi(TOKEN_PETER)).msg, 'userNoPermission')
-            A.equal((await getUserByTokenApi(TOKEN_APP)).msg, 'cannotGetUserFromPerm')
+            await addUsers([userRow('id-for-admin2', 'admin2', 'y', 'n', '{}'), userRow('id-for-deny', 'deny', 'y', 'y', '{}')])
+            //perm-run01 本輪(P-7): srv.mjs 之 verifyClientUser 不再以 isAdmin 否決, peter 通過部署方後由本套件以 userNotAdmin 拒絕; 「部署方拒絕」改以非角色因素否決之 TOKEN_DENY 代表
+            A.equal((await getUserByTokenApi(TOKEN_PETER)).msg, 'userNotAdmin')
+            A.equal((await getUserByTokenApi(TOKEN_DENY)).msg, 'userNoPermission')
+            A.equal((await getUserByTokenApi(TOKEN_NOFLAG)).msg, 'cannotGetUserFromPerm') //isApp 未轉傳(視同非應用系統): 不在 perm 表一律被拒; 轉傳 isApp 之系統服務用途見 api-callerMatrix
             A.equal((await getUserByTokenApi(TOKEN_BAD)).msg, 'cannotFindUserFromToken')
             A.equal((await getUserByTokenApi(TOKEN_ADMIN2)).msg, 'cannotGetUserFromPerm')
         })
