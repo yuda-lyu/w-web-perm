@@ -122,6 +122,7 @@ describe('api-getPermUserInfor', function() {
         //spec E2E-005：rules 為陣列且全 isActive==='n'（空權限 fail-safe）
         assert.strict.ok(Array.isArray(ur.rules), 'rules 應為陣列')
         assert.strict.ok(ur.rules.every((x) => x.isActive === 'n'), 'rules 應全 isActive=n（空權限）')
+        assert.strict.ok(ur.rules.length > 0, 'rules 須列出全部標的(非 rules=[] 之空洞「全 n」; perm-run05 外審 sol 第一輪#8)')
     })
 
     it('API-getPermUserInfor-006-funConvertPerm', async () => {
@@ -188,7 +189,7 @@ describe('api-getPermUserInfor', function() {
             //使用者之 id 由伺服端產生: 依 srcKey 讀回
             let uOi = (await selectAllRows('users')).find((v) => v.srcKey === 'sk-oi-u1')
             assert.strict.ok(uOi && typeof uOi.id === 'string' && uOi.id !== '', '依 srcKey 應讀回外部使用者列')
-            let ur = await getPermUserInfor(urlGetPermUserInfor, TOKEN_APP, uOi.id)
+            let ur = await getPermUserInfor(urlGetPermUserInfor, TOKEN_APP, uOi.srcKey) //perm-run05: mappingBy 為 id 時 userId 依登入對應(外部列傳 srcKey, 不是內部 id)
             assert.strict.equal(ur.user.grupsNames, 'oiGrup', 'cgrups 含 length 鍵時群組仍應被辨識（修正前為空字串）')
             let rule = ur.rules.find((v) => v.name === TARGET)
             assert.strict.ok(rule, `rules 應含標的 ${TARGET}`)
@@ -230,7 +231,7 @@ describe('api-getPermUserInfor', function() {
 
             let uAp = (await selectAllRows('users')).find((v) => v.srcKey === 'sk-ap-u1')
             assert.strict.ok(uAp && typeof uAp.id === 'string' && uAp.id !== '', '依 srcKey 應讀回外部使用者列')
-            let ur = await getPermUserInfor(urlGetPermUserInfor, TOKEN_APP, uAp.id)
+            let ur = await getPermUserInfor(urlGetPermUserInfor, TOKEN_APP, uAp.srcKey) //perm-run05: 同上(外部列傳 srcKey)
             assert.strict.equal(ur.user.grupsNames, 'apGrup')
             let by = new Map(ur.rules.map((v) => [v.name, v.isActive]))
             assert.strict.equal(by.get('apQ'), 'y', '被授權之標的')

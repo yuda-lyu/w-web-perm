@@ -1,0 +1,20 @@
+[
+ {
+  "id": "BASE",
+  "passes": 192,
+  "failures": 0
+ },
+ {
+  "id": "P2",
+  "note": "被觸及簽章不含來源",
+  "file": "server/procCore.mjs",
+  "status": 1,
+  "passes": 191,
+  "failures": 1,
+  "caught": true,
+  "titles": [
+   "unit-procCore-loginId (後台整表寫入: mappingBy=id 之登入識別撞值, R-MAPKEY-04) UL-016 lockExternalRows "
+  ],
+  "restored": true
+ }
+]

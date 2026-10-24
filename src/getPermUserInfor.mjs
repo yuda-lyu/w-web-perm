@@ -5,6 +5,16 @@ import isfun from 'wsemi/src/isfun.mjs'
 import fetchJson from './fetchJson.mjs'
 
 
+/**
+ * 由外部應用(node端)查詢指定使用者之權限資訊
+ *
+ * @param {String} url 輸入權限系統之getPermUserInfor網址字串，須含'token={sysToken}'與'userId={userId}'兩個佔位符，例如'http://localhost:11006/api/getPermUserInfor?token={sysToken}&userId={userId}'
+ * @param {String} tokenSelf 輸入系統介接用之app使用者token字串
+ * @param {String} userIdTar 輸入欲查詢之使用者id字串。權限系統mappingBy為'id'(預設)時，此為該使用者於外部系統之使用者id(與登入對應同一判準：外部同步列對應其來源鍵srcKey，後台列對應其id，不是權限系統配發之內部id；命中多筆時伺服端拒絕，HTTP回應msg為ambiguousUserFromPerm、本函數reject為cannotGetUserDataByUrl；查無使用者則回全停用之空權限)；mappingBy為'email'或'name'時，此為權限系統users表內之內部id
+ * @param {Object} [opt={}] 輸入設定物件，預設{}
+ * @param {Function} [opt.funConvertPerm] 輸入轉換函數，接收{user,rules}，回傳物件(可為Promise)以取代預設回傳值，未給則原樣回傳
+ * @returns {Promise} 回傳Promise，resolve為{user,rules}物件(或funConvertPerm轉換後之物件)，reject為錯誤鍵字串
+ */
 async function getPermUserInfor(url, tokenSelf, userIdTar, opt = {}) {
     //url: http://localhost:11006/api/getPermUserInfor?token={sysToken}&userId={userId}
     let errTemp = null

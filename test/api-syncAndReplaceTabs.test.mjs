@@ -367,10 +367,16 @@ describe('api-syncAndReplaceTabs', function() {
         assert.strict.equal(await snapOf('users', F), snap, '重送不增列、全列不變')
     })
 
-    it('API-sync-011-srcKey-namespace-per-from：users／grups／pemis 不同 from 之同一 srcKey 各自獨立(皆成功、各配 id、互不影響)', async function() {
+    it('API-sync-011-srcKey-namespace-per-from：grups／pemis 不同 from 之同一 srcKey 各自獨立(皆成功、各配 id、互不影響); users 於 mappingBy=id 時 srcKey 須跨來源唯一(perm-run05: 他來源同 srcKey 整批 loginIdCollision、零寫入)', async function() {
         const F = 'appTest-11'
         const G = 'appTest-11b'
-        for (let kt of ['users', 'grups', 'pemis']) {
+        //perm-run05(R-MAPKEY-05, 主控 2026-10-24 裁示①): users 之登入識別值(外部列為 srcKey)須跨全表唯一、不論 isActive; 預設 mappingBy=id 下他來源同 srcKey 不再各自獨立
+        assert.strict.deepEqual(await okSync('users', F, [MK.users('sk11-shared', ov('users', 'n11F-users'))], 'F users'), cnt(1, 0, 0, 0))
+        let snapU = await snapOf('users', F)
+        await expectReject('users', { from: G, rows: [MK.users('sk11-shared', ov('users', 'n11G-users'))] }, 'loginIdCollision', 'users 他 from 同 srcKey')
+        assert.strict.equal((await dbRows('users', G)).length, 0, '被拒時他 from 無任何列')
+        assert.strict.equal(await snapOf('users', F), snapU, '被拒時 F 逐位元不變')
+        for (let kt of ['grups', 'pemis']) {
             assert.strict.deepEqual(await okSync(kt, F, [MK[kt]('sk11-shared', ov(kt, `n11F-${kt}`))], 'F'), cnt(1, 0, 0, 0))
             //他 from 同 srcKey：不再被拒(修正前『主鍵已屬其他 from → invalidRows』僅 targets 仍成立，見下案)
             assert.strict.deepEqual(await okSync(kt, G, [MK[kt]('sk11-shared', ov(kt, `n11G-${kt}`))], 'G'), cnt(1, 0, 0, 0))

@@ -23,7 +23,7 @@
 //夾具(皆以外部來源 from 為界之真同步端點建立; 外部列 id 標籤／名稱前綴 xr／ext-, 不撞他檔夾具): 使用者 ext-u1(cgrups 引用 權限群組M2)、ext-u2、ext-u3(引用 ext-g1); 群組 ext-g1(cpemis 含 權限P1)、ext-g2;
 //  後台列夾具由管理者寫入 RPC(editTableRows)先於外部列建立。收尾 restoreTables(purgeExternalRows 直刪外部列夾具 → 整表寫回快照)並回驗筆數與無外部列殘留(R-E2E-ISO-01)。
 //perm-run03(外部匯入改依來源鍵 srcKey 差異同步, R-IMPORT-01): 外部列夾具之 id 標籤(id-xr-u1 等)是送入同步端點之 srcKey(syncRows 改送 srcKey 並丟掉 id), 庫內外部列之真實 id 由伺服端產生、不等於標籤;
-//  凡以 id 運作者(getPermUserInfor 查授權、store 欄位等待)先經 idOfSrc 取真實 id; 比對庫內外部列依 srcKey(rowOf／hasRow、PICK_UX／PICK_GX); 後台列夾具(editTableRows)id 不變。
+//  凡以 id 運作者(store 欄位等待)先經 idOfSrc 取真實 id; getPermUserInfor 查授權者 perm-run05 起 userId 依登入對應解析(mappingBy 為 id: 外部列傳 srcKey〔夾具標籤〕、後台列傳 id); 比對庫內外部列依 srcKey(rowOf／hasRow、PICK_UX／PICK_GX); 後台列夾具(editTableRows)id 不變。
 //授權樹期望值由 base seed 規則集依 R-AUTH-MERGE-00 推導(見 test/tools/e2eExt.mjs 之 TREE), 不抄實測值。
 //
 //跑法註記：本檔所有時序等待皆為偵測式(waitUntilExist／waitStoreCount／expectResultBox 等), 固定 waitForTimeout 只用於前端同步重繪後之短暫 settle(同既有 e2e 檔慣例)。
@@ -462,7 +462,8 @@ const CASES = [
         run: async (page) => {
             const idU3 = await idOfSrc('users', 'id-xr-u3') //ext-u3 之真實 id(外部列 id 由伺服端產生; 標籤 id-xr-u3 是 srcKey)
             assert.ok(idU3 !== null && idU3 !== 'id-xr-u3', `ext-u3 應已經同步建立且真實 id 不等於 srcKey 標籤(實得 ${JSON.stringify(idU3)})`)
-            assert.deepEqual(await getResolvedActiveTargets(page, idU3), TREE.P1, '改指派前 ext-u3 之授權＝ext-g1 之 P1')
+            assert.deepEqual(await getResolvedActiveTargets(page, 'id-xr-u3'), TREE.P1, '改指派前 ext-u3 之授權＝ext-g1 之 P1') //perm-run05: getPermUserInfor 之 userId 依登入對應, 外部列傳 srcKey(標籤), 不是內部 id
+            assert.deepEqual(await getResolvedActiveTargets(page, idU3), TREE.EMPTY, 'perm-run05: 傳內部 id 不是登入識別 → 查無 → 全停用之空權限(端到端)')
             await enter(page, 'grups', 6)
             const k1 = await rowIndexByCell(page, 'name', 'ext-g1')
             await page.locator(`.ag-row[row-index="${k1}"] .ag-cell[col-id="cpemis"] button`).first().click()
@@ -488,7 +489,7 @@ const CASES = [
             assert.equal(g.description, X_G1.description)
             assert.equal(g.from, F_G, '外部群組之來源不變')
             //spec E2E-008 驗證2(端到端不變式): 引用 ext-g1 之 ext-u3 實際查到之授權樹 = P1 ∪ P2(＝M1 之授權集)
-            assert.deepEqual(await getResolvedActiveTargets(page, await idOfSrc('users', 'id-xr-u3')), TREE.M1, '改指派後 ext-u3 之授權樹應含 P2 之標的')
+            assert.deepEqual(await getResolvedActiveTargets(page, 'id-xr-u3'), TREE.M1, '改指派後 ext-u3 之授權樹應含 P2 之標的')
         },
     },
     {

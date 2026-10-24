@@ -12,16 +12,23 @@
 //  M6 後台存檔撞值: 新增之後台列 id 等於有效外部列 srcKey → 整次拒收 loginIdCollision、零變更;
 //  M7 登入撞多筆(歷史資料: 後台列 id 與外部列 srcKey 相同, 皆有效)→ ambiguousUserFromPerm, 不取首筆; 資料通道 permission denied;
 //  M8 mappingBy 為 email／name 時行為不變: 以該欄位登入(與 srcKey 無關), 匯入 srcKey 等於後台 id 不拒;
-//  M9 停用的外部列不能登入; 重新匯入為有效後可登入; 停用列不構成撞值;
+//  M9 停用的外部列不能登入(恰 1 筆且停用 → 查無); 重新匯入為有效後可登入; perm-run05 起停用列仍構成撞值(不論 isActive): 匯入／後台存檔皆拒;
 //  M10 以 srcKey 登入之外部管理員呼叫寫入函數: 執行身分為其 perm 內部 id(稽核欄位記內部 id, 非 srcKey)。
+//perm-run05(主控 2026-10-24 收件裁示; 規則帳本 R-MAPKEY-05): 登入識別值須跨全表唯一、不論 isActive、含他來源——
+//  M11 匯入撞值(他來源): 批次 srcKey 等於他來源既有外部列之 srcKey(含停用者)→ 整批 loginIdCollision、零寫入; 同來源重送自己之列不算;
+//  M12 登入撞多筆不論有效與否: 兩來源同 srcKey 且一有效一停用 → ambiguousUserFromPerm(不以「只有一列有效」放行); 清掉其一後恰 1 筆有效照常登入;
+//  M13 匯入撞值(遷移前舊外部列): 他來源舊外部列(無 srcKey)以 id 為登入識別而參與, 批次 srcKey 等於其 id → 整批拒收;
+//  M14 getPermUserInfor(mappingBy='id'): userId 依登入對應解析——外部列傳 srcKey(傳內部 id 查無、回全停用空權限)、後台列傳 id、停用列查無、命中多筆 → HTTP 回應 msg 為 ambiguousUserFromPerm;
+//  M15 getPermUserInfor(mappingBy 為 email／name): userId 維持 perm 內部 id(不變), 傳 srcKey 查無;
+//  M16 後台存檔撞值不論 isActive: 新增停用之後台列 id 等於停用外部列 srcKey → 整次 loginIdCollision、零變更。
 //跑法(需測試鎖): node C:/opensrcOper/tools/quiet-run.mjs --name mapkeyid --lock --timeout 1800 -- npx mocha test/api-mapKeyId.test.mjs --timeout 300000
 import assert from 'assert'
-import { startApi, TOKEN_ADMIN, TOKEN_ADMIN2, TOKEN_APP, urlSync, getWoItems, callRpc, readTables, restoreTables, selectAllRows, cleanExternalFixtures } from './tools/api-setup.mjs'
+import { startApi, TOKEN_ADMIN, TOKEN_ADMIN2, TOKEN_APP, urlSync, getWoItems, callRpc, readTables, restoreTables, selectAllRows, cleanExternalFixtures, markSrLog, readSrLogSince } from './tools/api-setup.mjs'
 import { restartBackend, genTempSettings, apiBaseUrl } from './tools/e2e-setup.mjs'
 
 const A = assert.strict
 const X2 = 'id-for-admin2' //'{token-for-admin2}' 之使用者 id
-const FROMS = ['appMi-1', 'appMi-2', 'appMi-3', 'appMi-5', 'appMi-6', 'appMi-7', 'appMi-8', 'appMi-9', 'appMi-10']
+const FROMS = ['appMi-1', 'appMi-2', 'appMi-3', 'appMi-5', 'appMi-6', 'appMi-7', 'appMi-8', 'appMi-9', 'appMi-10', 'appMi-11a', 'appMi-11b', 'appMi-12a', 'appMi-12b', 'appMi-13a', 'appMi-13b', 'appMi-14', 'appMi-15', 'appMi-16']
 const T0 = '2026-01-01 00:00:00'
 
 let postSync = async (keyTable, body) => {
@@ -31,6 +38,8 @@ let postSync = async (keyTable, body) => {
 }
 let getUserByTokenApi = async (token) => (await fetch(`${apiBaseUrl}/api/getUserByToken?token=${encodeURIComponent(token)}`)).json()
 let getPermApi = async (token) => (await fetch(`${apiBaseUrl}/api/getPerm?token=${encodeURIComponent(token)}`)).json()
+//裸 HTTP 取 getPermUserInfor 之原始回應(app 使用者 token; 不經 client SDK, 以便檢視 msg 鍵)
+let getPermUserInforApi = async (userId) => (await fetch(`${apiBaseUrl}/api/getPermUserInfor?token=${encodeURIComponent(TOKEN_APP)}&userId=${encodeURIComponent(userId)}`)).json()
 
 //extRow: 匯入批次之外部使用者列(srcKey＝外部系統的使用者 id; 不送 id)
 let extRow = (srcKey, o = {}) => ({ srcKey, order: 0, name: 'admin2', email: 'admin2@example.com', description: 'ext', cgrups: '{}', isAdmin: 'y', isActive: 'y', ...o })
@@ -47,6 +56,19 @@ let backendRow = (id, o = {}) => ({ id, order: 99, name: 'admin2-b', email: 'adm
 let addBackend = async (rows) => {
     let cur = (await selectAllRows('users')).slice().sort((a, b) => (a.order || 0) - (b.order || 0)).map((v) => JSON.parse(JSON.stringify(v)))
     return await callRpc('updateUsers', [[...cur, ...rows]], TOKEN_ADMIN)
+}
+//waitLines: srLog 經 pino 非同步落檔, 以標記(動作之前取)定位後輪詢到符合 pred 之行(同 api-callerIdentity)
+let waitLines = async (mark, pred, label, ms = 30000) => {
+    let tEnd = Date.now() + ms
+    let lines = []
+    while (Date.now() < tEnd) {
+        lines = readSrLogSince(mark)
+        if (lines.some(pred)) {
+            return lines
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+    throw new Error(`${label}: ${ms} ms 內未見預期之 log 行; 實得 ${JSON.stringify(lines.map((l) => l.event || l.msg)).slice(0, 300)}`)
 }
 let snapUsers = async () => JSON.stringify((await selectAllRows('users')).slice().sort((a, b) => String(a.id).localeCompare(String(b.id))))
 
@@ -89,6 +111,7 @@ describe('api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 
         A.equal(r.msg.id, rows[0].id, '回的是 perm 內之列(內部 id)')
         let rp = await getPermApi(TOKEN_ADMIN2)
         A.equal(rp.state, 'success', `getPerm: ${JSON.stringify(rp).slice(0, 200)}`)
+        A.equal(rp.msg.user.id, rows[0].id, 'getPerm 以 getTokenUser 回傳之內部 id 查本人(不經 getPermUserInfor 之 userId 解析; perm-run05: 若誤經解析, 外部列以內部 id 會查無而 user 無 id)')
         let rc = await callRpc('getWebInfor', [], TOKEN_ADMIN2) //連線閘(標頭)＋執行身分(本體)皆以同一 token 通過完整驗證
         A.equal(rc.ok, true, `資料通道: ${JSON.stringify(rc).slice(0, 200)}`)
     })
@@ -192,19 +215,22 @@ describe('api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 
         await restartBackend('./settings.json')
     })
 
-    it('MI-009 停用的外部列不能登入; 重新匯入為有效後可登入; 停用列不構成撞值  [M9]', async function() {
+    it('MI-009 停用的外部列不能登入(恰 1 筆且停用 → 查無); 與之同值的停用後台列仍構成撞值(perm-run05: 不論 isActive, 後台存檔整次拒收); 重新匯入為有效後可登入  [M9]', async function() {
         let res = await postSync('users', { from: 'appMi-9', rows: [extRow(X2, { isActive: 'n' })] })
         A.equal(res.state, 'success', JSON.stringify(res))
         let r0 = await getUserByTokenApi(TOKEN_ADMIN2)
         A.equal(r0.state, 'error')
         A.equal(r0.msg, 'cannotGetUserFromPerm')
-        //停用的外部列 srcKey 等於後台列 id: 不構成撞值(匯入可、後台新增可)
-        let ra = await addBackend([backendRow(X2, { isActive: 'n' })]) //停用的後台列, 與停用的外部列 srcKey 相同
-        A.equal(ra.ok, true, JSON.stringify(ra))
-        let res2 = await postSync('users', { from: 'appMi-9', rows: [extRow(X2, { isActive: 'y' })] }) //外部列轉有效, 後台列仍停用: 可
+        //停用的外部列 srcKey 等於(停用)後台列 id: 構成撞值(修正前為「停用列不參與」而放行, 其後任一方轉有效即造成登入永久拒絕)
+        let before = await snapUsers()
+        let ra = await addBackend([backendRow(X2, { isActive: 'n' })])
+        A.equal(ra.ok, false, `不論 isActive 皆拒, 實得: ${JSON.stringify(ra).slice(0, 200)}`)
+        A.equal(ra.msg, 'loginIdCollision')
+        A.equal(await snapUsers(), before, '零變更')
+        let res2 = await postSync('users', { from: 'appMi-9', rows: [extRow(X2, { isActive: 'y' })] }) //同來源重送並轉有效: 可
         A.equal(res2.state, 'success', JSON.stringify(res2))
         let r1 = await getUserByTokenApi(TOKEN_ADMIN2)
-        A.equal(r1.state, 'success', `外部列有效、後台列停用: 恰 1 筆, 實得: ${JSON.stringify(r1)}`)
+        A.equal(r1.state, 'success', `外部列有效: 恰 1 筆, 實得: ${JSON.stringify(r1)}`)
         A.equal(r1.msg.srcKey, X2)
     })
 
@@ -220,5 +246,131 @@ describe('api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 
         A.ok(g)
         A.equal(g.userId, me.id, '建立者記 perm 內部 id')
         A.notEqual(g.userId, X2, '不是 srcKey')
+    })
+
+    it('MI-011 匯入撞值(他來源; perm-run05): 批次 srcKey 等於他來源既有外部列之 srcKey(含停用者)→ 整批 loginIdCollision、零寫入; 同來源重送自己之列不算; 改用不同 srcKey 後可匯入  [M11]', async function() {
+        let r1 = await postSync('users', { from: 'appMi-11a', rows: [extRow(X2, { isActive: 'n' })] })
+        A.equal(r1.state, 'success', JSON.stringify(r1))
+        let before = await snapUsers()
+        for (let isActive of ['y', 'n']) { //本批列有效或停用皆拒(停用列可被重新啟用, 不得預先放行)
+            let res = await postSync('users', { from: 'appMi-11b', rows: [extRow('mi11-ok', { name: 'ok11', email: 'ok11@example.com' }), extRow(X2, { name: 'dup11', email: 'dup11@example.com', isActive })] })
+            A.equal(res.state, 'error', `isActive=${isActive} 應被拒, 實得: ${JSON.stringify(res)}`)
+            A.equal(res.msg, 'loginIdCollision')
+            A.equal(await snapUsers(), before, '零寫入: users 表逐位元不變(含批次中不撞之列)')
+            A.ok(!JSON.stringify(res).includes(X2), '回應不得回顯 srcKey／id')
+        }
+        A.equal((await rowsFrom('appMi-11b')).length, 0)
+        let r2 = await postSync('users', { from: 'appMi-11a', rows: [extRow(X2, { isActive: 'n' })] }) //同來源重送自己之列
+        A.equal(r2.state, 'success', JSON.stringify(r2))
+        A.deepEqual(r2.msg, { nAdd: 0, nUpdate: 0, nDel: 0, nSame: 1 })
+        let r3 = await postSync('users', { from: 'appMi-11b', rows: [extRow('mi11-ok', { name: 'ok11', email: 'ok11@example.com' }), extRow('mi11-other', { name: 'oth11', email: 'oth11@example.com' })] })
+        A.equal(r3.state, 'success', `改用可唯一對應之 srcKey 後可匯入, 實得: ${JSON.stringify(r3)}`)
+        A.deepEqual(r3.msg, { nAdd: 2, nUpdate: 0, nDel: 0, nSame: 0 })
+    })
+
+    it('MI-012 登入撞多筆不論有效與否(perm-run05): 兩來源同 srcKey 且一有效一停用(歷史資料, 旁路寫庫)→ ambiguousUserFromPerm, 不因「只有一列有效」放行; 清掉其一後恰 1 筆有效照常登入  [M12]', async function() {
+        await putRows([
+            fullRow({ id: 'sys-mi12a', srcKey: X2, from: 'appMi-12a', isActive: 'n', name: 'mi12a', email: 'mi12a@example.com' }),
+            fullRow({ id: 'sys-mi12b', srcKey: X2, from: 'appMi-12b', isActive: 'y', name: 'mi12b', email: 'mi12b@example.com' }),
+        ])
+        let mark = await markSrLog()
+        let r = await getUserByTokenApi(TOKEN_ADMIN2)
+        A.equal(r.state, 'error', `命中 2 筆(含停用者)應拒絕, 實得: ${JSON.stringify(r)}`)
+        A.equal(r.msg, 'ambiguousUserFromPerm')
+        //既有跨來源重複之歷史資料: 登入拒絕並有 srLog 記錄(裁示①): 只記 mappingBy 與筆數, 不記登入值
+        let lines = await waitLines(mark, (l) => l.event === 'getTokenUser-error' && l.msg === 'ambiguousUserFromPerm', 'getTokenUser-error')
+        let ev = lines.find((l) => l.event === 'getTokenUser-error' && l.msg === 'ambiguousUserFromPerm')
+        A.equal(ev.mappingBy, 'id')
+        A.equal(ev.count, 2)
+        A.ok(!JSON.stringify(ev).includes(X2), 'srLog 不得記登入值')
+        let rc = await callRpc('getWebInfor', [], TOKEN_ADMIN2)
+        A.equal(rc.ok, false)
+        A.ok(/permission denied/.test(String(rc.msg)), `傳輸層回 permission denied，實得: ${rc.msg}`)
+        let rs = await getUserByTokenApi(TOKEN_ADMIN)
+        A.equal(rs.state, 'success', '其餘使用者不受影響')
+        await cleanExternalFixtures({ kts: ['users'], froms: ['appMi-12a'] }) //清掉停用的那一列
+        let r2 = await getUserByTokenApi(TOKEN_ADMIN2)
+        A.equal(r2.state, 'success', `恰 1 筆有效應登入, 實得: ${JSON.stringify(r2)}`)
+        A.equal(r2.msg.id, 'sys-mi12b')
+    })
+
+    it('MI-013 遷移前舊外部列(無 srcKey, 他來源)以 id 為登入識別而參與(主控裁示③): 批次 srcKey 等於其 id → 整批拒收、零寫入; 該來源首次匯入(srcKey＝舊 id)仍可遷移  [M13]', async function() {
+        await putRows([fullRow({ id: X2, from: 'appMi-13a', name: 'leg13', email: 'leg13@example.com' })]) //遷移前資料: 無 srcKey
+        let before = await snapUsers()
+        let res = await postSync('users', { from: 'appMi-13b', rows: [extRow(X2, { name: 'imp13', email: 'imp13@example.com' })] })
+        A.equal(res.state, 'error', `應被拒, 實得: ${JSON.stringify(res)}`)
+        A.equal(res.msg, 'loginIdCollision')
+        A.equal(await snapUsers(), before, '零寫入')
+        let r3 = await postSync('users', { from: 'appMi-13a', rows: [extRow(X2, { name: 'leg13', email: 'leg13@example.com', description: 'fixture' })] })
+        A.equal(r3.state, 'success', JSON.stringify(r3))
+        A.deepEqual(r3.msg, { nAdd: 0, nUpdate: 1, nDel: 0, nSame: 0 })
+    })
+
+    it('MI-014 getPermUserInfor(mappingBy=id)的 userId 依登入對應解析(perm-run05, 主控裁示②): 外部列傳 srcKey 命中、傳內部 id 查無(回全停用空權限)、後台列傳 id、停用列查無、命中多筆回 ambiguousUserFromPerm  [M14]', async function() {
+        let res = await postSync('users', { from: 'appMi-14', rows: [extRow(X2), extRow('mi14-off', { name: 'off14', email: 'off14@example.com', isActive: 'n' })] })
+        A.equal(res.state, 'success', JSON.stringify(res))
+        let me = (await rowsFrom('appMi-14')).find((v) => v.srcKey === X2)
+        A.ok(me && me.id !== X2, '前提: 外部列之內部 id 為系統配, 不是外部使用者 id')
+
+        let r1 = await getPermUserInforApi(X2) //外部列: 傳 srcKey
+        A.equal(r1.state, 'success', JSON.stringify(r1).slice(0, 200))
+        A.equal(r1.msg.user.id, me.id, '解析為該外部列(回的是內部 id)')
+        A.equal(r1.msg.user.srcKey, X2)
+
+        let r2 = await getPermUserInforApi(me.id) //傳內部 id: 不是登入識別 → 查無 → 全停用空權限(同不存在的 userId)
+        A.equal(r2.state, 'success', JSON.stringify(r2).slice(0, 200))
+        A.equal(r2.msg.user.id, undefined, '內部 id 不得命中外部列')
+        A.ok(Array.isArray(r2.msg.rules) && r2.msg.rules.every((v) => v.isActive === 'n'), '空權限')
+
+        let r3 = await getPermUserInforApi('id-for-admin') //後台列: 傳 id
+        A.equal(r3.state, 'success')
+        A.equal(r3.msg.user.id, 'id-for-admin')
+        A.ok(r2.msg.rules.length > 0 && r2.msg.rules.length === r3.msg.rules.length, '空權限須列出全部標的(筆數同有權限者), 不得是 rules=[] 之空洞「全 n」(外審 sol 第一輪#8)')
+
+        let r4 = await getPermUserInforApi('mi14-off') //停用的外部列: 查無
+        A.equal(r4.state, 'success')
+        A.equal(r4.msg.user.id, undefined, '停用列查無')
+
+        await putRows([fullRow({ id: X2, from: '', name: 'bk14', email: 'bk14@example.com' })]) //歷史撞值(旁路寫庫): 後台列 id 與外部列 srcKey 相同
+        let mark = await markSrLog()
+        let r5 = await getPermUserInforApi(X2)
+        A.equal(r5.state, 'error', `命中 2 筆應拒絕, 實得: ${JSON.stringify(r5).slice(0, 200)}`)
+        A.equal(r5.msg, 'ambiguousUserFromPerm')
+        //srLog: 只記 mappingBy 與筆數, 不記查詢值(外審 sol 第一輪#9)
+        let lines = await waitLines(mark, (l) => l.event === 'api/getPermUserInfor-error' && l.msg === 'ambiguousUserFromPerm', 'api/getPermUserInfor-error')
+        let ev = lines.find((l) => l.event === 'api/getPermUserInfor-error' && l.msg === 'ambiguousUserFromPerm')
+        A.equal(ev.mappingBy, 'id')
+        A.equal(ev.count, 2)
+        A.ok(!JSON.stringify(ev).includes(X2), 'srLog 不得記查詢值')
+    })
+
+    it('MI-015 getPermUserInfor(mappingBy 為 email／name)的 userId 維持 perm 內部 id(不變): 傳內部 id 命中、傳 srcKey 查無  [M15]', async function() {
+        for (let mode of ['email', 'name']) {
+            await restartBackend(genTempSettings({ mappingBy: mode }))
+            let from = 'appMi-15'
+            let res = await postSync('users', { from, rows: [extRow('mi15-guid', { name: 'mi15', email: 'mi15@example.com' })] })
+            A.equal(res.state, 'success', `mappingBy=${mode}: ${JSON.stringify(res)}`)
+            let me = (await rowsFrom(from))[0]
+            let r1 = await getPermUserInforApi(me.id)
+            A.equal(r1.state, 'success', `mappingBy=${mode}: ${JSON.stringify(r1).slice(0, 200)}`)
+            A.equal(r1.msg.user.id, me.id, `mappingBy=${mode} 傳內部 id 命中(不變)`)
+            let r2 = await getPermUserInforApi('mi15-guid')
+            A.equal(r2.state, 'success')
+            A.equal(r2.msg.user.id, undefined, `mappingBy=${mode} srcKey 不是 userId`)
+            await cleanExternalFixtures({ kts: ['users'], froms: [from] })
+        }
+        await restartBackend('./settings.json')
+    })
+
+    it('MI-016 後台存檔撞值不論 isActive(perm-run05): 停用之外部列 srcKey 等於新增之後台列 id(有效或停用)→ 整次 loginIdCollision、零變更  [M16]', async function() {
+        let res = await postSync('users', { from: 'appMi-16', rows: [extRow(X2, { isActive: 'n' })] })
+        A.equal(res.state, 'success', JSON.stringify(res))
+        let before = await snapUsers()
+        for (let isActive of ['y', 'n']) {
+            let ra = await addBackend([backendRow(X2, { isActive })])
+            A.equal(ra.ok, false, `isActive=${isActive} 應被拒, 實得: ${JSON.stringify(ra).slice(0, 200)}`)
+            A.equal(ra.msg, 'loginIdCollision')
+            A.equal(await snapUsers(), before, '零變更')
+        }
     })
 })

@@ -1,0 +1,193 @@
+[
+ {
+  "id": "BASE",
+  "passes": 24,
+  "failures": 0
+ },
+ {
+  "id": "K1",
+  "note": "登入查找只計有效列(修前口徑: 兩次 select 帶 isActive:y)",
+  "file": "server/keyCheck.mjs",
+  "status": 1,
+  "passes": 23,
+  "failures": 1,
+  "caught": true,
+  "titles": [
+   "api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 id, 撞值收嚴; perm-run04, R-MAPKEY-04) MI-01"
+  ],
+  "restored": true
+ },
+ {
+  "id": "K7",
+  "note": "登入多筆時只剩一列有效則放行(「只有一列有效」放行)",
+  "file": "server/keyCheck.mjs",
+  "status": 1,
+  "passes": 23,
+  "failures": 1,
+  "caught": true,
+  "titles": [
+   "api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 id, 撞值收嚴; perm-run04, R-MAPKEY-04) MI-01"
+  ],
+  "restored": true
+ },
+ {
+  "id": "K8",
+  "note": "恰 1 筆停用仍登入該列",
+  "file": "server/keyCheck.mjs",
+  "status": 2,
+  "passes": 22,
+  "failures": 2,
+  "caught": true,
+  "titles": [
+   "api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 id, 撞值收嚴; perm-run04, R-MAPKEY-04) MI-00",
+   "api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 id, 撞值收嚴; perm-run04, R-MAPKEY-04) MI-01"
+  ],
+  "restored": true
+ },
+ {
+  "id": "S1",
+  "note": "匯入端不檢查登入識別撞值",
+  "file": "server/syncCore.mjs",
+  "status": 3,
+  "passes": 21,
+  "failures": 3,
+  "caught": true,
+  "titles": [
+   "api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 id, 撞值收嚴; perm-run04, R-MAPKEY-04) MI-00",
+   "api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 id, 撞值收嚴; perm-run04, R-MAPKEY-04) MI-01",
+   "api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 id, 撞值收嚴; perm-run04, R-MAPKEY-04) MI-01"
+  ],
+  "restored": true
+ },
+ {
+  "id": "P1",
+  "note": "後台存檔不檢查登入識別撞值",
+  "file": "server/procCore.mjs",
+  "status": 3,
+  "passes": 21,
+  "failures": 3,
+  "caught": true,
+  "titles": [
+   "api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 id, 撞值收嚴; perm-run04, R-MAPKEY-04) MI-00",
+   "api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 id, 撞值收嚴; perm-run04, R-MAPKEY-04) MI-00",
+   "api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 id, 撞值收嚴; perm-run04, R-MAPKEY-04) MI-01"
+  ],
+  "restored": true
+ },
+ {
+  "id": "W1",
+  "note": "getPermUserInfor 恢復只以內部 id 查找(不經解析)",
+  "file": "server/WWebPerm.mjs",
+  "invalid": "find 命中 0 處: await getGenUserAndRulesByUserId(userIdPerm)",
+  "restored": true
+ },
+ {
+  "id": "W2",
+  "note": "getPermUserInfor 解析命中多筆不拒絕",
+  "file": "server/WWebPerm.mjs",
+  "status": 1,
+  "passes": 23,
+  "failures": 1,
+  "caught": true,
+  "titles": [
+   "api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 id, 撞值收嚴; perm-run04, R-MAPKEY-04) MI-01"
+  ],
+  "restored": true
+ },
+ {
+  "id": "W3",
+  "note": "getPermUserInfor 於 email／name 模式亦解析(應維持內部 id)",
+  "file": "server/WWebPerm.mjs",
+  "status": 2,
+  "passes": 22,
+  "failures": 2,
+  "caught": true,
+  "titles": [
+   "api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 id, 撞值收嚴; perm-run04, R-MAPKEY-04) MI-01",
+   "api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 id, 撞值收嚴; perm-run04, R-MAPKEY-04) MI-01"
+  ],
+  "restored": true
+ },
+ {
+  "id": "W4",
+  "note": "getPermUserInfor 查無改 reject userIdNoPermrules(應維持空權限)",
+  "file": "server/WWebPerm.mjs",
+  "invalid": "find 命中 0 處: return iseobj(user) ? user.id : null",
+  "restored": true
+ },
+ {
+  "id": "W5",
+  "note": "/api/getPerm 亦經 resolvePermUserId",
+  "file": "server/WWebPerm.mjs",
+  "status": 1,
+  "passes": 23,
+  "failures": 1,
+  "caught": true,
+  "titles": [
+   "api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 id, 撞值收嚴; perm-run04, R-MAPKEY-04) MI-00"
+  ],
+  "restored": true
+ },
+ {
+  "id": "W8",
+  "note": "getPermUserInfor 不採用已解析之列, 改以內部 id 重讀(解析與重讀間可被換人)",
+  "file": "server/WWebPerm.mjs",
+  "status": 0,
+  "passes": 24,
+  "failures": 0,
+  "caught": false,
+  "titles": [],
+  "restored": true
+ },
+ {
+  "id": "W11",
+  "note": "resolvePermUserId 命中後再以內部 id 重讀使用者(外審 sol 第二輪#1 之改壞範例)",
+  "file": "server/WWebPerm.mjs",
+  "status": 0,
+  "passes": 24,
+  "failures": 0,
+  "caught": false,
+  "titles": [],
+  "restored": true
+ },
+ {
+  "id": "W9",
+  "note": "resolvePermUserId 多筆時不記 srLog",
+  "file": "server/WWebPerm.mjs",
+  "status": 1,
+  "passes": 23,
+  "failures": 1,
+  "caught": true,
+  "titles": [
+   "api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 id, 撞值收嚴; perm-run04, R-MAPKEY-04) MI-01"
+  ],
+  "restored": true
+ },
+ {
+  "id": "W10",
+  "note": "resolvePermUserId 之 srLog 記查詢值",
+  "file": "server/WWebPerm.mjs",
+  "status": 1,
+  "passes": 23,
+  "failures": 1,
+  "caught": true,
+  "titles": [
+   "api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 id, 撞值收嚴; perm-run04, R-MAPKEY-04) MI-01"
+  ],
+  "restored": true
+ },
+ {
+  "id": "W7",
+  "note": "getTokenUser 多筆不拒絕(放行 null→查無)",
+  "file": "server/WWebPerm.mjs",
+  "status": 2,
+  "passes": 22,
+  "failures": 2,
+  "caught": true,
+  "titles": [
+   "api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 id, 撞值收嚴; perm-run04, R-MAPKEY-04) MI-00",
+   "api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 id, 撞值收嚴; perm-run04, R-MAPKEY-04) MI-01"
+  ],
+  "restored": true
+ }
+]

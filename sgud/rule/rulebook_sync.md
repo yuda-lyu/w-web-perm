@@ -64,35 +64,37 @@
 
 ### R-MAPKEY-04 users 登入對應 `mappingBy='id'`: 外部列對 `srcKey`、後台列對 `id`, 撞值於匯入／後台存檔／登入三處皆拒(O1; perm-run04, 2026-10-24; ADR-038 Update)
 
+> **perm-run05 修訂(2026-10-24, 主控收件裁示①②③)**: 本節規則 2～4 之「只計有效列」「他來源外部列不在匯入端拒收」及下表標 **[05 改]** 之列已被 **R-MAPKEY-05**(跨全表、不論 isActive、含他來源; `getPermUserInfor` 同口徑)取代, **以 R-MAPKEY-05 為準**; 其餘(O1 登入識別值定義、歷史撞值不擋之原則、檢查位置、固定錯誤鍵、`email`／`name` 不變)沿用.
+
 來源: 規格 `C:\opensrcOper\dspec\外部匯入之定義與機制.md` 第 9 節末(主控 2026-10-24 對 perm-run03 待裁示 1 採 O1; 不採「新增 `mappingBy='srcKey'`」〔O3〕, 因升版後以 `id` 模式部署者新匯入之使用者將靜默無法登入); 上位 R-PRINCIPLE-00 原則 3(衝突收嚴＋提示)、4(所有入口一致).
 
 軸: 入口(外部匯入／後台存檔／登入) × 列形狀(後台列〔from 空〕有效／停用、外部列〔from 非空〕有效／停用、遷移前舊外部列〔無 srcKey〕、他 from 外部列同 srcKey) × 被觸及者(批次列／新增或停用改啟用之後台列／歷史既有未觸及) × `mappingBy`(`id`〔含省略與不合法值〕／`email`／`name`).
 
 - **規則**:
   1. **登入識別值** `keyCheck.loginIdOf(row)`: 後台列(from 空)＝`id`; 外部列(from 非空)＝`srcKey`(其 `id` 是本系統配發之內部主鍵,**不是登入識別**); 遷移前之舊外部列(無 `srcKey`)暫以 `id`(同升版前,首次匯入補上 `srcKey` 後即改以 `srcKey`; 否則升版後至首次推送前所有舊外部使用者無法登入). 判斷**僅對 `mappingBy` 為 `id`**(含省略與不合法值); `email`／`name` 不變(從不看 `srcKey`).
-  2. **登入查找** `keyCheck.findLoginUsers(woItems.users, mappingBy, vSelf)`(`getTokenUser` 唯一呼叫點): `id` 模式以兩次帶條件之 `select`(`{id, isActive:'y'}`、`{srcKey, isActive:'y'}`,不做全表讀取)合併去重後以 `loginIdOf` 複判,結果一律經 `pickUniqueUser`——恰 1 筆登入、0 筆 `cannotGetUserFromPerm`、**多於 1 筆 `ambiguousUserFromPerm`(不取首筆)**; ORM 讀取失敗原樣拋出. 登入回的是 perm 內之列(`id` 為內部 id),`getUserIdByToken`／稽核欄位／`requireAdmin` 皆用該內部 id.
-  3. **撞值** `keyCheck.findLoginIdClash(rowsAfter, isTouched)`: 有效(`isActive='y'`)外部列之 `srcKey` 等於有效後台列之 `id`. 只有有效列參與(登入只匹配有效列); 只擋「被本次觸及」者. **匯入批次**(`syncCore.mjs`,於配對／寫入之前,表鎖內新鮮讀取之「他 from 之列＋本批」上判斷,本批列皆視為被觸及,同 R-MAPKEY-01 批次全列參與): 撞值 → 整批 `loginIdCollision`、零寫入,srLog `syncAndReplaceTabs-error`(reason `srcKeyIsAdminId`、`from`、`row`、`field:'srcKey'`). **後台存檔**(`procCore.updateTabItems`,位於**外部列守門〔`checkExternalWrite`〕與基準檢查之後、寫入前驗證〔`validateRowsBeforeWrite`〕之前**——不改變 perm-run03 既有拒收之優先序: 例如 `saveNewRowExists`、`saveExternalRowChanged`、`saveBaselineRequired` 皆先於撞值檢查; `guardWrite` 表鎖內): 被觸及＝新增之列、庫內為停用而送入為有效之列、或**登入識別(類別〔後台／外部〕＋值〔`loginIdOf`〕)與庫內不同之列**(外審 sol#2: `lockExternalRows` 為假時後台可改 `from`,外部列改為後台列即換了登入識別而可能撞到他列; 外部列守門啟用時 `from`／`srcKey` 不可改,由 `checkExternalWrite` 另拒); 撞值 → 整次 `loginIdCollision`、零變更,srLog `updateTabItems-ckKey-error`(`key:'id'`、reason `adminIdIsSrcKey`、`row`). **歷史既有(未被觸及)撞值不擋**(否則已有歷史資料之庫無法在後台修復; 同 R-MAPKEY-03): 原樣送回、`pickKeysOnly` 群組指派、刪除其中一列皆可存. 兩處 log 皆不記 `id`／`srcKey` 之值.
-  4. **不在匯入端拒收**: 他來源外部列彼此同 `srcKey`(`srcKey` 僅在 `from` 內唯一,README 已載; 規格只定外部 `srcKey` 對後台 `id`)、批次 `srcKey` 等於他來源外部列之內部 `id`(內部 id 不是登入識別)、遷移前舊外部列之 `id`(其 `id` 與後台列 `id` 因主鍵唯一不可能相同). 前者於登入時命中多筆即拒絕(規則 2).
+  2. **登入查找** `keyCheck.findLoginUsers(woItems.users, mappingBy, vSelf)`(`getTokenUser` 唯一呼叫點): `id` 模式以兩次帶條件之 `select`(`{id}`、`{srcKey}`; **[05 改]** perm-run05 起不帶 `isActive`〔不論有效與否計筆〕,不做全表讀取)合併去重後以 `loginIdOf` 複判——**多於 1 筆〔不論有效與否〕`ambiguousUserFromPerm`(不取首筆)**、恰 1 筆有效登入、恰 1 筆停用或 0 筆 `cannotGetUserFromPerm`(見 R-MAPKEY-05); ORM 讀取失敗原樣拋出. 登入回的是 perm 內之列(`id` 為內部 id),`getUserIdByToken`／稽核欄位／`requireAdmin` 皆用該內部 id.
+  3. **撞值** `keyCheck.findLoginIdClashDetail(rowsAfter, isTouched)`(`findLoginIdClash` 為其索引版): 外部列之 `srcKey` 等於後台列之 `id`〔kind `adminId`〕**[05 改]** 或他來源外部列之 `srcKey`〔kind `otherFrom`〕, 不論 `isActive`(perm-run04 原為「只有有效列參與」; 見 R-MAPKEY-05). 只擋「被本次觸及」者. **匯入批次**(`syncCore.mjs`,於配對／寫入之前,表鎖內新鮮讀取之「他 from 之列＋本批」上判斷,本批列皆視為被觸及,同 R-MAPKEY-01 批次全列參與): 撞值 → 整批 `loginIdCollision`、零寫入,srLog `syncAndReplaceTabs-error`(reason `srcKeyIsAdminId`〔對後台列〕／`srcKeyOtherFrom`〔對他來源外部列; 05 新增〕、`from`、`row`、`field:'srcKey'`). **後台存檔**(`procCore.updateTabItems`,位於**外部列守門〔`checkExternalWrite`〕與基準檢查之後、寫入前驗證〔`validateRowsBeforeWrite`〕之前**——不改變 perm-run03 既有拒收之優先序: 例如 `saveNewRowExists`、`saveExternalRowChanged`、`saveBaselineRequired` 皆先於撞值檢查; `guardWrite` 表鎖內): 被觸及＝新增之列、或**登入識別(類別〔後台／外部＋來源 `from`〕＋值〔`loginIdOf`〕)與庫內不同之列**〔**[05 改]** 停用改啟用不算被觸及: 登入識別未變; 簽章含來源，外部列換 `from` 即被觸及〕(外審 sol#2: `lockExternalRows` 為假時後台可改 `from`,外部列改為後台列即換了登入識別而可能撞到他列; 外部列守門啟用時 `from`／`srcKey` 不可改,由 `checkExternalWrite` 另拒); 撞值 → 整次 `loginIdCollision`、零變更,srLog `updateTabItems-ckKey-error`(`key:'id'`、reason `adminIdIsSrcKey`／`srcKeyOtherFrom`〔05 新增〕、`row`). **歷史既有(未被觸及)撞值不擋**(否則已有歷史資料之庫無法在後台修復; 同 R-MAPKEY-03): 原樣送回、`pickKeysOnly` 群組指派、刪除其中一列皆可存. 兩處 log 皆不記 `id`／`srcKey` 之值.
+  4. **不在匯入端拒收**: 批次 `srcKey` 等於他來源外部列之內部 `id`(有 `srcKey` 者; 內部 id 不是登入識別). **[05 改]** 原載「他來源外部列彼此同 `srcKey` 不在匯入端拒收、登入時才拒」已**不成立**: 主控 2026-10-24 裁示①(不同外部系統之使用者 id 碰撞常見而非同一人)改為匯入端整批拒收 `loginIdCollision`(見 R-MAPKEY-05); 遷移前舊外部列(無 `srcKey`)以 `id` 為登入識別而參與比對(裁示③).
   5. 固定錯誤鍵 `loginIdCollision`(`procLang.mjs`,eng／cht,不含佔位符、不回顯值); 前端不知 `mappingBy`(伺服端選項),後台存檔被拒時以伺服端回的鍵經 `showCheckYes` 顯示.
 - **輸入空間表(36 格,逐格對應測試; 外審 sol 補 33～36)**:
 
 | # | 入口 | 情境(對向列〔既有〕／被觸及列) | 結果 | 測試 |
 |---|---|---|---|---|
 | 1 | 匯入 | 批次列有效 srcKey＝有效後台列 id | 拒 `loginIdCollision`、零寫入 | SC-L1、MI-005 |
-| 2 | 匯入 | 批次列停用 srcKey＝有效後台列 id | 過 | SC-L4 |
-| 3 | 匯入 | 批次列有效 srcKey＝停用後台列 id | 過 | SC-L4(後半) |
-| 4 | 匯入 | 同列由停用重送為有效(後台列有效) | 拒、庫內維持上次結果 | SC-L4 |
+| 2 | 匯入 | 批次列停用 srcKey＝有效後台列 id | **[05 改]** 拒 `loginIdCollision`、零寫入(原: 過) | SC-L4 |
+| 3 | 匯入 | 批次列有效 srcKey＝停用後台列 id | **[05 改]** 拒(原: 過) | SC-L4(後半) |
+| 4 | 匯入 | 同列由停用重送為有效(後台列有效) | **[05 改]** 首次停用推送即已拒(見 2), 無「放行後轉有效」之狀態 | SC-L4 |
 | 5 | 匯入 | `mappingBy` 為 email／name,srcKey＝後台 id | 過(不變) | SC-L5、MI-008 |
-| 6 | 匯入 | srcKey＝他來源外部列之內部 id 或其 srcKey | 過(登入時 2 筆才拒) | SC-L3 |
+| 6 | 匯入 | srcKey＝他來源外部列之內部 id 或其 srcKey | 內部 id(該列有 srcKey): 過(內部 id 不是登入識別); **[05 改]** 其 srcKey: 拒 `loginIdCollision`(含該列停用; 原: 過、登入時 2 筆才拒) | SC-L3、MI-011 |
 | 7 | 匯入 | 遷移(舊外部列,srcKey＝舊 id) | 過、nUpdate=1、id 不變 | SC-L6、MI-003 |
 | 8 | 匯入 | 歷史撞值存在,批次含該 srcKey | 拒(批次全列參與)；不含該列之批次過(該歷史列依差異同步刪除) | SC-L10 |
 | 9 | 匯入 | 其他表(grups／pemis)srcKey＝後台 id | 不適用、過 | SC-L7 |
 | 10 | 匯入 | 多列批次僅一列撞值 | 整批拒、其餘列亦不寫 | SC-L2、MI-005 |
 | 11 | 後台存檔 | 新增有效後台列 id＝有效外部列 srcKey | 拒、零變更 | UL-001、MI-006 |
-| 12 | 後台存檔 | 新增停用後台列 id＝有效外部列 srcKey | 過 | UL-003 |
-| 13 | 後台存檔 | 後台停用列改啟用,id＝有效外部列 srcKey | 拒 | UL-004 |
-| 14 | 後台存檔 | 同上但外部列停用 | 過 | UL-004、MI-009 |
-| 15 | 後台存檔 | 新增有效後台列 id＝停用外部列 srcKey | 過 | UL-005 |
+| 12 | 後台存檔 | 新增停用後台列 id＝有效外部列 srcKey | **[05 改]** 拒(原: 過) | UL-003、MI-009 |
+| 13 | 後台存檔 | 歷史撞值之後台停用列改啟用,id＝有效外部列 srcKey | **[05 改]** 過: 停用改啟用不改登入識別, 不算被觸及(原: 拒; 登入時照拒) | UL-004 |
+| 14 | 後台存檔 | 同上但外部列亦停用 | 過(同 13) | UL-004 |
+| 15 | 後台存檔 | 新增有效後台列 id＝停用外部列 srcKey | **[05 改]** 拒(原: 過) | UL-005、MI-016 |
 | 16 | 後台存檔 | 歷史撞值原樣送回／群組指派／刪其一 | 過(可修復) | UL-006、MI-007 |
 | 17 | 後台存檔 | 歷史撞值存在,另新增撞另一外部列 | 拒(不被歷史遮蔽) | UL-007 |
 | 18 | 後台存檔 | `mappingBy` 為 email／name | 過(不變) | UL-002 |
@@ -103,22 +105,65 @@
 | 23 | 登入 | 外部列內部 id＝token id、srcKey 不同 | 0 筆 `cannotGetUserFromPerm` | LI-011、MI-002 |
 | 24 | 登入 | 遷移後外部列(srcKey＝id) | 1 筆(去重) | LI-012、MI-003 |
 | 25 | 登入 | 遷移前舊外部列(無 srcKey) | 暫以 id、1 筆 | LI-013、MI-003 |
-| 26 | 登入 | 停用列 | 0 筆 | LI-014、MI-009 |
+| 26 | 登入 | 停用列 | 恰 1 筆且停用 → 視同查無 `cannotGetUserFromPerm`; **[05 改]** 與他列同值(不論他列有效與否)→ 2 筆 `ambiguousUserFromPerm` | LI-014、LI-016b、MI-009、MI-012 |
 | 27 | 登入 | 後台 id 與外部 srcKey 同時符合(歷史資料) | 2 筆 `ambiguousUserFromPerm` | LI-015、MI-007 |
-| 28 | 登入 | 兩來源外部列同 srcKey | 2 筆 `ambiguousUserFromPerm` | LI-016 |
+| 28 | 登入 | 兩來源外部列同 srcKey(歷史資料) | 2 筆 `ambiguousUserFromPerm`(匯入端 **[05 改]** 已拒收, 見 6) | LI-016 |
 | 29 | 登入 | 外部列內部 id＝另一外部列 srcKey | 只符合 srcKey 那列 | LI-017 |
 | 30 | 登入 | `mappingBy` 為 email／name | 不變(以該欄位;與 srcKey 無關) | LI-018、MI-008 |
 | 31 | 登入 | `mappingBy` 不合法值 | 視同 id | LI-019 |
 | 32 | 登入 | ORM 讀取失敗(第一次或第二次查詢) | 原樣拋出(不吞成 0 筆或採信第一次) | LI-020、LI-020b、LI-021(條件含 isActive) |
 | 33 | 後台存檔 | `lockExternalRows` 為假,外部列改 `from` 為空使登入識別由 srcKey 變為 id 而撞他來源有效外部列 srcKey | 拒 `loginIdCollision`、零變更(含 srcKey 恰等於 id 而只有類別改變者); 識別改變而無撞值、歷史撞值原樣送回／無關欄位修改／刪其一 → 過 | UL-012、UL-013、UL-014、UL-015 |
-| 34 | 匯入／後台／登入 | 精確比對: `srcKey`／`id` 前後空白、大小寫不同; `isActive` 為 `'Y'`／`true`／`1`／`''`／缺漏 | 不撞、不匹配(只有 `'y'` 參與; 值原樣 `===`) | LI-020c、LI-038 |
+| 34 | 匯入／後台／登入 | 精確比對: `srcKey`／`id` 前後空白、大小寫不同 | 不撞、不匹配(值原樣 `===`) | LI-020c、LI-038 |
+| 34b | 匯入／後台／登入 | **[05 改]** `isActive` 為 `'Y'`／`true`／`1`／`''`／缺漏(非標準值) | 撞值檢查不論 `isActive` 故**仍撞**(LI-033); 登入單獨命中恰 1 筆且 `isActive` 非 `'y'` 視同查無(LI-020c), 與有效列同值則 2 筆拒(LI-016b) | LI-020c、LI-033、LI-016b |
 | 35 | 匯入 | 撞值與其他拒收並存 | 先到先拒: `idNotAllowed` → `srcKeyInvalid` → `srcKeyDuplicate` → …名稱／對應鍵 → 讀庫 → 跨來源 → **`loginIdCollision`** → 依 `srcKey` 配對(`srcKeyConflict`);庫內異常且本批無撞值者仍回 `srcKeyConflict` | SC-L11 |
-| 36 | 登入 | 兩來源外部列同 `srcKey` 且僅一列有效(設計限制) | 登入到該有效列(與 email／name 對應鍵同口徑,部署須確保 token 使用者 id 跨來源唯一); 兩列皆有效 → 2 筆拒 | LI-016、LI-016b |
+| 36 | 登入 | 兩來源外部列同 `srcKey` 且僅一列有效 | **[05 改]** 2 筆 `ambiguousUserFromPerm`, 不放行(原「設計限制」: 登入到該有效列; 主控裁示①: 已停用者之 token 不得對到他來源之有效列); 兩列皆有效／皆停用 → 亦 2 筆拒 | LI-016、LI-016b、MI-012 |
 
 - **站點全集(盤點指令)**: `git grep -nE "findLoginUsers|findLoginIdClash|loginIdOf" -- server`(`keyCheck.mjs` 定義; `WWebPerm.mjs:getTokenUser`、`syncCore.mjs:syncAndReplaceTabs`、`procCore.mjs:updateTabItems` 各一呼叫點); `git grep -n "woItems.users.select(" -- server` 須只剩 `getGenUserByKV`(以內部 id 反查,恆 ≤ 1 筆)——可執行版 `unit-keyCheck` SITE-KC-004、`unit-loginId` SITE-LI-001～004. 其他以 `mappingBy` 取 users 之處(`procCore`／`syncCore` 之 email／name 檢查、`nameDupReport` 離線工具)不屬登入識別,不變.
-- **判準**: 已套(三個入口); 刻意不套(`email`／`name` 模式; 停用列; 歷史未觸及; 他來源外部列同 `srcKey`〔登入時拒〕).
-- **測試**: `unit-loginId`(純函數 LI-001～038＋LI-016b／020b／020c＋SITE-LI)、`unit-procCore-loginId`(UL-001～015)、`unit-syncCore` SC-L1～L11、`api-mapKeyId`(真後端 MI-001～010)、`unit-keyCheck` SITE-KC-004; 變異驗證見報告與 `spec/evidence/perm-run04/mutation-results.md`.
-- **已知限制**: ①他來源外部列彼此同 `srcKey` 不在匯入端拒收,登入時才拒(`ambiguousUserFromPerm`),與 README「`srcKey` 僅在 `from` 內唯一」一致; ②離線稽核工具 `nameDupReport` 之 `--mapping-by id` 仍只報告 id 缺漏(未列 `srcKey`／`id` 撞值); ③舊外部列(無 `srcKey`)暫以 `id` 登入是過渡規則,首次匯入補上 `srcKey` 後失效.
+- **判準**: 已套(三個入口); 刻意不套(`email`／`name` 模式; 歷史未觸及). 〔**[05 改]** 原載「停用列」「他來源外部列同 `srcKey`〔登入時拒〕」為刻意不套——perm-run05 起兩者皆已套用(R-MAPKEY-05)。〕
+- **測試**: `unit-loginId`(純函數 LI-001～038＋LI-016b／020b／020c＋SITE-LI)、`unit-procCore-loginId`(UL-001～015)、`unit-syncCore` SC-L1～L11、`api-mapKeyId`(真後端 MI-001～010)、`unit-keyCheck` SITE-KC-004; 變異驗證見報告與 `spec/evidence/perm-run04/mutation-results.md`. 〔perm-run05 更新見 R-MAPKEY-05。〕
+- **已知限制**: ①〔原載「他來源外部列彼此同 `srcKey` 不在匯入端拒收,登入時才拒」——**perm-run05 起不成立**,見 R-MAPKEY-05〕; ②〔原載「`nameDupReport --mapping-by id` 仍只報告 id 缺漏」——**perm-run05 起不成立**,已列登入識別撞值組,見 R-MAPKEY-05〕; ③舊外部列(無 `srcKey`)暫以 `id` 登入是過渡規則,首次匯入補上 `srcKey` 後失效(其 `id` 在失效前仍參與撞值比對).
+
+### R-MAPKEY-05 登入識別值須跨全表唯一(不論 isActive、含他來源); `getPermUserInfor` 的 userId 依登入對應解析(perm-run05, 2026-10-24; ADR-038 Update)
+
+來源: 主控 2026-10-24 對 perm-run04 收件裁示——①`mappingBy='id'` 時 `srcKey` 須跨全部來源唯一(不論 isActive)且不得等於後台列 `id`, 匯入撞值整批拒收並提示部署方改用可唯一對應之鍵, 登入命中多筆(有效與否)一律拒絕、不得「只有一列有效則放行」, 既有跨來源重複之歷史資料登入拒絕＋srLog, README Upgrade Notes 載稽核與處置; ②`/api/getPermUserInfor` 的 `userId` 於 `mappingBy='id'` 時依同一登入對應解析(外部列→`srcKey`、後台列→`id`、撞值拒絕), 其他模式維持內部 id, JSDoc／README 註明並入 Upgrade Notes; ③遷移前舊外部列(無 `srcKey`)以 id 登入核可. 理由: 不同外部系統之使用者 id 碰撞常見而非同一人; 停用列可被重新啟用, 若匯入放行停用列之撞值, 其後轉有效即造成登入永久拒絕; 登入識別是身分, 衝突就收嚴(R-PRINCIPLE-00 原則 3、4).
+
+軸: 入口(匯入／後台存檔／登入／`getPermUserInfor`／離線稽核) × 列形狀(後台列、外部列有 `srcKey`、舊外部列無 `srcKey`) × `isActive`(有效／停用／非標準值) × 來源關係(同 `from`／不同 `from`／後台對外部) × 被觸及者 × `mappingBy`(`id`〔含省略與不合法值〕／`email`／`name`).
+
+- **規則**:
+  1. **撞值組合**(`keyCheck.findLoginIdClashDetail`, 單一擁有者): 同一登入識別值(`loginIdOf`)出現在兩列, 且該對**不是**下列三種不屬登入識別撞值者——「兩後台列」(登入識別值＝主鍵 id, 同一主鍵於表中不可並存)、「同一來源〔`from` 相同〕皆有 `srcKey` 之兩外部列」(同步端 `srcKeyDuplicate`／`srcKeyConflict` 另拒)、「同一來源皆無 `srcKey` 之兩舊外部列」(同一主鍵); 其餘皆撞——後台↔外部(kind `adminId`)、外部↔他來源外部(kind `otherFrom`)、**同一來源一有 `srcKey` 一為舊形而其 id 等於對方 `srcKey`(claimTwice 形, kind `sameFrom`; 外審 sol 第一輪#1: 後台於 `lockExternalRows` 為假時可新增此形, 登入命中兩筆、同步端回 `srcKeyConflict`)**. **不論 `isActive`**(含非標準值)、不論有無被停用. 外部列之內部 `id`(有 `srcKey` 者)不是登入識別, 不參與; 舊外部列(無 `srcKey`)以 `id` 參與(裁示③).
+  2. **匯入**(`syncCore`, 位置不變: 跨 from 檢查之後、依 `srcKey` 配對之前, 表鎖內新鮮讀取): 本批列皆視為被觸及, 與他 `from` 任一既有列撞 → 整批 `loginIdCollision`、零寫入, srLog `syncAndReplaceTabs-error` reason `srcKeyIsAdminId`／`srcKeyOtherFrom`、`from`、`row`、`field:'srcKey'`(不記值). 固定訊息提示「改用可唯一對應使用者的值, 或請部署方改以其他可唯一對應的鍵〔例如 email〕」.
+  3. **後台存檔**(`procCore.updateTabItems`, 位置不變: `checkExternalWrite`／基準檢查之後、`validateRowsBeforeWrite` 之前, perm-run03 錯誤優先序不變): 被觸及＝新增之列, 或簽章〔類別 `a`／`x:<from>` ＋ `loginIdOf`〕與庫內同 id 列不同之列(庫內舊列**不再只取有效者**); 停用↔啟用不改簽章, 不算被觸及. 歷史撞值原樣送回／群組指派／刪其一皆可存(可修復). reason `adminIdIsSrcKey`／`srcKeyOtherFrom`／`srcKeyClaimTwice`(同來源 claimTwice 形).
+  4. **登入**(`findLoginUsers`; `getTokenUser`): `id` 模式的兩次 `select` 不帶 `isActive`, 合併去重、`loginIdOf` 複判後**不論有效與否計筆**: 多於 1 筆 → `ambiguousUserFromPerm`(srLog 只記 `mappingBy` 與筆數); 恰 1 筆有效 → 登入; 恰 1 筆停用或 0 筆 → `cannotGetUserFromPerm`. `email`／`name` 不變.
+  5. **`getPermUserInfor`**(`WWebPerm.mjs:resolvePermUserId`, 僅 `/api/getPermUserInfor` 路由使用): `mappingBy` 為 `id` 時 `userId` 以 `findLoginUsers` 解析——多筆 → HTTP 回 `ambiguousUserFromPerm`(SDK 對外 reject `cannotGetUserDataByUrl`)、srLog `api/getPermUserInfor-error`; 恰 1 筆有效 → **以解析出之列直接算權限, 不再以內部 id 重讀**(外審 sol 第一輪#2: 解析與重讀之間該列可被刪除、同 id 被另一人佔用, 重讀會取得另一人之權限; `resolvePermUserId` 回 `{ userId, userFind }`, `getGenUserAndRulesByUserId(userId, userPre)` 在 `userPre` 非 undefined 時採用); 其餘(查無／恰 1 筆停用)→ 與修正前查無使用者相同, 回全停用之空權限(E2E-005, 不改為 reject). **傳入值未命中任何登入識別才是空權限; 若傳入之內部 id 恰等於另一列之登入識別, 則命中該另一列**(外審 sol 第一輪#4: 升級風險, 見 README). `email`／`name` 時 `userId` 維持 perm 內部 id(`userFind` 為 undefined, 照舊以 id 讀取). `/api/getPerm` 之 `userIdSelf` 為 `getTokenUser` 回傳之內部 id, **不經解析**.
+  6. **離線稽核**(`server/tools/nameDupReport.mjs --mapping-by id`): 列出每一組「同一登入識別值有 ≥ 2 列」者(與登入同口徑: 命中多筆即拒; 不論 isActive、含他來源與同一來源), 標 `scope`: `crossSource`＝匯入／後台存檔會擋之撞值組合(判準 `findLoginIdClashDetail`)、`sameSource`＝同一來源之重複(同步端本就拒絕; 外審 sol 第一輪#5: 否則升級稽核會報零組而使用者仍不能登入), 供 README Upgrade Notes 之盤點與處置.
+- **輸入空間表(逐格對應測試)**:
+
+| # | 入口 | 情境 | 結果 | 測試 |
+|---|---|---|---|---|
+| 1 | 匯入 | 批次 srcKey＝他來源外部列 srcKey(該列有效／停用; 批次列有效／停用) | 拒 `loginIdCollision`、零寫入(含批次中不撞之列)、不回顯值 | SC-L3、MI-011 |
+| 2 | 匯入 | 同來源重送自己之列(同 srcKey) | 不算(nSame) | SC-L3、MI-011 |
+| 3 | 匯入 | 批次 srcKey＝他來源遷移前舊外部列之 id | 拒 | SC-L4b、MI-013 |
+| 4 | 匯入 | 該舊外部列所屬來源首次匯入(srcKey＝舊 id) | 過、nUpdate=1 | SC-L4b、MI-003、MI-013 |
+| 5 | 匯入 | srcKey＝後台列 id(後台列有效／停用) | 拒 | SC-L1、SC-L4、MI-005 |
+| 6 | 後台存檔 | 新增後台列 id＝外部列 srcKey(外部列有效／停用; 新列有效／停用) | 拒、零變更 | UL-001、UL-003、UL-005、MI-006、MI-009、MI-016 |
+| 7 | 後台存檔 | 外部列換 from(lockExternalRows 為假)致與他來源撞 | 拒(簽章含來源) | UL-012 |
+| 8 | 後台存檔 | 歷史撞值原樣送回／群組指派／刪其一／停用改啟用 | 過 | UL-004、UL-006、UL-015、MI-007 |
+| 9 | 登入 | 兩列同值(有效＋停用／皆有效／皆停用; 後台＋外部／兩來源外部) | 2 筆 `ambiguousUserFromPerm`, 不放行 | LI-016b、MI-007、MI-012 |
+| 10 | 登入 | 恰 1 筆有效／恰 1 筆停用／0 筆 | 登入／`cannotGetUserFromPerm`／同 | LI-016c、LI-014、MI-009 |
+| 11 | 登入 | 清掉其一後恰 1 筆有效 | 恢復登入 | MI-012 |
+| 12 | 登入 | `id` 模式查詢條件 | 只帶 `id`／`srcKey` 之一(不帶 `isActive`)、不做全表讀取; email／name 仍帶 `isActive` | LI-021 |
+| 13 | `getPermUserInfor` | 外部列傳 srcKey／傳內部 id／後台列傳 id／停用列／多筆 | 命中該列／**未命中任何登入識別時**空權限(列出全部標的且皆 n; 若該內部 id 恰等於另一列之登入識別則命中另一列, 見 LI-017)／命中／空權限／`ambiguousUserFromPerm`(srLog `api/getPermUserInfor-error` 只記 mappingBy 與筆數) | MI-014、API-getPermUserInfor-005／007／008、LI-017 |
+| 14 | `getPermUserInfor` | `mappingBy` 為 email／name | `userId` 維持內部 id(傳 srcKey 查無) | MI-015 |
+| 15 | `getPermUserInfor` | 接線 | `resolvePermUserId` 先於 `getGenUserAndRulesByUserId` 且傳入解析出之列; `/api/getPerm` 不經 | SITE-LI-005、MI-001(getPerm 本人) |
+| 16 | 離線稽核 | 撞值組(adminId／otherFrom／claimTwice／舊外部列)／同來源同 srcKey(含其一停用)／內部 id 與他列同值 | 前者標 `crossSource`、同來源標 `sameSource`、內部 id 與他列同值不列 | ND-005b |
+| 17 | 匯入／後台／登入 | `mappingBy` 為 email／name | 不檢查、不變 | SC-L5、UL-002、LI-018、MI-008 |
+| 18 | 後台存檔 | `lockExternalRows` 為假: 新增外部形列(from 非空、無 srcKey)其 id 等於同來源既有外部列之 srcKey(claimTwice 形) | 拒 `loginIdCollision`、零變更(reason `srcKeyClaimTwice`); 預設(保護啟用)由外部列守門先拒 `saveFromNotAllowed` | LI-035c、UL-017 |
+| 19 | 登入 | 非標準 `isActive`(`'Y'`、`true`、`1`、`''`、缺漏)之列與標準有效列同值 | 2 筆拒(不因「唯一標準有效列」而放行) | LI-016b |
+
+- **站點全集(盤點指令)**: `git grep -nE "findLoginUsers|findLoginIdClash|loginIdOf" -- server`(`keyCheck.mjs` 定義; `WWebPerm.mjs:getTokenUser`／`resolvePermUserId`、`syncCore.mjs`、`procCore.mjs`、`server/tools/nameDupReport.mjs` 各呼叫); `git grep -n "woItems.users.select(" -- server` 須只剩 `getGenUserByKV`(內部 id 反查,恆 ≤ 1 筆). 可執行版 `unit-loginId` SITE-LI-001～005、`unit-keyCheck` SITE-KC-004.
+- **判準**: 已套(匯入／後台存檔／登入／getPermUserInfor／稽核); 刻意不套(`email`／`name` 模式; `/api/getPerm`; 歷史未觸及者之存檔).
+- **測試**: `unit-loginId`、`unit-procCore-loginId`、`unit-syncCore`(SC-L3／L4／L4b)、`unit-nameDupReport` ND-005b、`api-mapKeyId`(MI-001～016); 既有以內部 id 傳 `getPermUserInfor` 之外部列夾具改傳 srcKey(`api-getPermUserInfor` 007／008、`api-keyProp`、`api-authMerge`、`api-refCascade`、`e2e-external-rows`、`e2e-ref-cascade`、`e2e-array-form`); 變異驗證見 `spec/evidence/perm-run05/mutation-results.md`.
+- **已知限制**: ①升版前已存在之跨來源重複 `srcKey` 不被阻擋存檔, 但該登入值一律被拒(`ambiguousUserFromPerm`)且重新匯入同值被拒——須依 README Upgrade Notes 以 `nameDupReport --mapping-by id` 盤點並處置; ②`getPermUserInfor` 之 userId 語意改變對既有以內部 id 呼叫者為行為變更(外部列傳內部 id 現回空權限), 已入 README Upgrade Notes; ③本輪不新增亦不重產任何標準圖(e2e 後以 `git status --short test/pics` 須為空回驗); ④**範圍外, 未修**(外審 sol 第一輪#3, 已探測確證): 後台整表寫入 `users` 時, 送入之整表含兩列**相同 id**(不同 name／email)會被併成一列、靜默遺失其一且回成功——`prepRows` 的整表 id 重複預檢只涵蓋 `pemis`／`grups`(`procCore.mjs:271`), `users` 沒有(單元層 `tmp` 探測與真後端 `updateUsers` 皆重現: 送 `probeA`／`probeB` 同 id 後只剩 `probeB`)。前端不會產生(新列 id 為隨機); 僅 API 直打可達; 屬既有行為、非本輪引入, 本輪不改; 建議另案把重複預檢擴及 `users`(錯誤鍵 `saveRowFieldDuplicate`)——登入識別唯一性之『兩後台列』排除以「同一主鍵於表中不可並存」為前提, 該缺口不影響本規則之判準; ⑤**部署前提**(外審 sol 第一輪#6): 兩個來源原用同一值時, 只改一方的 `srcKey` 不夠——部署方 `getUserByToken` 回報之使用者代號須同步改為新 `srcKey`(例如加來源前綴), 否則舊代號之令牌仍會登入到仍持有該值的另一人; README Upgrade Notes 已載。
 
 ## 引用連帶:改名級聯與刪除連帶清理(2026-10-22 run06, ADR-036; 來源: 使用者 2026-10-21「刪除須連帶清理引用」裁示、主控定案 F-07、`R-PRINCIPLE-00` 原則 6、適用表 m／n)
 

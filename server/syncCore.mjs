@@ -8,7 +8,7 @@ import ds from '../src/schema/index.mjs'
 import validateRowsBeforeWrite, { maxIdBytes } from './validateRows.mjs'
 import planRefChanges, { REF_OF, diffRefTargets } from '../src/js/refCascade.mjs'
 import { SERVER_FIELDS } from '../src/js/externalRows.mjs'
-import { findDupIndex, findKeyOtherFrom, withTabLocks, mapKeyOf, checkMapKeyBatch, findLoginIdClash } from './keyCheck.mjs'
+import { findDupIndex, findKeyOtherFrom, withTabLocks, mapKeyOf, checkMapKeyBatch, findLoginIdClashDetail } from './keyCheck.mjs'
 import { checkCascadePlan, writeWithCascade } from './cascadeWrite.mjs'
 import { markHasKey, keepAssignOnMissing, keepAssignByEntity, countSrcKeyRenumber } from './syncKeep.mjs'
 import { toOutKey, isRowObj } from './procCore.mjs'
@@ -211,12 +211,14 @@ function syncCore({ woItems, procOrm, lockTabs, srLog, mappingBy = 'id', cascade
                 }
             }
 
-            //users 登入識別撞值(mappingBy 為 'id' 時; perm-run04, 規則帳本 R-MAPKEY-04, 規格第 9 節末 O1): 外部列以 srcKey、後台列以 id 對應外部 token 之使用者 id, 本批有效列之 srcKey 等於某有效後台列(from 空)之 id,
-            //登入將同時匹配兩筆 → 整批拒收 loginIdCollision(收嚴＋提示; 零寫入). 本批列皆視為被觸及(同 R-MAPKEY-01: 批次全列參與); 停用列不參與; 固定訊息、log 不記 srcKey／id 之值
+            //users 登入識別撞值(mappingBy 為 'id' 時; perm-run04, 規則帳本 R-MAPKEY-04, 規格第 9 節末 O1): 外部列以 srcKey、後台列以 id 對應外部 token 之使用者 id.
+            //perm-run05(主控 2026-10-24 收件裁示): srcKey 須跨全表唯一, 「不論 isActive」「含他來源外部列」——本批任一列(皆視為被觸及, 同 R-MAPKEY-01: 批次全列參與)之 srcKey 等於他 from 之任一既有列
+            //(後台列之 id、他來源外部列之 srcKey、他來源舊外部列〔無 srcKey〕之 id)→ 登入將命中多筆 → 整批拒收 loginIdCollision(收嚴＋提示, 提示請部署方改用可唯一對應之鍵; 零寫入); 同 from 之既有列不算(隨後由差異同步配對或刪除).
+            //固定訊息、log 不記 srcKey／id 之值
             if (keyTable === 'users' && mapKeyOf(mappingBy) === null) {
-                let kClash = findLoginIdClash([...others, ...rows], (r, k) => k >= others.length)
-                if (kClash >= 0) {
-                    logErr('loginIdCollision', { reason: 'srcKeyIsAdminId', from, row: kClash - others.length, field: 'srcKey' })
+                let dClash = findLoginIdClashDetail([...others, ...rows], (r, k) => k >= others.length)
+                if (dClash !== null) {
+                    logErr('loginIdCollision', { reason: (dClash.kind === 'otherFrom') ? 'srcKeyOtherFrom' : 'srcKeyIsAdminId', from, row: dClash.k - others.length, field: 'srcKey' })
                     return Promise.reject('loginIdCollision')
                 }
             }

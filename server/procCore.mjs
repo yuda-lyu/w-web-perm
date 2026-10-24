@@ -18,7 +18,7 @@ import { restoreExternalOrder, dropServerOnlyDiff, restoreServerFields, checkExt
 import { isBaselineValid, getContract } from '../src/js/rowDigest.mjs'
 import { getRefTarget, parseSubject, parseRefDecl, checkSubjectIdentity, checkRefIdentity } from '../src/js/refIdentity.mjs'
 import { getRejectKey } from 'w-serv-orm/src/baseline.mjs'
-import { findTouchedDup, findDupIndex, withTabLocks, checkUsersWrite, mapKeyOf, loginIdOf, findLoginIdClash } from './keyCheck.mjs'
+import { findTouchedDup, findDupIndex, withTabLocks, checkUsersWrite, mapKeyOf, loginIdOf, findLoginIdClashDetail } from './keyCheck.mjs'
 import { checkCascadePlan, writeWithCascade } from './cascadeWrite.mjs'
 
 
@@ -431,17 +431,18 @@ function proc(woItems, procOrm, { srLog, withTabLocks: lockTabs, guardWrite, loc
         }
 
         //users 登入識別撞值(mappingBy 為 'id' 時; perm-run04, 規則帳本 R-MAPKEY-04, 規格 dspec/外部匯入之定義與機制.md 第 9 節末 O1): 外部列以 srcKey、後台列以 id 對應外部 token 之使用者 id;
-        //被本次觸及＝新增之列、由停用改有效之列、或登入識別(類別〔後台／外部〕＋值〔loginIdOf: 後台列為 id、外部列為 srcKey〕)與庫內不同之列(外審 sol#2: lockExternalRows 為假時後台可改 from, 外部列改為後台列即換了登入識別而撞到他列;
+        //perm-run05(主控 2026-10-24 收件裁示): 登入識別值須跨全表唯一——不論 isActive、含他來源外部列(登入查找不論有效與否計筆, 放行停用列之撞值, 其後轉有效即造成登入永久拒絕).
+        //被本次觸及＝新增之列、或登入識別(類別〔後台／外部＋來源 from〕＋值〔loginIdOf: 後台列為 id、外部列為 srcKey〕)與庫內不同之列(外審 sol#2: lockExternalRows 為假時後台可改 from, 外部列改為後台列即換了登入識別而撞到他列;
         //外部列守門啟用時 from 與 srcKey 不可改, 由上方 checkExternalWrite 先拒——故本檢查置於外部列守門之後, perm-run03 既有之錯誤鍵〔saveExternalRowChanged 等〕不變, 被觸及者實務上只有後台列).
-        //撞值(有效後台列 id 等於有效外部列 srcKey)→ 登入將同時匹配兩筆 → 整次拒收 loginIdCollision(零寫入, 收嚴＋提示). 只擋「本次造成或觸及」者(歷史既有撞值原樣送回不擋, 同 R-MAPKEY-03).
+        //停用改啟用只是狀態改變, 登入識別不變, 不算被觸及(歷史撞值不因啟用而新擋; 登入時照拒). 只擋「本次造成或觸及」者(歷史既有撞值原樣送回不擋, 同 R-MAPKEY-03; 後台仍可修復).
         //缺 id 之列無從比對(ORM 補隨機主鍵). 於任何寫入之前(procOrm 在下方). srLog 不記 id／srcKey 之值
         if (keyTable === 'users' && mapKeyOf(mappingBy) === null) {
-            //sigOf: 登入識別之「類別＋值」(後台列 a／外部列 x; 外審 sol 第二輪#1: 外部列改為後台列而 srcKey 恰等於 id 時值不變、類別已變, 仍須視為被觸及)
-            let sigOf = (v) => `${isestr(v.from) ? 'x' : 'a'}|${loginIdOf(v)}`
-            let loginOld = new Map(ltdtOld.filter((v) => v !== null && typeof v === 'object' && v.isActive === 'y' && isestr(v.id)).map((v) => [v.id, sigOf(v)]))
-            let kClash = findLoginIdClash(rows, (r) => !(isestr(r.id) && loginOld.has(r.id) && loginOld.get(r.id) === sigOf(r)))
-            if (kClash >= 0) {
-                srLog.error({ event: 'updateTabItems-ckKey-error', keyTable, key: 'id', msg: 'loginIdCollision', reason: 'adminIdIsSrcKey', row: kClash })
+            //sigOf: 登入識別之「類別＋來源＋值」(後台列 a／外部列 x:來源; 外審 sol 第二輪#1: 外部列改為後台列而 srcKey 恰等於 id 時值不變、類別已變, 仍須視為被觸及; perm-run05: 來源改變亦同)
+            let sigOf = (v) => `${isestr(v.from) ? `x:${v.from}` : 'a'}|${loginIdOf(v)}`
+            let loginOld = new Map(ltdtOld.filter((v) => v !== null && typeof v === 'object' && isestr(v.id)).map((v) => [v.id, sigOf(v)]))
+            let dClash = findLoginIdClashDetail(rows, (r) => !(isestr(r.id) && loginOld.has(r.id) && loginOld.get(r.id) === sigOf(r)))
+            if (dClash !== null) {
+                srLog.error({ event: 'updateTabItems-ckKey-error', keyTable, key: 'id', msg: 'loginIdCollision', reason: (dClash.kind === 'otherFrom') ? 'srcKeyOtherFrom' : ((dClash.kind === 'sameFrom') ? 'srcKeyClaimTwice' : 'adminIdIsSrcKey'), row: dClash.k })
                 return Promise.reject('loginIdCollision')
             }
         }

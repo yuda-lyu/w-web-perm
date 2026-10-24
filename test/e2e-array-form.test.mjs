@@ -32,7 +32,7 @@
 //  其 cgrups／cpemis 為指派欄, 由伺服端引用連帶改寫(不受守門限制); 另把夾具建立移入 try(夾具中途失敗仍走 finally 還原, 否則殘列使後續案誤報重複).
 //perm-run03(外部匯入改依來源鍵 srcKey 差異同步; R-IMPORT-01、規格 C:\opensrcOper\dspec\外部匯入之定義與機制.md): 同步端點不再收 id(帶 id 整批拒收 idNotAllowed)、每列須帶 srcKey; 外部列之 id 由伺服端產生(新增配新 id、修改保留 id)。
 //  ①本檔各外部列夾具之 id 欄(U_ID／id-arr-g／id-ren-ext 等)改為「標籤」＝送入同步端點之 srcKey(本檔 syncRows／seedArrayForm 送出時改送 srcKey 並丟掉 id);
-//  ②凡以標籤當真實 id 者(getResolvedActiveTargets〔getPermUserInfor 依 id 查〕、readDbField、rowOfSnap、列比對)一律先經 realId／srcKey 解析——見檔內 realId、getResolvedActiveTargets 包裝、keyOf;
+//  ②凡以標籤當真實 id 者(readDbField、rowOfSnap、列比對)一律先經 realId／srcKey 解析——見檔內 realId、keyOf; getResolvedActiveTargets〔getPermUserInfor〕perm-run05 起 userId 依登入對應解析(外部列傳 srcKey、後台列傳 id), 包裝改經 loginKeyOf;
 //  ③同分區再送一批為差異同步(依 srcKey 新增／修改／刪除／不變), 不再整批取代: 每案 beforeEach 重送夾具 → 被前案改過之夾具列依 srcKey 還原為夾具值(夾具各列皆帶 cgrups／cpemis／crules 鍵, 指派欄亦被還原);
 //  ④AF-014a／b／e 之 reverseTableByOtherEnd: 外部列以同 srcKey 重送並給反序 order(依 srcKey 對應, 非依 id)。
 //  後台列夾具(editTable／seedExtra 旁路寫庫)之 id 不變, 仍以 id 比對。本檔無「以外部同步建立之使用者登入」之案例(全程以預設管理者登入), 故不受 users.mappingBy='id' 待裁示之影響。
@@ -146,9 +146,19 @@ async function realId(kt, label) {
     const hit = rows.find((v) => v.id === label) || rows.find((v) => v.srcKey === label)
     return hit ? hit.id : label
 }
-//端到端授權(getPermUserInfor 依真實 id 查): 參數可為真實 id 或外部列夾具標籤(經 realId 解析), 其餘同 e2e-setup 之 getResolvedActiveTargets
+//夾具標籤／真實 id → getPermUserInfor 之 userId(登入對應鍵; perm-run05: mappingBy 為 id 時外部列傳其 srcKey、後台列傳 id, 不是外部列之內部 id): 先找列(同 realId), 外部列(from 非空且有 srcKey)回 srcKey, 其餘回 id; 找不到原樣回傳
+async function loginKeyOf(kt, label) {
+    const r = await callRpc(`${kt}.select`, [], TOKEN_ADMIN)
+    const rows = (r.ok && Array.isArray(r.output)) ? r.output : []
+    const hit = rows.find((v) => v.id === label) || rows.find((v) => v.srcKey === label)
+    if (!hit) {
+        return label
+    }
+    return (typeof hit.from === 'string' && hit.from !== '' && typeof hit.srcKey === 'string' && hit.srcKey !== '') ? hit.srcKey : hit.id
+}
+//端到端授權(getPermUserInfor): 參數可為真實 id 或外部列夾具標籤(經 loginKeyOf 轉為登入對應鍵), 其餘同 e2e-setup 之 getResolvedActiveTargets
 async function getResolvedActiveTargets(page, idOrLabel) {
-    return await getResolvedActiveTargetsById(page, await realId('users', idOrLabel))
+    return await getResolvedActiveTargetsById(page, await loginKeyOf('users', idOrLabel))
 }
 
 //「另一端把 users／grups 整表反序」(AF-014a／b／e; run07): 外部列之 order 由外部擁有, 後台整表寫入(updateXxx)不改其 order(伺服端還原為庫內值, R-EXT-OWN-01), 單以 updateXxx 反序只會重排後台列、外部列不動;

@@ -126,7 +126,8 @@ let permOf = async (userId) => {
 let permAll = async () => {
     let out = {}
     for (let u of await selectAll('users')) {
-        out[u.id] = await permOf(u.id)
+        let isExt = typeof u.from === 'string' && u.from !== '' && typeof u.srcKey === 'string' && u.srcKey !== ''
+        out[u.id] = await permOf(isExt ? u.srcKey : u.id) //perm-run05: getPermUserInfor 之 userId 依登入對應(外部列傳 srcKey、後台列傳 id); 以內部 id 為鍵存結果, 前後可逐使用者比對
     }
     return out
 }

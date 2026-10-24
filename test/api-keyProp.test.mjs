@@ -25,7 +25,7 @@ const crulesOf = (poison) => JSON.stringify([
     { name: T_ON2, isActive: 'y' },
 ])
 
-//seed: 回傳夾具使用者之庫內 id(伺服端產生; 同 srcKey 重送保留同一 id)
+//seed: 回傳夾具使用者查詢 getPermUserInfor 用之 userId; perm-run05 起 mappingBy 為 id 時 userId 依登入對應解析, 外部列傳其 srcKey(不是伺服端產生之內部 id; 內部 id 查無而回空權限)
 async function seed(crules) {
     const FIX = {
         pemis: [{ srcKey: 'sk-kp-p', order: 300, name: 'kp-p', crules }],
@@ -39,7 +39,7 @@ async function seed(crules) {
     }
     const u = (await selectAllRows('users')).find((v) => v.srcKey === SK_U)
     assert.ok(u && typeof u.id === 'string' && u.id !== '', '依 srcKey 應讀回夾具使用者列')
-    return u.id
+    return u.srcKey
 }
 
 //裸 HTTP 取 getPermUserInfor 的原始回應(不經 client SDK, 以便檢視 msg 原文)
@@ -105,6 +105,7 @@ describe('api-keyProp (資料驅動之規則名轉屬性鍵, R-KEY-PROP-01)', fu
         assert.strictEqual(body.state, 'success', text.slice(0, 300))
         assert.strictEqual(body.msg.rules.length, await countTargets(), '壞 JSON 降級後仍須回傳全部標的(不得退化為空 rules)')
         assert.ok(body.msg.rules.every((v) => v.isActive === 'n'), '壞 JSON → 全 n')
+        assert.strictEqual(body.msg.user.srcKey, uid, '查得夾具使用者本人(傳錯鍵時 user 無 srcKey 而回空權限, 「全 n」斷言會空轉; perm-run05)')
     })
 
 })

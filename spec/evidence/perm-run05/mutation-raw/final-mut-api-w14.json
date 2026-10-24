@@ -1,0 +1,36 @@
+[
+ {
+  "id": "BASE",
+  "passes": 24,
+  "failures": 0
+ },
+ {
+  "id": "W1",
+  "note": "getPermUserInfor 恢復只以內部 id 查找(不經解析)",
+  "file": "server/WWebPerm.mjs",
+  "status": 3,
+  "passes": 21,
+  "failures": 3,
+  "caught": true,
+  "titles": [
+   "api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 id, 撞值收嚴; perm-run04, R-MAPKEY-04) MI-01",
+   "api-getPermUserInfor length 鍵於 JSON 字串欄位（R-OBJ-ITER-01） API-getPermUserInfor-007-length-ke",
+   "api-getPermUserInfor 標的 id 含 . 或 [ 、或為原型鍵名（R-AUTH-PATH-01） API-getPermUserInfor-008-target"
+  ],
+  "restored": true
+ },
+ {
+  "id": "W4",
+  "note": "getPermUserInfor 查無改 reject userIdNoPermrules(應維持空權限)",
+  "file": "server/WWebPerm.mjs",
+  "status": 2,
+  "passes": 22,
+  "failures": 2,
+  "caught": true,
+  "titles": [
+   "api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 id, 撞值收嚴; perm-run04, R-MAPKEY-04) MI-01",
+   "api-getPermUserInfor API-getPermUserInfor-005-nonexistent-userId-empty-perms"
+  ],
+  "restored": true
+ }
+]

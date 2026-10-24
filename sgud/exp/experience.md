@@ -151,3 +151,13 @@
 - **beam 之進度**: 同 perm-run01, stdout 到最後才一次輸出, 查 `~/.local/share/opencode/opencode.db` 之 `session.time_updated`。
 - **外審抓到之真缺陷: 以名稱為鍵、跨列共用之「選取記錄」會被後一列之選取以新快照覆蓋**(sol#1, 高): 兩列先後選同名實體、中間該實體被刪除後同名重建 → 前一列之授權被新實體接管而宣告仍相符; 單測與 e2e 之初版都只測「單列」。**凡是『名稱 → 身分』之累積記錄, 測試必須含「同名、不同時點、不同列」之格**(輸入空間表加『列』軸)。修法取「同名先後選取而身分不同 → 記衝突、宣告無效、前端不放行」(改動最小、更收嚴)。**採納外審修正後再補增量外審**(perm-run01 教訓)——本輪增量輪(sol 6 分鐘、beam 2 分鐘)皆無新發現。
 - **測試只釘『不得寫入』而鍵容許兩種者, 拿掉實作仍過**(sol#2, IDN-113): 凡守門分支之測試都要固定錯誤鍵、reason 與零 I/O, 不要用『鍵∈{A,B}』。
+
+## 登入識別值跨全表唯一(不論 isActive)與 getPermUserInfor 的 userId 依登入對應(2026-10-24 perm-run05; 帳本 R-MAPKEY-05; ADR-038 Update(perm-run05); 報告 `C:\opensrcOper\dnow\20261022221854\agent-out\perm-run05-修正報告.md`)
+
+- **改共用查詢鍵之語意, 先盤點『以舊鍵呼叫它的夾具』, 且要提防『傳錯鍵仍綠』**: `getPermUserInfor` 的 `userId` 由內部 id 改為登入對應(外部列傳 `srcKey`)後, 以內部 id 查外部使用者的測試夾具(`rg -l "getPermUserInfor|getResolvedActiveTargets" test`)有一類**不會變紅**——斷言『全 n／空權限』者(`api-authMerge` 損壞字串案、`api-keyProp` 壞 JSON)傳錯鍵一樣回空權限, 改前改後都綠、斷言卻已空轉。這類夾具改傳 `srcKey` 後, 在 HEAD 版與新版 server 上同綠, 回跑也分不出對錯; 要靠同檔『斷言非空權限』的對照案(`API-KP-000`、`API-chm-*` 正向案例, 在 HEAD 版上為紅, 見 `red-evidence-api.md`)確認所傳之鍵真的命中。
+- **『被觸及』判定之簽章須含所有決定身分之維度**: 初版簽章只有〔類別＋登入識別值〕, 變異『簽章不含 `from`』竟倖存——只換來源、值與類別都不變的列(同來源兩列同 srcKey 之歷史資料, 其一換 `from`)會漏判成『未被觸及』而放行跨來源撞值。補 UL-016。**凡『只擋被觸及者』的檢查, 簽章維度＝規則中判定撞值所用的全部維度**。
+- **全套首跑才揭露的夾具**: 單測與觸及檔都綠, 全套 unit+api 仍有 1 敗——`API-sync-011` 原本斷言『users 不同 from 同 srcKey 各自獨立』, 正是本輪裁示要禁止的情形。改規則先 `rg` 『同 srcKey 跨 from』的夾具(`rg -n "sk[0-9a-z-]*shared|同一 srcKey|同 srcKey" test`), 不要等全套。
+- **防禦性守門與其行為等價**: `getGenUserByUserId` 對非字串 userId 的早退, 拿掉後 `select({id:null})` 恰查無, 行為測試抓不到(變異 W6 倖存); 只能靜態斷言守門存在(SITE-LI-005), 且報告要明說『行為層不可證』。
+- **變異 harness 寫法**: unit 變異跑在 repo 內副本(`cp` 出 `server/ src/ test/tools/` 與少數測試檔; `tmp/` 在 repo 內, node_modules 由 repo 根解析), api 變異直接改 repo 並在 `quiet-run --lock` 內跑; 檔案為 CRLF, 多行 `find` 要依檔案 EOL 轉換; 每個變異都 `finally` 還原＋md5 回驗; `find` 須恰命中 1 處否則 INVALID。腳本留在 `spec/evidence/perm-run05/mutation-raw/mutate.mjs`。
+- **取修前紅證據不用 stash／checkout**: unit 層以 `git archive HEAD server src package.json` 解到 repo 內副本再放新測試檔; api 層暫以 HEAD 版 server 檔覆蓋(先 `cp` 備份並記 md5, 跑完立即還原回驗)。副本缺新匯出時加回 `null` 樁讓測試檔可載入、逐條斷言失敗。
+- **git-bash 的 `kill -0 <Windows PID>` 對 node 的 Windows PID 恆失敗**(等待 detached 派工行程的迴圈會立刻誤判結束); 改用 `tasklist //FI "PID eq N" | grep -q node.exe`。codex 的活性看 `~/.codex/sessions/<日期>/rollout-*.jsonl` 的增長(stdout 到最後才一次輸出)。

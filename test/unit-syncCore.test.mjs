@@ -790,27 +790,51 @@ describe('unit-syncCore (外部匯入依 srcKey 差異同步, perm-run03, R-IMPO
             await assertRejected(env, 'users', 'appX', [U('ok-1', 'u-ok1'), U('ok-2', 'u-ok2'), U(ADM, 'ux'), U('ok-3', 'u-ok3')], 'loginIdCollision')
         })
 
-        it('SC-L3 邊界: srcKey 等於他來源外部列的 id 或 srcKey 不在匯入端拒收(規格只定外部 srcKey 對後台 id; 外部列的 id 不是登入識別, 他來源同 srcKey 於登入時多筆拒絕)', async function() {
+        it('SC-L3 srcKey 須跨來源唯一(perm-run05): 批次 srcKey 等於他來源外部列之 srcKey → loginIdCollision、整批拒收、零寫入; 等於他來源外部列之內部 id(不是登入識別)不算撞值', async function() {
             let env = createEnv()
-            let r = await sync(env, 'users', 'appX', [U('id-u2', 'ua'), U('o-u2', 'ub')]) //'id-u2' 為他來源外部列的內部 id; 'o-u2' 為其 srcKey
+            await assertRejected(env, 'users', 'appX', [U('o-u2', 'ub')], 'loginIdCollision') //'o-u2' 為來源 other 之外部列 srcKey
+            let r = await sync(env, 'users', 'appX', [U('id-u2', 'ua')]) //'id-u2' 為來源 other 之外部列的內部 id: 不是登入識別
             assert.strictEqual(r.ok, true, JSON.stringify(r.v))
-            assert.deepStrictEqual(r.v, { nAdd: 2, nUpdate: 0, nDel: 0, nSame: 0 })
+            assert.deepStrictEqual(r.v, { nAdd: 1, nUpdate: 0, nDel: 0, nSame: 0 })
+            let rl = env.logs.find((l) => l.event === 'syncAndReplaceTabs-error' && l.msg === 'loginIdCollision')
+            assert.strictEqual(rl.reason, 'srcKeyOtherFrom', '他來源撞值之 reason')
         })
 
-        it('SC-L4 停用列不參與: 批次列停用、或後台列停用 → 可匯入; 其後把該列改為有效(轉有效造成同時匹配兩筆)→ 拒收且庫內維持上次結果  [登入只匹配有效列]', async function() {
+        it('SC-L4 不論 isActive 皆算撞值(perm-run05): 批次列停用、後台列停用、他來源列停用、雙方皆停用 → 皆整批拒收、零寫入; 停用改有效之重送亦拒', async function() {
+            //批次列停用 × 後台列有效
             let env = createEnv()
-            let r = await sync(env, 'users', 'appX', [U(ADM, 'ux', { isActive: 'n' })])
-            assert.strictEqual(r.ok, true, `批次列停用應可匯入: ${JSON.stringify(r.v)}`)
+            await assertRejected(env, 'users', 'appX', [U(ADM, 'ux', { isActive: 'n' })], 'loginIdCollision')
+            //後台列停用 × 批次列有效
+            let env2 = createEnv({ seed: (s) => { s.users.find((x) => x.id === 'id-u1').isActive = 'n' } })
+            await assertRejected(env2, 'users', 'appX', [U(ADM, 'ux')], 'loginIdCollision')
+            //雙方皆停用
+            await assertRejected(env2, 'users', 'appX', [U(ADM, 'ux', { isActive: 'n' })], 'loginIdCollision')
+            //他來源列停用 × 批次列有效／停用
+            let env3 = createEnv({ seed: (s) => { s.users.find((x) => x.id === 'id-u2').isActive = 'n' } })
+            await assertRejected(env3, 'users', 'appX', [U('o-u2', 'ub')], 'loginIdCollision')
+            await assertRejected(env3, 'users', 'appX', [U('o-u2', 'ub', { isActive: 'n' })], 'loginIdCollision')
+            //srcKey 無撞值之停用列照常可匯入(停用本身不是拒收理由)
+            let r = await sync(env3, 'users', 'appX', [U('free-1', 'uf', { isActive: 'n' })])
+            assert.strictEqual(r.ok, true, JSON.stringify(r.v))
+        })
+
+        it('SC-L4b 同一來源重送自己之列不算撞值(同來源之兩列同 srcKey 由 srcKeyDuplicate／srcKeyConflict 另拒); 舊外部列(無 srcKey)以 id 為登入識別: 他來源批次 srcKey 等於其 id → 撞值; 同來源批次 srcKey 等於其 id → 遷移配對(不撞)', async function() {
+            let env = createEnv({
+                seed: (s) => { s.users.push({ ...ds.users.funNew(), ...AUDIT, id: 'legacy-9', order: 9, name: 'leg', email: 'leg@x.example.com', description: 'legacy', from: 'appL', cgrups: '{}', isAdmin: 'n', isActive: 'y' }) },
+            })
+            let r1 = await sync(env, 'users', 'appX', [U('o-u2-new', 'un')])
+            assert.strictEqual(r1.ok, true, '無撞值')
+            let r2 = await sync(env, 'users', 'appX', [U('o-u2-new', 'un')]) //同來源重送自己之列
+            assert.deepStrictEqual(r2.v, { nAdd: 0, nUpdate: 0, nDel: 0, nSame: 1 })
             let before = snapAll(env)
             let c0 = cntAll(env)
-            let r1 = await sync(env, 'users', 'appX', [U(ADM, 'ux', { isActive: 'y' })]) //停用改有效
-            assert.deepStrictEqual([r1.ok, r1.v], [false, 'loginIdCollision'])
-            assertSnapEq(env, before, '被拒時四表須逐位元維持上次結果')
+            let rj = await sync(env, 'users', 'appX', [U('o-u2-new', 'un'), U('legacy-9', 'ul')]) //他來源(appL)舊外部列之 id＝其登入識別
+            assert.deepStrictEqual([rj.ok, rj.v], [false, 'loginIdCollision'])
+            assertSnapEq(env, before, '被拒時四表須逐位元不變')
             assert.strictEqual(cntAll(env), c0, '被拒時不得有任何寫入呼叫')
-
-            let env2 = createEnv({ seed: (s) => { s.users.find((x) => x.id === 'id-u1').isActive = 'n' } })
-            let r2 = await sync(env2, 'users', 'appX', [U(ADM, 'ux')])
-            assert.strictEqual(r2.ok, true, `後台列停用時批次列(有效)應可匯入: ${JSON.stringify(r2.v)}`)
+            let r3 = await sync(env, 'users', 'appL', [U('legacy-9', 'leg', { email: 'leg@x.example.com', description: 'legacy' })]) //同來源 → 遷移
+            assert.strictEqual(r3.ok, true, JSON.stringify(r3.v))
+            assert.deepStrictEqual(r3.v, { nAdd: 0, nUpdate: 1, nDel: 0, nSame: 0 })
         })
 
         it('SC-L5 mappingBy 為 email／name 時不檢查(不變): srcKey 等於後台列 id 可匯入', async function() {

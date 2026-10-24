@@ -1,0 +1,20 @@
+[
+ {
+  "id": "BASE",
+  "passes": 24,
+  "failures": 0
+ },
+ {
+  "id": "W5",
+  "note": "/api/getPerm 亦經 resolvePermUserId",
+  "file": "server/WWebPerm.mjs",
+  "status": 1,
+  "passes": 23,
+  "failures": 1,
+  "caught": true,
+  "titles": [
+   "api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 id, 撞值收嚴; perm-run04, R-MAPKEY-04) MI-00"
+  ],
+  "restored": true
+ }
+]

@@ -1,0 +1,300 @@
+[
+ {
+  "id": "BASE",
+  "passes": 191,
+  "failures": 0
+ },
+ {
+  "id": "K1",
+  "note": "登入查找只計有效列(修前口徑: 兩次 select 帶 isActive:y)",
+  "file": "server/keyCheck.mjs",
+  "status": 2,
+  "passes": 189,
+  "failures": 2,
+  "caught": true,
+  "titles": [
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) findLoginUsers(L2) LI-016b 不論 ",
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) findLoginUsers(L2) LI-021 效能不變"
+  ],
+  "restored": true
+ },
+ {
+  "id": "K2",
+  "note": "撞值只計有效列(修前口徑)",
+  "file": "server/keyCheck.mjs",
+  "status": 7,
+  "passes": 184,
+  "failures": 7,
+  "caught": true,
+  "titles": [
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) findLoginIdClash(L3) LI-033 不論",
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) findLoginIdClash(L3) LI-035 他來",
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) findLoginIdClash(L3) LI-036 非物",
+   "unit-procCore-loginId (後台整表寫入: mappingBy=id 之登入識別撞值, R-MAPKEY-04) UL-003 新增之後台列為停用、而其 id 等",
+   "unit-procCore-loginId (後台整表寫入: mappingBy=id 之登入識別撞值, R-MAPKEY-04) UL-005 外部列已停用(srcKey 相同)",
+   "unit-syncCore (外部匯入依 srcKey 差異同步, perm-run03, R-IMPORT-01) users 登入識別撞值(mappingBy=id, O1: "
+  ],
+  "restored": true
+ },
+ {
+  "id": "K3",
+  "note": "撞值不含他來源外部列(otherFrom 不判)",
+  "file": "server/keyCheck.mjs",
+  "status": 7,
+  "passes": 184,
+  "failures": 7,
+  "caught": true,
+  "titles": [
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) findLoginIdClash(L3) LI-034 外部",
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) findLoginIdClash(L3) LI-035 他來",
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) findLoginIdClash(L3) LI-035b f",
+   "unit-syncCore (外部匯入依 srcKey 差異同步, perm-run03, R-IMPORT-01) users 登入識別撞值(mappingBy=id, O1: ",
+   "unit-syncCore (外部匯入依 srcKey 差異同步, perm-run03, R-IMPORT-01) users 登入識別撞值(mappingBy=id, O1: ",
+   "unit-syncCore (外部匯入依 srcKey 差異同步, perm-run03, R-IMPORT-01) users 登入識別撞值(mappingBy=id, O1: "
+  ],
+  "restored": true
+ },
+ {
+  "id": "K4",
+  "note": "同一來源之兩外部列也算撞值",
+  "file": "server/keyCheck.mjs",
+  "status": 2,
+  "passes": 189,
+  "failures": 2,
+  "caught": true,
+  "titles": [
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) findLoginIdClash(L3) LI-035 他來",
+   "unit-nameDupReport (名稱重複與對應鍵稽核工具) ND-005b mappingBy=id 報「登入識別撞值」(perm-run05, R-MAPKEY-05):"
+  ],
+  "restored": true
+ },
+ {
+  "id": "K5",
+  "note": "兩後台列也算撞值",
+  "file": "server/keyCheck.mjs",
+  "status": 1,
+  "passes": 190,
+  "failures": 1,
+  "caught": true,
+  "titles": [
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) findLoginIdClash(L3) LI-035 他來"
+  ],
+  "restored": true
+ },
+ {
+  "id": "K6",
+  "note": "舊外部列(無 srcKey)不參與登入識別",
+  "file": "server/keyCheck.mjs",
+  "status": 5,
+  "passes": 186,
+  "failures": 5,
+  "caught": true,
+  "titles": [
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) loginIdOf(L1) LI-003 遷移前舊外部列(s",
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) findLoginUsers(L2) LI-013 遷移前之",
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) findLoginIdClash(L3) LI-034 外部",
+   "unit-syncCore (外部匯入依 srcKey 差異同步, perm-run03, R-IMPORT-01) users 登入識別撞值(mappingBy=id, O1: ",
+   "unit-nameDupReport (名稱重複與對應鍵稽核工具) ND-005b mappingBy=id 報「登入識別撞值」(perm-run05, R-MAPKEY-05):"
+  ],
+  "restored": true
+ },
+ {
+  "id": "K7",
+  "note": "登入多筆時只剩一列有效則放行(「只有一列有效」放行)",
+  "file": "server/keyCheck.mjs",
+  "status": 1,
+  "passes": 190,
+  "failures": 1,
+  "caught": true,
+  "titles": [
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) findLoginUsers(L2) LI-016b 不論 "
+  ],
+  "restored": true
+ },
+ {
+  "id": "K8",
+  "note": "恰 1 筆停用仍登入該列",
+  "file": "server/keyCheck.mjs",
+  "status": 3,
+  "passes": 188,
+  "failures": 3,
+  "caught": true,
+  "titles": [
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) findLoginUsers(L2) LI-014 停用列(",
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) findLoginUsers(L2) LI-020c 精確比",
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) findLoginUsers(L2) LI-016c 單一列"
+  ],
+  "restored": true
+ },
+ {
+  "id": "K9",
+  "note": "所有列皆視為被觸及(歷史撞值也擋)",
+  "file": "server/keyCheck.mjs",
+  "status": 13,
+  "passes": 178,
+  "failures": 13,
+  "caught": true,
+  "titles": [
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) findLoginIdClash(L3) LI-030 被觸",
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) findLoginIdClash(L3) LI-031 被觸",
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) findLoginIdClash(L3) LI-032 歷史",
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) findLoginIdClash(L3) LI-033 不論",
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) findLoginIdClash(L3) LI-034 外部",
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) findLoginIdClash(L3) LI-035 他來"
+  ],
+  "restored": true
+ },
+ {
+  "id": "S1",
+  "note": "匯入端不檢查登入識別撞值",
+  "file": "server/syncCore.mjs",
+  "status": 10,
+  "passes": 181,
+  "failures": 10,
+  "caught": true,
+  "titles": [
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) SITE-LI 站點接線(靜態; 只擋字面與位置之回退, 語",
+   "unit-syncCore (外部匯入依 srcKey 差異同步, perm-run03, R-IMPORT-01) users 登入識別撞值(mappingBy=id, O1: ",
+   "unit-syncCore (外部匯入依 srcKey 差異同步, perm-run03, R-IMPORT-01) users 登入識別撞值(mappingBy=id, O1: ",
+   "unit-syncCore (外部匯入依 srcKey 差異同步, perm-run03, R-IMPORT-01) users 登入識別撞值(mappingBy=id, O1: ",
+   "unit-syncCore (外部匯入依 srcKey 差異同步, perm-run03, R-IMPORT-01) users 登入識別撞值(mappingBy=id, O1: ",
+   "unit-syncCore (外部匯入依 srcKey 差異同步, perm-run03, R-IMPORT-01) users 登入識別撞值(mappingBy=id, O1: "
+  ],
+  "restored": true
+ },
+ {
+  "id": "S3",
+  "note": "匯入端 reason 恆為 srcKeyIsAdminId",
+  "file": "server/syncCore.mjs",
+  "status": 1,
+  "passes": 190,
+  "failures": 1,
+  "caught": true,
+  "titles": [
+   "unit-syncCore (外部匯入依 srcKey 差異同步, perm-run03, R-IMPORT-01) users 登入識別撞值(mappingBy=id, O1: "
+  ],
+  "restored": true
+ },
+ {
+  "id": "S4",
+  "note": "匯入端只與他 from 之有效列比對(修前口徑)",
+  "file": "server/syncCore.mjs",
+  "status": 1,
+  "passes": 190,
+  "failures": 1,
+  "caught": true,
+  "titles": [
+   "unit-syncCore (外部匯入依 srcKey 差異同步, perm-run03, R-IMPORT-01) users 登入識別撞值(mappingBy=id, O1: "
+  ],
+  "restored": true
+ },
+ {
+  "id": "P1",
+  "note": "後台存檔不檢查登入識別撞值",
+  "file": "server/procCore.mjs",
+  "status": 8,
+  "passes": 183,
+  "failures": 8,
+  "caught": true,
+  "titles": [
+   "unit-procCore-loginId (後台整表寫入: mappingBy=id 之登入識別撞值, R-MAPKEY-04) UL-001 新增後台列 id 等於有效外部列之",
+   "unit-procCore-loginId (後台整表寫入: mappingBy=id 之登入識別撞值, R-MAPKEY-04) UL-003 新增之後台列為停用、而其 id 等",
+   "unit-procCore-loginId (後台整表寫入: mappingBy=id 之登入識別撞值, R-MAPKEY-04) UL-005 外部列已停用(srcKey 相同)",
+   "unit-procCore-loginId (後台整表寫入: mappingBy=id 之登入識別撞值, R-MAPKEY-04) UL-007 歷史撞值存在時, 另新增一個 id",
+   "unit-procCore-loginId (後台整表寫入: mappingBy=id 之登入識別撞值, R-MAPKEY-04) UL-008 同批多列任一列撞值 → 整批拒收,",
+   "unit-procCore-loginId (後台整表寫入: mappingBy=id 之登入識別撞值, R-MAPKEY-04) UL-009 srLog: event=upda"
+  ],
+  "restored": true
+ },
+ {
+  "id": "P2",
+  "note": "被觸及簽章不含來源",
+  "file": "server/procCore.mjs",
+  "status": 0,
+  "passes": 191,
+  "failures": 0,
+  "caught": false,
+  "titles": [],
+  "restored": true
+ },
+ {
+  "id": "P3",
+  "note": "庫內舊列只取有效者(修前口徑: 停用改啟用算被觸及)",
+  "file": "server/procCore.mjs",
+  "status": 1,
+  "passes": 190,
+  "failures": 1,
+  "caught": true,
+  "titles": [
+   "unit-procCore-loginId (後台整表寫入: mappingBy=id 之登入識別撞值, R-MAPKEY-04) UL-004 停用／啟用只是狀態: 歷史撞值之後"
+  ],
+  "restored": true
+ },
+ {
+  "id": "P4",
+  "note": "後台存檔所有列皆視為被觸及",
+  "file": "server/procCore.mjs",
+  "status": 5,
+  "passes": 186,
+  "failures": 5,
+  "caught": true,
+  "titles": [
+   "unit-procCore-loginId (後台整表寫入: mappingBy=id 之登入識別撞值, R-MAPKEY-04) UL-004 停用／啟用只是狀態: 歷史撞值之後",
+   "unit-procCore-loginId (後台整表寫入: mappingBy=id 之登入識別撞值, R-MAPKEY-04) UL-006 歷史撞值(後台列 k 與外部列 s",
+   "unit-procCore-loginId (後台整表寫入: mappingBy=id 之登入識別撞值, R-MAPKEY-04) UL-009 srLog: event=upda",
+   "unit-procCore-loginId (後台整表寫入: mappingBy=id 之登入識別撞值, R-MAPKEY-04) UL-014 lockExternalRows ",
+   "unit-procCore-loginId (後台整表寫入: mappingBy=id 之登入識別撞值, R-MAPKEY-04) UL-015 lockExternalRows "
+  ],
+  "restored": true
+ },
+ {
+  "id": "W5",
+  "note": "/api/getPerm 亦經 resolvePermUserId",
+  "file": "server/WWebPerm.mjs",
+  "status": 1,
+  "passes": 190,
+  "failures": 1,
+  "caught": true,
+  "titles": [
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) SITE-LI 站點接線(靜態; 只擋字面與位置之回退, 語"
+  ],
+  "restored": true
+ },
+ {
+  "id": "W7",
+  "note": "getTokenUser 多筆不拒絕(放行 null→查無)",
+  "file": "server/WWebPerm.mjs",
+  "status": 0,
+  "passes": 191,
+  "failures": 0,
+  "caught": false,
+  "titles": [],
+  "restored": true
+ },
+ {
+  "id": "N1",
+  "note": "離線稽核不列登入識別撞值",
+  "file": "server/tools/nameDupReport.mjs",
+  "status": 1,
+  "passes": 190,
+  "failures": 1,
+  "caught": true,
+  "titles": [
+   "unit-nameDupReport (名稱重複與對應鍵稽核工具) ND-005b mappingBy=id 報「登入識別撞值」(perm-run05, R-MAPKEY-05):"
+  ],
+  "restored": true
+ },
+ {
+  "id": "N2",
+  "note": "離線稽核只列有效列之撞值",
+  "file": "server/tools/nameDupReport.mjs",
+  "status": 1,
+  "passes": 190,
+  "failures": 1,
+  "caught": true,
+  "titles": [
+   "unit-nameDupReport (名稱重複與對應鍵稽核工具) ND-005b mappingBy=id 報「登入識別撞值」(perm-run05, R-MAPKEY-05):"
+  ],
+  "restored": true
+ }
+]

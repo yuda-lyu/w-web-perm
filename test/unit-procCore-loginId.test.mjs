@@ -1,8 +1,10 @@
 //後台整表寫入 users 之登入識別撞值檢查(mappingBy='id' 之 O1 規則; perm-run04 範圍一; 規則帳本 R-MAPKEY-04; 規格 dspec/外部匯入之定義與機制.md 第 9 節末)
 //
+//perm-run05 更新(主控裁示: 不同外部系統之使用者 id 碰撞常見而非同一人; srcKey 須跨來源唯一、不論 isActive): P1／P2 改為不論 isActive 皆算撞值——
+//  登入查找不論有效與否計筆, 若匯入／後台存檔放行停用列之撞值, 其後該列轉為有效即造成永久登入拒絕; 故停用列與他來源之外部列皆參與.
 //述語(期望由規格推導, 不照實作現況):
-//  P1 mappingBy 為 'id'(含省略與不合法值)時, 後台存檔「新增或改變之後台列 id」若等於既有有效外部列之 srcKey → 整次拒收 loginIdCollision、四表零變更、零寫入;
-//  P2 「改變」含停用改啟用(登入只匹配有效列, 啟用才造成同時匹配兩筆); 停用列(新增即停用、外部列已停用)不參與;
+//  P1 mappingBy 為 'id'(含省略與不合法值)時, 後台存檔「新增或改變之後台列 id」若等於既有外部列之 srcKey(不論 isActive) → 整次拒收 loginIdCollision、四表零變更、零寫入;
+//  P2 「被觸及」＝新增之列或登入識別(類別＋值)與庫內不同之列; 停用改啟用只是狀態改變, 不改變登入識別, 不算被觸及(歷史撞值不因啟用而新擋; 登入時照拒);
 //  P3 歷史既有(未被觸及)之撞值不擋: 原樣送回並編修無關列、群組指派(pickKeysOnly)、刪除其中一列皆可存(否則已有歷史資料之庫無法在後台修復);
 //  P4 mappingBy 為 'email'／'name' 時不檢查(同一操作可存);
 //  P5 被拒時 srLog 記 event=updateTabItems-ckKey-error、key='id'、msg='loginIdCollision'、reason、row(列索引), 不記 id／srcKey 之值;
@@ -53,6 +55,11 @@ const SEEDS = {
     swap: () => [mkUser('b1'), ext('K', 'A-key', { from: 'A' }), ext('p', 'K', { from: 'B' })],
     //swap2: 同 swap, 但外部列 K 之 srcKey 恰等於其 id(轉為後台列後登入識別之「值」不變, 只有類別由外部變後台; 外審 sol 第二輪#1)
     swap2: () => [mkUser('b1'), ext('K', 'K', { from: 'A' }), ext('p', 'K', { from: 'B' })],
+    //dupsame: 同一來源 A 之兩外部列同 srcKey 'K'(歷史資料; perm-run05 簽章含來源之守護)
+    dupsame: () => [mkUser('b1'), ext('p1', 'K', { from: 'A' }), ext('p2', 'K', { from: 'A' })],
+    //claim: 來源 A 之外部列 S(srcKey 'K'); 供後台(保護關閉時)新增外部形列 id 'K' 之 claimTwice 形(外審 sol 第一輪#1)
+    claim: () => [mkUser('b1'), ext('S', 'K', { from: 'A' })],
+    claimOff: () => [mkUser('b1'), ext('S', 'K', { from: 'A', isActive: 'n' })],
 }
 
 describe('unit-procCore-loginId (後台整表寫入: mappingBy=id 之登入識別撞值, R-MAPKEY-04)', function() {
@@ -124,37 +131,33 @@ describe('unit-procCore-loginId (後台整表寫入: mappingBy=id 之登入識�
         }
     })
 
-    it('UL-003 新增之後台列為停用 → 不參與, 可存  [P2]', async function() {
+    it('UL-003 新增之後台列為停用、而其 id 等於有效外部列之 srcKey → 仍拒收(不論 isActive; 否則其後轉有效即造成登入永久拒絕)、零寫入; mappingBy 為 email 不檢查  [P1]', async function() {
         let e = createEnv('base', 'id')
-        let r = await run(e.pc, [...(await rowsOf(e.woItems)), nu({ id: 'GUID-1', isActive: 'n' })])
-        A.deepEqual(r, OK)
-        A.ok(e.woItems.users.has('GUID-1'))
+        await assertRejected(e, [...(await rowsOf(e.woItems)), nu({ id: 'GUID-1', isActive: 'n' })])
+        let e2 = createEnv('base', 'email')
+        A.deepEqual(await run(e2.pc, [...(await rowsOf(e2.woItems)), nu({ id: 'GUID-1', isActive: 'n' })]), OK)
     })
 
-    it('UL-004 後台停用列改啟用而其 id 等於有效外部列之 srcKey → 拒收; 外部列已停用則可存  [P2: 停用改啟用算改變]', async function() {
-        //actv: 後台停用列 'GUID-1' 的 id 與有效外部列 srcKey 相同(停用時不構成撞值)→ 啟用即造成同時匹配兩筆
+    it('UL-004 停用／啟用只是狀態: 歷史撞值之後台停用列改啟用(登入識別不變)不算被觸及 → 可存(歷史撞值不因啟用而新擋; 登入時照拒); mappingBy 為 email 不檢查  [P2]', async function() {
+        //actv: 後台停用列 'GUID-1' 與外部列 e1 之 srcKey 'GUID-1' 相同(歷史撞值; 現行入口不可造, 旁路寫庫)
         let e = createEnv('actv', 'id')
         let rows = await rowsOf(e.woItems)
         by(rows, 'GUID-1').isActive = 'y'
-        await assertRejected(e, rows)
-        //外部列已停用 → 啟用後台列可存
-        let e2 = createEnv('actv2', 'id')
+        A.deepEqual(await run(e.pc, rows), OK)
+        A.equal(e.woItems.users.get('GUID-1').isActive, 'y')
+        let e2 = createEnv('actv2', 'id') //外部列亦停用: 同
         let rows2 = await rowsOf(e2.woItems)
         by(rows2, 'GUID-1').isActive = 'y'
         A.deepEqual(await run(e2.pc, rows2), OK)
-        A.equal(e2.woItems.users.get('GUID-1').isActive, 'y')
-        //mappingBy=email 不檢查
         let e3 = createEnv('actv', 'email')
         let rows3 = await rowsOf(e3.woItems)
         by(rows3, 'GUID-1').isActive = 'y'
         A.deepEqual(await run(e3.pc, rows3), OK)
     })
 
-    it('UL-005 外部列已停用(srcKey 相同)時新增後台列 → 可存; 停用的後台列既有 id 與之相同亦不構成撞值  [P2]', async function() {
+    it('UL-005 外部列已停用(srcKey 相同)時新增後台列 → 仍拒收(不論 isActive)、零寫入  [P1]', async function() {
         let e = createEnv('base', 'id')
-        let r = await run(e.pc, [...(await rowsOf(e.woItems)), nu({ id: 'GUID-2' })]) //e2 的 srcKey 'GUID-2' 為停用外部列
-        A.deepEqual(r, OK)
-        A.ok(e.woItems.users.has('GUID-2'))
+        await assertRejected(e, [...(await rowsOf(e.woItems)), nu({ id: 'GUID-2' })]) //e2 的 srcKey 'GUID-2' 為停用外部列
     })
 
     it('UL-006 歷史撞值(後台列 k 與外部列 srcKey k 皆有效)原樣送回並編修無關列 → 可存; 群組指派(pickKeysOnly)可存; 刪除後台列 k(修復)可存  [P3]', async function() {
@@ -283,6 +286,38 @@ describe('unit-procCore-loginId (後台整表寫入: mappingBy=id 之登入識�
         A.equal(e.woItems.users.get('p').from, '')
         let e2 = createEnv('swap', 'id', { lockExternalRows: false })
         A.deepEqual(await run(e2.pc, await rowsOf(e2.woItems)), OK, '原樣送回')
+    })
+
+    it('UL-016 lockExternalRows 為假: 外部列只換 from(類別仍為外部、srcKey 不變)而與他來源同值 → 登入識別之來源改變即被觸及 → loginIdCollision、零變更; 同一來源之兩列同 srcKey 原樣送回(歷史, 同來源不算撞)可存(perm-run05 簽章含來源)', async function() {
+        //dupsame: 同一來源 A 之兩外部列同 srcKey 'K'(歷史資料; 同來源由 srcKeyDuplicate／srcKeyConflict 處理, 非登入識別撞值)
+        let e0 = createEnv('dupsame', 'id', { lockExternalRows: false })
+        A.deepEqual(await run(e0.pc, await rowsOf(e0.woItems)), OK, '同來源同 srcKey 原樣送回可存')
+        let e = createEnv('dupsame', 'id', { lockExternalRows: false })
+        let rows = await rowsOf(e.woItems)
+        by(rows, 'p2').from = 'B' //登入識別 (x:A,'K') → (x:B,'K'): 值與類別(外部)不變, 來源改變, 與 p1(A,'K') 成為跨來源同值
+        await assertRejected(e, rows)
+    })
+
+    it('UL-017 lockExternalRows 為假: 後台新增外部形列(from 非空、無 srcKey), 其 id 等於同來源既有外部列之 srcKey(claimTwice 形; 登入命中兩筆、同步端回 srcKeyConflict; 外審 sol 第一輪#1) → loginIdCollision、零變更, reason srcKeyClaimTwice; 預設(外部列保護啟用)則由外部列守門先拒 saveFromNotAllowed', async function() {
+        let e = createEnv('claim', 'id', { lockExternalRows: false })
+        await assertRejected(e, [...(await rowsOf(e.woItems)), nu({ id: 'K', from: 'A' })])
+        let lg = e.logs.find((l) => l.event === 'updateTabItems-ckKey-error')
+        A.ok(lg && lg.reason === 'srcKeyClaimTwice', `reason 應為 srcKeyClaimTwice, 實得 ${JSON.stringify(lg)}`)
+        //不論雙方 isActive(含停用與非標準值): 既有外部列有效／停用 × 新增列各取值皆拒、零寫入(外審 sol 第二輪#2)
+        for (let seedName of ['claim', 'claimOff']) {
+            for (let v of ['y', 'n', 'Y', true, '', undefined]) {
+                let ev = createEnv(seedName, 'id', { lockExternalRows: false })
+                await assertRejected(ev, [...(await rowsOf(ev.woItems)), nu({ id: 'K', from: 'A', isActive: v })])
+            }
+        }
+        //id 不同於對方 srcKey 的外部形列可存(無撞值)
+        let e2 = createEnv('claim', 'id', { lockExternalRows: false })
+        A.deepEqual(await run(e2.pc, [...(await rowsOf(e2.woItems)), nu({ id: 'K2', from: 'A' })]), OK)
+        //預設(外部列保護啟用): 後台不得新增 from 非空之列, 由外部列守門先拒(perm-run03 錯誤優先序不變)
+        let e3 = createEnv('claim', 'id')
+        let before3 = snapAll(e3.woItems)
+        A.deepEqual(await run(e3.pc, [...(await rowsOf(e3.woItems)), nu({ id: 'K', from: 'A' })]), { ok: false, v: 'saveFromNotAllowed' })
+        A.deepEqual(snapAll(e3.woItems), before3, '零變更')
     })
 
     it('UL-011 後台列既有 id 不變、其他欄位改動 → 不是改變 id, 不擋(例: 有效後台列 b1 改描述, 而外部列 srcKey 與之無關)  [P3]', async function() {

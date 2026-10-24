@@ -480,7 +480,8 @@ let kpLang = {
     //perm-run03 範圍二(外部匯入改依來源鍵 srcKey 差異同步; dspec/外部匯入之定義與機制.md 第 9 節):
     //  srcKeyInvalid 批次內有列缺 srcKey、srcKey 為空或非字串(含長度／字元不合) → 整批拒收、零寫入; srcKeyDuplicate 同批 srcKey 重複 → 整批拒收;
     //  idNotAllowed 批次內有列帶 id(內部主鍵由本系統產生, 外部不得指定) → 整批拒收; srcKeyConflict 同 from 庫內有重複 srcKey(資料異常), 或同一 srcKey 被兩個庫內列主張(一個已有 srcKey、一個以 id 主張)而無法唯一配對 → 整批拒收、零寫入並提示人工處置(以 g_purgeFrom.mjs 清源後重匯入);
-    //  loginIdCollision(perm-run04, 規則帳本 R-MAPKEY-04; 規格第 9 節末 O1): mappingBy='id' 時外部列以 srcKey、後台列以 id 對應外部 token 之使用者 id; 有效外部列之 srcKey 等於有效後台列之 id 即撞值(登入會同時匹配兩筆),
+    //  loginIdCollision(perm-run04, 規則帳本 R-MAPKEY-04／R-MAPKEY-05; 規格第 9 節末 O1): mappingBy='id' 時外部列以 srcKey、後台列以 id 對應外部 token 之使用者 id; 登入識別值於兩列相同即撞值(登入會同時匹配多筆),
+    //    perm-run05 起「不論 isActive」「含他來源外部列」(後台列 id↔外部列 srcKey、外部列 srcKey↔他來源外部列 srcKey), 訊息須同時涵蓋後台存檔與外部匯入兩種讀者並提示改用可唯一對應之鍵;
     //    匯入批次(整批拒收、零寫入)與後台存檔(整次拒收、零變更)皆回此鍵, 登入時命中多筆另回 ambiguousUserFromPerm; 固定訊息, 不回顯 srcKey 與 id
     srcKeyInvalid: {
         eng: `Invalid srcKey: every row must carry a non-empty string srcKey`,
@@ -499,8 +500,8 @@ let kpLang = {
         cht: `此來源之既有資料無法依 srcKey 唯一配對。資料未變更，請聯絡管理員處置`,
     },
     loginIdCollision: {
-        eng: `Nothing was changed: the id of an active administrator-managed user is the same as the srcKey of an active user synchronized from an external source, so a login by id would match both users. Please give one of them a different value`,
-        cht: `資料未變更：有效的後台使用者之 id 與有效的外部同步使用者之 srcKey 相同，依 id 登入時會同時符合兩位使用者。請將其中一個改為不同的值`,
+        eng: `Nothing was changed: a login identifier (the id of an administrator-managed user, or the srcKey of a user synchronized from an external source) is also used by another user or another source, whether or not either user is enabled, so a login by id would match more than one user. Please use a value that identifies the user uniquely, or ask the deployer to map users by another unique key (for example the email)`,
+        cht: `資料未變更：有一筆資料的登入識別（後台使用者的 id，或外部同步使用者的 srcKey）與其他使用者或其他來源的相同（不論是否停用），依 id 登入時會同時符合多位使用者。請改用可唯一對應使用者的值，或請部署方改以其他可唯一對應的鍵（例如 email）進行對應`,
     },
     cannotGetUserId: {
         eng: `Cannot get the user id`,

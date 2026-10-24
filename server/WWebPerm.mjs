@@ -35,7 +35,7 @@ import srLogInit from './srLog.mjs'
 import procStaInfor from './procStaInfor.mjs'
 import { maskTok, maskQuery, maskUrl } from './maskLog.mjs'
 import wrapInjected from './wrapInjected.mjs'
-import { pickUniqueUser, findLoginUsers } from './keyCheck.mjs'
+import { pickUniqueUser, findLoginUsers, mapKeyOf } from './keyCheck.mjs'
 import { createAuthorizeExec, wrapOperOrm } from './dataChannel.mjs'
 
 
@@ -62,7 +62,7 @@ import { createAuthorizeExec, wrapOperOrm } from './dataChannel.mjs'
  * @param {String} [opt.webLogo=''] 輸入站台logo字串，採base64格式，預設''
  * @param {String} [opt.subfolder=''] 輸入站台所在子目錄字串，提供站台位於內網採反向代理進行服務時，故需支援位於子目錄情形，預設''
  * @param {String} [opt.urlRedirect=''] 輸入錯誤時自動轉址字串，提供站台例如無法登入或驗證失敗時須自動轉址，預設''
- * @param {String} [opt.mappingBy='id'] 輸入外部系統識別使用者token後所提供之資料物件，與權限系統之使用者資料物件，兩者間查找之對應欄位，可選'id'、'email'、'name'，未給或非此三者時為'id'，預設'id'。對應鍵須能唯一指出使用者：mappingBy為'email'或'name'時，外部同步(syncAndReplaceTabs)users之有效(isActive為'y')列，該欄位須為非空字串且與本批及其他from之有效列皆不重複(違規整批拒收invalidRows)；登入查找以對應鍵於權限系統users命中多於1筆有效使用者時一律拒絕(ambiguousUserFromPerm)，不取首筆；mappingBy為'id'(預設)時，後台列(from為空)以其id對應外部token使用者之id，外部同步列(from非空)則以其來源鍵srcKey對應(外部列之id為本系統配發之內部主鍵，不是登入識別；升版前同步寫入、尚無srcKey之舊外部列在首次匯入補上srcKey前暫以id對應)，並防止撞值：有效外部列之srcKey等於有效後台列之id時，外部同步(syncAndReplaceTabs)整批拒收(loginIdCollision，零寫入)、後台存檔(updateUsers)新增或啟用之後台列id撞到有效外部列srcKey時整次拒收(loginIdCollision，零變更)，登入時若仍命中多於1筆則拒絕(ambiguousUserFromPerm)；停用(isActive非'y')列不參與
+ * @param {String} [opt.mappingBy='id'] 輸入外部系統識別使用者token後所提供之資料物件，與權限系統之使用者資料物件，兩者間查找之對應欄位，可選'id'、'email'、'name'，未給或非此三者時為'id'，預設'id'。對應鍵須能唯一指出使用者：mappingBy為'email'或'name'時，外部同步(syncAndReplaceTabs)users之有效(isActive為'y')列，該欄位須為非空字串且與本批及其他from之有效列皆不重複(違規整批拒收invalidRows)；登入查找以對應鍵於權限系統users命中多於1筆有效使用者時一律拒絕(ambiguousUserFromPerm)，不取首筆；mappingBy為'id'(預設)時，後台列(from為空)以其id對應外部token使用者之id，外部同步列(from非空)則以其來源鍵srcKey對應(外部列之id為本系統配發之內部主鍵，不是登入識別；升版前同步寫入、尚無srcKey之舊外部列在首次匯入補上srcKey前暫以id對應)，並防止撞值(登入識別值須跨全表唯一，不論isActive、含他來源外部列；不同外部系統之使用者id碰撞常見而非同一人，已停用者之token不得對到他來源之有效列)：外部同步(syncAndReplaceTabs)批次內任一列之srcKey等於他來源任一既有列之登入識別值(後台列id、他來源外部列srcKey)時整批拒收(loginIdCollision，零寫入，請部署方改用可唯一對應之鍵，如以email對應並將mappingBy設為'email')、後台存檔(updateUsers)新增或改變之後台列id撞到任一外部列srcKey時整次拒收(loginIdCollision，零變更)，登入時若命中多於1筆(不論有效與否)則拒絕(ambiguousUserFromPerm)、恰命中1筆但已停用視同查無(cannotGetUserFromPerm)；mappingBy為'id'時getPermUserInfor之userId亦依此對應解析(外部列傳其srcKey、後台列傳id，不是內部id；命中多筆拒絕ambiguousUserFromPerm)，'email'／'name'時userId仍為perm內部id；升版前既有之跨來源重複srcKey歷史資料不阻擋存檔，但登入一律拒絕，請依README Upgrade Notes盤點處置
  * @param {Boolean} [opt.cascadeRename=true] 輸入群組、權限改名時是否連帶更新引用它之授權字串(users.cgrups、grups.cpemis)，預設true。改名以主鍵id判定(同id異名)，後台整表儲存與外部同步(同一from內)皆適用，於同一次寫入內改寫並可能寫入外部來源之users列之cgrups；給false則不連帶(引用成為懸空，視同引用查無對象而收嚴並於頁面提示)。群組、權限、標的被刪除時之引用連帶清理(users.cgrups、grups.cpemis、pemis.crules)不受此設定影響
  * @param {String} [opt.lockExternalRows='y'] 輸入後台是否不得改外部列(from為非空字串，即經syncAndReplaceTabs由外部來源同步之列)，可選'y'或'n'，預設'y'。'y'時伺服端強制：後台新增列from須為空字串、外部列不可刪除、不可改from、身分/結構欄(指派欄與順序以外之欄位)不可改，違規整次拒收(saveFromNotAllowed／saveExternalRowChanged)；授權指派欄(users.cgrups、grups.cpemis、pemis.crules)後台可寫，但須附載入基準(用戶端自動附帶)，無基準者拒收(saveBaselineRequired)；外部列之order由外部擁有、後台儲存不重編。給'n'回到舊行為(僅保留from須為字串之檢查)。升版後既有庫中from為非空字串之列即視為外部列而唯讀，請先以g_fixFromType.mjs／g_purgeFrom.mjs盤點(見README Upgrade Notes)
  * @param {String} [opt.logFd='./logs'] 輸入log紀錄儲存位置字串，預設'./logs'
@@ -654,6 +654,26 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     }
 
 
+    //resolvePermUserId: /api/getPermUserInfor 之 userId(外部應用傳入)依登入對應解析(perm-run05, 規則帳本 R-MAPKEY-05; 主控 2026-10-24 收件裁示②):
+    //mappingBy 為 'id' 時, 外部應用手上只有外部使用者 id(即登入識別: 外部列對 srcKey、後台列對 id), 不知本系統配發之內部 id, 故與登入入口同一判準(keyCheck.findLoginUsers)解析:
+    //命中多筆(不論有效與否)→ 拒絕 ambiguousUserFromPerm(不取首筆); 恰 1 筆有效 → 回 { userId: 其內部 id, userFind: 該列 };
+    //其餘(查無或恰 1 筆停用)→ 回 { userId: null, userFind: null }(視同查無使用者, 回全停用之空權限, 與修正前查無使用者行為相同);
+    //以解析出之列直接算權限, 不再以內部 id 重讀(外審 sol 第一輪#2: 解析與重讀之間該列可被刪除、同 id 被另一人佔用, 重讀會取得另一人之權限);
+    //'email'／'name' 時 userId 維持內部 id(行為不變, userFind 為 undefined 表示照舊以 id 讀取). 僅此路由使用: /api/getPerm 之 userIdSelf 已是 getTokenUser 回傳之內部 id, 不得再解析.
+    let resolvePermUserId = async (userIdFind) => {
+        if (mapKeyOf(mappingBy) !== null) {
+            return { userId: userIdFind, userFind: undefined }
+        }
+        let { user, count } = await findLoginUsers(woItems.users, mappingBy, userIdFind)
+        if (count > 1) {
+            console.log('mappingBy', mappingBy, 'count', count)
+            srLog.error({ event: 'api/getPermUserInfor-error', msg: 'ambiguousUserFromPerm', mappingBy, count })
+            return Promise.reject('ambiguousUserFromPerm')
+        }
+        return iseobj(user) ? { userId: user.id, userFind: user } : { userId: null, userFind: null }
+    }
+
+
     //getGenUserByUserId
     let getGenUserByUserId = async(userId) => {
 
@@ -670,10 +690,10 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
 
     //getGenUserAndRulesByUserId
-    let getGenUserAndRulesByUserId = async (userId) => {
+    let getGenUserAndRulesByUserId = async (userId, userPre = undefined) => {
 
-        //userFind
-        let userFind = await getGenUserByUserId(userId)
+        //userFind, userPre 非 undefined 時(含 null＝查無)為呼叫端已解析之列, 直接採用不重讀(resolvePermUserId); 否則依 userId 讀取
+        let userFind = (userPre !== undefined) ? userPre : await getGenUserByUserId(userId)
         // console.log('userFind', userFind)
 
         //grups
@@ -935,8 +955,11 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                         return Promise.reject(`tokenNoPermission`)
                     }
 
-                    //getGenUserAndRulesByUserId, 查找到的使用者與權限
-                    let userWithRulesFind = await getGenUserAndRulesByUserId(userIdFind)
+                    //resolvePermUserId, mappingBy 為 id 時依登入對應解析出使用者列(外部列傳 srcKey、後台列傳 id; 多筆拒絕), email／name 時維持內部 id
+                    let userPerm = await resolvePermUserId(userIdFind)
+
+                    //getGenUserAndRulesByUserId, 查找到的使用者與權限(已解析之列直接採用)
+                    let userWithRulesFind = await getGenUserAndRulesByUserId(userPerm.userId, userPerm.userFind)
                     // console.log('getGenUserAndRulesByUserId', userWithRulesFind)
 
                     //check

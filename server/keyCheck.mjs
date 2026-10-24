@@ -271,9 +271,10 @@ function pickUniqueUser(rs) {
 
 //users 登入對應 mappingBy='id' 之 O1 規則(perm-run04, 規則帳本 R-MAPKEY-04; 規格 dspec/外部匯入之定義與機制.md 第 9 節末, 主控 2026-10-24 定案):
 //  外部列(from 非空)以外部 token 之使用者 id 對 srcKey(其 id 是本系統配發之內部主鍵, 不是登入識別), 後台列(from 空)對 id.
-//  外部列 srcKey 與後台列 id 相同即「撞值」(登入會同時匹配兩筆): 匯入批次、後台存檔、登入三處皆拒(原則 3 收嚴＋提示、原則 4 所有入口一致).
-//  只有有效(isActive='y')列參與: 登入只匹配有效列, 停用列不構成撞值(轉為有效時才算被觸及).
-//  判準(loginIdOf／findLoginUsers／findLoginIdClash)單一擁有者在本檔; 外部同步(syncCore.mjs)、後台整表寫入(procCore.mjs)、登入查找(WWebPerm.mjs:getTokenUser)只呼叫本檔.
+//  perm-run05(主控 2026-10-24 收件裁示): 登入識別值須跨全表唯一, 「不論 isActive」「含他來源」: 不同外部系統之使用者 id 碰撞常見而非同一人, 且停用列可被重新啟用,
+//  故「只有一列有效」不得放行(否則已停用者之 token 會對到他來源之有效列). 撞值之組合: 同一登入識別值出現在兩列, 且該對不是「兩後台列」(同一主鍵)、「同一來源皆有 srcKey 之兩外部列」(srcKeyDuplicate／srcKeyConflict 於同步端另拒)與「同一來源皆無 srcKey 之兩舊外部列」(同一主鍵); 詳見 findLoginIdClashDetail.
+//  匯入批次、後台存檔、登入三處皆拒(原則 3 收嚴＋提示、原則 4 所有入口一致); 登入時命中多筆(不論有效與否)即拒絕, 恰 1 筆且停用視同查無.
+//  判準(loginIdOf／findLoginUsers／findLoginIdClashDetail)單一擁有者在本檔; 外部同步(syncCore.mjs)、後台整表寫入(procCore.mjs)、登入查找與 getPermUserInfor(WWebPerm.mjs)只呼叫本檔.
 let isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v)
 let isEStr = (v) => isStr(v) && v.length > 0
 
@@ -297,8 +298,10 @@ function loginIdOf(row) {
 
 
 /**
- * 登入查找(getTokenUser): 以對應鍵查 perm users 中有效(isActive='y')之列, 回 { user, count }(同 pickUniqueUser: 僅恰 1 筆時 user 為該列, 多筆不取首筆).
- * 'email'／'name': 以該欄位查(不變). 其餘(含預設 'id'): 後台列對 id、外部列對 srcKey(見上方 O1 規則): 兩次帶條件之 select(id、srcKey 各一; 皆含 isActive, 不做全表讀取), 合併去重後以 loginIdOf 複判.
+ * 登入查找(getTokenUser／getPermUserInfor): 回 { user, count }(僅恰 1 筆有效列時 user 為該列, 多筆不取首筆).
+ * 'email'／'name': 以該欄位查 perm users 中有效(isActive='y')之列(不變, 同 pickUniqueUser).
+ * 其餘(含預設 'id'): 後台列對 id、外部列對 srcKey(見上方 O1 規則), 「不論 isActive」計筆(perm-run05): 兩次帶條件之 select(id、srcKey 各一; 不帶 isActive, 不做全表讀取),
+ * 合併去重後以 loginIdOf 複判; 多於 1 筆 → count 為筆數、user 為 null(不以「只有一列有效」放行); 恰 1 筆且有效 → 該列; 恰 1 筆但停用 → count 0(視同查無).
  * ORM 讀取失敗原樣拋出(不吞成 0 筆).
  *
  * @param {Object} tabUsers 輸入 users 表之 ORM 物件(select)
@@ -311,56 +314,95 @@ async function findLoginUsers(tabUsers, mappingBy, vSelf) {
     if (key !== null) {
         return pickUniqueUser(await tabUsers.select({ [key]: vSelf, isActive: 'y' }))
     }
-    let rsId = await tabUsers.select({ id: vSelf, isActive: 'y' })
-    let rsSrc = await tabUsers.select({ srcKey: vSelf, isActive: 'y' })
+    let rsId = await tabUsers.select({ id: vSelf })
+    let rsSrc = await tabUsers.select({ srcKey: vSelf })
     let kp = new Map() //以 id 去重(srcKey 等於 id 之遷移後外部列會被兩次查詢各命中一次)
     for (let r of [...(Array.isArray(rsId) ? rsId : []), ...(Array.isArray(rsSrc) ? rsSrc : [])]) {
         if (isObj(r) && isEStr(r.id)) {
             kp.set(r.id, r)
         }
     }
-    return pickUniqueUser([...kp.values()].filter((r) => r.isActive === 'y' && loginIdOf(r) === vSelf))
+    let hits = [...kp.values()].filter((r) => loginIdOf(r) === vSelf)
+    if (hits.length === 1 && hits[0].isActive !== 'y') {
+        return { user: null, count: 0 }
+    }
+    return pickUniqueUser(hits)
 }
 
 
 /**
- * 登入識別撞值(mappingBy='id'): 回傳寫入後之表 rowsAfter 中第一個「被本次觸及」之有效列, 其與對向有效列撞值者之索引, 無則 -1.
- *  - 被觸及之有效外部列(from 非空且有 srcKey), 其 srcKey 等於某有效後台列(from 空)之 id;
- *  - 被觸及之有效後台列, 其 id 等於某有效外部列之 srcKey.
- * 歷史既有(未被觸及)之撞值不擋(否則已有歷史資料之庫無法在後台修復; 同 R-MAPKEY-03); 停用列不參與; 舊外部列(無 srcKey)與外部列之 id 不是登入識別, 不參與;
- * 他來源外部列彼此同 srcKey 不在此檢查(srcKey 僅在 from 內唯一; 登入時命中多筆即拒絕).
+ * 登入識別撞值(mappingBy='id'): 回傳寫入後之表 rowsAfter 中第一個「被本次觸及」之列, 其登入識別值(loginIdOf)與另一列相同且屬撞值組合者之細節, 無則 null.
+ * 「不論 isActive」「含他來源」(perm-run05): 撞值組合＝同一登入識別值出現在兩列, 且該對不是下列三種不屬登入識別撞值者:
+ *  - 兩後台列(登入識別值＝主鍵 id, 同一主鍵於表中不可並存);
+ *  - 同一來源(from 相同)之兩外部列且皆有 srcKey(srcKeyDuplicate／srcKeyConflict 於同步端另拒);
+ *  - 同一來源之兩舊外部列(皆無 srcKey, 登入識別值＝id, 即同一主鍵).
+ * 撞值之種類:
+ *  - adminId: 一為後台列(from 空)、一為外部列(其 srcKey; 舊外部列無 srcKey 者為其 id)相同;
+ *  - otherFrom: 兩外部列來源不同而登入識別值相同;
+ *  - sameFrom: 同一來源之兩外部列, 一有 srcKey、一為舊形(無 srcKey, 以其 id 為登入識別)而該 id 等於對方 srcKey——即同步端之 claimTwice(srcKeyConflict), 登入亦命中兩筆
+ *    (後台新增外部形列只在 lockExternalRows 為假時可能; 外審 sol 第一輪#1).
+ * 歷史既有(未被觸及)之撞值不擋(否則已有歷史資料之庫無法在後台修復; 同 R-MAPKEY-03). 外部列之內部 id(有 srcKey 者)不是登入識別, 不參與.
  *
  * @param {Array} rowsAfter 寫入後之 users 全表(後台整表寫入為送入之整表; 外部匯入為「他 from 之列＋本批」)
+ * @param {Function} isTouched (row, index) → Boolean, 該列是否為本次造成或觸及
+ * @returns {Object|null} { k, kOther, kind: 'adminId'|'otherFrom'|'sameFrom' }(k 為第一個被觸及且撞值之列索引, kOther 為與之撞值的另一列中索引最小者), 無則 null
+ */
+function findLoginIdClashDetail(rowsAfter, isTouched) {
+    if (!Array.isArray(rowsAfter)) {
+        return null
+    }
+    let groups = new Map() //登入識別值 → 列索引陣列(以 Map 計, 免原型鍵名誤判)
+    rowsAfter.forEach((r, k) => {
+        let v = loginIdOf(r)
+        if (v === '') {
+            return
+        }
+        if (!groups.has(v)) {
+            groups.set(v, [])
+        }
+        groups.get(v).push(k)
+    })
+    for (let k = 0; k < rowsAfter.length; k++) {
+        let r = rowsAfter[k]
+        let v = loginIdOf(r)
+        if (v === '' || !isTouched(r, k)) {
+            continue
+        }
+        let rx = isEStr(r.from)
+        for (let kOther of groups.get(v)) {
+            if (kOther === k) {
+                continue
+            }
+            let o = rowsAfter[kOther]
+            let ox = isEStr(o.from)
+            if (!rx && !ox) {
+                continue
+            }
+            if (rx && ox && r.from === o.from) {
+                //同一來源: 皆有 srcKey 或皆無 srcKey 者不在此判; 一有一無(claimTwice 形)才撞
+                if (isEStr(r.srcKey) === isEStr(o.srcKey)) {
+                    continue
+                }
+                return { k, kOther, kind: 'sameFrom' }
+            }
+            return { k, kOther, kind: (rx && ox) ? 'otherFrom' : 'adminId' }
+        }
+    }
+    return null
+}
+
+
+/**
+ * 登入識別撞值(mappingBy='id'): findLoginIdClashDetail 之索引版, 回第一個被觸及且撞值之列索引, 無則 -1
+ *
+ * @param {Array} rowsAfter 寫入後之 users 全表
  * @param {Function} isTouched (row, index) → Boolean, 該列是否為本次造成或觸及
  * @returns {Number} 撞值列之索引, 無為 -1
  */
 function findLoginIdClash(rowsAfter, isTouched) {
-    if (!Array.isArray(rowsAfter)) {
-        return -1
-    }
-    let isAct = (r) => isObj(r) && r.isActive === 'y'
-    let admIds = new Set()
-    let extKeys = new Set()
-    for (let r of rowsAfter) {
-        if (!isAct(r)) {
-            continue
-        }
-        if (isEStr(r.from)) {
-            if (isEStr(r.srcKey)) {
-                extKeys.add(r.srcKey)
-            }
-        }
-        else if (isEStr(r.id)) {
-            admIds.add(r.id)
-        }
-    }
-    return rowsAfter.findIndex((r, k) => {
-        if (!isAct(r) || !isTouched(r, k)) {
-            return false
-        }
-        return isEStr(r.from) ? (isEStr(r.srcKey) && admIds.has(r.srcKey)) : (isEStr(r.id) && extKeys.has(r.id))
-    })
+    let d = findLoginIdClashDetail(rowsAfter, isTouched)
+    return d === null ? -1 : d.k
 }
 
 
-export { findDupIndex, hasDupKey, findKeyOtherFrom, findTouchedDup, withTabLocks, mapKeyOf, checkMapKeyBatch, checkUsersWrite, pickUniqueUser, loginIdOf, findLoginUsers, findLoginIdClash }
+export { findDupIndex, hasDupKey, findKeyOtherFrom, findTouchedDup, withTabLocks, mapKeyOf, checkMapKeyBatch, checkUsersWrite, pickUniqueUser, loginIdOf, findLoginUsers, findLoginIdClash, findLoginIdClashDetail }

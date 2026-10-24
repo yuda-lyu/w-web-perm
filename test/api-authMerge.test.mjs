@@ -6,7 +6,7 @@
 //  ①授權字串(crules／cpemis／cgrups)逐字不變(後端不改寫、不補齊稠密)②getPermUserInfor 回傳之 rules 等於單元層對讀回資料呼叫 getUserRules 之結果 ③等於本檔寫死之規格預期值.
 //DB 斷言一律 getWoItems() 後唯讀 select; 本檔專屬 from 於 after 經 cleanExternalFixtures 清除(base seed 不動).
 //perm-run03(外部匯入改依 srcKey 差異同步, R-IMPORT-01): 同步端點不收 id(送 id 整批拒收 idNotAllowed), 每列須帶 srcKey; 內部主鍵 id 由伺服端產生(targets 例外: id＝srcKey),
-//  故本檔夾具列只帶 srcKey(標籤 sk-…), 讀回時依 srcKey 找列, getPermUserInfor 用讀回之真實 id 查詢. 授權字串以「名稱」互相引用(cgrups→群組名、cpemis→權限名、crules→標的 id), 與 id 無關, 規格表(CASES)不受影響.
+//  故本檔夾具列只帶 srcKey(標籤 sk-…), 讀回時依 srcKey 找列, getPermUserInfor 用 srcKey 查詢(perm-run05: mappingBy 為 id 時 userId 依登入對應, 外部列傳 srcKey, 不是讀回之內部 id). 授權字串以「名稱」互相引用(cgrups→群組名、cpemis→權限名、crules→標的 id), 與 id 無關, 規格表(CASES)不受影響.
 
 import assert from 'assert'
 import { startApi, urlSync, urlGetPermUserInfor, TOKEN_APP, getWoItems, cleanExternalFixtures } from './tools/api-setup.mjs'
@@ -136,8 +136,10 @@ describe('api-authMerge - 授權合併規格(R-AUTH-MERGE-00)之 API 層抽驗',
         })
         //查詢端不因損壞字串而失敗: 該使用者的有效權限為全 n(fail-safe); 使用者之 id 由伺服端產生, 依 srcKey 取得
         for (let k = 0; k < bad.length; k++) {
-            let ur = await getPermUserInfor(urlGetPermUserInfor, TOKEN_APP, bySrc(back.users, `sk-chm2-u${k}`).id)
+            let ur = await getPermUserInfor(urlGetPermUserInfor, TOKEN_APP, bySrc(back.users, `sk-chm2-u${k}`).srcKey) //perm-run05: userId 依登入對應(外部列傳 srcKey; 傳內部 id 會查無而回全 n, 使本斷言空轉)
             assert.ok(ur.rules.every((x) => x.isActive === 'n'), `損壞 cgrups #${k} → 全 n`)
+            assert.strictEqual(ur.user.srcKey, `sk-chm2-u${k}`, `查得夾具使用者本人(傳錯鍵時 user 無 srcKey 而回空權限, 「全 n」斷言會空轉; perm-run05)`)
+            assert.deepStrictEqual(ur.rules.filter((x) => T.includes(x.name)).map((x) => x.name).sort(), [...T].sort(), `損壞 cgrups #${k} 仍列出本檔全部標的(非 rules=[] 之空洞「全 n」; 外審 sol 第二輪#3)`)
         }
     })
 
@@ -165,7 +167,7 @@ describe('api-authMerge - 授權合併規格(R-AUTH-MERGE-00)之 API 層抽驗',
             let me = bySrc(users, `sk-chm-${id}`)
 
             //①API
-            let ur = await getPermUserInfor(urlGetPermUserInfor, TOKEN_APP, me.id)
+            let ur = await getPermUserInfor(urlGetPermUserInfor, TOKEN_APP, me.srcKey) //perm-run05: 外部列傳 srcKey(登入對應)
             assert.ok(Array.isArray(ur.rules))
             assert.ok(!ur.rules.some((x) => x.name === 'chm-TX'), '孤兒管理對象不輸出')
             let apiYs = ysOf(ur.rules)

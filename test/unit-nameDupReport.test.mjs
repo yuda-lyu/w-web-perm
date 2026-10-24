@@ -102,7 +102,40 @@ describe('unit-nameDupReport (名稱重複與對應鍵稽核工具)', function()
         assert.strict.deepEqual(rp.mapKey.name.dup.map((g) => [g.value, g.rows.map((u) => u.id)]), [['peter', ['u2', 'u3']]])
     })
 
-    it('ND-005 --mapping-by 指定時只報該鍵; id 只報缺漏(不會有重複)', function() {
+    it('ND-005b mappingBy=id 報「登入識別撞值」(perm-run05, R-MAPKEY-05): 不論 isActive、含他來源; 兩後台列與同來源兩外部列不報; 外部列之內部 id 不是登入識別; 舊外部列(無 srcKey)以 id 參與; 文字報告含撞值段', function() {
+        let u = (o) => ({ name: o.id, email: `${o.id}@x.com`, from: '', isActive: 'y', cgrups: '{}', ...o })
+        let d = {
+            users: [
+                u({ id: 'b-k' }), //後台列 k(登入識別 b-k)
+                u({ id: 'sys-1', srcKey: 'b-k', from: 'appA', isActive: 'n' }), //停用之外部列 srcKey 等於後台列 id → 撞(adminId)
+                u({ id: 'sys-2', srcKey: 'dup', from: 'appA' }), u({ id: 'sys-3', srcKey: 'dup', from: 'appB', isActive: 'n' }), //他來源同 srcKey, 一停用 → 撞(otherFrom)
+                u({ id: 'sys-4', srcKey: 'same', from: 'appA' }), u({ id: 'sys-5', srcKey: 'same', from: 'appA', isActive: 'n' }), //同來源同 srcKey(其一停用): 登入命中兩筆即拒、同步回 srcKeyConflict → 須列出(scope sameSource; 外審 sol 第一輪#5)
+                u({ id: 'old-2', from: 'appE' }), u({ id: 'sys-10', srcKey: 'old-2', from: 'appE' }), //同來源一為舊形(無 srcKey, 登入識別為其 id)、一有 srcKey 等於該 id(claimTwice 形) → 跨來源撞值組合(crossSource)
+                u({ id: 'old-1', from: 'appC' }), u({ id: 'sys-6', srcKey: 'old-1', from: 'appD' }), //舊外部列(無 srcKey)以 id 參與 → 撞
+                u({ id: 'sys-7', srcKey: 'guid-7', from: 'appA' }), u({ id: 'guid-7x', from: '' }), //外部列內部 id 與他列無關
+                u({ id: 'sys-8', srcKey: 'sys-9', from: 'appA' }), u({ id: 'sys-9', srcKey: 'guid-9', from: 'appB' }), //外部列 sys-8 之 srcKey 等於另一外部列的內部 id: 內部 id 不是登入識別 → 不撞
+            ],
+        }
+        let rp = buildReport(d, { mappingBy: 'id' })
+        assert.strict.deepEqual(Object.keys(rp.mapKey), ['id'])
+        assert.strict.deepEqual(rp.mapKey.id.empty, [])
+        let got = rp.mapKey.id.dup.map((g) => [g.value, g.scope, g.rows.map((r) => `${r.id}:${r.isActive}`).sort()]).sort((a, b) => (a[0] < b[0] ? -1 : 1))
+        assert.strict.deepEqual(got, [
+            ['b-k', 'crossSource', ['b-k:y', 'sys-1:n']],
+            ['dup', 'crossSource', ['sys-2:y', 'sys-3:n']],
+            ['old-1', 'crossSource', ['old-1:y', 'sys-6:y']],
+            ['old-2', 'crossSource', ['old-2:y', 'sys-10:y']],
+            ['same', 'sameSource', ['sys-4:y', 'sys-5:n']],
+        ])
+        let txt = formatReport(rp)
+        for (let s of ['對應鍵 id', '撞值 5 組', '跨來源撞值「b-k」2 筆', '同來源重複「same」2 筆', 'isActive="n"']) {
+            assert.strict.ok(txt.includes(s), `報告應含「${s}」: ${txt}`)
+        }
+        //mappingBy 為 email／name 時不受影響(不含 id 段)
+        assert.strict.deepEqual(Object.keys(buildReport(d, { mappingBy: 'email' }).mapKey), ['email'])
+    })
+
+    it('ND-005 --mapping-by 指定時只報該鍵; id 報缺漏與登入識別撞值(無撞值時 dup 為空)', function() {
         assert.strict.deepEqual(Object.keys(buildReport(fixture(), { mappingBy: 'email' }).mapKey), ['email'])
         assert.strict.deepEqual(Object.keys(buildReport(fixture(), { mappingBy: 'name' }).mapKey), ['name'])
         let d = fixture()

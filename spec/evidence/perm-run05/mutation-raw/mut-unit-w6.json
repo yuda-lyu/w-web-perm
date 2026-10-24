@@ -1,0 +1,20 @@
+[
+ {
+  "id": "BASE",
+  "passes": 192,
+  "failures": 0
+ },
+ {
+  "id": "W6",
+  "note": "getGenUserByUserId 移除非字串守門(null 直接查 ORM)",
+  "file": "server/WWebPerm.mjs",
+  "status": 1,
+  "passes": 191,
+  "failures": 1,
+  "caught": true,
+  "titles": [
+   "unit-loginId (users 登入對應 mappingBy=id 之 O1 規則, R-MAPKEY-04) SITE-LI 站點接線(靜態; 只擋字面與位置之回退, 語"
+  ],
+  "restored": true
+ }
+]
