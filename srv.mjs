@@ -71,6 +71,22 @@ let getUserByToken = async (token) => {
                 isAdmin: 'n',
             }
         }
+        if (token === '{token-for-mutate}') { //測試用(perm-run01 外審 sol#2): perm 列為管理員, 但 verifyClientUser 會改寫其收到之 user 物件(id、isAdmin), 模擬行為不良之部署方回呼; 套件須以驗證當下之 perm 列為準
+            return {
+                id: 'id-for-mutate',
+                name: 'mutate',
+                email: 'mutate@example.com',
+                isAdmin: 'y',
+            }
+        }
+        if (token === '{token-for-slow}') { //測試用(perm-run01 外審 sol#3): 一般使用者, verifyClientUser 為 async 且等待約 1.5 秒, 供「驗證與取權限樹之間該列被改動」案例
+            return {
+                id: 'id-for-slow',
+                name: 'slow',
+                email: 'slow@example.com',
+                isAdmin: 'n',
+            }
+        }
         if (token === '{token-for-verify-throw}') { //回有效使用者, 但 verifyClientUser / verifyAppUser 對其拋錯(Error.message 為合成秘密), 模擬部署方驗證函數拋錯
             return {
                 id: 'id-for-verify-throw',
@@ -93,6 +109,14 @@ let verifyClientUser = (user, from) => {
     }
     if (process.env.NODE_ENV !== 'production' && user.id === 'id-for-member') { //測試用: 見 getUserByToken 之 '{token-for-member}'(部署方放行非管理員, 套件仍須於函數層級另檢查角色)
         return true
+    }
+    if (process.env.NODE_ENV !== 'production' && user.id === 'id-for-mutate') { //測試用: 見 '{token-for-mutate}'——改寫收到之 user 物件後放行(套件傳給本函數的是副本, 改寫不得影響執行身分與角色)
+        user.id = 'id-for-peter'
+        user.isAdmin = 'n'
+        return true
+    }
+    if (process.env.NODE_ENV !== 'production' && user.id === 'id-for-slow') { //測試用: 見 '{token-for-slow}'——async 放行並等待約 1.5 秒
+        return new Promise((resolve) => setTimeout(() => resolve(true), 1500))
     }
     return user.isAdmin === 'y' //測試僅系統管理者使用
 }

@@ -33,7 +33,7 @@ import fs from 'fs'
 import path from 'path'
 import { cleanup, launchBrowser, captureStableWithBox, apiBaseUrl, genTempSettings, restartBackend, assertBaselineMatch } from './tools/e2e-setup.mjs'
 import { runBaselineCase, createBaselineGate, openCasePage, itemsUnionBox } from './tools/e2eLib.mjs'
-import { urlSync, TOKEN_APP, cleanExternalFixtures } from './tools/api-setup.mjs'
+import { urlSync, TOKEN_APP, TOKEN_MEMBER, readTables, restoreTables, editTableRows, cleanExternalFixtures } from './tools/api-setup.mjs'
 
 
 const baselineDir = './test/pics/init'
@@ -43,9 +43,10 @@ const isBaseline = process.argv.includes('--baseline')
 
 //每語系: server 注入後各連線狀態畫面應呈現之文字（來自 mUI kpFallback, src/plugins/mUI.mjs, 非現狀指紋）
 //  connecting=csIng / login=csLogin / errLogin=csErrLogin / errConn=csErrConn
+//  notAdmin=csErrNotAdmin(perm-run01, E2E-007: 一般使用者登入被拒)
 const expectedText = {
-    eng: { connecting: 'Connecting', login: 'Logged in', errLogin: 'Login denied', errConn: 'Unable to connect' },
-    cht: { connecting: '連線中', login: '已登入', errLogin: '拒絕登入', errConn: '無法連線' },
+    eng: { connecting: 'Connecting', login: 'Logged in', errLogin: 'Login denied', errConn: 'Unable to connect', notAdmin: 'No permission to enter the permission console' },
+    cht: { connecting: '連線中', login: '已登入', errLogin: '拒絕登入', errConn: '無法連線', notAdmin: '無權進入權限後台' },
 }
 
 
@@ -143,6 +144,13 @@ async function captureErrConn(page, lang) {
 }
 
 
+//E2E-007: 無權進入權限後台畫面（csErrNotAdmin）。連線懸置 → 強制 connState='csErrNotAdmin' → 穩定呈現「無權進入權限後台」/「No permission to enter the permission console」。
+//真實登入流程（一般使用者被拒、不轉址、權杖清空、未發資料通道請求）另由 E2E-007-not-admin 以語意斷言驗；本案只供畫面標準圖（同 E2E-004/005 之強制狀態法）。
+async function captureNotAdmin(page, lang) {
+    return await captureConnState(page, lang, 'csErrNotAdmin', 'notAdmin')
+}
+
+
 //E2E-002: 已登入過場畫面（csLogin LayoutState）。登入成功但 webInfor 尚未回填（ready=false）時，LayoutState 以連線動畫圖加
 //「已登入」文字呈現之過場態（此態之後 webInfor 回填、ready 轉真才切到五頁籤殼層 E2E-003-login-ok）。
 //連線懸置 → 強制 connState='csLogin'（webInfor 未回填 → ready=false → LayoutState csLogin 分支）→ 穩定呈現「已登入」/「Logged in」。
@@ -193,6 +201,8 @@ const cases = [
     { name: 'E2E-003-login-ok', capture: captureLoginOk, kind: 'loginOk', settings: { staEventMock: true }, stages: ['E2E-003-login-ok'] },
     { name: 'E2E-004-err-login-screen', capture: captureErrLogin, kind: 'connState', key: 'errLogin', stages: ['E2E-004-err-login-screen'] },
     { name: 'E2E-005-err-conn-screen', capture: captureErrConn, kind: 'connState', key: 'errConn', stages: ['E2E-005-err-conn-screen'] },
+    //主控 2026-10-24 授權新增標準圖
+    { name: 'E2E-007-err-not-admin-screen', capture: captureNotAdmin, kind: 'connState', key: 'notAdmin', stages: ['E2E-007-err-not-admin-screen'] },
 ]
 
 
@@ -397,6 +407,78 @@ else {
                     //  外部同步又拒空 rows, 且單一 mocha 行程全跑(npm test)時 api 檔已使本行程持有 lmdb 映射, reseed 退化為 upsert 而不移除多餘列(殘留列污染其後的
                     //  e2e-ref-cascade／e2e-rela-user-grup／e2e-targets／e2e-users 之 captureBaseSeedOnce)。故經單一收尾入口(規則帳本 R-TEST-EXT-CLEAN-01)移除本案分區並回驗 users 為 base seed
                     await cleanExternalFixtures({ kts: ['users'], froms: [FROM_006], pristine: true })
+                }
+            })
+        }
+
+        //E2E-007（perm-run01, 2026-10-24; spec 流程_應用啟動與登入 E2E-007; 規則帳本 R-ADMIN-ONLY-01）: 一般使用者(部署方放行)登入權限後台 → 被拒並顯示「無權進入權限後台」。
+        //  語意斷言（真實登入流程）; 不在 cases 陣列內。畫面標準圖由 cases 之 E2E-007-err-not-admin-screen（強制狀態法）產製比對（主控 2026-10-24 授權）。
+        //  資料前置（非使用者操作）: 管理員(sys)經資料通道把 member(TOKEN_MEMBER: srv.mjs 之 verifyClientUser 放行、perm 列 isAdmin='n' 且啟用)加入 users。
+        //  開啟網址用 127.0.0.1（非開發環境）: 其他登入失敗在非開發環境會立即轉址 urlRedirect, 本案證明一般使用者被拒時改為停在提示畫面（不轉址）, 使用者才看得到原因。
+        //  清理: restoreTables(擷取快照)移除 member 並還原三表、還原 ./settings.json。
+        for (const lang of langs) {
+            it(`E2E-007-not-admin [${lang}]: 一般使用者(部署方放行)登入 → 後端 userNotAdmin、畫面停在「${expectedText[lang].notAdmin}」(csErrNotAdmin)、不轉址、不進殼層、未發資料通道請求、權杖清空`, async function() {
+                this.timeout(300000)
+                let snap = null
+                try {
+                    await restartBackend(genTempSettings({ language: lang, urlRedirect: `${apiBaseUrl}/__e2e-redirect-007__` }))
+                    snap = await readTables() //擷取收尾用快照(與 restoreTables 對稱; 不使用 callRpc('updateUsers')——LC-005 禁 e2e-init 以管理者寫入收尾外部列夾具, 本案夾具為後台列, 走共用層)
+                    await editTableRows('users', (rows) => {
+                        rows.push({ id: 'id-for-member', order: 50, name: 'member', email: 'member@example.com', description: '', from: '', cgrups: '{}', isAdmin: 'n', isActive: 'y' })
+                    })
+                    const browser = await launchBrowser()
+                    try {
+                        const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage()
+                        const mainReqs = []
+                        page.on('request', (r) => {
+                            if (r.url().includes('/api/main')) {
+                                mainReqs.push(r.url())
+                            }
+                        })
+                        const respP = page.waitForResponse((r) => r.url().includes('getUserByToken'), { timeout: 60000 })
+                        await page.goto(`${apiBaseUrl}/?token=${encodeURIComponent(TOKEN_MEMBER)}`, { waitUntil: 'domcontentloaded', timeout: 60000 })
+                        //①後端回應: 登入檢查 /api/getUserByToken → state=error、msg=userNotAdmin(固定語系鍵)
+                        const body = await (await respP).json()
+                        assert.strictEqual(body.state, 'error', `getUserByToken 應拒絕一般使用者, 實得 ${JSON.stringify(body)}`)
+                        assert.strictEqual(body.msg, 'userNotAdmin', `應回固定語系鍵 userNotAdmin, 實得 ${JSON.stringify(body.msg)}`)
+                        //②畫面停在「無權進入權限後台」(connState=csErrNotAdmin), 該語系文字, 不是一般的「拒絕登入」, 且不進入殼層、不卡在連線中
+                        await page.waitForFunction(() => !!(window.$vo && window.$vo.$store && window.$vo.$store.state.connState === 'csErrNotAdmin'), null, { timeout: 30000 })
+                        await page.waitForFunction((t) => (document.body.innerText || '').includes(t), expectedText[lang].notAdmin, { timeout: 15000 })
+                        await page.waitForTimeout(3000) //非開發環境之其他登入失敗會於此時間內已轉址; 本案須仍停在原頁
+                        const info = await page.evaluate(() => {
+                            const vo = window.$vo
+                            return {
+                                winLang: (window.___pmwperm___ || {}).language,
+                                body: (document.body.innerText || '').replace(/\s+/g, ' '),
+                                connState: vo.$store.state.connState,
+                                href: location.href,
+                                token: localStorage.getItem('wperm:userToken'),
+                                tabs: ['mmTargets', 'mmPemis', 'mmGrups', 'mmUsers'].map((k) => vo.$t(k)),
+                            }
+                        })
+                        assert.strictEqual(info.winLang, lang, `window.___pmwperm___.language 應=${lang}`)
+                        assert.strictEqual(info.connState, 'csErrNotAdmin')
+                        assert.ok(info.body.includes(expectedText[lang].notAdmin), `畫面應含「${expectedText[lang].notAdmin}」, 實得 ${info.body.slice(0, 200)}`)
+                        const other = lang === 'eng' ? 'cht' : 'eng'
+                        assert.ok(!info.body.includes(expectedText[other].notAdmin), '不含另一語系之提示')
+                        assert.ok(!info.body.includes(expectedText[lang].errLogin) && !info.body.includes(expectedText[lang].connecting), '不是一般的「拒絕登入」，也不卡在「連線中」')
+                        assert.ok(info.href.startsWith(`${apiBaseUrl}/`) && !info.href.includes('__e2e-redirect-007__'), `停在原頁、不轉址至 urlRedirect, 實得 ${info.href}`)
+                        for (const t of info.tabs) {
+                            assert.ok(!info.body.includes(t), `不進入殼層: 不應見頁籤「${t}」`)
+                        }
+                        //③權杖清空; ④被拒者未發任何資料通道請求(連不上 /api/main, 無資料可讀)
+                        assert.strictEqual(info.token, '', `localStorage wperm:userToken 應被清為空字串, 實得 ${JSON.stringify(info.token)}`)
+                        assert.deepStrictEqual(mainReqs, [], `被拒者不應發出資料通道請求, 實得 ${JSON.stringify(mainReqs)}`)
+                    }
+                    finally {
+                        await browser.close().catch(() => {})
+                    }
+                }
+                finally {
+                    if (snap !== null) {
+                        await restoreTables(snap) //移除 member 並還原三表原文(不留測試加入之列)
+                    }
+                    await restartBackend('./settings.json')
                 }
             })
         }

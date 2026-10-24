@@ -1667,7 +1667,8 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
                 assert.strict.equal(count(wcode, /\bawait requireAdmin\(/g), 4, 'WWebPerm.mjs 內 await requireAdmin( 恰 4 處(四個 updateXxx)')
                 let mDef = /let requireAdmin = async \(userId, funcName\) => \{([\s\S]*?)\n    \}\n/.exec(wcode)
                 assert.strict.ok(mDef, '應有 requireAdmin 定義')
-                assert.strict.ok(/isAdmin !== 'y'/.test(mDef[1]) && /Promise\.reject\('userNotAdmin'\)/.test(mDef[1]), 'requireAdmin 須以 isAdmin 判定並 reject userNotAdmin')
+                //perm-run01(R-ADMIN-ONLY-01): 角色判準改由單一擁有者 adminCheck.isAdminRow 承擔(isActive＝y 且 isAdmin＝y; unit-adminOnlySite AOS-001 驗其真值表), requireAdmin 經它判定並 reject userNotAdmin
+                assert.strict.ok(/!isAdminRow\(u\)/.test(mDef[1]) && /Promise\.reject\('userNotAdmin'\)/.test(mDef[1]), 'requireAdmin 須以 isAdminRow 判定並 reject userNotAdmin')
                 assert.strict.ok(/catch \(err\) \{\s*u = null\s*\}/.test(mDef[1]), '讀取失敗須視同不符(fail-closed)')
             })
 

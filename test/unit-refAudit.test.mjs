@@ -29,7 +29,7 @@ import ds from '../src/schema/index.mjs'
 import auditRefs from '../src/js/refAudit.mjs'
 import findRefRows from '../src/js/findRefRows.mjs'
 import { getUserRules } from '../src/plugins/mShare.mjs'
-import { buildReport, formatReport, cleanOutOf } from '../server/tools/authRefsAudit.mjs'
+import { buildReport, formatReport, cleanOutOf, isSameFile } from '../server/tools/authRefsAudit.mjs'
 import { runClean } from '../server/tools/authRefsClean.mjs'
 import { mkTable } from './tools/unitOrm.mjs'
 
@@ -960,6 +960,101 @@ describe('unit-refAudit (懸空引用稽核與一次性清理)', function() {
                 let r2 = runAudit([fp, '--clean-out', out1])
                 assert.strictEqual(r2.status, 0, r2.stderr)
                 assert.strictEqual(sha1(fp), h0)
+            })
+
+            //RA-037 偶發失敗之根因(perm-run01 範圍三): fs.statSync 預設以 Number 回 ino, NTFS 檔案識別碼為 64 位元(序號左移 48 位元＋記錄號), 序號 ≥ 32 時超過 2**53,
+            //相鄰 MFT 記錄(同序號、記錄號差 1)之 ino 轉成 Number 後相同 → 不同檔被判為同一檔而拒絕寫出(離開碼 2). 修正: 以 { bigint: true } 精確比對.
+            it('RA-037b 單元: 不同檔之 inode 超過 2**53 且相鄰(…387／…388)時不得被判為同一檔; 同一 inode(硬連結別名)仍判為同一檔', function() {
+                let { dir, fp } = setup('same7')
+                let other = path.join(dir, 'other.json')
+                fs.writeFileSync(other, 'x')
+                let INO = { [fp]: 12384898979555387n, [other]: 12384898979555388n } //取自 2026-10-24 實測之相鄰檔對(同序號、記錄號差 1)
+                let statStub = (p, o) => {
+                    let big = INO[p]
+                    return (o && o.bigint) ? { ino: big, dev: 1n } : { ino: Number(big), dev: 1 } //同 fs.statSync: 預設 Number, bigint 選項回精確值
+                }
+                assert.strictEqual(Number(INO[fp]), Number(INO[other]), '前提: 兩個 inode 轉 Number 後相同(精度遺失)')
+                assert.strictEqual(isSameFile(fp, other, statStub), false, '不同檔(精確 inode 不同)不得判為同一檔')
+                assert.strictEqual(isSameFile(other, fp, statStub), false, '反向亦然')
+                INO[other] = INO[fp]
+                assert.strictEqual(isSameFile(fp, other, statStub), true, '精確 inode 相同(硬連結別名)須判為同一檔')
+                //inode 相同但 dev(磁碟區)不同: 不同磁碟區的 inode 編號各自獨立, 不是同一檔
+                let DEV = { [fp]: 1n, [other]: 2n }
+                let statDev = (p) => ({ ino: INO[fp], dev: DEV[p] })
+                assert.strictEqual(isSameFile(fp, other, statDev), false, '不同 dev 即使 inode 相同也不是同一檔')
+                DEV[other] = 1n
+                assert.strictEqual(isSameFile(fp, other, statDev), true, '同 dev 同 inode 才是同一檔')
+                //inode 為 0(部分檔案系統不提供)不當作同一檔
+                let statZero = () => ({ ino: 0n, dev: 1n })
+                assert.strictEqual(isSameFile(fp, other, statZero), false, 'inode 為 0 視為不可判定, 不當同一檔')
+            })
+
+            //外審 sol#6／#7(perm-run01): ①路徑字串僅 Windows 不分大小寫(其他平台 in.json 與 IN.json 可為不同檔); ②檔案系統不提供可用 inode(ino=0n)時, 符號連結別名仍須經 realpath 辨識, 不得當成不同檔而覆寫輸入
+            it('RA-037d 路徑字串比對: win32 不分大小寫、其他平台大小寫敏感(僅大小寫不同之未存在路徑)', function() {
+                let { dir } = setup('same9')
+                let a = path.join(dir, 'in.json')
+                let b = path.join(dir, 'IN.json.nonexist')
+                assert.strictEqual(isSameFile(a, path.join(dir, 'IN.JSON.NONEXIST'), undefined, 'linux'), false, 'linux: 大小寫不同＝不同路徑(且不存在, 無 inode 可比)')
+                assert.strictEqual(isSameFile(path.join(dir, 'x.json'), path.join(dir, 'X.json'), undefined, 'win32'), true, 'win32: 僅大小寫不同＝同一路徑')
+                assert.strictEqual(isSameFile(path.join(dir, 'x.json'), path.join(dir, 'X.json'), undefined, 'linux'), false, 'linux: 僅大小寫不同＝不同路徑')
+                assert.strictEqual(isSameFile(a, a, undefined, 'linux'), true, '同一路徑恆為同一檔')
+                assert.strictEqual(isSameFile(a, b, undefined, 'linux'), false)
+            })
+
+            it('RA-037e 目錄別名(junction／符號連結)× inode 不可用(ino=0n): 經 realpath 仍辨識為同一檔; 環境無權建立連結則略過', function() {
+                //Windows 建立檔案符號連結需特權(此環境 EPERM), 目錄 junction 則否——以「父目錄別名」覆蓋 realpath 判定(檔案符號連結同走 realpath)
+                let { dir, fp } = setup('same10')
+                let aliasDir = path.join(TMP, 'same10-alias')
+                try {
+                    fs.symlinkSync(dir, aliasDir, 'junction')
+                }
+                catch (err) {
+                    console.log(`(略過 RA-037e: 此環境不支援目錄連結: ${err.code})`)
+                    this.skip()
+                }
+                let alias = path.join(aliasDir, path.basename(fp))
+                assert.ok(fs.existsSync(alias), '前提: 別名路徑可讀到同一檔')
+                let statZero = () => ({ ino: 0n, dev: 1n }) //檔案系統不提供 inode
+                assert.strictEqual(isSameFile(fp, alias, statZero), true, 'ino=0n 時經目錄別名之同一檔仍須判為同一檔')
+                assert.strictEqual(isSameFile(alias, fp, statZero), true, '反向亦然')
+                let other = path.join(dir, 'other2.json')
+                fs.writeFileSync(other, 'x')
+                assert.strictEqual(isSameFile(fp, other, statZero), false, '不同檔(ino 不可用且 realpath 不同)不當同一檔')
+                //端到端: CLI 以別名路徑為輸出時須拒絕, 輸入檔逐字不動(不依賴 inode)
+                let h0 = sha1(fp)
+                let r = runAudit([fp, '--clean-out', alias])
+                assert.strictEqual(r.status, 2, `經目錄別名之同一檔須被拒(${r.stdout}${r.stderr})`)
+                assert.strictEqual(sha1(fp), h0, '輸入檔逐字不動')
+            })
+
+            it('RA-037c 真實檔案系統: 取得 Number(ino) 相同而 BigInt(ino) 不同之兩檔作為輸入與輸出 → 須正常寫出, 輸入檔不變(修前離開碼 2 誤拒); 此環境找不到這類檔對則略過', function() {
+                this.timeout(60000)
+                let dir = path.join(TMP, 'same8')
+                fs.mkdirSync(dir, { recursive: true })
+                let seen = new Map()
+                let pair = null
+                for (let i = 0; i < 3000 && pair === null; i++) {
+                    let p = path.join(dir, `f${i}.json`)
+                    fs.writeFileSync(p, JSON.stringify(dirtyFx()))
+                    let n = fs.statSync(p)
+                    let b = fs.statSync(p, { bigint: true })
+                    let key = `${n.dev}:${n.ino}`
+                    if (seen.has(key) && seen.get(key).big !== b.ino) {
+                        pair = [seen.get(key).p, p]
+                    }
+                    else {
+                        seen.set(key, { p, big: b.ino })
+                    }
+                }
+                if (pair === null) {
+                    console.log('(略過 RA-037c: 此環境於 3000 個檔案內找不到 inode 轉 Number 後相同之不同檔對)')
+                    this.skip()
+                }
+                let h0 = sha1(pair[0])
+                let r = runAudit([pair[0], '--clean-out', pair[1]])
+                assert.strictEqual(r.status, 0, r.stderr)
+                assert.deepStrictEqual(JSON.parse(fs.readFileSync(pair[1], 'utf8')), cleanOutOf(auditRefs(dirtyFx()).changes), '輸出檔已寫入')
+                assert.strictEqual(sha1(pair[0]), h0, '輸入檔不變')
             })
 
         })

@@ -25,6 +25,11 @@ let kpLang = {
         eng: 'Login denied',
         cht: '拒絕登入',
     },
+    //perm-run01(R-ADMIN-ONLY-01): 後台登入檢查回 userNotAdmin(登入者不是系統管理員, 即使部署方放行)時前端顯示之連線狀態文字; 同鍵另置於 src/plugins/mUI.mjs 之 kpFallback(被拒者連不上資料通道, 取不到本字典)
+    csErrNotAdmin: {
+        eng: 'No permission to enter the permission console',
+        cht: '無權進入權限後台',
+    },
 
     aggridLanguage: {
         eng: 'en',
@@ -473,9 +478,10 @@ let kpLang = {
         cht: `未儲存：資料已更新或頁面過舊（此次請求未附所異動之群組、權限或標的之身分資訊）。資料未變更，請重新整理頁面後再操作。`,
     },
     //perm-run03 範圍四(寫入函數之角色檢查; dspec/使用者身分驗證原則.md 二.4): userNotAdmin 呼叫 updateTargets／updatePemis／updateGrups／updateUsers 者不是 perm users 表中有效之系統管理員(isAdmin='y') → 拒收、零寫入
+    //perm-run01(R-ADMIN-ONLY-01): 同鍵亦為資料通道(連線閘、執行身分)與後台登入檢查拒絕非系統管理員之固定鍵, 文字涵蓋存取與變更
     userNotAdmin: {
-        eng: `Only system administrators can change this data`,
-        cht: `僅系統管理員可變更此資料`,
+        eng: `Only system administrators can access or change this data`,
+        cht: `僅系統管理員可存取或變更此資料`,
     },
     //perm-run03 範圍二(外部匯入改依來源鍵 srcKey 差異同步; dspec/外部匯入之定義與機制.md 第 9 節):
     //  srcKeyInvalid 批次內有列缺 srcKey、srcKey 為空或非字串(含長度／字元不合) → 整批拒收、零寫入; srcKeyDuplicate 同批 srcKey 重複 → 整批拒收;

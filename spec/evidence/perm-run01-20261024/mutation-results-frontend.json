@@ -1,0 +1,26 @@
+[
+  {
+    "id": "F1",
+    "desc": "前端: userNotAdmin 時仍轉址(拿掉 loginError 之 return)",
+    "file": "src/App.vue",
+    "caught": true,
+    "exit": 2,
+    "failing": 2,
+    "passing": 0,
+    "restored": true
+  },
+  {
+    "id": "F2",
+    "error": "原字串須恰命中 1 處, 實得 0"
+  },
+  {
+    "id": "F3",
+    "desc": "前端: loginError 不辨識 userNotAdmin(退回一律 csErrLogin＋轉址)",
+    "file": "src/App.vue",
+    "caught": true,
+    "exit": 2,
+    "failing": 2,
+    "passing": 0,
+    "restored": true
+  }
+]

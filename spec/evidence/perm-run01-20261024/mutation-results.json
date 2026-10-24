@@ -1,0 +1,162 @@
+[
+  {
+    "id": "M1",
+    "desc": "拿掉連線閘之角色檢查(checkToken 改回 getAndVerifyClientUser)",
+    "caught": true,
+    "exit": 22,
+    "failing": 22,
+    "passing": 20,
+    "restored": true,
+    "file": "server/WWebPerm.mjs"
+  },
+  {
+    "id": "M2",
+    "desc": "拿掉反查之角色檢查(getUserIdByToken 改回 getAndVerifyClientUser)",
+    "caught": true,
+    "exit": 4,
+    "failing": 4,
+    "passing": 38,
+    "restored": true,
+    "file": "server/WWebPerm.mjs"
+  },
+  {
+    "id": "M3",
+    "desc": "拿掉後台登入之角色檢查(/api/getUserByToken 改回 getAndVerifyClientUser)",
+    "caught": true,
+    "exit": 5,
+    "failing": 5,
+    "passing": 37,
+    "restored": true,
+    "file": "server/WWebPerm.mjs"
+  },
+  {
+    "id": "M4",
+    "desc": "核心關卡不檢查角色(adminOnly && !isAdmin 恆假)",
+    "caught": true,
+    "exit": 26,
+    "failing": 26,
+    "passing": 16,
+    "restored": true,
+    "file": "server/WWebPerm.mjs"
+  },
+  {
+    "id": "M5",
+    "desc": "角色恆為管理員(let isAdmin = isAdminRow(user) 改 true)",
+    "caught": true,
+    "exit": 26,
+    "failing": 26,
+    "passing": 16,
+    "restored": true,
+    "file": "server/WWebPerm.mjs"
+  },
+  {
+    "id": "M6",
+    "desc": "過度收緊: /api/getPerm 也要求管理員(一般使用者查本人權限樹被擋)",
+    "caught": true,
+    "exit": 3,
+    "failing": 3,
+    "passing": 39,
+    "restored": true,
+    "file": "server/WWebPerm.mjs"
+  },
+  {
+    "id": "M7",
+    "desc": "縱深防禦拿掉(requireAdmin 恆通過)",
+    "caught": true,
+    "exit": 1,
+    "failing": 1,
+    "passing": 9,
+    "restored": true,
+    "file": "server/WWebPerm.mjs"
+  },
+  {
+    "id": "M8",
+    "desc": "isAdminRow 不檢查 isActive",
+    "caught": true,
+    "exit": 1,
+    "failing": 1,
+    "passing": 9,
+    "restored": true,
+    "file": "server/adminCheck.mjs"
+  },
+  {
+    "id": "M9",
+    "desc": "isAdminRow 改認繼承屬性",
+    "caught": true,
+    "exit": 1,
+    "failing": 1,
+    "passing": 9,
+    "restored": true,
+    "file": "server/adminCheck.mjs"
+  },
+  {
+    "id": "M10",
+    "desc": "角色改於部署方之後才判定(isAdminRow 移到 verifyClientUser 之後)",
+    "caught": true,
+    "exit": 1,
+    "failing": 1,
+    "passing": 9,
+    "restored": true,
+    "file": "server/WWebPerm.mjs"
+  },
+  {
+    "id": "M11",
+    "desc": "範圍二: users 不檢查同批重複 id",
+    "caught": true,
+    "exit": 6,
+    "failing": 6,
+    "passing": 41,
+    "restored": true,
+    "file": "server/procCore.mjs"
+  },
+  {
+    "id": "M12",
+    "desc": "範圍二: pickKeysOnly 模式不預檢送入列重複 id",
+    "caught": true,
+    "exit": 2,
+    "failing": 2,
+    "passing": 45,
+    "restored": true,
+    "file": "server/procCore.mjs"
+  },
+  {
+    "id": "M13",
+    "desc": "範圍二: 預檢不做數字／字串同值正規化",
+    "caught": true,
+    "exit": 1,
+    "failing": 1,
+    "passing": 46,
+    "restored": true,
+    "file": "server/procCore.mjs"
+  },
+  {
+    "id": "M14",
+    "desc": "範圍三: isSameFile 退回 Number inode",
+    "caught": true,
+    "exit": 2,
+    "failing": 2,
+    "passing": 1,
+    "restored": true,
+    "file": "server/tools/authRefsAudit.mjs"
+  },
+  {
+    "id": "M15",
+    "desc": "範圍三: isSameFile 不比 dev",
+    "caught": false,
+    "exit": 0,
+    "failing": 0,
+    "passing": 3,
+    "restored": true,
+    "file": "server/tools/authRefsAudit.mjs"
+  },
+  {
+    "id": "M16",
+    "desc": "requireAdmin 站點守護: SITE-EX-013 對 isAdminRow 的檢查(requireAdmin 改回不判角色)",
+    "caught": true,
+    "exit": 1,
+    "failing": 1,
+    "passing": 0,
+    "restored": true,
+    "file": "server/WWebPerm.mjs"
+  }
+]

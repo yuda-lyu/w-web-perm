@@ -81,3 +81,11 @@ npm pack --dry-run --json  (輸出於新版 npm 為以套件名為鍵之物件; 
 ```
 
 - **已知限制**: ①`建議w-web-perm修正.md`(主控之建議書, 位於 repo 根且未被 `.npmignore` 排除)在 `npm pack` 清單內, 發布前由主控處理(本輪不動建議書); ②`test/tools/authMergeReport.mjs` 不出貨(見上); ③三個 `g_*.mjs` 只檢查 `<db>/wperm` 資料夾存在, 資料夾存在但為空時 ORM 仍會建立空表並報告零筆(外審 sol #6, 以空 `wperm` 夾實測屬實; 既有行為, 本輪只把 README 改為不誇稱「不建立空庫」, 未改程式).
+
+### R-TOOL-SAMEFILE-01 判斷「兩路徑是否同一檔」須以 bigint 取 inode(2026-10-24 perm-run01 範圍三; `unit-refAudit` RA-037 偶發失敗之根因)
+
+- **規則**: 以 `fs.statSync` 之 `ino` 判斷同一檔(硬連結別名)時一律傳 `{ bigint: true }` 並以 BigInt 比對(`a.ino !== 0n && a.ino === b.ino && a.dev === b.dev`). 預設 Number 只有 53 位元精度, NTFS 檔案識別碼＝序號(高 16 位元)＜＜48＋記錄號(低 48 位元), 序號 ≥ 32 即超過 2**53; 相鄰 MFT 記錄(同序號、記錄號差 1)之不同檔轉成 Number 後相同 → 被誤判為同一檔 → `authRefsAudit.mjs --clean-out` 拒絕寫出(離開碼 2, `失敗: --clean-out 不得與輸入匯出檔為同一檔`). 判準單一擁有者 `server/tools/authRefsAudit.mjs:isSameFile(fpA, fpB, statFn)`(`statFn` 為單元測試注入接縫).
+- **外審 sol 補強(#6／#7, 2026-10-24)**: ①路徑字串比對僅 `win32` 不分大小寫(`isSameFile(…, platform = process.platform)`), 其他平台大小寫敏感——`in.json` 與 `IN.json` 在大小寫敏感檔案系統可為不同檔, 原一律轉小寫會誤拒(RA-037d); ②兩者皆存在時先比 `fs.realpathSync.native`(解開符號連結與父目錄別名), 再比 BigInt inode＋dev——檔案系統不提供可用 inode(`ino=0n`)時符號連結別名仍被辨識, 不致被當成不同檔而覆寫輸入匯出檔(RA-037e: 以目錄 junction 驗證, 此環境檔案符號連結需特權〔EPERM〕, RA-036e 亦因此略過).
+- **根因證據(2026-10-24, Windows 11 / NTFS / Node 24)**: ①未改碼重跑 `unit-refAudit` 8 次失敗 1 次(12.5%), 失敗為 RA-037「不同路徑正常」之第三次 `--clean-out out1`(`in.json` 與已存在之 `in.json.clean`); ②`tmp/perm-run01/inoProbe2.mjs` 批量建立／刪除 6000 個檔: 293 對「不同檔、`statSync().ino` Number 相同而 BigInt 不同」(例: `12384898979555387` 與 `…388`), 全部 ino 皆 > 2**53; ③修後同檔案 30 次全綠(50 passing/次).
+- **站點全集**: `rg -n "\.ino\b" server src g_*.mjs`(期望: 只有 `authRefsAudit.mjs:isSameFile`); 其他「同一檔」判定(`authRefsClean` 的 `--backup` 與資料庫檔別名)走 `wx` 旗標與路徑正規化, 不比 inode(RA-057／058).
+- **測試**: `unit-refAudit` RA-037b(注入 `statFn` 之相鄰 inode 單元, 修前紅)、RA-037c(真實檔案系統找出 Number 相同而 BigInt 不同之檔對, 以 CLI 實跑 `--clean-out`, 修前紅〔離開碼 2〕; 此環境找不到這類檔對則略過).

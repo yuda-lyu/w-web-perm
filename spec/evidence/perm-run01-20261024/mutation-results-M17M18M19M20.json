@@ -1,0 +1,42 @@
+[
+  {
+    "id": "M17",
+    "desc": "外審 sol#3: /api/getPerm 驗證後以 id 重讀(不傳 userSelf)",
+    "caught": true,
+    "exit": 2,
+    "failing": 2,
+    "passing": 42,
+    "restored": true,
+    "file": "server/WWebPerm.mjs"
+  },
+  {
+    "id": "M18",
+    "desc": "外審 sol#2: 部署方收到原物件而非副本",
+    "caught": true,
+    "exit": 2,
+    "failing": 2,
+    "passing": 42,
+    "restored": true,
+    "file": "server/WWebPerm.mjs"
+  },
+  {
+    "id": "M19",
+    "desc": "外審 sol#6: isSameFile 路徑比對在所有平台不分大小寫",
+    "caught": true,
+    "exit": 1,
+    "failing": 1,
+    "passing": 4,
+    "restored": true,
+    "file": "server/tools/authRefsAudit.mjs"
+  },
+  {
+    "id": "M20",
+    "desc": "外審 sol#7: isSameFile 拿掉 realpath 判定(ino=0n 時符號連結別名當不同檔)",
+    "caught": true,
+    "exit": 1,
+    "failing": 1,
+    "passing": 4,
+    "restored": true,
+    "file": "server/tools/authRefsAudit.mjs"
+  }
+]

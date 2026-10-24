@@ -41,6 +41,8 @@ export const TOKEN_APP = '{token-for-application}'     // → id-for-application
 export const TOKEN_PETER = '{token-for-peter}'         // → id-for-peter（在表、有效、isAdmin='n' → verifyClientUser 拒）
 export const TOKEN_ADMIN2 = '{token-for-admin2}'       // → id-for-admin2（perm-run03 範圍三：第二位管理員；其 perm users 列由測試自建／停用，過 verifyClientUser 需該列 isAdmin='y'）
 export const TOKEN_MEMBER = '{token-for-member}'       // → id-for-member（perm-run03 範圍四：perm users 列〔測試自建〕isAdmin='n'，但 srv.mjs 之 verifyClientUser 放行 → 通過連線閘之非管理員）
+export const TOKEN_MUTATE = '{token-for-mutate}'       // → id-for-mutate（perm-run01 外審 sol#2：perm 列〔測試自建〕為管理員, 但 srv.mjs 之 verifyClientUser 會改寫其收到之 user 物件〔id→id-for-peter、isAdmin→n〕後放行；套件傳副本, 改寫不得影響執行身分與角色）
+export const TOKEN_SLOW = '{token-for-slow}'           // → id-for-slow（perm-run01 外審 sol#3：perm 列〔測試自建〕isAdmin='n', verifyClientUser 為 async 並等待約 1.5 秒, 供 /api/getPerm「驗證後該列被改動」案例）
 export const TOKEN_BAD = 'nope-invalid'               // → getUserByToken 回 {} → 守門 reject
 export const TOKEN_REJECT = '{token-for-reject}' // → getUserByToken reject 上游原文(含合成秘密)；W 契約視同查無
 export const TOKEN_VERIFY_THROW = '{token-for-verify-throw}' // → verifyClientUser / verifyAppUser 拋錯；W 契約視同無權限

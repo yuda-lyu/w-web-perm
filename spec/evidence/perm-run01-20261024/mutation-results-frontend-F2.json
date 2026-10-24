@@ -1,0 +1,12 @@
+[
+  {
+    "id": "F2",
+    "desc": "前端: kpFallback 之 csErrNotAdmin 英文文字為空(被拒者取不到字典, 英文畫面只剩鍵名)",
+    "file": "src/plugins/mUI.mjs",
+    "caught": true,
+    "exit": 1,
+    "failing": 1,
+    "passing": 1,
+    "restored": true
+  }
+]

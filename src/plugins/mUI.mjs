@@ -40,6 +40,11 @@ let kpFallback = {
         eng: 'Login denied',
         cht: '拒絕登入',
     },
+    //perm-run01(R-ADMIN-ONLY-01): 登入者不是系統管理員(後端 userNotAdmin, 即使部署方放行); 被拒者連不上資料通道、取不到後端字典, 故文字須在此備妥(同鍵亦在 server/procLang.mjs)
+    csErrNotAdmin: {
+        eng: 'No permission to enter the permission console',
+        cht: '無權進入權限後台',
+    },
 }
 
 

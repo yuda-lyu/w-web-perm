@@ -458,4 +458,97 @@ describe('unit-procCore-writeValidate (寫入前驗證與寫入失敗回 key, AD
         assert.strict.deepEqual(await run(pc, 'targets', rows3), { ok: true, v: 'saveTabItemsSuccess' })
     })
 
+
+    // ===== perm-run01 範圍二: 後台整表寫入之同批重複 id(四表一併檢查): 整批拒收 saveRowFieldDuplicate、零寫入, 不得「兩列併成一列、靜默遺失其一」 =====
+    //來源: perm-run05 確證 users 同批兩列同 id 被合併為一列而回成功(pemis／grups／targets 早已拒收, WV-008／ckKey; users 與 pickKeysOnly 模式漏了)。
+    //輸入空間: 表 {users, grups, pemis, targets} × 形狀 {既有 id 在批內出現兩次〔內容不同〕, 兩列新增列同一個庫內不存在之 id, 數字 id 與同值字串 id, 唯一 id 對照組} × 模式 {整表 diff, users 之 pickKeysOnly}
+
+    describe('WV-DUPID 同批重複 id', function() {
+
+        let dupOf = (table, base, o = {}) => ({ ...base, ...o })
+        //以既有第 1 列為底, 造一列同 id、內容不同(名稱／email 另取, 使其不因其他唯一性檢查而先被拒)之列
+        let tweak = (table) => (table === 'users' ? { email: 'dup-copy@example.com', description: 'dup-copy' } : (table === 'targets' ? { description: 'dup-copy' } : { name: `${table}-dup-copy`, description: 'dup-copy' }))
+
+        for (let table of ['users', 'grups', 'pemis', 'targets']) {
+
+            it(`WV-DUPID-001 [${table}] 既有列之 id 在同批出現兩次(內容不同) → saveRowFieldDuplicate、資料表零變更(修前 users 回成功並遺失其一)`, async function() {
+                let { woItems, pc } = createEnv()
+                let before = snapAll(woItems)
+                let rows = (await woItems[table].select()).sort((a, b) => a.order - b.order)
+                rows.push(dupOf(table, rows[0], tweak(table)))
+                let r = await run(pc, table, rows)
+                assert.strict.deepEqual(r, { ok: false, v: 'saveRowFieldDuplicate' })
+                assert.strict.deepEqual(snapAll(woItems), before, '零寫入')
+            })
+
+            it(`WV-DUPID-002 [${table}] 兩列新增列帶同一個庫內不存在之 id → saveRowFieldDuplicate、零寫入`, async function() {
+                let { woItems, pc } = createEnv()
+                let before = snapAll(woItems)
+                let id = table === 'targets' ? 'T-dup-new' : 'id-dup-new'
+                let a = newRow(table, { id, ...(table === 'users' ? { name: 'dup-a', email: 'dup-a@example.com' } : (table === 'targets' ? {} : { name: `${table}-dup-a` })) })
+                let b = newRow(table, { id, ...(table === 'users' ? { name: 'dup-b', email: 'dup-b@example.com' } : (table === 'targets' ? {} : { name: `${table}-dup-b` })) })
+                let rows = [...(await woItems[table].select()).sort((x, y) => x.order - y.order), a, b]
+                let r = await run(pc, table, rows)
+                assert.strict.deepEqual(r, { ok: false, v: 'saveRowFieldDuplicate' })
+                assert.strict.deepEqual(snapAll(woItems), before, '零寫入')
+            })
+
+            it(`WV-DUPID-003 [${table}] 對照組: 兩列新增列 id 唯一 → 成功且兩列皆寫入(重複檢查不誤擋)`, async function() {
+                let { woItems, pc } = createEnv()
+                let n0 = (await woItems[table].select()).length
+                let ids = table === 'targets' ? ['T-ok-a', 'T-ok-b'] : ['id-ok-a', 'id-ok-b']
+                let mk = (id, k) => newRow(table, { id, ...(table === 'users' ? { name: `ok-${k}`, email: `ok-${k}@example.com` } : (table === 'targets' ? {} : { name: `${table}-ok-${k}` })) })
+                let rows = [...(await woItems[table].select()).sort((x, y) => x.order - y.order), mk(ids[0], 'a'), mk(ids[1], 'b')]
+                let r = await run(pc, table, rows)
+                assert.strict.deepEqual(r, { ok: true, v: 'saveTabItemsSuccess' })
+                assert.strict.equal((await woItems[table].select()).length, n0 + 2, '兩列新增列皆寫入')
+            })
+        }
+
+        for (let table of ['users', 'grups', 'pemis']) {
+            it(`WV-DUPID-004 [${table}] 數字 id 與同值字串 id 視為同一個 id(R-ORM-04 正規化後比對) → saveRowFieldDuplicate、零寫入`, async function() {
+                let { woItems, pc } = createEnv()
+                let before = snapAll(woItems)
+                let a = newRow(table, { id: 7, ...(table === 'users' ? { name: 'n-a', email: 'n-a@example.com' } : { name: `${table}-n-a` }) })
+                let b = newRow(table, { id: '7', ...(table === 'users' ? { name: 'n-b', email: 'n-b@example.com' } : { name: `${table}-n-b` }) })
+                let rows = [...(await woItems[table].select()).sort((x, y) => x.order - y.order), a, b]
+                let r = await run(pc, table, rows)
+                assert.strict.deepEqual(r, { ok: false, v: 'saveRowFieldDuplicate' })
+                assert.strict.deepEqual(snapAll(woItems), before, '零寫入')
+            })
+        }
+
+        it('WV-DUPID-005 [users, pickKeysOnly=for:grups] 批內同一個既有 id 出現兩次(cgrups 不同) → saveRowFieldDuplicate、零寫入(修前後列靜默覆蓋前列並回成功); 對照: 每個 id 一列照常', async function() {
+            let { woItems, pc } = createEnv()
+            let before = snapAll(woItems)
+            let rows = (await woItems.users.select()).sort((a, b) => a.order - b.order)
+            let g1 = JSON.stringify({ M1: { mode: 'OR', isActive: 'y' } })
+            let g2 = JSON.stringify({ M2: { mode: 'OR', isActive: 'y' } })
+            let dupRows = [{ ...rows[0], cgrups: g1 }, { ...rows[0], cgrups: g2 }, rows[1]]
+            let r = await pc.updateUsers('id-admin', dupRows, { pickKeysOnly: ['cgrups'] }).then((v) => ({ ok: true, v })).catch((v) => ({ ok: false, v }))
+            assert.strict.deepEqual(r, { ok: false, v: 'saveRowFieldDuplicate' })
+            assert.strict.deepEqual(snapAll(woItems), before, '零寫入')
+            //數字 id 與同值字串 id 亦視為重複(pickKeysOnly 合併前先正規化)
+            let r2 = await pc.updateUsers('id-admin', [{ ...rows[0], id: 7, cgrups: g1 }, { ...rows[0], id: '7', cgrups: g2 }], { pickKeysOnly: ['cgrups'] }).then((v) => ({ ok: true, v })).catch((v) => ({ ok: false, v }))
+            assert.strict.deepEqual(r2, { ok: false, v: 'saveRowFieldDuplicate' })
+            assert.strict.deepEqual(snapAll(woItems), before, '零寫入(數字／字串同值)')
+            //對照組: 每個 id 一列 → 成功, cgrups 依送入列採納
+            let ok = await pc.updateUsers('id-admin', [{ ...rows[0], cgrups: g1 }, rows[1]], { pickKeysOnly: ['cgrups'] }).then((v) => ({ ok: true, v })).catch((v) => ({ ok: false, v }))
+            assert.strict.deepEqual(ok, { ok: true, v: 'saveTabItemsSuccess' })
+            assert.strict.equal(woItems.users.get(rows[0].id).cgrups, g1, '對照組之 cgrups 已採納')
+        })
+
+        it('WV-DUPID-006 拒收記 srLog: event updateTabItems-ckKey-error、key id、msg saveRowFieldDuplicate; 不含 email／描述等資料值', async function() {
+            let { woItems, pc, logs } = createEnv()
+            let rows = (await woItems.users.select()).sort((a, b) => a.order - b.order)
+            rows.push({ ...rows[0], email: 'dup-secret@example.com', description: 'SENSITIVE-DESC' })
+            let r = await run(pc, 'users', rows)
+            assert.strict.deepEqual(r, { ok: false, v: 'saveRowFieldDuplicate' })
+            let e = logs.find((l) => l.level === 'error' && l.event === 'updateTabItems-ckKey-error' && l.key === 'id')
+            assert.strict.ok(e && e.msg === 'saveRowFieldDuplicate', `應有 id 重複之 srLog, 實得 ${JSON.stringify(logs.map((l) => l.event))}`)
+            let all = JSON.stringify(logs)
+            assert.strict.ok(!all.includes('dup-secret@example.com') && !all.includes('SENSITIVE-DESC'), 'srLog 不得含 email 與描述值')
+        })
+    })
+
 })

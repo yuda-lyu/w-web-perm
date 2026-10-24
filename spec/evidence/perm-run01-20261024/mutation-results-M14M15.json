@@ -1,0 +1,22 @@
+[
+  {
+    "id": "M14",
+    "desc": "範圍三: isSameFile 退回 Number inode",
+    "caught": true,
+    "exit": 2,
+    "failing": 2,
+    "passing": 1,
+    "restored": true,
+    "file": "server/tools/authRefsAudit.mjs"
+  },
+  {
+    "id": "M15",
+    "desc": "範圍三: isSameFile 不比 dev",
+    "caught": true,
+    "exit": 1,
+    "failing": 1,
+    "passing": 2,
+    "restored": true,
+    "file": "server/tools/authRefsAudit.mjs"
+  }
+]

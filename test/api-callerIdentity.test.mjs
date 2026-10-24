@@ -5,8 +5,10 @@
 //    標頭 token(連線閘)有效、本體 token 無效之輸入空間: {不在 perm users〔app 權杖〕、perm 內但被 verifyClientUser 拒〔isAdmin n〕、perm 內但已停用、getUserByToken 查無〔無效〕、
 //    getUserByToken reject 上游原文、verifyClientUser 拋錯〔perm users 內有此列且啟用, 才走到驗證器〕、perm users 無此列〔admin2 尚未建立〕} × 被呼叫函數 {寫入 updateGrups、唯讀 getWebInfor}。
 //    兩 token 皆有效且為不同使用者時以本體 token 之使用者執行(稽核欄位為本體使用者)。mappingBy=email 時回傳 perm 內之 id(非外部 token 宣稱之 id)。
-//[A] requireAdmin: updateTargets／updatePemis／updateGrups／updateUsers 僅 perm users 表中有效且 isAdmin='y' 之使用者可呼叫; 通過連線閘之非管理員(TOKEN_MEMBER: srv.mjs 之 verifyClientUser 放行)
-//    被拒 userNotAdmin、零寫入、記 srLog(函數名＋userId, 無 token); perm 為權威(token 宣稱 isAdmin 'n'、perm 列 'y' 者可呼叫); 管理員照常。
+//[A] requireAdmin: updateTargets／updatePemis／updateGrups／updateUsers 僅 perm users 表中有效且 isAdmin='y' 之使用者可呼叫; 通過部署方 verifyClientUser 之非管理員(TOKEN_MEMBER: srv.mjs 放行)
+//    零寫入; perm 為權威(token 宣稱 isAdmin 'n'、perm 列 'y' 者可呼叫); 管理員照常。
+//    〔perm-run01 更新(R-ADMIN-ONLY-01)〕資料通道的連線閘與執行身分已改為只限系統管理員(getAndVerifyAdminUser), 非管理員於連線閘即被拒(permission denied; 整個入口矩陣見 api-adminOnly),
+//    不會再走到 requireAdmin——requireAdmin 轉為縱深防禦(僅「連線後角色被降級」之競態可達, 黑箱測不到, 以 unit-adminOnlySite 之站點守護與變異驗證涵蓋); 本組 A1／A4／A5 改驗新的拒絕點。
 //跑法(需測試鎖): node C:/opensrcOper/tools/quiet-run.mjs --name tcid --lock --timeout 1800 -- npx mocha test/api-callerIdentity.test.mjs --timeout 300000
 import assert from 'assert'
 import { assertPristineSeed } from './tools/baseSeed.mjs'
@@ -192,30 +194,30 @@ describe('api-callerIdentity (資料通道執行身分完整驗證＋寫入函�
     })
 
 
-    describe('A 函數層級角色檢查(requireAdmin)', function() {
+    describe('A 非管理員之寫入(perm-run01 起於連線閘拒; requireAdmin 為縱深防禦)', function() {
 
         //通過連線閘(srv.mjs 之 verifyClientUser 放行 id-for-member)但 perm 列 isAdmin='n' 之使用者
         let memberReady = async (isAdmin = 'n', isActive = 'y') => {
             await addUsers([userRow('id-for-member', 'member', isAdmin, isActive)])
         }
 
-        it('CI-A0 前提: member 通過連線閘(唯讀 getWebInfor、資料通道 select 皆成功)', async function() {
+        it('CI-A0 前提: member 通過部署方 verifyClientUser(經 /api/getPerm 取得本人權限樹; 自 perm-run01 起資料通道與後台登入另限管理員, 見 api-adminOnly)', async function() {
             await memberReady()
-            let r = await callRpc('getWebInfor', [], TOKEN_MEMBER)
-            A.equal(r.ok, true, JSON.stringify(r).slice(0, 200))
-            let s = await callRpc('grups.select', [], TOKEN_MEMBER)
-            A.equal(s.ok, true)
+            let r = await fetch(`http://127.0.0.1:11006/api/getPerm?token=${encodeURIComponent(TOKEN_MEMBER)}`)
+            let j = await r.json()
+            A.equal(j.state, 'success', JSON.stringify(j).slice(0, 200))
+            A.equal(j.msg.user.id, 'id-for-member')
         })
 
         for (let kt of KTS) {
-            it(`CI-A1 ${FN[kt]}: 通過連線閘之非管理員(perm 列 isAdmin n)被拒 userNotAdmin、零寫入; 管理員照常  [C2、使用者身分驗證原則 二.4]`, async function() {
+            it(`CI-A1 ${FN[kt]}: 通過部署方之非管理員(perm 列 isAdmin n)被拒、零寫入; 管理員照常  [C2、使用者身分驗證原則 二.4; perm-run01 起於連線閘即拒(permission denied), 原為 requireAdmin 之 userNotAdmin]`, async function() {
                 await memberReady()
                 let before = await snap4()
                 let rows = await rowsOf(kt)
                 let edited = rows.map((r, k) => (k === 0 ? { ...r, description: 'edited-by-member' } : r))
                 let r = await callRpc(FN[kt], [edited], TOKEN_MEMBER)
                 A.equal(r.ok, false, `非管理員不得寫入, 實得 ${JSON.stringify(r).slice(0, 200)}`)
-                A.equal(r.msg, 'userNotAdmin')
+                A.equal(r.msg, 'permission denied')
                 A.equal(await snap4(), before, '零寫入')
                 let ok = await callRpc(FN[kt], [edited], TOKEN_ADMIN)
                 A.equal(ok.ok, true, `管理員照常: ${JSON.stringify(ok).slice(0, 200)}`)
@@ -238,26 +240,26 @@ describe('api-callerIdentity (資料通道執行身分完整驗證＋寫入函�
             A.equal(r.msg, 'permission denied')
         })
 
-        it('CI-A4 被拒記 srLog: event requireAdmin-error、msg userNotAdmin、funcName、userId; 無 token 與資料值  [dspec 規則 6]', async function() {
+        it('CI-A4 被拒記 srLog: event verifyConn-error、msg userNotAdmin、apiType main(perm-run01 起於連線閘拒; 原為 requireAdmin-error); 無 token 與資料值  [dspec 規則 6]', async function() {
             await memberReady()
             let mark = await markSrLog()
             let rows = (await rowsOf('users')).map((r, k) => (k === 0 ? { ...r, description: 'SENSITIVE-DESC' } : r))
             let r = await callRpc('updateUsers', [rows], TOKEN_MEMBER)
-            A.equal(r.msg, 'userNotAdmin')
-            let lines = await waitLines(mark, (l) => l.event === 'requireAdmin-error', 'requireAdmin-error')
-            let ev = lines.find((l) => l.event === 'requireAdmin-error')
-            A.equal(ev.msg, 'userNotAdmin')
-            A.equal(ev.funcName, 'updateUsers')
-            A.equal(ev.userId, 'id-for-member')
+            A.equal(r.msg, 'permission denied')
+            let lines = await waitLines(mark, (l) => l.event === 'verifyConn-error' && l.msg === 'userNotAdmin', 'verifyConn-error userNotAdmin')
+            let ev = lines.find((l) => l.event === 'verifyConn-error' && l.msg === 'userNotAdmin')
+            A.equal(ev.apiType, 'main')
             let all = JSON.stringify(lines)
             A.ok(!all.includes(TOKEN_MEMBER), 'log 不得含 token 值')
             A.ok(!all.includes('SENSITIVE-DESC'), 'log 不得含寫入內容')
+            A.ok(!lines.some((l) => l.event === 'requireAdmin-error'), '連線閘已拒, 不會走到 requireAdmin')
         })
 
-        it('CI-A5 唯讀函數不受角色檢查約束(getWebInfor／getStaEvent 等唯讀函數對通過連線閘者可用; 本輪只收斂改變狀態之四個函數)', async function() {
+        it('CI-A5 唯讀函數亦限管理員(perm-run01, R-ADMIN-ONLY-01; 原為「唯讀函數不受角色檢查約束」): member 呼叫 getWebInfor 於連線閘被拒', async function() {
             await memberReady()
             let r = await callRpc('getWebInfor', [], TOKEN_MEMBER)
-            A.equal(r.ok, true)
+            A.equal(r.ok, false)
+            A.equal(r.msg, 'permission denied')
         })
     })
 })

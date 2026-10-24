@@ -266,9 +266,9 @@ function proc(woItems, procOrm, { srLog, withTabLocks: lockTabs, guardWrite, loc
             return (typeof id === 'number' && Number.isFinite(id)) ? { ...r, id: String(id) } : r
         })
 
-        //pemis／grups 以 id 對應既有列(見下方 isNameKeyTable 分支), 送入之整表內主鍵 id(字串)不得重複, 否則 Map(id → 列) 靜默併成一列而遺失其一(unit-procCore-writeValidate WV-008);
-        //缺 id 之列(API 直打, 視為新增)不參與; 錯誤鍵同 validateRowsBeforeWrite 之 idDuplicate: saveRowFieldDuplicate
-        if (arrHas(keyTable, ['pemis', 'grups'])) {
+        //pemis／grups／users 以 id 對應既有列(見下方 isNameKeyTable／users 分支, ltdtDiffByKey 以 Map(id → 列)), 送入之整表內主鍵 id(字串)不得重複, 否則同批兩列被靜默併成一列而遺失其一(unit-procCore-writeValidate WV-008、WV-DUPID);
+        //targets 之 id 重複已由上方 ckKey(rows, 'id') 拒收. 四表一併檢查(perm-run01 範圍二, perm-run05 確證 users 漏了此檢查). 缺 id 之列(API 直打, 視為新增)不參與; 錯誤鍵同 validateRowsBeforeWrite 之 idDuplicate: saveRowFieldDuplicate
+        if (arrHas(keyTable, ['pemis', 'grups', 'users'])) {
             let kIdDup = findDupIndex(rows, 'id', (r) => isestr(get(r, 'id'))) //空字串 id 視為未給(待自動產號, validateRows 同), 不參與重複判定(外審 sol R6)
             if (kIdDup >= 0) {
                 srLog.error({ event: 'updateTabItems-ckKey-error', keyTable, key: 'id', msg: 'saveRowFieldDuplicate', row: kIdDup, value: get(rows, [kIdDup, 'id']) })
@@ -284,6 +284,18 @@ function proc(woItems, procOrm, { srLog, withTabLocks: lockTabs, guardWrite, loc
         let rowsPre = null
         if (!isearr(pickKeysOnly)) {
             rowsPre = await prepRows(rows)
+        }
+        else {
+            //pickKeysOnly(users 之 for:grups 模式): 送入列於鎖內與庫內列合併後才前處理(prepRows), 合併以 id 為鍵(mergePickKeysOnly 的 kpIn[id] = 列, 同 id 後者覆蓋前者)——
+            //送入列內同一 id 出現兩次會被靜默併成一列而遺失其一, 故在合併之前(取鎖之前, 純函式)先以相同口徑拒收(有限數字 id 與同值字串 id 視為同一個, 同合併前之正規化; perm-run01 範圍二)
+            let kIdDupIn = findDupIndex(map(rows, (r) => {
+                let id = get(r, 'id')
+                return (typeof id === 'number' && Number.isFinite(id)) ? { id: String(id) } : r
+            }), 'id', (r) => isestr(get(r, 'id')))
+            if (kIdDupIn >= 0) {
+                srLog.error({ event: 'updateTabItems-ckKey-error', keyTable, key: 'id', msg: 'saveRowFieldDuplicate', row: kIdDupIn, value: get(rows, [kIdDupIn, 'id']) })
+                return Promise.reject('saveRowFieldDuplicate')
+            }
         }
 
         //雙擊防護(後端): 同一操作者之同表寫入處理中再送出即拒絕 'saveInProgress'(不排隊, 見 lockSave.mjs, ADR-025);

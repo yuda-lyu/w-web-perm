@@ -37,6 +37,7 @@ import { maskTok, maskQuery, maskUrl } from './maskLog.mjs'
 import wrapInjected from './wrapInjected.mjs'
 import { pickUniqueUser, findLoginUsers, mapKeyOf } from './keyCheck.mjs'
 import { createAuthorizeExec, wrapOperOrm } from './dataChannel.mjs'
+import isAdminRow from './adminCheck.mjs'
 
 
 /**
@@ -44,16 +45,17 @@ import { createAuthorizeExec, wrapOperOrm } from './dataChannel.mjs'
  *
  * 身分驗證責任(dspec/使用者身分驗證原則.md 第三節, 使用方套件標準註解): 框架(w-converhp、w-serv-hapi、w-serv-webdata、w-serv-orm)不驗證 token, 一律由本套件負責.
  * 連線閘(verifyConn)與執行身分(getUserIdByToken)皆須完整驗證(token 有效、本系統使用者存在且啟用、部署方授權); hapi apis 路由各自驗證; 函數層級另檢查角色或成員; 公開入口只限列名者.
- * 本套件之落實: 資料通道之連線閘(標頭 token)與執行身分(請求本體 __sysToken__)皆經 getAndVerifyClientUser(外部 getUserByToken → perm users 存在且 isActive='y' → 部署方 verifyClientUser), 任一關不過函數不執行;
- * 改變狀態之 kpFunExt 函數(updateTargets／updatePemis／updateGrups／updateUsers)另限 perm users 表中有效且 isAdmin='y' 者(perm 以自身 users 表為權威, 不採 token 宣稱之 isAdmin), 不符回 userNotAdmin、零寫入;
- * hapi apis 路由: getUserByToken／getPerm 驗 client 使用者, getPermUserInfor／syncAndReplaceTabs 驗 app 使用者(verifyAppUser); 無公開入口(前端靜態檔除外).
+ * 本套件之落實(perm-run01 起「權限後台與資料通道只限系統管理員」, 規則帳本 R-ADMIN-ONLY-01): 資料通道之連線閘(標頭 token, 所有入口: main 之 RPC／表 select／系統函數, 上傳下載各 apiType)與執行身分(請求本體 __sysToken__)、後台登入檢查(/api/getUserByToken)皆經 getAndVerifyAdminUser
+ * (外部 getUserByToken → perm users 存在且 isActive='y' → 部署方 verifyClientUser → perm users 表之列 isAdmin='y'; perm 以自身 users 表為權威, 不採 token 宣稱之 isAdmin), 任一關不過函數不執行(一般使用者即使部署方放行亦被拒, 回 userNotAdmin);
+ * 一般使用者(isAdmin='n')只能經 /api/getPerm 以 token 查本人權限樹; 改變狀態之 kpFunExt 函數(updateTargets／updatePemis／updateGrups／updateUsers)另保留 perm users 表中有效且 isAdmin='y' 之縱深檢查(requireAdmin), 不符回 userNotAdmin、零寫入;
+ * hapi apis 路由: getUserByToken(只限管理員)／getPerm(任何通過 verifyClientUser 之有效使用者, 回本人權限樹)驗 client 使用者, getPermUserInfor／syncAndReplaceTabs 驗 app 使用者(verifyAppUser); 無公開入口(前端靜態檔除外).
  *
  * @class
  * @param {Function} WOrm 輸入資料庫ORM函數
  * @param {String} url 輸入資料庫連線字串，例如w-orm-lmdb為'./db'，或w-orm-mongodb為'mongodb://username:password@$127.0.0.1:27017'
  * @param {String} db 輸入資料庫名稱字串
  * @param {Function} getUserByToken 輸入處理函數，函數會傳入使用者token，通過此函數處理後並回傳使用者資訊物件，並至少須提供'id'、'email'、'name'、'isAdmin'欄位，且'isAdmin'限輸入'y'或'n'。注意: token 回傳之'isAdmin'僅供識別，權限系統一律以自身users表該使用者之'isAdmin'欄位值為權威，不會被 token 宣稱之值複寫。函數拋錯或reject時視同查無使用者(回自家錯誤key，錯誤原文不回前端、不入log，只於srLog記warn)
- * @param {Function} verifyClientUser 輸入驗證瀏覽使用者身份之處理函數，函數會傳入使用者資訊物件(perm users 表之列)與來源字串from，通過此函數識別後回傳布林值(可為Promise)，允許使用者回傳true，反之回傳false。from 值域: 'getUserByToken'(登入)、'getPerm'(api/getPerm)、以及資料通道之 apiType 'main'(RPC 與 ORM 執行; 連線閘驗標頭 token、執行身分〔getUserIdByToken〕驗請求本體 __sysToken__, 兩者各經本函數一次, 本體 token 與標頭 token 不同時兩個使用者各自驗證)、'upload-controller'、'upload-slice'、'download-get-filename'、'download-get-file'、'download'；資料通道與登入採同一授權強度(反查 perm users 且 isActive='y' 後再經本函數)；函數拋錯或reject時視同回傳false
+ * @param {Function} verifyClientUser 輸入驗證瀏覽使用者身份之處理函數，函數會傳入使用者資訊物件(perm users 表之列)與來源字串from，通過此函數識別後回傳布林值(可為Promise)，允許使用者回傳true，反之回傳false。from 值域: 'getUserByToken'(登入)、'getPerm'(api/getPerm)、以及資料通道之 apiType 'main'(RPC 與 ORM 執行; 連線閘驗標頭 token、執行身分〔getUserIdByToken〕驗請求本體 __sysToken__, 兩者各經本函數一次, 本體 token 與標頭 token 不同時兩個使用者各自驗證)、'upload-controller'、'upload-slice'、'download-get-filename'、'download-get-file'、'download'；資料通道與登入採同一授權強度(反查 perm users 且 isActive='y' 後再經本函數)；函數拋錯或reject時視同回傳false。本函數收到的是該列之淺層副本，改寫其欄位不影響本套件後續採用之執行身分與角色判定。本函數通過後，本套件另要求資料通道與後台登入(from 為 'getUserByToken'、'main'、'upload-controller' 等)限 perm users 表中 isAdmin 為 'y' 者(一般使用者即使本函數放行亦被拒，回 userNotAdmin)，故本函數不必再以 from 區分管理員與一般使用者，但可再收緊；一般使用者查本人權限樹之 /api/getPerm(from 為 'getPerm')仍會呼叫本函數，勿回傳 user.isAdmin === 'y' 而擋掉他們
  * @param {Function} verifyAppUser 輸入驗證應用程序使用者身份之處理函數，函數會傳入使用者資訊物件，通過此函數識別後回傳布林值，允許使用者回傳true，反之回傳false；函數拋錯或reject時視同回傳false
  * @param {Object} [opt={}] 輸入設定物件，預設{}
  * @param {Integer} [opt.serverPort=11006] 輸入伺服器通訊port，預設11006。註：原opt.useCheckUser、opt.getUserById、opt.useExcludeWhenNotAdmin已隨w-serv-orm 1.1.9移除，給予undefined、null、false以外之值時建構即拋錯(錯誤訊息出自w-serv-orm之checkOptRemoved，並記srLog)；資料通道之使用者授權由verifyConn(verifyClientUser)負責、表操作只開放select，刪除該三鍵即可，無須替代設定
@@ -126,7 +128,9 @@ import { createAuthorizeExec, wrapOperOrm } from './dataChannel.mjs'
  *     console.log('verifyClientUser/user', user)
  *     // return false //測試無法登入
  *     console.log('於生產環境時得加入限制瀏覽器使用者身份機制')
- *     return user.isAdmin === 'y' //測試僅系統管理者使用
+ *     //本套件於此函數通過後，另要求資料通道與後台登入限系統管理員(perm users 表之 isAdmin 為 'y')，一般使用者仍可經 /api/getPerm(from 為 'getPerm')以 token 查本人權限樹，
+ *     //故此處不可回傳 user.isAdmin === 'y'(會擋掉一般使用者之 /api/getPerm); 僅需放行有效之瀏覽使用者，或依 from 與自家政策再收緊(例如依來源網段或系統別拒絕)
+ *     return true
  * }
  *
  * let verifyAppUser = (user, from) => {
@@ -490,14 +494,19 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
 
     //getAndVerifyClientUser
-    let getAndVerifyClientUser = async (token, from = '') => {
+    let getAndVerifyClientUser = async (token, from = '', { adminOnly = false } = {}) => {
         //基於token查找client使用者, 會基於外部getUserByToken以及perm內部users進行查找並比對
+        //adminOnly 為 true 時(經 getAndVerifyAdminUser)於完整驗證通過後另要求 perm 列為有效之系統管理員(R-ADMIN-ONLY-01); 預設 false 者(/api/getPerm)一般使用者照常
 
         //getTokenUser
         let user = await getTokenUser(token)
 
-        //verifyClientUser
-        let b = verifyClientUser(user, from)
+        //isAdmin, 於交給部署方前判定(判準 adminCheck.isAdminRow, perm 列為權威)
+        let isAdmin = isAdminRow(user)
+
+        //verifyClientUser, 部署方只收到淺層副本(perm 列之欄位皆為純量): 其函數即使改寫收到之 user(id、isAdmin…)亦不影響本函數回傳之 user——
+        //後續以 user.id 為執行身分／查權限樹, 檢查之值即使用之值(perm-run01 外審 sol#2: 否則角色取自 A、執行 id 被改成 M)
+        let b = verifyClientUser({ ...user }, from)
         if (ispm(b)) {
             b = await b
         }
@@ -509,7 +518,24 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             return Promise.reject(`userNoPermission`)
         }
 
+        //check admin, 一般使用者即使部署方放行亦拒絕(固定語系鍵 userNotAdmin; 只記 from, 不記 token 與使用者資料)
+        if (adminOnly && !isAdmin) {
+            srLog.error({ event: 'getAndVerifyAdminUser-error', msg: 'userNotAdmin', from })
+            return Promise.reject(`userNotAdmin`)
+        }
+
         return user
+    }
+
+
+    //getAndVerifyAdminUser: 權限後台與資料通道只限系統管理員(perm-run01; 使用者 2026-10-24 裁示「系統管理員才能讀寫 4 表, 一般使用者是沒法進權限後台的, 故只能用 token 查自己權限樹」; 規則帳本 R-ADMIN-ONLY-01)
+    //在 getAndVerifyClientUser 之完整驗證(外部 getUserByToken → perm users 存在且 isActive='y' → 部署方 verifyClientUser)之後, 另要求該使用者為 perm users 表中 isAdmin='y' 且 isActive='y':
+    //perm 以自身 users 表為權威, 不採 token(getUserByToken)宣稱之 isAdmin(user 為 getTokenUser 當次新鮮讀取之 perm 列, 不快取); 不符即 reject 固定語系鍵 userNotAdmin(fail-closed), 記 srLog(只記 from, 不記 token 與使用者資料).
+    //部署方 verifyClientUser 仍照常套用(只能再收緊), 不必再以 from 區分管理員與一般使用者. 唯一不經本函數之使用者入口為 /api/getPerm(一般使用者以 token 查本人權限樹), 以及應用系統路由(verifyAppUser).
+    //判準單一擁有者 adminCheck.isAdminRow(與 requireAdmin 共用)
+    //角色於 getTokenUser 回傳當下判定(早於交給部署方 verifyClientUser), 使「檢查之值即使用之值」: 部署方函數即使修改其收到之 user 物件亦不影響角色判定; 但拒絕鍵次序為先 userNoPermission(部署方否決)後 userNotAdmin
+    let getAndVerifyAdminUser = async (token, from = '') => {
+        return await getAndVerifyClientUser(token, from, { adminOnly: true })
     }
 
 
@@ -560,10 +586,11 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         //改為與登入入口對稱, 使 UI 之「是否有效」與部署層 verifyClientUser 政策對資料通道亦生效.
         //from 為 w-converhp 之 apiType('main' / 'upload-controller' / 'upload-slice' / 'download-get-filename' / 'download-get-file' / 'download'),
         //供部署層 verifyClientUser(user, from) 區分入口.
+        //perm-run01(R-ADMIN-ONLY-01): 資料通道只限系統管理員——完整驗證通過後另要求 perm 列 isAdmin='y' 且 isActive='y', 所有入口(main 之 RPC／表 select／系統函數, 上傳下載各 apiType)同一道閘; 一般使用者即使部署方放行亦拒絕(只能用 /api/getPerm 查本人權限樹)
         checkToken: async(token, from = '') => {
 
-            //getAndVerifyClientUser, reject 時 key: cannotFindUserFromToken / cannotGetUserFromPerm / userNoPermission 等
-            await getAndVerifyClientUser(token, from)
+            //getAndVerifyAdminUser, reject 時 key: cannotFindUserFromToken / cannotGetUserFromPerm / userNoPermission / userNotAdmin 等
+            await getAndVerifyAdminUser(token, from)
 
             return true
         },
@@ -646,7 +673,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         catch (err) {
             u = null
         }
-        if (!iseobj(u) || u.isAdmin !== 'y') {
+        if (!isAdminRow(u)) { //縱深防禦: 資料通道已於連線閘與執行身分要求管理員(R-ADMIN-ONLY-01), 此處對新鮮讀取之列再判一次(連線後角色被降級之競態)
             srLog.error({ event: 'requireAdmin-error', msg: 'userNotAdmin', funcName, userId })
             return Promise.reject('userNotAdmin')
         }
@@ -803,8 +830,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                         return Promise.reject(`tokenNoPermission`)
                     }
 
-                    //getAndVerifyClientUser
-                    let user = await getAndVerifyClientUser(token, 'getUserByToken')
+                    //getAndVerifyAdminUser, 後台登入檢查只限系統管理員(perm-run01, R-ADMIN-ONLY-01): 一般使用者即使部署方放行亦拒絕(userNotAdmin, 前端顯示「無權進入權限後台」); 一般使用者查本人權限樹走 /api/getPerm
+                    let user = await getAndVerifyAdminUser(token, 'getUserByToken')
                     // console.log('user', user)
 
                     //check
@@ -878,8 +905,9 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                         return Promise.reject(`tokenNoPermission`)
                     }
 
-                    //getGenUserAndRulesByUserId, 查找到的client使用者與權限
-                    let userWithRulesSelf = await getGenUserAndRulesByUserId(userIdSelf)
+                    //getGenUserAndRulesByUserId, 查找到的client使用者與權限; 第2參傳入驗證時取得之列(userSelf), 直接採用不以 id 重讀:
+                    //驗證與重讀之間(含 verifyClientUser 為 async 之等待期間)該列可能被改登入鍵或刪除後同 id 換人, 重讀會回另一人之資料與權限樹(同 /api/getPermUserInfor 之 resolvePermUserId, perm-run01 外審 sol#3)
+                    let userWithRulesSelf = await getGenUserAndRulesByUserId(userIdSelf, userSelf)
                     // console.log('getGenUserAndRulesByUserId', r)
 
                     //check
@@ -1096,7 +1124,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
             //身分驗證責任(dspec/使用者身分驗證原則.md 第三節, 使用方套件標準註解): 框架(w-converhp、w-serv-hapi、w-serv-webdata、w-serv-orm)不驗證 token, 一律由本套件負責.
             //連線閘(verifyConn)與執行身分(getUserIdByToken)皆須完整驗證(token 有效、本系統使用者存在且啟用、部署方授權); hapi apis 路由各自驗證; 函數層級另檢查角色或成員(updateXxx 限 perm users 表之 isAdmin='y', requireAdmin); 公開入口只限列名者.
-            //本函數: 驗連線標頭之 token(getAndVerifyClientUser: 外部 getUserByToken → perm users 存在且 isActive='y' → 部署方 verifyClientUser(user, apiType)).
+            //本函數: 驗連線標頭之 token(getAndVerifyAdminUser: 外部 getUserByToken → perm users 存在且 isActive='y' → 部署方 verifyClientUser(user, apiType) → perm 列 isAdmin='y', R-ADMIN-ONLY-01: 權限後台與資料通道只限系統管理員, 一般使用者查本人權限樹走 /api/getPerm).
 
             //token
             let token = strdelleft(authorization, 7) //刪除Bearer
@@ -1150,16 +1178,17 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
             //身分驗證責任(dspec/使用者身分驗證原則.md 第三節, 使用方套件標準註解; 規則 w-web呼叫者身分驗證.md 規則 4): 框架(w-converhp、w-serv-hapi、w-serv-webdata、w-serv-orm)不驗證 token, 一律由本套件負責.
             //連線閘(verifyConn)與執行身分(getUserIdByToken)皆須完整驗證(token 有效、本系統使用者存在且啟用、部署方授權); hapi apis 路由各自驗證; 函數層級另檢查角色或成員; 公開入口只限列名者.
-            //本函數: 資料通道只傳遞 token, 反查使用者即驗證身分之步驟(w-serv-orm 1.1.10 起 ORM 層不做使用者檢查): 與連線閘同等完整——經 getAndVerifyClientUser(外部 getUserByToken → perm users 存在且 isActive='y' → 部署方 verifyClientUser),
+            //本函數: 資料通道只傳遞 token, 反查使用者即驗證身分之步驟(w-serv-orm 1.1.10 起 ORM 層不做使用者檢查): 與連線閘同等完整——經 getAndVerifyAdminUser(外部 getUserByToken → perm users 存在且 isActive='y' → 部署方 verifyClientUser → perm 列 isAdmin='y'),
             //任一關不過即 reject(框架據此不執行函數, fail-closed)並記 srLog, 不回顯 token 與使用者資料. 請求標頭與本體 __sysToken__ 縱為不同 token, 兩個身分亦各經完整驗證(框架不比對兩 token).
             //回傳 perm users 表內該使用者之 id(非外部 token 宣稱之 id): 稽核欄位(userId／userIdUpdate)與函數層級角色檢查(requireAdmin)皆以 perm 內之列為準; mappingBy 為 email／name 時兩者可不同.
             //from 取 'main': 本函數只在資料通道 RPC／表操作(apiType 'main')之執行身分反查時被框架呼叫(上傳下載通道無監聽), 與連線閘對同一請求所用之 apiType 一致, 使部署方 verifyClientUser 依 from 分流之政策兩處一致, 不引入新的 from 值.
+            //perm-run01(R-ADMIN-ONLY-01): 與連線閘同為「只限系統管理員」——另要求 perm 列 isAdmin='y' 且 isActive='y'(getAndVerifyAdminUser), 否則 reject userNotAdmin, 框架即不執行函數(含唯讀函數與表 select).
             let user = null
             try {
-                user = await getAndVerifyClientUser(token, 'main')
+                user = await getAndVerifyAdminUser(token, 'main')
             }
             catch (err) {
-                let key = toOutKey(err, 'cannotFindUserId') //已知語系鍵原樣(cannotFindUserFromToken／cannotGetUserFromPerm／userNoPermission 等), 其餘(ORM／I/O 原文、Error)一律 cannotFindUserId, 不外送原文
+                let key = toOutKey(err, 'cannotFindUserId') //已知語系鍵原樣(cannotFindUserFromToken／cannotGetUserFromPerm／userNoPermission／userNotAdmin 等), 其餘(ORM／I/O 原文、Error)一律 cannotFindUserId, 不外送原文
                 srLog.error({ event: 'getUserIdByToken-error', msg: key })
                 return Promise.reject(key)
             }
@@ -1180,7 +1209,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         //裸 insert/save/del/delAll 繞過上述不變式, 2026-10-14 起不開放(直呼回 invalid func[表名.方法]); 對自寫客戶端直呼裸表操作之部署方為行為變更(README Upgrade Notes)
         methodsExec: ['select'],
         //authorizeExec: w-serv-webdata 1.1.7 起 useDbOrm:true 必填; 只對已取得 userId 之 select 放行(methodsExec 之外之第二道), 拒絕記 srLog event 'authorizeExec'.
-        //連線者身分之授權在 verifyConn(getAndVerifyClientUser), 此處不重做
+        //連線者身分之授權在 verifyConn(getAndVerifyAdminUser: 完整驗證＋限系統管理員), 此處不重做
         authorizeExec: createAuthorizeExec({ srLog }),
         tableNamesSync,
         kpFunExt: { //接收參數第1個為userId, 之後才是前端給予參數

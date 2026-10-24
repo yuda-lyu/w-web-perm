@@ -133,6 +133,32 @@ function formatReport(rp, opt = {}) {
 }
 
 
+/**
+ * 兩個路徑是否指向同一個檔案(供 --clean-out 不得覆寫輸入檔之判定): 先比解析後之絕對路徑(僅 Windows 不分大小寫; 其他平台大小寫敏感, 僅大小寫不同者可為不同檔),
+ * 兩者皆已存在時再比實際路徑(realpath: 解開符號連結與父目錄別名; 檔案系統不提供可用 inode 時仍能辨識符號連結別名), 最後以 inode 與 dev 判定硬連結
+ *
+ * @param {String} fpA 路徑 A
+ * @param {String} fpB 路徑 B
+ * @param {Function} [statFn=fs.statSync] 輸入取得檔案資訊之函數(單元測試用,簽章同 fs.statSync)
+ * @param {String} [platform=process.platform] 輸入平台字串(單元測試用), 'win32' 時路徑字串比對不分大小寫
+ * @returns {Boolean} 回傳是否為同一檔
+ */
+function isSameFile(fpA, fpB, statFn = fs.statSync, platform = process.platform) {
+    let norm = (p) => (platform === 'win32' ? p.toLowerCase() : p)
+    let same = norm(path.resolve(fpA)) === norm(path.resolve(fpB))
+    if (!same && fs.existsSync(fpB) && fs.existsSync(fpA)) {
+        same = norm(fs.realpathSync.native(fpA)) === norm(fs.realpathSync.native(fpB))
+        if (!same) {
+            //須以 bigint 取 inode: Number 只有 53 位元精度, NTFS 檔案識別碼(序號<<48|記錄號)超過 2**53 時, 相鄰記錄之不同檔會得到相同 Number 而被誤判為同一檔(perm-run01 範圍三, RA-037 偶發失敗之根因)
+            let a = statFn(fpA, { bigint: true })
+            let b = statFn(fpB, { bigint: true })
+            same = a.ino !== 0n && a.ino === b.ino && a.dev === b.dev
+        }
+    }
+    return same
+}
+
+
 //CLI
 if (isMain(import.meta.url)) {
     let args = process.argv.slice(2)
@@ -145,13 +171,7 @@ if (isMain(import.meta.url)) {
     }
     //輸出不得覆寫輸入(同一檔; 以解析後之絕對路徑與已存在檔之 inode 判定): --clean-out 只含變更列之 id 與引用欄位, 覆寫匯出檔會使其遺失其餘列與欄位
     if (cleanOut !== undefined) {
-        let same = path.resolve(fp).toLowerCase() === path.resolve(cleanOut).toLowerCase()
-        if (!same && fs.existsSync(cleanOut) && fs.existsSync(fp)) {
-            let a = fs.statSync(fp)
-            let b = fs.statSync(cleanOut)
-            same = a.ino !== 0 && a.ino === b.ino && a.dev === b.dev
-        }
-        if (same) {
+        if (isSameFile(fp, cleanOut)) {
             console.error('失敗: --clean-out 不得與輸入匯出檔為同一檔(會覆寫原匯出檔)')
             process.exit(2)
         }
@@ -172,4 +192,4 @@ if (isMain(import.meta.url)) {
 }
 
 
-export { buildReport, formatReport, cleanOutOf }
+export { buildReport, formatReport, cleanOutOf, isSameFile }
