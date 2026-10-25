@@ -1,0 +1,39 @@
+[quiet-run] exit=2 time=46s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261025-161932-perm-run01.log (78 行, 8 KB)
+[quiet-run] cmd: npx mocha --no-parallel test/api-sysFuncs.test.mjs --timeout 300000
+[quiet-run] lock: 取得並已釋放(等待 0s)
+== 統計 ==
+  15 passing (24s)
+  2 failing
+== 失敗段落(前 28 行) ==
+  1) api-sysFuncs (系統函數 × 呼叫者 × 新舊協定, perm-run01 R-SYSFUNCS-01, 真後端)
+       [sys:polling] × 協定 old: 管理員服務等級(A／AUA／AS)只在 new／body 放行, 其餘一律拒、不回資料:
+      AssertionError [ERR_ASSERTION]: [sys:polling]/old 有 3 格不符
++ actual - expected
++ [
++   'A: 預期 body([sys:polling] permission denied), 實得 allow',
++   'AUA: 預期 body([sys:polling] permission denied), 實得 allow',
++   'AS: 預期 body([sys:polling] permission denied), 實得 allow'
++ ]
+- []
+      + expected - actual
+      -[
+      -  "A: 預期 body([sys:polling] permission denied), 實得 allow"
+      -  "AUA: 預期 body([sys:polling] permission denied), 實得 allow"
+      -  "AS: 預期 body([sys:polling] permission denied), 實得 allow"
+      -]
+      +[]
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-sysFuncs.test.mjs:181:19)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+  2) api-sysFuncs (系統函數 × 呼叫者 × 新舊協定, perm-run01 R-SYSFUNCS-01, 真後端)
+       被拒者零副作用: 舊協定輪詢被拒後, 該 clientId 不留在線身分(之後以新協定管理員身分首次輪詢仍可綁定):
+      AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
++ 'allow'
+- 'body:[sys:polling] permission denied'
+      + expected - actual
+      -allow
+      +body:[sys:polling] permission denied
+== 最後 2 行(非空,不含上列失敗段落) ==
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-sysFuncs.test.mjs:216:11)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)

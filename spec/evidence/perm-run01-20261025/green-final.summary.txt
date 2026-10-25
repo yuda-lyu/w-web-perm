@@ -1,0 +1,22 @@
+[quiet-run] exit=0 time=39s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261025-192911-perm-run01.log (109 行, 21 KB)
+[quiet-run] cmd: npx mocha --no-parallel test/unit-sysFuncsSite.test.mjs test/api-sysFuncs.test.mjs test/api-callerMatrix.test.mjs --timeout 300000
+[quiet-run] lock: 取得並已釋放(等待 0s)
+== 統計 ==
+  77 passing (37s)
+== 最後 15 行(非空,不含上列失敗段落) ==
+      ✔ MX-B1 Bearer 方案(大小寫不敏感、單一空白)通過; Basic／Token／無方案／多空白／Tab／缺憑證／無標頭 → 視同無 token(permission denied) (49ms)
+      ✔ MX-B2 通訊路由同一規則: Basic 方案帶管理員 token 亦視同無 token(回應 ≡ 無效 token)
+    Q /syncAndReplaceTabs 先驗身分再驗 keyTable(P-5)
+      ✔ MX-Q1 未通過身分驗證者(無 token、無效 token、U、AUM、NFN、ASN、AUD)之回應與 srLog 皆與 keyTable 無關(有效表名／未知表名／空／未帶皆同一回應); 通過應用系統路由等級者才見 invalidKeyTable (70ms)
+    R perm-run02: ①應用系統路由相容認定  ②系統服務用途須 app: 前綴
+      ✔ MX-R1 ①相容: 不在表且 isAdmin y 而未轉傳 isApp 者(NF／NFV)於兩條應用系統路由放行(舊版 sso 之應用系統身分即 isAdmin y, 升版不中斷), 稽核欄記其外部 id; isApp y 與否結果相同 (76ms)
+      ✔ MX-R2 ①在表者以 perm 列為準(不看反查之 isAdmin): 同一外部身分 sso-admin-77(反查 isAdmin y)不在表時放行; 建為一般使用者列 → userNotAdmin; 改為有效管理員 → 放行; 停用 → cannotGetUserFromPerm; 刪除列 → 回到不在表而放行 (171ms)
+      ✔ MX-R3 ②系統服務用途須 id 以 app: 開頭: 同為不在表、isApp y、isAdmin y, 僅 id 前綴不同 → AS(app:key-sys)可用後端管理員服務、AUX(sso-admin-77)與 APP(id-for-application)不可; 後台登入、資料通道標頭／本體、寫入函數皆然, 零寫入 (55ms)
+      ✔ MX-R4 ②「二者一致」: 使用者用途綁不在表之 sso 管理員(AUX)的後端結果 ≡ 該管理員自身使用者 token(NFV)——後台登入、資料通道標頭／本體的拒絕鍵逐一相同; 兩者應用系統路由皆放行  [原則二之一: 使用者用途＝同綁定者]
+      ✔ MX-R5 [外審 sol F1] 嚴格系統服務形狀(AS: app:key-sys、isApp y、isAdmin y)而 perm 有主鍵同為其 id 之停用列 → 在表, 不落入系統服務用途: 後台登入、資料通道(標頭／本體)、應用路由皆拒(固定語系鍵)、零寫入 (49ms)
+      ✔ MX-R6 [外審 sol F1] 不在表且 isAdmin n、而 verifyAppUser 因非角色因素否決 → 兩條應用系統路由皆先回 userNoPermission(部署方否決先於等級不足 userNotAdmin), 零寫入; 對照: 同為不在表之 isAdmin n 但未被否決(NFN)回 userNotAdmin
+      ✔ MX-R8 [外審 sol 增量輪 G5] ①的權限面: 不在表之 sso 管理員(NFV 自身 token／AUX 綁定 token)可經 /syncAndReplaceTabs 匯入自己的 users 列(srcKey ≡ 外部 id、isAdmin y)——之後同一 token 以該 perm 列通過後台與資料通道, 稽核欄由外部 id 轉為 perm 內部 id; 此為既定政策(應用系統路由＝管理員等級, 1.1.15 起即可寫 users), 以測試固定其結果
+      ✔ MX-R7 [外審 sol F1] 外部列管理員(經匯入建立, srcKey ≡ 外部 id sso-ext-5, 內部 id 為系統配發): 後台登入、資料通道、兩條應用系統路由皆通過, 稽核欄一律記 perm 內部 id(≠ srcKey)
+[api-callerMatrix] 已斷言格數(含相容軸): 965
+  77 passing (37s)
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)

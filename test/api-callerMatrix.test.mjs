@@ -316,9 +316,16 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
             { name: 'targets.select', fn: 'targets.select', args: async () => [] },
             { name: '[sys:getFuncList]', fn: '[sys:getFuncList]', args: async () => [] },
             { name: '[sys:getTableTags]', fn: '[sys:getTableTags]', args: async () => [] },
-            //[sys:polling](w-serv-broadcast 輪詢; 輸入為 { clientId }): 連線閘(標頭)與其他入口同; 其本體 __sysToken__ 之身分檢查屬框架(w-serv-webdata ≥1.1.16 之 verifyPolling; 本機安裝 w-serv-broadcast 1.1.10 無此檢查,
-            //  排程第 128 項 sysFuncsPublic 嚴格設定), 故只測標頭來源(onlyHeader)
-            { name: '[sys:polling]', fn: '[sys:polling]', onlyHeader: true, call: async (c, src) => rawRpc('[sys:polling]', { clientId: `mx-${c.k}`, __sysToken__: c.token }, { Authorization: `Bearer ${c.token}` }) },
+            //[sys:polling](w-serv-broadcast 輪詢; 輸入為 { clientId, __sysToken__ }): 連線閘(標頭)與其他入口同; 其本體 __sysToken__ 之身分檢查由框架(w-serv-webdata ≥1.1.16 之 verifyPolling)經 getUserIdByToken 為之,
+            //  本套件 sysFuncsPublic 只公開 [sys:getFuncList](perm-run01 2026-10-25, R-SYSFUNCS-01), 故兩個身分來源皆測(標頭來源之本體為有效管理員; 本體來源之標頭為有效管理員)。
+            //  clientId 含來源: 同一 clientId 換身分輪詢會被框架拒(clientId 與身分綁定), 兩個來源之身分不同。新舊協定(缺 __sysToken__ 鍵等)之完整矩陣見 api-sysFuncs.test.mjs
+            {
+                name: '[sys:polling]',
+                fn: '[sys:polling]',
+                call: async (c, src) => (src === 'header'
+                    ? rawRpc('[sys:polling]', { clientId: `mx-${c.k}-h`, __sysToken__: TOKEN_ADMIN }, { 'Authorization': `Bearer ${c.token}` })
+                    : rawRpc('[sys:polling]', { clientId: `mx-${c.k}-b`, __sysToken__: c.token }, { 'Authorization': `Bearer ${TOKEN_ADMIN}` })),
+            },
             { name: 'updateUsers', fn: 'updateUsers', kt: 'users', args: async (c) => [(await rowsOf('users')).map((r, k) => (k === 0 ? { ...r, description: descOf(c) } : r))] },
             { name: 'updateGrups', fn: 'updateGrups', kt: 'grups', args: async (c) => [(await rowsOf('grups')).map((r, k) => (k === 0 ? { ...r, description: descOf(c) } : r))] },
             { name: 'updatePemis', fn: 'updatePemis', kt: 'pemis', args: async (c) => [(await rowsOf('pemis')).map((r, k) => (k === 0 ? { ...r, description: descOf(c) } : r))] },
@@ -328,7 +335,7 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
         for (let e of entries) {
             it(`MX-D ${e.name}: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]`, async function() {
                 for (let c of ALL) {
-                    for (let src of (e.onlyHeader ? ['header'] : ['header', 'body'])) {
+                    for (let src of ['header', 'body']) {
                         let s0 = await snap4()
                         let args = e.args ? await e.args(c) : null
                         let r = e.call ? await e.call(c, src) : ((src === 'header') ? await callRpc(e.fn, args, c.token) : await callRpc(e.fn, args, TOKEN_ADMIN, { sysToken: c.token }))
@@ -349,7 +356,7 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
                                 A.equal(r.msg, 'permission denied', `${tag}: 連線閘`)
                             }
                             else {
-                                A.ok(KEYS.has(r.msg) || r.msg === 'permission denied' || /sysToken|userId/i.test(r.msg), `${tag}: 執行身分之拒絕應為固定語系鍵, 實得 ${r.msg}`)
+                                A.ok(KEYS.has(r.msg) || r.msg === 'permission denied' || r.msg === '[sys:polling] permission denied' || /sysToken|userId/i.test(r.msg), `${tag}: 執行身分之拒絕應為固定語系鍵(輪詢為框架固定訊息 [sys:polling] permission denied), 實得 ${r.msg}`)
                             }
                             for (let s of LEAK) {
                                 A.ok(!r.raw.includes(s), `${tag}: 被拒回應不得含 ${s}`)

@@ -1,0 +1,226 @@
+{
+  "when": "2026-10-25T08:28:55.742Z",
+  "apiBaseUrl": "http://127.0.0.1:11006",
+  "scenarios": {
+    "S0_noToken": {
+      "redirectedToUrlRedirect": true,
+      "redirectAfterMs": 2160,
+      "apiSummary": {},
+      "apiCount": 0,
+      "consoleErrors": []
+    },
+    "S1_validToken": {
+      "readyAtMs": 4443,
+      "tables": {
+        "users": 4,
+        "grups": 4,
+        "pemis": 4,
+        "targets": 22
+      },
+      "bodyAfterReady": "Permission Service A web service package for user permissions and management targets. English Statistics Event Frequency",
+      "tabsVisited": [
+        {
+          "tab": "Statistics",
+          "bodyHas": true
+        },
+        {
+          "tab": "Targets",
+          "bodyHas": true
+        },
+        {
+          "tab": "Permissions",
+          "bodyHas": true
+        },
+        {
+          "tab": "Permission groups",
+          "bodyHas": true
+        },
+        {
+          "tab": "Users",
+          "bodyHas": true
+        }
+      ],
+      "pushWriteOk": true,
+      "pushReceived": true,
+      "pushLatencyMs": 2172,
+      "pushRestoreOk": true,
+      "connStateEnd": "csLogin",
+      "apiSummary": {
+        "GET /api/getUserByToken": {
+          "n": 1,
+          "success": 0,
+          "error": 0,
+          "errors": {},
+          "withSysTokenKey": 0,
+          "withTokenString": 0,
+          "tokenEqualsHeader": 0
+        },
+        "main:[sys:polling]": {
+          "n": 6,
+          "success": 6,
+          "error": 0,
+          "errors": {},
+          "withSysTokenKey": 6,
+          "withTokenString": 6,
+          "tokenEqualsHeader": 6
+        },
+        "main:[sys:getFuncList]": {
+          "n": 1,
+          "success": 1,
+          "error": 0,
+          "errors": {},
+          "withSysTokenKey": 1,
+          "withTokenString": 1,
+          "tokenEqualsHeader": 1
+        },
+        "main:getWebInfor": {
+          "n": 1,
+          "success": 1,
+          "error": 0,
+          "errors": {},
+          "withSysTokenKey": 1,
+          "withTokenString": 1,
+          "tokenEqualsHeader": 1
+        },
+        "main:[sys:getTableTags]": {
+          "n": 1,
+          "success": 1,
+          "error": 0,
+          "errors": {},
+          "withSysTokenKey": 1,
+          "withTokenString": 1,
+          "tokenEqualsHeader": 1
+        },
+        "main:getStaEvent": {
+          "n": 1,
+          "success": 1,
+          "error": 0,
+          "errors": {},
+          "withSysTokenKey": 1,
+          "withTokenString": 1,
+          "tokenEqualsHeader": 1
+        },
+        "main:getStaEventTable": {
+          "n": 1,
+          "success": 1,
+          "error": 0,
+          "errors": {},
+          "withSysTokenKey": 1,
+          "withTokenString": 1,
+          "tokenEqualsHeader": 1
+        },
+        "main:grups.select": {
+          "n": 3,
+          "success": 3,
+          "error": 0,
+          "errors": {},
+          "withSysTokenKey": 3,
+          "withTokenString": 3,
+          "tokenEqualsHeader": 3
+        },
+        "main:pemis.select": {
+          "n": 1,
+          "success": 1,
+          "error": 0,
+          "errors": {},
+          "withSysTokenKey": 1,
+          "withTokenString": 1,
+          "tokenEqualsHeader": 1
+        },
+        "main:targets.select": {
+          "n": 1,
+          "success": 1,
+          "error": 0,
+          "errors": {},
+          "withSysTokenKey": 1,
+          "withTokenString": 1,
+          "tokenEqualsHeader": 1
+        },
+        "main:users.select": {
+          "n": 1,
+          "success": 1,
+          "error": 0,
+          "errors": {},
+          "withSysTokenKey": 1,
+          "withTokenString": 1,
+          "tokenEqualsHeader": 1
+        }
+      },
+      "consoleErrors": []
+    },
+    "S2_ordinaryUser": {
+      "reachedNotAdmin": true,
+      "connState": "csErrNotAdmin",
+      "body": "No permission to enter the permission console",
+      "tokenInStore": "",
+      "redirected": false,
+      "apiSummary": {
+        "GET /api/getUserByToken": {
+          "n": 1,
+          "success": 0,
+          "error": 0,
+          "errors": {},
+          "withSysTokenKey": 0,
+          "withTokenString": 0,
+          "tokenEqualsHeader": 0
+        }
+      },
+      "consoleErrors": []
+    },
+    "S2_cleanupOk": true,
+    "S3_badToken": {
+      "redirectedToUrlRedirect": true,
+      "redirectAfterMs": 2153,
+      "apiSummary": {
+        "GET /api/getUserByToken": {
+          "n": 1,
+          "success": 0,
+          "error": 0,
+          "errors": {},
+          "withSysTokenKey": 0,
+          "withTokenString": 0,
+          "tokenEqualsHeader": 0
+        }
+      },
+      "apiCount": 1,
+      "consoleErrors": []
+    },
+    "S4_oldBundle": {
+      "swapped": [
+        "app.a9d18af3.js <- app.307bef4f.js",
+        "chunk-vendors.154af6b2.js <- chunk-vendors.6cc4d11e.js"
+      ],
+      "connState": "csLogin",
+      "body": "Logged in",
+      "tables": {
+        "users": null,
+        "grups": null
+      },
+      "apiSummary": {
+        "GET /api/getUserByToken": {
+          "n": 1,
+          "success": 0,
+          "error": 0,
+          "errors": {},
+          "withSysTokenKey": 0,
+          "withTokenString": 0,
+          "tokenEqualsHeader": 0
+        },
+        "main:[sys:polling]": {
+          "n": 7,
+          "success": 0,
+          "error": 7,
+          "errors": {
+            "error:[sys:polling] permission denied": 7
+          },
+          "withSysTokenKey": 0,
+          "withTokenString": 0,
+          "tokenEqualsHeader": 0
+        }
+      },
+      "consoleErrors": [
+        "[w-serv-broadcast] [sys:polling] error [sys:polling] permission denied"
+      ]
+    }
+  }
+}

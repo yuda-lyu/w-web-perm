@@ -48,6 +48,9 @@ import createRouteResult from './routeResult.mjs'
  * (外部 getUserByToken → perm users 存在且 isActive='y' → 部署方 verifyClientUser → perm users 表之列 isAdmin='y'; perm 以自身 users 表為權威, 不採 token 宣稱之 isAdmin), 任一關不過函數不執行(一般使用者即使部署方放行亦被拒, 回 userNotAdmin);
  * 一般使用者(isAdmin='n')只能經 /api/getPerm 以 token 查本人權限樹; 改變狀態之 kpFunExt 函數(updateTargets／updatePemis／updateGrups／updateUsers)另保留 perm users 表中有效且 isAdmin='y' 之縱深檢查(requireAdmin), 不符回 userNotAdmin、零寫入;
  * hapi apis 路由: getUserByToken(只限管理員)／getPerm(任何通過 verifyClientUser 之有效使用者, 回本人權限樹)驗 client 使用者, getPermUserInfor／syncAndReplaceTabs 驗 app 使用者(套件自行要求管理員等級, 再經 verifyAppUser); 無公開入口(前端靜態檔除外).
+ * 系統函數(dspec/使用者身分驗證原則.md 二.7、二.8; 規則帳本 R-SYSFUNCS-01): 本套件設定 sysFuncsPublic 為只公開 [sys:getFuncList](函數名稱清單); [sys:polling](輪詢, 取走廣播與同步表時間戳)與 [sys:getTableTags](同步表名與時間戳)須有效身分——
+ * 前端元件(w-serv-hapi 1.1.8／w-serv-webdata 1.1.16／w-serv-broadcast 1.1.12 起)於輪詢本體帶 __sysToken__, 每輪經 getUserIdByToken 反查(須為系統管理員; 缺 __sysToken__ 鍵之輪詢不反查, 直接被拒). 因 getUserIdByToken 對空 token 與非管理員 fail-closed 且連線閘先擋, [sys:getFuncList] 實際仍須有效管理員身分.
+ * 登入前前端不連線(src/main.js 之 useWaitToken: true), 不依賴公開之系統函數; 已發布之舊前端建置檔(輪詢不帶 __sysToken__)升版後輪詢被拒, 使用者需重新載入頁面.
  *
  * token 種類與等級(使用者 2026-10-24 定案, dspec/使用者身分驗證原則.md 二之一; 規則帳本 R-APP-TOKEN-01): 使用者 token(一般使用者／系統管理員)代表登入者, 等級以 perm users 表之列判定; 應用系統 token(部署方 getUserByToken 回傳 isApp 為 'y')分兩種用途——
  * 使用者用途(以 userId 綁定使用者, 反查回所綁使用者之實際資料與 isApp='y'): 以所綁使用者之 perm users 列判定, 與其使用者 token 相同, 不需特別處理;
@@ -1316,6 +1319,13 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             }
             return userId
         },
+        //系統函數身分關卡(dspec/使用者身分驗證原則.md 二.7、二.8; 規則帳本 R-SYSFUNCS-01): 只公開 [sys:getFuncList](只回函數名稱, 無敏感內容);
+        //[sys:polling](取走廣播與同步表時間戳)與 [sys:getTableTags](同步表名與時間戳)須有效身分——前端元件(w-serv-hapi 1.1.8／w-serv-webdata 1.1.16／w-serv-broadcast 1.1.12 起)於輪詢本體帶 __sysToken__, 每輪經 getUserIdByToken 反查.
+        //框架預設三者皆公開(相容既有前端元件), 未顯式設定即退回全公開, 故不可省; 缺 __sysToken__ 鍵之輪詢(已發布之舊前端建置檔)升版後被拒, 需重新載入頁面.
+        //本套件 getUserIdByToken 為真實反查且對空 token／非管理員 fail-closed, 連線閘亦先擋: 所列 [sys:getFuncList] 實際仍須有效管理員身分, 只是設定之表述.
+        //登入前不連線: src/main.js 之 useWaitToken: true 使前端元件在有 token 之前不輪詢、不取函數清單(與 w-web-sso 不同: sso 登入頁登入前須連線, 故另公開 [sys:polling]), 本套件不需公開 [sys:polling].
+        //前提由 test/unit-sysFuncsSite.test.mjs 靜態守護, 行為由 test/api-sysFuncs.test.mjs 守護; 此設定只管三個系統函數, 不影響 kpFunExt.
+        sysFuncsPublic: ['[sys:getFuncList]'],
         corsOrigins: ['*'],
         useDbOrm: true,
         kpOrm: woItems,

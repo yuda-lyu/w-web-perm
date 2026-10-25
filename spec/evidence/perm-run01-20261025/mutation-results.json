@@ -1,0 +1,313 @@
+{
+  "when": "2026-10-25T11:32:06.490Z",
+  "results": [
+    {
+      "id": "M1",
+      "desc": "拿掉 sysFuncsPublic(退回框架預設:三者皆公開)",
+      "file": "server/WWebPerm.mjs",
+      "runs": [
+        {
+          "test": "unit-sysFuncsSite",
+          "exit": 2,
+          "passing": 2,
+          "failing": 2,
+          "failedTitles": [
+            "1) unit-sysFuncsSite (系統函數身分關卡之設定與前提, perm-run01)",
+            "2) unit-sysFuncsSite (系統函數身分關卡之設定與前提, perm-run01)"
+          ],
+          "caught": true,
+          "sec": 1
+        },
+        {
+          "test": "api-sysFuncs",
+          "exit": 2,
+          "passing": 19,
+          "failing": 2,
+          "failedTitles": [
+            "1) api-sysFuncs (系統函數 × 呼叫者 × 新舊協定, perm-run01 R-SYSFUNCS-01, 真後端)",
+            "2) api-sysFuncs (系統函數 × 呼叫者 × 新舊協定, perm-run01 R-SYSFUNCS-01, 真後端)"
+          ],
+          "caught": true,
+          "sec": 17
+        }
+      ],
+      "caughtBy": [
+        "unit-sysFuncsSite",
+        "api-sysFuncs"
+      ],
+      "caught": true
+    },
+    {
+      "id": "M2",
+      "desc": "sysFuncsPublic 多列 [sys:polling]",
+      "file": "server/WWebPerm.mjs",
+      "runs": [
+        {
+          "test": "unit-sysFuncsSite",
+          "exit": 2,
+          "passing": 2,
+          "failing": 2,
+          "failedTitles": [
+            "1) unit-sysFuncsSite (系統函數身分關卡之設定與前提, perm-run01)",
+            "2) unit-sysFuncsSite (系統函數身分關卡之設定與前提, perm-run01)"
+          ],
+          "caught": true,
+          "sec": 1
+        },
+        {
+          "test": "api-sysFuncs",
+          "exit": 2,
+          "passing": 19,
+          "failing": 2,
+          "failedTitles": [
+            "1) api-sysFuncs (系統函數 × 呼叫者 × 新舊協定, perm-run01 R-SYSFUNCS-01, 真後端)",
+            "2) api-sysFuncs (系統函數 × 呼叫者 × 新舊協定, perm-run01 R-SYSFUNCS-01, 真後端)"
+          ],
+          "caught": true,
+          "sec": 17
+        }
+      ],
+      "caughtBy": [
+        "unit-sysFuncsSite",
+        "api-sysFuncs"
+      ],
+      "caught": true
+    },
+    {
+      "id": "M3",
+      "desc": "sysFuncsPublic 多列 [sys:getTableTags]",
+      "file": "server/WWebPerm.mjs",
+      "runs": [
+        {
+          "test": "unit-sysFuncsSite",
+          "exit": 2,
+          "passing": 2,
+          "failing": 2,
+          "failedTitles": [
+            "1) unit-sysFuncsSite (系統函數身分關卡之設定與前提, perm-run01)",
+            "2) unit-sysFuncsSite (系統函數身分關卡之設定與前提, perm-run01)"
+          ],
+          "caught": true,
+          "sec": 1
+        },
+        {
+          "test": "api-sysFuncs",
+          "exit": 0,
+          "passing": 21,
+          "failing": 0,
+          "failedTitles": [],
+          "caught": false,
+          "sec": 16
+        }
+      ],
+      "caughtBy": [
+        "unit-sysFuncsSite"
+      ],
+      "caught": true
+    },
+    {
+      "id": "M4",
+      "desc": "sysFuncsPublic 改為空陣列",
+      "file": "server/WWebPerm.mjs",
+      "runs": [
+        {
+          "test": "unit-sysFuncsSite",
+          "exit": 2,
+          "passing": 2,
+          "failing": 2,
+          "failedTitles": [
+            "1) unit-sysFuncsSite (系統函數身分關卡之設定與前提, perm-run01)",
+            "2) unit-sysFuncsSite (系統函數身分關卡之設定與前提, perm-run01)"
+          ],
+          "caught": true,
+          "sec": 1
+        },
+        {
+          "test": "api-sysFuncs",
+          "exit": 0,
+          "passing": 21,
+          "failing": 0,
+          "failedTitles": [],
+          "caught": false,
+          "sec": 17
+        }
+      ],
+      "caughtBy": [
+        "unit-sysFuncsSite"
+      ],
+      "caught": true
+    },
+    {
+      "id": "M5",
+      "desc": "鍵名打錯(sysFuncPublic; 框架忽略未知鍵而退回預設)",
+      "file": "server/WWebPerm.mjs",
+      "runs": [
+        {
+          "test": "unit-sysFuncsSite",
+          "exit": 1,
+          "passing": 3,
+          "failing": 1,
+          "failedTitles": [
+            "1) unit-sysFuncsSite (系統函數身分關卡之設定與前提, perm-run01)",
+            "1) SFS-001 server/WWebPerm.mjs 恰一處 sysFuncsPublic, 值恰為 ['[sys:getFuncList]'], 位於 WServHapiServer 選項物件內"
+          ],
+          "caught": true,
+          "sec": 1
+        },
+        {
+          "test": "api-sysFuncs",
+          "exit": 2,
+          "passing": 19,
+          "failing": 2,
+          "failedTitles": [
+            "1) api-sysFuncs (系統函數 × 呼叫者 × 新舊協定, perm-run01 R-SYSFUNCS-01, 真後端)",
+            "2) api-sysFuncs (系統函數 × 呼叫者 × 新舊協定, perm-run01 R-SYSFUNCS-01, 真後端)"
+          ],
+          "caught": true,
+          "sec": 16
+        }
+      ],
+      "caughtBy": [
+        "unit-sysFuncsSite",
+        "api-sysFuncs"
+      ],
+      "caught": true
+    },
+    {
+      "id": "M6",
+      "desc": "明列三者皆公開",
+      "file": "server/WWebPerm.mjs",
+      "runs": [
+        {
+          "test": "unit-sysFuncsSite",
+          "exit": 2,
+          "passing": 2,
+          "failing": 2,
+          "failedTitles": [
+            "1) unit-sysFuncsSite (系統函數身分關卡之設定與前提, perm-run01)",
+            "2) unit-sysFuncsSite (系統函數身分關卡之設定與前提, perm-run01)"
+          ],
+          "caught": true,
+          "sec": 1
+        },
+        {
+          "test": "api-sysFuncs",
+          "exit": 2,
+          "passing": 19,
+          "failing": 2,
+          "failedTitles": [
+            "1) api-sysFuncs (系統函數 × 呼叫者 × 新舊協定, perm-run01 R-SYSFUNCS-01, 真後端)",
+            "2) api-sysFuncs (系統函數 × 呼叫者 × 新舊協定, perm-run01 R-SYSFUNCS-01, 真後端)"
+          ],
+          "caught": true,
+          "sec": 17
+        }
+      ],
+      "caughtBy": [
+        "unit-sysFuncsSite",
+        "api-sysFuncs"
+      ],
+      "caught": true
+    },
+    {
+      "id": "M7",
+      "desc": "getUserIdByToken 對空 token 改回空字串(fail-open): 公開之 [sys:getFuncList] 變匿名可呼叫",
+      "file": "server/WWebPerm.mjs",
+      "runs": [
+        {
+          "test": "unit-sysFuncsSite",
+          "exit": 0,
+          "passing": 4,
+          "failing": 0,
+          "failedTitles": [],
+          "caught": false,
+          "sec": 1
+        },
+        {
+          "test": "api-sysFuncs",
+          "exit": 5,
+          "passing": 16,
+          "failing": 5,
+          "failedTitles": [
+            "1) api-sysFuncs (系統函數 × 呼叫者 × 新舊協定, perm-run01 R-SYSFUNCS-01, 真後端)",
+            "2) api-sysFuncs (系統函數 × 呼叫者 × 新舊協定, perm-run01 R-SYSFUNCS-01, 真後端)"
+          ],
+          "caught": true,
+          "sec": 17
+        }
+      ],
+      "caughtBy": [
+        "api-sysFuncs"
+      ],
+      "caught": true
+    },
+    {
+      "id": "M8",
+      "desc": "前端 useWaitToken 改 false(登入前即連線)",
+      "file": "src/main.js",
+      "runs": [
+        {
+          "test": "unit-sysFuncsSite",
+          "exit": 1,
+          "passing": 3,
+          "failing": 1,
+          "failedTitles": [
+            "1) unit-sysFuncsSite (系統函數身分關卡之設定與前提, perm-run01)",
+            "1) SFS-002 src/main.js: WServHapiClient 以 useWaitToken: true 且 getToken 取 $store.state.userToken(登入前不連線、不呼叫系統函數)"
+          ],
+          "caught": true,
+          "sec": 1
+        }
+      ],
+      "caughtBy": [
+        "unit-sysFuncsSite"
+      ],
+      "caught": true
+    },
+    {
+      "id": "M9",
+      "desc": "package.json 之 w-serv-hapi 範圍退回 ^1.1.7",
+      "file": "package.json",
+      "runs": [
+        {
+          "test": "unit-sysFuncsSite",
+          "exit": 1,
+          "passing": 3,
+          "failing": 1,
+          "failedTitles": [
+            "1) unit-sysFuncsSite (系統函數身分關卡之設定與前提, perm-run01)",
+            "1) SFS-003 相依版本: package.json 之 w-serv-hapi 下限 ≥ 1.1.8; 已安裝 w-serv-hapi ≥ 1.1.8、w-serv-webdata ≥ 1.1.16、w-serv-broadcast ≥ 1.1.12"
+          ],
+          "caught": true,
+          "sec": 1
+        }
+      ],
+      "caughtBy": [
+        "unit-sysFuncsSite"
+      ],
+      "caught": true
+    },
+    {
+      "id": "M10",
+      "desc": "另處(server/ 內)新增系統函數公開判斷之字面值",
+      "file": "server/WWebPerm.mjs",
+      "runs": [
+        {
+          "test": "unit-sysFuncsSite",
+          "exit": 1,
+          "passing": 3,
+          "failing": 1,
+          "failedTitles": [
+            "1) unit-sysFuncsSite (系統函數身分關卡之設定與前提, perm-run01)"
+          ],
+          "caught": true,
+          "sec": 1
+        }
+      ],
+      "caughtBy": [
+        "unit-sysFuncsSite"
+      ],
+      "caught": true
+    }
+  ]
+}
