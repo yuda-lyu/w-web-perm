@@ -46,7 +46,18 @@ export const TOKEN_SLOW = '{token-for-slow}'           // → id-for-slow（perm
 //應用系統 token 測試權杖(perm-run01 本輪, R-APP-TOKEN-01; 對照 dspec/w-web存取管控表.md 第二節 AU／AS)。TOKEN_APP 即系統服務用途(isApp='y'、isAdmin='y'、不在 perm users 表)。
 export const TOKEN_AS = '{token-for-app-system}'              // → id 'app:key-sys'、email 空、isApp y、isAdmin y（系統服務用途真實形狀, 不在 perm users 表）
 export const TOKEN_AS_N = '{token-for-app-system-n}'          // → 同上但 isAdmin n（不屬系統服務用途）
-export const TOKEN_NOFLAG = '{token-for-app-noflag}'          // → AS 形狀但 getUserByToken 未轉傳 isApp（視同 n; 舊版 TOKEN_APP 之語意: 不在 perm users 表、非應用系統）
+export const TOKEN_NOFLAG = '{token-for-app-noflag}'          // → AS 形狀但 getUserByToken 未轉傳 isApp（視同 n; 舊版 TOKEN_APP 之語意: 不在 perm users 表、非應用系統; perm-run02: 資料通道／後台登入拒, 應用系統路由因 isAdmin y 放行）
+export const TOKEN_NOFLAG_N = '{token-for-noflag-n}'          // → perm-run02: 不在 perm users 表、isAdmin n、未轉傳 isApp（各入口皆拒）
+export const TOKEN_SSO_ADMIN = '{token-for-sso-admin}'        // → perm-run02: 不在 perm users 表之 sso 管理員以自身使用者 token（id 'sso-admin-77'、未轉傳 isApp）
+export const TOKEN_AU_SSO = '{token-for-app-bind-sso}'        // → perm-run02: 使用者用途綁「不在 perm users 表之 sso 管理員」（同上 id＋isApp y; id 非 'app:' 開頭, 不是系統服務用途）
+export const TOKEN_FLAG_N = '{token-for-app-flag-n}'          // → perm-run02 外審 F1: 'app:key-flag-n'、isAdmin y、isApp 明確 'n'（非系統服務用途; 應用系統路由只看 isAdmin 而放行）
+export const TOKEN_FLAG_ODD = '{token-for-app-flag-odd}'      // → perm-run02 外審 F1: 'app:key-flag-odd'、isAdmin y、isApp 'Y'（非嚴格 'y'）
+export const TOKEN_APP_DENY_N = '{token-for-app-deny-n}'      // → perm-run02 外審 F1: id 'app:key-deny'（verifyAppUser 否決）、isAdmin n、不在表: 拒絕鍵次序（部署方否決先於等級不足）
+export const TOKEN_EXT_ROW = '{token-for-ext-row}'            // → perm-run02 外審 F1: 外部 id 'sso-ext-5'（對應 perm 外部列之 srcKey; 列由測試經 /syncAndReplaceTabs 建立）
+export const TOKEN_AS_EMAIL = '{token-for-app-email}'         // → perm-run02 外審 F1: 'app:key-email'、email 非空、isApp y、isAdmin y（嚴格系統服務形狀; 人造帶 email, 供停用列案例）
+export const TOKEN_AS_EMAIL_ALT = '{token-for-app-email-alt}' // → perm-run02 增量外審 G4: 嚴格系統服務形狀（app:key-email-alt）, email／name 同 perm 某停用列而主鍵不同（僅 mappingBy=email／name 以對應鍵命中）
+export const TOKEN_AS_GHOST = '{token-for-app-ghost}'       // → perm-run02 外審 F3: 系統服務用途 'app:key-ghost'（登錄近期系統服務用途 id）
+export const TOKEN_GHOST_USER = '{token-for-ghost-user}'      // → perm-run02 外審 F3: 一般 sso 管理員（email ghost@example.com）, 經 perm 列（主鍵 'app:key-ghost', mappingBy=email）通過驗證; srv.mjs 之 verifyClientUser 對該列等待約 2 秒
 export const TOKEN_AU_ADMIN = '{token-for-app-bind-admin}'    // → 使用者用途綁管理員（base seed admin 之實際資料 + isApp y）
 export const TOKEN_AU_MEMBER = '{token-for-app-bind-member}'  // → 使用者用途綁一般使用者（base seed peter 之實際資料 + isApp y）
 export const TOKEN_AU_DISABLED = '{token-for-app-bind-disabled}' // → 使用者用途綁定之使用者在 perm users 表但停用（列由測試自建; 上游 isAdmin y）

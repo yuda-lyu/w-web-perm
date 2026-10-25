@@ -1,0 +1,22 @@
+[quiet-run] exit=0 time=4m51s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261024-220306-perm-run02-api-final.log (29 行, 3 KB)
+[quiet-run] cmd: npx mocha --no-parallel test/api-*.test.mjs --timeout 180000 --reporter dot
+[quiet-run] lock: 取得並已釋放(等待 0s)
+== 統計 ==
+  486 passing (5m)
+== 最後 15 行(非空,不含上列失敗段落) ==
+  ........................................................
+  ...................................................[api-identity AI-5a] 六輪中存檔先持鎖而成功 3 輪, 被引用實體先被替換而存檔被拒 3 輪
+.[api-identity AI-5b] 六輪中存檔先持鎖而成功 3 輪, 被引用實體先被替換而存檔被拒 3 輪
+.[api-identity AI-5c] 六輪中存檔先持鎖而成功 3 輪, 被引用實體先被替換而存檔被拒 3 輪
+.[api-identity AI-5d] 六輪中存檔先持鎖而成功 3 輪, 被引用實體先被替換而存檔被拒 3 輪
+.[api-identity AI-5e] 六輪中存檔先持鎖而成功 3 輪, 被引用實體先被替換而存檔被拒 3 輪
+.
+  ..............警告: seedDb 無法刪除 ./db（仍有行程持有 lmdb 映射）: EPERM, Permission denied: 'C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\db'；本次改在既有 DB 上 upsert（僅限 api after-hook 還原, 不得用於產製標準圖）
+..........................................
+  ......seed-extra: C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\test\_tmp\api-refCascade\seed-extra.json
+........seed-extra: C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\test\_tmp\api-refCascade\seed-extra.json
+.警告: seedDb 無法刪除 ./db（仍有行程持有 lmdb 映射）: EPERM, Permission denied: 'C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\db'；本次改在既有 DB 上 upsert（僅限 api after-hook 還原, 不得用於產製標準圖）
+.........................................
+  ......................................警告: seedDb 無法刪除 ./db（仍有行程持有 lmdb 映射）: EPERM, Permission denied: 'C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\db'；本次改在既有 DB 上 upsert（僅限 api after-hook 還原, 不得用於產製標準圖）
+  486 passing (5m)
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)

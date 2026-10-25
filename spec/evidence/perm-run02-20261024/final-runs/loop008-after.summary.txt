@@ -1,0 +1,20 @@
+[quiet-run] exit=0 time=2m51s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261024-222655-perm-run02-loop008-after.log (16 行, 1 KB)
+[quiet-run] cmd: node tmp/perm-run02/loop008.mjs 15 after
+[quiet-run] lock: 取得並已釋放(等待 0s)
+== 最後 15 行(非空,不含上列失敗段落) ==
+[loop008:after] 2/15 exit=0 passing=2 failing=0 
+[loop008:after] 3/15 exit=0 passing=2 failing=0 
+[loop008:after] 4/15 exit=0 passing=2 failing=0 
+[loop008:after] 5/15 exit=0 passing=2 failing=0 
+[loop008:after] 6/15 exit=0 passing=2 failing=0 
+[loop008:after] 7/15 exit=0 passing=2 failing=0 
+[loop008:after] 8/15 exit=0 passing=2 failing=0 
+[loop008:after] 9/15 exit=0 passing=2 failing=0 
+[loop008:after] 10/15 exit=0 passing=2 failing=0 
+[loop008:after] 11/15 exit=0 passing=2 failing=0 
+[loop008:after] 12/15 exit=0 passing=2 failing=0 
+[loop008:after] 13/15 exit=0 passing=2 failing=0 
+[loop008:after] 14/15 exit=0 passing=2 failing=0 
+[loop008:after] 15/15 exit=0 passing=2 failing=0 
+[loop008:after] 結果: 15 次全過, 0 次含失敗(共 15 次, 每次 2 案〔eng、cht〕)
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)

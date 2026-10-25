@@ -1,23 +1,25 @@
 //應用系統 token 之配合與連線閘/路由修補之判準與站點不變式(perm-run01 本輪; 規則帳本 R-APP-TOKEN-01、R-BEARER-01、R-ROUTE-MSG-01; dspec/w-web存取管控表.md 第二節 P-1、P-2、P-3、P-5)
 //
-//受測: server/adminCheck.mjs(isSystemAppUser)、server/keyCheck.mjs(countLoginRows)、server/WWebPerm.mjs(getExtUser／countPermRows／verifySystemApp／getAndVerifyAdminUser／getAndVerifyAppUser／requireAdmin／verifyConn／syncAndReplaceTabs 路由／四路由 routeResult).
-//述語:
-//  AT-001  isSystemAppUser(外部反查結果): 僅「非空字串 id、isApp==='y'、isAdmin==='y'(自有屬性、嚴格相等)」為 true; 其餘一律 false(輸入空間見該案);
+//受測: server/adminCheck.mjs(isSystemAppUser、isExtAdminUser)、server/keyCheck.mjs(countLoginRows)、server/WWebPerm.mjs(getExtUser／countPermRows／verifySystemApp／getAndVerifyAdminUser／getAndVerifyAppUser／requireAdmin／verifyConn／syncAndReplaceTabs 路由／四路由 routeResult).
+//述語(perm-run02 起 AT-001 加 app: 前綴、新增 AT-003、AT-S2／S8 改寫、新增 AT-S9):
+//  AT-001  isSystemAppUser(外部反查結果; 後台登入檢查、資料通道、requireAdmin 之「系統服務用途」嚴格認定的形狀部分): 僅「id 為以 'app:' 開頭之字串、isApp==='y'、isAdmin==='y'(自有屬性、嚴格相等)」為 true; 其餘一律 false(輸入空間見該案);
 //  AT-002  countLoginRows: 不論 isActive 計列數(停用之列也算在表中); 'id' 模式後台列對 id、外部列對 srcKey; 'email'／'name' 以該欄位; 對應值非空字串回 0;
+//  AT-003  isExtAdminUser(外部反查結果; 應用系統路由對「不在表」者之相容認定): 只看自有屬性 isAdmin==='y'(嚴格相等), 不要求 isApp、不要求 id 形狀;
 //  AT-S1   P-2: getAndVerifyAdminUser 只在「isSystemAppUser 且 countPermRows 為 0」時走系統服務用途(verifySystemApp), 其餘一律轉呼 getAndVerifyClientUser(adminOnly) 並共用同一次外部反查結果(userExt);
-//  AT-S2   P-1: getAndVerifyAppUser 在 perm 表者以 perm 列(isAdminRow)為準、不在表者以 isSystemAppUser 為準; 先 verifyAppUser(userNoPermission)後等級(userNotAdmin); 部署方只收淺層副本, 回傳為交給部署方之前取得者;
+//  AT-S2   P-1: getAndVerifyAppUser 在 perm 表者以 perm 列(isAdminRow)為準、不在表者以 isExtAdminUser 為準(perm-run02①: 不再用 isSystemAppUser); 先 verifyAppUser(userNoPermission)後等級(userNotAdmin); 部署方只收淺層副本, 回傳為交給部署方之前取得者;
 //  AT-S3   P-3: verifyConn 以 reBearerAuth 取 token(不得以固定長度截斷);
 //  AT-S4   P-5: /syncAndReplaceTabs 先 getAndVerifyAppUser 後讀 keyTable;
 //  AT-S5   requireAdmin: 在 perm 表者(不論 isActive)以該列為準; 不在表者須為 getUserIdByToken 登錄之系統服務用途 id; getUserIdByToken 只對 verifySystemApp 產生之物件登錄;
 //  AT-S6   R-ROUTE-MSG-01: 四條 hapi 路由皆經 routeResult, 不得再有 `r.msg = r.msg.message`;
 //  AT-S7   srv.mjs(範例部署): 轉傳 isApp, verifyClientUser／verifyAppUser 不以 isAdmin 判斷(P-7);
-//  AT-S8   系統服務用途之判準(isApp／isAdmin 比對)只在 adminCheck.mjs。
+//  AT-S8   系統服務用途之判準(isApp／isAdmin 比對)只在 adminCheck.mjs;
+//  AT-S9   系統服務用途之 id 前綴('app:')只在 adminCheck.mjs 定義與比對(perm-run02②單一擁有者)。
 //跑法: npx mocha test/unit-appToken.test.mjs --reporter list --timeout 30000
 import assert from 'assert'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { isSystemAppUser } from '../server/adminCheck.mjs'
+import { isSystemAppUser, isExtAdminUser } from '../server/adminCheck.mjs'
 import { countLoginRows } from '../server/keyCheck.mjs'
 import { stripLineComment, sourceLines } from './tools/srcScan.mjs'
 
@@ -39,14 +41,14 @@ let count = (s, re) => (s.match(re) || []).length
 describe('unit-appToken (應用系統 token 之判準與站點不變式, perm-run01 R-APP-TOKEN-01)', function() {
 
     describe('isSystemAppUser(AT-001)', function() {
-        it('AT-001a 系統服務用途之形狀 → true(email／name 可空或缺)', function() {
+        it('AT-001a 系統服務用途之形狀 → true(email／name 可空或缺; id 以 app: 開頭)', function() {
             A.equal(isSystemAppUser({ id: 'app:k1', name: 'k1', email: '', isAdmin: 'y', isApp: 'y' }), true)
             A.equal(isSystemAppUser({ id: 'app:k1', isAdmin: 'y', isApp: 'y' }), true)
-            A.equal(isSystemAppUser({ id: 'x', name: 'n', email: 'e@x.com', isAdmin: 'y', isApp: 'y', extra: 1 }), true)
+            A.equal(isSystemAppUser({ id: 'app:k1', name: 'n', email: 'e@x.com', isAdmin: 'y', isApp: 'y', extra: 1 }), true)
         })
 
-        it('AT-001b 輸入空間 id × isApp × isAdmin: 僅 (非空字串, y, y) 為 true', function() {
-            let ids = ['app:k', 'x', '', ' ', 0, 1, null, undefined, true, {}, [], ['a']]
+        it("AT-001b 輸入空間 id × isApp × isAdmin: 僅 (以 'app:' 開頭之字串, y, y) 為 true  [perm-run02②: 使用者用途綁不在表之 sso 管理員〔id 非 app: 開頭〕不是系統服務用途]", function() {
+            let ids = ['app:k', 'app:', 'x', '', ' ', 'sso-admin-77', 'App:k', 'APP:k', ' app:k', 'xapp:k', 'app', 'app-k', 'app：k', 'app.k', 0, 1, null, undefined, true, {}, [], ['a']]
             let vals = ['y', 'n', 'Y', ' y', 'y ', 'yes', '', true, false, 1, 0, null, undefined]
             let nTrue = 0
             let nAll = 0
@@ -55,7 +57,7 @@ describe('unit-appToken (應用系統 token 之判準與站點不變式, perm-ru
                     for (let isAdmin of vals) {
                         nAll++
                         let r = isSystemAppUser({ id, isApp, isAdmin })
-                        let expect = (typeof id === 'string' && id !== '' && isApp === 'y' && isAdmin === 'y')
+                        let expect = (typeof id === 'string' && id.startsWith('app:') && isApp === 'y' && isAdmin === 'y')
                         A.equal(r, expect, `id=${JSON.stringify(id)} isApp=${JSON.stringify(isApp)} isAdmin=${JSON.stringify(isAdmin)}`)
                         if (r) {
                             nTrue++
@@ -63,24 +65,83 @@ describe('unit-appToken (應用系統 token 之判準與站點不變式, perm-ru
                     }
                 }
             }
-            A.equal(nAll, 12 * 13 * 13)
-            A.equal(nTrue, 3, "12×13×13=2028 格中 isApp、isAdmin 皆為 'y' 且 id 為非空字串者(app:k、x、單一空白)三格為 true")
+            A.equal(nAll, 22 * 13 * 13)
+            A.equal(nTrue, 2, "22×13×13=3718 格中 isApp、isAdmin 皆為 'y' 且 id 以 'app:' 開頭者(app:k、app:)兩格為 true; 'App:k'／' app:k'／'app：k' 等近似形一律 false")
         })
 
         it('AT-001c 缺欄／非物件／陣列／繼承屬性 → false(只認自有屬性)', function() {
-            A.equal(isSystemAppUser({ id: 'a', isAdmin: 'y' }), false, '缺 isApp(未轉傳 = 視同 n)')
-            A.equal(isSystemAppUser({ id: 'a', isApp: 'y' }), false, '缺 isAdmin')
+            A.equal(isSystemAppUser({ id: 'app:a', isAdmin: 'y' }), false, '缺 isApp(未轉傳 = 視同 n)')
+            A.equal(isSystemAppUser({ id: 'app:a', isApp: 'y' }), false, '缺 isAdmin')
             A.equal(isSystemAppUser({ isApp: 'y', isAdmin: 'y' }), false, '缺 id')
             for (let v of [null, undefined, 'y', 1, true, [], ['a'], () => true]) {
                 A.equal(isSystemAppUser(v), false, `${typeof v}`)
             }
-            let inherited = Object.create({ id: 'a', isApp: 'y', isAdmin: 'y' })
+            let inherited = Object.create({ id: 'app:a', isApp: 'y', isAdmin: 'y' })
             A.equal(isSystemAppUser(inherited), false, '繼承屬性不算')
             let arr = ['y']
-            arr.id = 'a'
+            arr.id = 'app:a'
             arr.isApp = 'y'
             arr.isAdmin = 'y'
             A.equal(isSystemAppUser(arr), false, '陣列不算')
+        })
+    })
+
+
+    describe('isExtAdminUser(AT-003; perm-run02①)', function() {
+        it("AT-003a 只看自有屬性 isAdmin==='y'(嚴格相等); 不要求 isApp、不要求 id 形狀", function() {
+            A.equal(isExtAdminUser({ isAdmin: 'y' }), true, '舊版 sso 之應用系統身分: 只有 isAdmin y')
+            A.equal(isExtAdminUser({ id: 'x', isAdmin: 'y' }), true)
+            A.equal(isExtAdminUser({ id: 'app:k', isAdmin: 'y', isApp: 'y' }), true)
+            A.equal(isExtAdminUser({ id: 'app:k', isAdmin: 'y', isApp: 'n' }), true, 'isApp n 亦同(相容; 不在表者只看 isAdmin)')
+            A.equal(isExtAdminUser({ id: 5, isAdmin: 'y' }), true, 'id 形狀由路由另檢(syncAndReplaceTabs 要求非空字串 id), 等級判準不看')
+        })
+
+        it('AT-003b 輸入空間 isAdmin × isApp × id: 僅 isAdmin 為 y 者為 true', function() {
+            let vals = ['y', 'n', 'Y', ' y', 'y ', 'yes', '', true, false, 1, 0, null, undefined]
+            let ids = ['app:k', 'x', '', 0, null, undefined, {}]
+            let nTrue = 0
+            let nAll = 0
+            for (let id of ids) {
+                for (let isApp of vals) {
+                    for (let isAdmin of vals) {
+                        nAll++
+                        let r = isExtAdminUser({ id, isApp, isAdmin })
+                        A.equal(r, isAdmin === 'y', `id=${JSON.stringify(id)} isApp=${JSON.stringify(isApp)} isAdmin=${JSON.stringify(isAdmin)}`)
+                        if (r) {
+                            nTrue++
+                        }
+                    }
+                }
+            }
+            A.equal(nAll, 7 * 13 * 13)
+            A.equal(nTrue, 7 * 13, '7×13×13=1183 格中 isAdmin 為 y 者 7×13=91 格為 true')
+        })
+
+        it('AT-003c 缺欄／非物件／陣列／繼承屬性 → false', function() {
+            A.equal(isExtAdminUser({ id: 'a' }), false, '缺 isAdmin')
+            A.equal(isExtAdminUser({}), false)
+            for (let v of [null, undefined, 'y', 1, true, [], ['a'], () => true]) {
+                A.equal(isExtAdminUser(v), false, `${typeof v}`)
+            }
+            A.equal(isExtAdminUser(Object.create({ isAdmin: 'y' })), false, '繼承屬性不算')
+            let arr = ['y']
+            arr.isAdmin = 'y'
+            A.equal(isExtAdminUser(arr), false, '陣列不算')
+        })
+
+        it('AT-003d 與 isSystemAppUser 之關係: 系統服務用途形狀必為 isExtAdminUser 為真之子集(嚴格認定只會比相容認定更窄)', function() {
+            let ids = ['app:k', 'x', '', null]
+            let vals = ['y', 'n', '', null, undefined]
+            for (let id of ids) {
+                for (let isApp of vals) {
+                    for (let isAdmin of vals) {
+                        let u = { id, isApp, isAdmin }
+                        if (isSystemAppUser(u)) {
+                            A.equal(isExtAdminUser(u), true, JSON.stringify(u))
+                        }
+                    }
+                }
+            }
         })
     })
 
@@ -161,12 +222,14 @@ describe('unit-appToken (應用系統 token 之判準與站點不變式, perm-ru
             A.ok(vs.includes('kpSystemAppUser.add(userUse)'), '通過後登錄(供 getUserIdByToken 辨識)')
         })
 
-        it('AT-S2 P-1: getAndVerifyAppUser 在表者以 perm 列、不在表者以 isSystemAppUser; 先部署方後等級; 回傳為交給部署方之前取得者', function() {
+        it('AT-S2 P-1: getAndVerifyAppUser 在表者以 perm 列、不在表者以 isExtAdminUser(相容: 只看 isAdmin y, 不要求 isApp 與 app: 前綴); 先部署方後等級; 回傳為交給部署方之前取得者', function() {
             let body = takeBody(code, /let getAndVerifyAppUser = async/)
             A.ok(body.includes("getExtUser(token, 'getAndVerifyAppUser-error')"))
             A.ok(/\(await countPermRows\(user\)\) > 0/.test(body), '須先判斷是否在 perm 表')
             A.ok(body.includes('getTokenUser(token, user)') && body.includes('isAdminRow(userPerm)'), '在表者以 getTokenUser 驗證後之 perm 列判定 isAdminRow')
-            A.ok(body.includes('isSystemAppUser(user)'), '不在表者以 isSystemAppUser 判定')
+            A.ok(body.includes('isExtAdminUser(user)'), '不在表者以 isExtAdminUser 判定(perm-run02①)')
+            A.ok(!body.includes('isSystemAppUser'), '應用系統路由不得再用 isSystemAppUser(系統服務用途之嚴格認定只用於後台登入檢查、資料通道、requireAdmin)')
+            A.ok(!/\bisApp\b/.test(body), '應用系統路由之等級判定不得出現 isApp')
             let iUse = body.indexOf('let userUse = (userPerm !== null) ? { ...user, id: userPerm.id } : { ...user }') //在表者以 perm 列主鍵為執行身分(稽核欄), 不在表者為外部 id
             let iVerify = body.indexOf('verifyAppUser({ ...user }, from)')
             let iLevel = body.indexOf('if (!isLevel)')
@@ -207,6 +270,8 @@ describe('unit-appToken (應用系統 token 之判準與站點不變式, perm-ru
             let g = takeBody(code, /getUserIdByToken: async \(token\) => \{/, /\n        \},\n/)
             A.ok(g.includes('kpSystemAppUser.has(user)') && g.includes('markSystemAppId(userId)'), 'getUserIdByToken 只對 verifySystemApp 產生之物件登錄')
             A.equal(count(code, /markSystemAppId\(/g), 1, '登錄呼叫點只有 getUserIdByToken 一處')
+            A.ok(g.includes('clearSystemAppId(userId)'), '以 perm 列通過者須清除該 id 之近期登錄(perm-run02 外審 sol F3; 行為見 api-callerMatrix MX-M6)')
+            A.equal(count(code, /clearSystemAppId\(/g), 1, '清除呼叫點只有 getUserIdByToken 一處')
             A.equal(count(code, /kpSystemAppIds\.set\(/g), 1, 'kpSystemAppIds 之寫入點只有 markSystemAppId 一處')
             A.ok(code.includes('let SYSTEM_APP_TTL_MS = 60000') && /Date\.now\(\) - t <= SYSTEM_APP_TTL_MS/.test(code), '登錄須有 TTL(外審 sol F06: 不得永久登錄)')
             A.equal(count(code, /kpSystemAppUser\.add\(/g), 1, 'kpSystemAppUser 登錄點只有 verifySystemApp 一處')
@@ -256,6 +321,34 @@ describe('unit-appToken (應用系統 token 之判準與站點不變式, perm-ru
             //允許: adminCheck.mjs(判準本身); WWebPerm.mjs verifySystemApp 回傳固定值 isApp: 'y'(非比對)
             let bad = hits.filter((h) => !/^server\/adminCheck\.mjs:/.test(h) && !/^server\/WWebPerm\.mjs:\d+: isApp: 'y',$/.test(h))
             A.deepEqual(bad, [], `isApp 之比對須只在 adminCheck.mjs:\n${bad.join('\n')}`)
+        })
+
+        it("AT-S9 系統服務用途之 id 前綴('app:')只在 adminCheck.mjs 定義與比對; server/ 其餘檔案之程式碼(排除註解)不得出現 'app:' 字面或 startsWith 比對", function() {
+            let dir = path.join(projRoot, 'server')
+            let hits = []
+            let walk = (d) => {
+                for (let f of fs.readdirSync(d, { withFileTypes: true })) {
+                    if (f.isDirectory()) {
+                        if (f.name !== 'staLogs') {
+                            walk(path.join(d, f.name))
+                        }
+                    }
+                    else if (f.name.endsWith('.mjs')) {
+                        let fp = path.join(d, f.name)
+                        let rel = path.relative(projRoot, fp).split(path.sep).join('/')
+                        sourceLines(fp, 'code').forEach(({ no, text }) => {
+                            if (/['"`]app:/.test(text) || /startsWith\(\s*['"`]app/.test(text)) {
+                                hits.push(`${rel}:${no}: ${text.trim()}`)
+                            }
+                        })
+                    }
+                }
+            }
+            walk(dir)
+            let bad = hits.filter((h) => !/^server\/adminCheck\.mjs:/.test(h))
+            A.deepEqual(bad, [], `app: 前綴之比對須只在 adminCheck.mjs:\n${bad.join('\n')}`)
+            let ac = fs.readFileSync(path.join(projRoot, 'server/adminCheck.mjs'), 'utf8')
+            A.ok(/SYSTEM_APP_ID_PREFIX = 'app:'/.test(ac) && /startsWith\(SYSTEM_APP_ID_PREFIX\)/.test(ac), "adminCheck.mjs 須以常數 SYSTEM_APP_ID_PREFIX = 'app:' 與 startsWith 比對")
         })
     })
 })

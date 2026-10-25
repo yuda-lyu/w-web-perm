@@ -1,0 +1,22 @@
+[quiet-run] exit=0 time=5m38s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261024-223207-perm-run02-unit-post.log (695 行, 50 KB)
+[quiet-run] cmd: npx mocha --no-parallel test/unit-*.test.mjs --timeout 180000 --reporter dot
+== 統計 ==
+  4297 passing (6m)
+  1 pending
+== 最後 15 行(非空,不含上列失敗段落) ==
+  .........targets.insert id changed by clearXSS [ { k: 0, id: 'a<b' } ]
+targets.insert id changed by clearXSS [ { k: 0, id: 'g<b' } ]
+targets.insert id changed by clearXSS [ { k: 0, id: 'T1<x' } ]
+targets.insert id changed by clearXSS [ { k: 0, id: '<script>x' } ]
+targets.insert id changed by clearXSS [ { k: 0, id: '<img src=x onerror=alert(1)>' } ]
+targets.insert id changed by clearXSS [ { k: 0, id: '<!-- c -->' } ]
+targets.insert id changed by clearXSS [ { k: 0, id: '<?php' } ]
+targets.insert id changed by clearXSS [ { k: 0, id: 'a<' } ]
+targets.insert id changed by clearXSS [ { k: 0, id: '<' } ]
+targets.insert id changed by clearXSS [ { k: 0, id: 'x</y' } ]
+targets.insert id changed by clearXSS [ { k: 0, id: '<B>大寫</B>' } ]
+targets.insert id changed by clearXSS [ { k: 0, id: '<a href="javascript:x">y</a>' } ]
+.................................
+  4297 passing (6m)
+  1 pending
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)

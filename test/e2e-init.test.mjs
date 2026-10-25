@@ -507,9 +507,25 @@ else {
                     const browser = await launchBrowser()
                     try {
                         const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage()
-                        const respP = page.waitForResponse((r) => r.url().includes('getUserByToken'), { timeout: 60000 })
+                        //回應本體須在頁面轉址之前讀取(perm-run02 修正測試競態): 非開發環境之登入失敗立即轉址, 轉址後 Playwright 取不到先前回應之本體
+                        //  (`response.json: Protocol error (Network.getResponseBody): No resource with given identifier found`, 修前單案重跑失敗率約 83%);
+                        //  故於 route 內先讀本體再原樣放行(請求與回應皆不改), 之後的斷言(state、msg、轉址)與修前相同, 不放寬。
+                        let resolveBody = null
+                        let rejectBody = null
+                        const bodyP = new Promise((resolve, reject) => {
+                            resolveBody = resolve
+                            rejectBody = reject
+                        })
+                        const bodyTimer = setTimeout(() => rejectBody(new Error('getUserByToken 回應逾時(60 秒)')), 60000)
+                        await page.route('**/api/getUserByToken*', async(route) => {
+                            const resp = await route.fetch()
+                            const text = await resp.text()
+                            resolveBody(JSON.parse(text))
+                            await route.fulfill({ response: resp, body: text })
+                        })
                         await page.goto(`${apiBaseUrl}/?token=${encodeURIComponent(TOKEN_DENY)}`, { waitUntil: 'domcontentloaded', timeout: 60000 })
-                        const body = await (await respP).json()
+                        const body = await bodyP
+                        clearTimeout(bodyTimer)
                         assert.strictEqual(body.state, 'error', `getUserByToken 應拒絕, 實得 ${JSON.stringify(body)}`)
                         assert.strictEqual(body.msg, 'userNoPermission', `部署方否決應回固定語系鍵 userNoPermission, 實得 ${JSON.stringify(body.msg)}`)
                         await page.waitForURL((u) => u.href.includes('__e2e-redirect-008__'), { timeout: 30000 }) //非開發環境之登入失敗立即轉址

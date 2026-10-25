@@ -4,6 +4,16 @@
 
 - **2026-10-22 抽出歷史經驗**:2026-10-20 以前之各節(e2e 側欄位移、統計頁、升版、授權存檔不變等)移至 `experience_20261022.md`(標題與內容不變);查久遠經驗時再調閱.
 
+## 應用系統路由相容認定與系統服務用途 `app:` 前綴(2026-10-24 第四輪 perm-run02〔任務 20261024182735〕; 帳本 R-APP-TOKEN-01 補述規則 7～8; ADR-040 Update; 報告 `C:\opensrcOper\dnow\20261024182735\agent-out\perm-run02-修正報告.md`)
+- **同一個『是不是管理員』問題有兩個相容面, 不要只做一個函數**: 升版相容面(應用系統路由, 舊 sso 之應用系統身分即 `isAdmin='y'`)要寬, 新能力面(系統服務用途, perm-run01 才新增)要嚴; 做成兩個各自單一擁有者的函數(`isExtAdminUser`／`isSystemAppUser`)並用站點守護(AT-S2／S8／S9)禁止第三處自行比對, 比讓一個函數帶旗標分流好。判準改動前先問『這個入口在已發布版本是拒絕還是放行』——拒絕者可以放心收緊, 放行者收緊就是破壞性變更。
+- **矩陣的『等級』不是單一布林**: perm-run01 的 `lvl` 一個旗標對全部入口; 兩套判準後必須拆成 `svc`／`app` 兩欄, 每個斷言點明用哪一欄, 否則『改了判準、測試用錯欄』會靜默通過。拆欄後先讓測試對未修碼紅(30 敗)再改碼。
+- **單元測試對『前綴』類判準要窮舉近似形**: `App:`、`APP:`、前導空白、`xapp:`、`app`、`app-k`、全形冒號、非字串(22 個 id × 13 × 13 格); 變異 MB2～MB5(不分大小寫、`includes`、`trim`、無冒號)只有這一層抓得到, API 層權杖不可能涵蓋。
+- **確定性競態測試的作法**: 外審 sol F3 的競態(跨請求共用的登錄被『經 perm 列通過驗證、其後該列被刪』之請求沿用)靠 `srv.mjs` 的部署方驗證函數對特定 id 等待 2 秒, 測試於等待中刪列, 窗口固定、不靠重試; 同一測試順帶抓到『`requireAdmin` 查無列時提前放行』這類字串守護(AT-S5)抓不到的變異。凡縱深防禦層在 API 層『不可達』, 先想能否用部署方鉤子的等待把窗口撐開。
+- **外審副本中性化**: 副本含大量『注入／利用』(中文慣用語)字樣, 以 `tmp/perm-run02/neutralize.mjs` 對副本做詞替換(不動識別字)後 sol 兩輪(19 分、約 20 分)皆正常完成; 副本只留審查相關檔(server、相關 test、README、4 份 spec、rulebook_security), 去掉 37MB 標準圖。
+- **完整檔偶然通過的 e2e 案例要單案重跑量失敗率**: `e2e-init` E2E-008 於 run01 與本輪第一次全檔跑皆通過, 凍結碼最終輪卻 1 案失敗; 單案(`--grep E2E-008`)未改碼重跑 15 次(30 案)失敗 24 案(80%), 錯誤全同(`response.json: Protocol error (Network.getResponseBody): No resource with given identifier found`)——頁面在非開發環境登入失敗立即轉址, Playwright 於轉址後取不到先前回應的本體。凡『`waitForResponse` 後才 `.json()`』且該回應會觸發轉址的案例, 改在 `page.route` 內 `route.fetch()` 先讀本體再 `route.fulfill({ response, body })` 原樣放行(斷言不變); 修後 15 次 30 案 0 失敗。量測腳本 `spec/evidence/perm-run02-20261024/e2e008-flake/loop008.mjs`。E2E-006／007 同寫法但頁面不轉址, 未動。
+- **變異腳本錨點要驗證恰命中 1 次**: MD5 初版錨點 `if (!b) {\n console.log('user', user)` 命中 2 次(getAndVerifyAppUser 與 getAndVerifyClientUser 同形), 腳本因此報 ERROR 而非靜默套錯; 錨點要含該函數獨有的 srLog 事件名。
+- **`quiet-run --lock` 內不能再用 `>` 重導到檔** (守門 hook 會擋 `echo/cat/printf >`); 要長輸出就讓 quiet-run 自己寫 `tmp/quiet-run/`, 事後 `cp` 摘要入證據目錄; 等待背景結果用前景 `until [ -f x ]; do sleep 5; done`(`timeout` ≤ 570000)而非連續 Monitor。
+
 ## 應用系統 token 之配合、應用系統路由管理員等級、Bearer、路由失敗不回原文(2026-10-24 第三輪 perm-run01〔任務 20261024182735〕; 帳本 R-APP-TOKEN-01／R-BEARER-01／R-ROUTE-MSG-01; ADR-040; 報告 `C:\opensrcOper\dnow\20261024182735\agent-out\perm-run01-修正報告.md`)
 - **「不在 perm 表」不能用登入反查的結果判斷**: `keyCheck.findLoginUsers` 對「恰 1 筆但停用」回 `{ user:null, count:0 }`(登入視同查無, perm-run05); 若拿 `count===0` 當「不在表」, 使用者用途之應用系統 token 綁定的使用者在 perm 被停用時, 會落入系統服務用途而取得管理員服務(上游 `isApp='y'`＋`isAdmin='y'` 形狀與系統服務用途完全相同). 另立 `countLoginRows`(同對應規則、不篩 isActive)當「是否在表」之單一判準; 凡「查無」語意被拿來做授權放行的判斷, 先問『停用／刪除／重複』三種狀態各算查無還是在表.
 - **兩種用途靠『是否在 perm 表』區分, 不靠欄位**: 使用者用途(AU)與系統服務用途(AS)在 sso 反查形狀上只差 id 與 email/name 是否為真實使用者; perm 無從直接分辨, 以『在表者一律以 perm 列為準』收斂, 代價是『綁定了不在 perm 表之 sso 管理員』的 AU 會被當成 AS(ADR-040 待裁示 ③; 可選收緊 `id` 以 `app:` 開頭).

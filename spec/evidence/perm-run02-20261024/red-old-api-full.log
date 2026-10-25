@@ -1,0 +1,603 @@
+
+
+  api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+[e2e-setup] starting backend (port 11006)...
+[e2e-setup] backend ready
+    H 靜態檔與 hapi 路由(5 入口 × 15 呼叫者)
+      ✔ MX-H1 靜態檔 /{file*}: 所有呼叫者(含無 token)皆可取得  [靜態檔公開, 表第二節] (73ms)
+      1) MX-H2 GET /api/getUserByToken(後台登入檢查): 後端管理員服務等級(A／AUA／AS)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料(含 id 非 app: 開頭之 APP／AUX)  [P-2: AS 放行; perm-run02②: AS 須 app: 前綴]
+      ✔ MX-H3 GET /api/getPerm(查本人權限樹): U／A／AUA／AUM 得本人之樹; N、AS、NF、ASN、AUD 拒(AS 無「本人」)  [表第二節; AU＝所綁使用者]
+      2) MX-H4 GET /api/getPermUserInfor(查他人權限樹): 在表者以 perm 列(A／AUA 通過)、不在表者只看反查 isAdmin y(AS／NF／NFV／APP／AUX 通過, 不要求 isApp 與 app: 前綴); 其餘拒  [P-1 + perm-run02①: 相容]
+      3) MX-H5 POST /syncAndReplaceTabs(整表覆寫): 通過應用系統路由等級者寫入(稽核欄 userId 在表者記 perm 列主鍵、不在表者記外部 id); 其餘拒且零寫入  [P-1; P-2 稽核欄記 app:…; perm-run02①相容]
+    C 通訊路由(ulctr／slc／dwgfn／dwgf／dw × 15 呼叫者): 同一連線閘, 後端管理員服務等級過閘, 其餘 permission denied
+      4) MX-C /api/ulctr(upload-controller): 非後端管理員服務等級之回應 ≡ 無效 token 之回應(permission denied); A／AUA／AS 已過閘; id 非 app: 開頭之 APP／AUX 與相容軸皆被擋
+      5) MX-C /api/slc(upload-slice): 非後端管理員服務等級之回應 ≡ 無效 token 之回應(permission denied); A／AUA／AS 已過閘; id 非 app: 開頭之 APP／AUX 與相容軸皆被擋
+      6) MX-C /api/dwgfn(download-get-filename): 非後端管理員服務等級之回應 ≡ 無效 token 之回應(permission denied); A／AUA／AS 已過閘; id 非 app: 開頭之 APP／AUX 與相容軸皆被擋
+      7) MX-C /api/dwgf(download-get-file): 非後端管理員服務等級之回應 ≡ 無效 token 之回應(permission denied); A／AUA／AS 已過閘; id 非 app: 開頭之 APP／AUX 與相容軸皆被擋
+      8) MX-C /api/dw(download): 非後端管理員服務等級之回應 ≡ 無效 token 之回應(permission denied); A／AUA／AS 已過閘; id 非 app: 開頭之 APP／AUX 與相容軸皆被擋
+    D 資料通道(/api/main)14 個函數 × 15 呼叫者 × 標頭／本體兩個身分來源
+      9) MX-D getWebInfor: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]
+      10) MX-D getStaEventTable: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]
+      11) MX-D getStaEvent: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]
+      12) MX-D users.select: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]
+      13) MX-D grups.select: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]
+      14) MX-D pemis.select: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]
+      15) MX-D targets.select: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]
+      16) MX-D [sys:getFuncList]: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]
+      17) MX-D [sys:getTableTags]: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]
+      18) MX-D [sys:polling]: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]
+      19) MX-D updateUsers: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]
+      20) MX-D updateGrups: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]
+      21) MX-D updatePemis: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]
+      22) MX-D updateTargets: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]
+    P 使用者用途跟隨所綁使用者; 部署方否決; 檢查之值即使用之值
+      ✔ MX-P1 AU 綁管理員: 該管理員被降為一般使用者 → AU 同步失去管理員服務(資料通道、後台登入、應用路由皆拒); 升回後恢復  [AU＝同綁定者, perm 列為權威]
+      ✔ MX-P2 AU 綁停用之使用者: 不因「停用視同查無」落入系統服務用途; 該使用者啟用且為管理員後可用, 停用後又拒  [AU 在表者以 perm 列為準]
+      ✔ MX-P3 AS 被部署方 verifyAppUser 因非角色因素否決: 後台登入、應用路由、資料通道(標頭 permission denied／本體 userNoPermission)皆拒且零寫入  [部署方可再收緊]
+      ✔ MX-P4 管理員之 perm 列因非角色因素被 verifyClientUser 否決(TOKEN_DENY): userNoPermission  [P-7: 部署方否決者之固定鍵]
+      23) MX-P7 標頭與本體為不同身分之組合(資料通道兩個身分來源各自完整驗證, 函數以本體身分執行): 服務身分／管理員交叉  [外審 sol F01]
+      ✔ MX-P5檢查之值即使用之值: verifyAppUser 改寫其收到之 user 物件(id→id-for-peter、isAdmin→n)後放行, 稽核欄與回傳身分仍為交給部署方之前取得者(app:key-mutate)
+      ✔ MX-P6 AS 新增資料: 新列建立者與更新者皆為 app:…, 且可被管理員讀回; AS 之寫入與管理員同一契約(同批重複 id 仍整批拒收)
+    M mappingBy 變體(email／name): 呼叫者分類不隨對應鍵改變; 稽核 id 為 perm 內 id; 外部 id 與 perm 主鍵衝突之服務身分各入口一致被拒
+      mappingBy=email
+        24) MX-M1 [email] 十五類呼叫者 × 後台登入檢查／應用路由查他人樹／資料通道(標頭、本體): 後台與資料通道看 svc 等級、應用路由看 app 等級, 與預設對應鍵(id)相同
+        ✔ MX-M2 [email] 外部 id 與 perm 主鍵衝突之服務身分(users 另有 id 同為 app:key-sys 之一般使用者列): 各入口一致被拒, 零寫入  [外審 sol F03]
+        ✔ MX-M5 [email] 主鍵同為服務身分 id 之**停用管理員**列(外審 sol F1: 嚴格系統服務形狀×停用列): 在表以列為準, 各入口一致被拒(不得因停用而落入系統服務用途), 零寫入
+      mappingBy=name
+        25) MX-M1 [name] 十五類呼叫者 × 後台登入檢查／應用路由查他人樹／資料通道(標頭、本體): 後台與資料通道看 svc 等級、應用路由看 app 等級, 與預設對應鍵(id)相同
+        ✔ MX-M2 [name] 外部 id 與 perm 主鍵衝突之服務身分(users 另有 id 同為 app:key-sys 之一般使用者列): 各入口一致被拒, 零寫入  [外審 sol F03]
+        ✔ MX-M5 [name] 主鍵同為服務身分 id 之**停用管理員**列(外審 sol F1: 嚴格系統服務形狀×停用列): 在表以列為準, 各入口一致被拒(不得因停用而落入系統服務用途), 零寫入
+      mappingBy=email 之稽核 id
+        ✔ MX-M3 外部 id(sso-admin-9)與 perm 主鍵(id-for-admin)不同之管理員: 資料通道與應用路由之稽核欄皆記 perm 內 id; 後台登入檢查回 perm 列  [外審 sol F02] (54ms)
+        26) MX-M6 [外審 sol F3] 近期系統服務用途登錄不得被「經 perm 列通過驗證、其後該列於 requireAdmin 讀取前被刪」之請求沿用: AS(app:key-ghost)先登錄 → perm 建立主鍵同為 app:key-ghost 之管理員列(email 對應) → 一般 sso 管理員經該列通過身分驗證(部署方驗證等待約 2 秒) → 等待期間該列被刪 → 寫入函數須 userNotAdmin、零寫入
+        ✔ MX-M7 [mappingBy=email; 外審 sol 增量輪 G4] 嚴格系統服務形狀(app:key-email-alt、isApp y、isAdmin y)、外部 id 與列主鍵不同, 只靠 email／name 對應鍵命中 perm 停用列 → 在表, 以列為準: 後台登入、資料通道(標頭／本體)、兩條應用路由皆拒(不得因嚴格形狀而略過對應鍵查找), 零寫入
+        ✔ MX-M4 使用者用途綁定之使用者在 perm 表但停用、外部 id(sso-appdis-9)與 perm 主鍵不同(只能靠對應鍵 email 找到該列): 不得因「停用視同查無」落入系統服務用途; 啟用後以該列為準  [P-2 核心: 在表含停用]
+    B 連線閘之 Authorization 須為 Bearer 方案(P-3)
+      ✔ MX-B1 Bearer 方案(大小寫不敏感、單一空白)通過; Basic／Token／無方案／多空白／Tab／缺憑證／無標頭 → 視同無 token(permission denied) (44ms)
+      ✔ MX-B2 通訊路由同一規則: Basic 方案帶管理員 token 亦視同無 token(回應 ≡ 無效 token)
+    Q /syncAndReplaceTabs 先驗身分再驗 keyTable(P-5)
+      27) MX-Q1 未通過身分驗證者(無 token、無效 token、U、AUM、NFN、ASN、AUD)之回應與 srLog 皆與 keyTable 無關(有效表名／未知表名／空／未帶皆同一回應); 通過應用系統路由等級者才見 invalidKeyTable
+    R perm-run02: ①應用系統路由相容認定  ②系統服務用途須 app: 前綴
+      28) MX-R1 ①相容: 不在表且 isAdmin y 而未轉傳 isApp 者(NF／NFV)於兩條應用系統路由放行(舊版 sso 之應用系統身分即 isAdmin y, 升版不中斷), 稽核欄記其外部 id; isApp y 與否結果相同
+      29) MX-R2 ①在表者以 perm 列為準(不看反查之 isAdmin): 同一外部身分 sso-admin-77(反查 isAdmin y)不在表時放行; 建為一般使用者列 → userNotAdmin; 改為有效管理員 → 放行; 停用 → cannotGetUserFromPerm; 刪除列 → 回到不在表而放行
+      30) MX-R3 ②系統服務用途須 id 以 app: 開頭: 同為不在表、isApp y、isAdmin y, 僅 id 前綴不同 → AS(app:key-sys)可用後端管理員服務、AUX(sso-admin-77)與 APP(id-for-application)不可; 後台登入、資料通道標頭／本體、寫入函數皆然, 零寫入
+      31) MX-R4 ②「二者一致」: 使用者用途綁不在表之 sso 管理員(AUX)的後端結果 ≡ 該管理員自身使用者 token(NFV)——後台登入、資料通道標頭／本體的拒絕鍵逐一相同; 兩者應用系統路由皆放行  [原則二之一: 使用者用途＝同綁定者]
+      ✔ MX-R5 [外審 sol F1] 嚴格系統服務形狀(AS: app:key-sys、isApp y、isAdmin y)而 perm 有主鍵同為其 id 之停用列 → 在表, 不落入系統服務用途: 後台登入、資料通道(標頭／本體)、應用路由皆拒(固定語系鍵)、零寫入 (46ms)
+      ✔ MX-R6 [外審 sol F1] 不在表且 isAdmin n、而 verifyAppUser 因非角色因素否決 → 兩條應用系統路由皆先回 userNoPermission(部署方否決先於等級不足 userNotAdmin), 零寫入; 對照: 同為不在表之 isAdmin n 但未被否決(NFN)回 userNotAdmin
+      32) MX-R8 [外審 sol 增量輪 G5] ①的權限面: 不在表之 sso 管理員(NFV 自身 token／AUX 綁定 token)可經 /syncAndReplaceTabs 匯入自己的 users 列(srcKey ≡ 外部 id、isAdmin y)——之後同一 token 以該 perm 列通過後台與資料通道, 稽核欄由外部 id 轉為 perm 內部 id; 此為既定政策(應用系統路由＝管理員等級, 1.1.15 起即可寫 users), 以測試固定其結果
+      ✔ MX-R7 [外審 sol F1] 外部列管理員(經匯入建立, srcKey ≡ 外部 id sso-ext-5, 內部 id 為系統配發): 後台登入、資料通道、兩條應用系統路由皆通過, 稽核欄一律記 perm 內部 id(≠ srcKey)
+[api-callerMatrix] 已斷言格數(含相容軸): 618
+
+
+  20 passing (22s)
+  32 failing
+
+  1) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       H 靜態檔與 hapi 路由(5 入口 × 15 呼叫者)
+         MX-H2 GET /api/getUserByToken(後台登入檢查): 後端管理員服務等級(A／AUA／AS)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料(含 id 非 app: 開頭之 APP／AUX)  [P-2: AS 放行; perm-run02②: AS 須 app: 前綴]:
+
+      AssertionError [ERR_ASSERTION]: APP: {"state":"success","msg":{"id":"id-for-application","name":"application","email":"application@example.com","isAdmin":"y","isApp":"y"}}
+
+'success' !== 'error'
+
+      + expected - actual
+
+      -success
+      +error
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:179:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  2) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       H 靜態檔與 hapi 路由(5 入口 × 15 呼叫者)
+         MX-H4 GET /api/getPermUserInfor(查他人權限樹): 在表者以 perm 列(A／AUA 通過)、不在表者只看反查 isAdmin y(AS／NF／NFV／APP／AUX 通過, 不要求 isApp 與 app: 前綴); 其餘拒  [P-1 + perm-run02①: 相容]:
+
+      AssertionError [ERR_ASSERTION]: NF: {"state":"error","msg":"userNotAdmin"}
+
+'error' !== 'success'
+
+      + expected - actual
+
+      -error
+      +success
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:226:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  3) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       H 靜態檔與 hapi 路由(5 入口 × 15 呼叫者)
+         MX-H5 POST /syncAndReplaceTabs(整表覆寫): 通過應用系統路由等級者寫入(稽核欄 userId 在表者記 perm 列主鍵、不在表者記外部 id); 其餘拒且零寫入  [P-1; P-2 稽核欄記 app:…; perm-run02①相容]:
+
+      AssertionError [ERR_ASSERTION]: NF: {"state":"error","msg":"userNotAdmin"}
+
+'error' !== 'success'
+
+      + expected - actual
+
+      -error
+      +success
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:254:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  4) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       C 通訊路由(ulctr／slc／dwgfn／dwgf／dw × 15 呼叫者): 同一連線閘, 後端管理員服務等級過閘, 其餘 permission denied
+         MX-C /api/ulctr(upload-controller): 非後端管理員服務等級之回應 ≡ 無效 token 之回應(permission denied); A／AUA／AS 已過閘; id 非 app: 開頭之 APP／AUX 與相容軸皆被擋:
+
+      AssertionError [ERR_ASSERTION]: APP: 回應本體同無效 token
++ actual - expected
+
++ '@\x10\x00\x00\x00\x00\x00\x00[55]{"error":"invalid mode[] in payload","retryable":false}'
+- '@\x10\x00\x00\x00\x00\x00\x00[29]{"error":"permission denied"}'
+
+      + expected - actual
+
+      -@      [55]{"error":"invalid mode[] in payload","retryable":false}
+      +@      [29]{"error":"permission denied"}
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:297:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  5) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       C 通訊路由(ulctr／slc／dwgfn／dwgf／dw × 15 呼叫者): 同一連線閘, 後端管理員服務等級過閘, 其餘 permission denied
+         MX-C /api/slc(upload-slice): 非後端管理員服務等級之回應 ≡ 無效 token 之回應(permission denied); A／AUA／AS 已過閘; id 非 app: 開頭之 APP／AUX 與相容軸皆被擋:
+
+      AssertionError [ERR_ASSERTION]: APP: 回應本體同無效 token
++ actual - expected
+
++ '@\x10\x00\x00\x00\x00\x00\x00[59]{"error":"invalid chunkIndex in headers","retryable":false}'
+- '@\x10\x00\x00\x00\x00\x00\x00[29]{"error":"permission denied"}'
+
+      + expected - actual
+
+      -@      [59]{"error":"invalid chunkIndex in headers","retryable":false}
+      +@      [29]{"error":"permission denied"}
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:297:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  6) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       C 通訊路由(ulctr／slc／dwgfn／dwgf／dw × 15 呼叫者): 同一連線閘, 後端管理員服務等級過閘, 其餘 permission denied
+         MX-C /api/dwgfn(download-get-filename): 非後端管理員服務等級之回應 ≡ 無效 token 之回應(permission denied); A／AUA／AS 已過閘; id 非 app: 開頭之 APP／AUX 與相容軸皆被擋:
+
+      AssertionError [ERR_ASSERTION]: APP: 回應本體同無效 token
++ actual - expected
+
++ '@\x10\x00\x00\x00\x00\x00\x00[55]{"error":"invalid fileId in payload","retryable":false}'
+- '@\x10\x00\x00\x00\x00\x00\x00[29]{"error":"permission denied"}'
+
+      + expected - actual
+
+      -@      [55]{"error":"invalid fileId in payload","retryable":false}
+      +@      [29]{"error":"permission denied"}
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:297:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  7) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       C 通訊路由(ulctr／slc／dwgfn／dwgf／dw × 15 呼叫者): 同一連線閘, 後端管理員服務等級過閘, 其餘 permission denied
+         MX-C /api/dwgf(download-get-file): 非後端管理員服務等級之回應 ≡ 無效 token 之回應(permission denied); A／AUA／AS 已過閘; id 非 app: 開頭之 APP／AUX 與相容軸皆被擋:
+
+      AssertionError [ERR_ASSERTION]: APP: HTTP 狀態同無效 token
+
+400 !== 403
+
+      + expected - actual
+
+      -400
+      +403
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:296:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  8) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       C 通訊路由(ulctr／slc／dwgfn／dwgf／dw × 15 呼叫者): 同一連線閘, 後端管理員服務等級過閘, 其餘 permission denied
+         MX-C /api/dw(download): 非後端管理員服務等級之回應 ≡ 無效 token 之回應(permission denied); A／AUA／AS 已過閘; id 非 app: 開頭之 APP／AUX 與相容軸皆被擋:
+
+      AssertionError [ERR_ASSERTION]: APP: 回應本體同無效 token
++ actual - expected
+
++ '@\x10\x00\x00\x00\x00\x00\x00[55]{"error":"invalid fileId in payload","retryable":false}'
+- '@\x10\x00\x00\x00\x00\x00\x00[29]{"error":"permission denied"}'
+
+      + expected - actual
+
+      -@      [55]{"error":"invalid fileId in payload","retryable":false}
+      +@      [29]{"error":"permission denied"}
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:297:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  9) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       D 資料通道(/api/main)14 個函數 × 15 呼叫者 × 標頭／本體兩個身分來源
+         MX-D getWebInfor: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]:
+
+      AssertionError [ERR_ASSERTION]: getWebInfor APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"{\"webLogo\":\"data:image/svg+xml;base64,PHN2ZyBmaWxsPSJub25lIiBoZWlnaHQ9IjQ4IiB3aWR0aD0iNDgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTQ4IDBIMHY
+
+true !== false
+
+      + expected - actual
+
+      -true
+      +false
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:347:31)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  10) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       D 資料通道(/api/main)14 個函數 × 15 呼叫者 × 標頭／本體兩個身分來源
+         MX-D getStaEventTable: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]:
+
+      AssertionError [ERR_ASSERTION]: getStaEventTable APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"[{\"event\":\"verifyConn\",\"last1Day\":445784,\"last8Hour\":256475,\"last4Hour\":220149,\"last1Hour\":174340},{\"event\":\"updateUsers-success\",\"last1Day\":20704
+
+true !== false
+
+      + expected - actual
+
+      -true
+      +false
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:347:31)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  11) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       D 資料通道(/api/main)14 個函數 × 15 呼叫者 × 標頭／本體兩個身分來源
+         MX-D getStaEvent: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]:
+
+      AssertionError [ERR_ASSERTION]: getStaEvent APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"[{\"time\":\"2026-10-17T21\",\"data\":{\"count\":0}},{\"time\":\"2026-10-17T22\",\"data\":{\"count\":0}},{\"time\":\"2026-10-17T23\",\"data\":{\"count\":0}},{\"time
+
+true !== false
+
+      + expected - actual
+
+      -true
+      +false
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:347:31)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  12) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       D 資料通道(/api/main)14 個函數 × 15 呼叫者 × 標頭／本體兩個身分來源
+         MX-D users.select: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]:
+
+      AssertionError [ERR_ASSERTION]: users.select APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"[{\"id\":\"id-for-admin\",\"order\":4,\"name\":\"admin\",\"email\":\"admin@example.com\",\"description\":\"\",\"from\":\"\",\"srcKey\":\"\",\"cgrups\":\"\\n        
+
+true !== false
+
+      + expected - actual
+
+      -true
+      +false
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:347:31)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  13) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       D 資料通道(/api/main)14 個函數 × 15 呼叫者 × 標頭／本體兩個身分來源
+         MX-D grups.select: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]:
+
+      AssertionError [ERR_ASSERTION]: grups.select APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"[{\"id\":\"id-for-權限群組M1\",\"order\":1,\"name\":\"權限群組M1\",\"description\":\"權限群組M1的說明\",\"from\":\"\",\"srcKey\":\"\",\"cpemis\":\"\\n            {\\n             
+
+true !== false
+
+      + expected - actual
+
+      -true
+      +false
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:347:31)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  14) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       D 資料通道(/api/main)14 個函數 × 15 呼叫者 × 標頭／本體兩個身分來源
+         MX-D pemis.select: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]:
+
+      AssertionError [ERR_ASSERTION]: pemis.select APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"[{\"id\":\"id-for-權限P1\",\"order\":1,\"name\":\"權限P1\",\"description\":\"權限P1的說明\",\"from\":\"\",\"srcKey\":\"\",\"crules\":\"{  \\\"專案A/頁A/區塊A\\\": 'y', \\\"專案A/頁B
+
+true !== false
+
+      + expected - actual
+
+      -true
+      +false
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:347:31)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  15) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       D 資料通道(/api/main)14 個函數 × 15 呼叫者 × 標頭／本體兩個身分來源
+         MX-D targets.select: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]:
+
+      AssertionError [ERR_ASSERTION]: targets.select APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"[{\"id\":\"專案A/頁A/區塊A\",\"order\":1,\"description\":\"專案A/頁A/區塊A的說明\",\"from\":\"\",\"srcKey\":\"\",\"userId\":\"id-for-admin\",\"timeCreate\":\"2026-10-24T21:52:06
+
+true !== false
+
+      + expected - actual
+
+      -true
+      +false
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:347:31)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  16) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       D 資料通道(/api/main)14 個函數 × 15 呼叫者 × 標頭／本體兩個身分來源
+         MX-D [sys:getFuncList]: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]:
+
+      AssertionError [ERR_ASSERTION]: [sys:getFuncList] APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"[\"grups.select\",\"pemis.select\",\"targets.select\",\"users.select\",\"getWebInfor\",\"updateTargets\",\"updatePemis\",\"updateGrups\",\"updateUsers\",\"getStaEve
+
+true !== false
+
+      + expected - actual
+
+      -true
+      +false
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:347:31)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  17) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       D 資料通道(/api/main)14 個函數 × 15 呼叫者 × 標頭／本體兩個身分來源
+         MX-D [sys:getTableTags]: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]:
+
+      AssertionError [ERR_ASSERTION]: [sys:getTableTags] APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"{\"mode\":\"syncKpTable\",\"data\":{\"grups\":\"2026-10-24T21:52:08+08:00|SC6jNw\",\"pemis\":\"2026-10-24T21:52:08+08:00|4Pt5tQ\",\"targets\":\"2026-10-24T21:52:08+
+
+true !== false
+
+      + expected - actual
+
+      -true
+      +false
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:347:31)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  18) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       D 資料通道(/api/main)14 個函數 × 15 呼叫者 × 標頭／本體兩個身分來源
+         MX-D [sys:polling]: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]:
+
+      AssertionError [ERR_ASSERTION]: [sys:polling] APP header: 不得成功, 實得 {"ok":true,"msg":"","raw":"@\u0010\u0000\u0000\u0000\u0000\u0000\u0000[48]{\"success\":{\"func\":\"[sys:polling]\",\"output\":[]}}"}
+
+true !== false
+
+      + expected - actual
+
+      -true
+      +false
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:347:31)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  19) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       D 資料通道(/api/main)14 個函數 × 15 呼叫者 × 標頭／本體兩個身分來源
+         MX-D updateUsers: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]:
+
+      AssertionError [ERR_ASSERTION]: updateUsers APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"saveTabItemsSuccess","output":"saveTabItemsSuccess","raw":"@\u0010\u0000\u0000\u0000\u0000\u0000\u0000[91]{\"success\":{\"func\":\"updateUsers\",\"output\":{\"state
+
+true !== false
+
+      + expected - actual
+
+      -true
+      +false
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:347:31)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  20) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       D 資料通道(/api/main)14 個函數 × 15 呼叫者 × 標頭／本體兩個身分來源
+         MX-D updateGrups: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]:
+
+      AssertionError [ERR_ASSERTION]: updateGrups APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"saveTabItemsSuccess","output":"saveTabItemsSuccess","raw":"@\u0010\u0000\u0000\u0000\u0000\u0000\u0000[91]{\"success\":{\"func\":\"updateGrups\",\"output\":{\"state
+
+true !== false
+
+      + expected - actual
+
+      -true
+      +false
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:347:31)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  21) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       D 資料通道(/api/main)14 個函數 × 15 呼叫者 × 標頭／本體兩個身分來源
+         MX-D updatePemis: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]:
+
+      AssertionError [ERR_ASSERTION]: updatePemis APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"saveTabItemsSuccess","output":"saveTabItemsSuccess","raw":"@\u0010\u0000\u0000\u0000\u0000\u0000\u0000[91]{\"success\":{\"func\":\"updatePemis\",\"output\":{\"state
+
+true !== false
+
+      + expected - actual
+
+      -true
+      +false
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:347:31)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  22) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       D 資料通道(/api/main)14 個函數 × 15 呼叫者 × 標頭／本體兩個身分來源
+         MX-D updateTargets: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]:
+
+      AssertionError [ERR_ASSERTION]: updateTargets APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"saveTabItemsSuccess","output":"saveTabItemsSuccess","raw":"@\u0010\u0000\u0000\u0000\u0000\u0000\u0000[93]{\"success\":{\"func\":\"updateTargets\",\"output\":{\"sta
+
+true !== false
+
+      + expected - actual
+
+      -true
+      +false
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:347:31)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  23) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       P 使用者用途跟隨所綁使用者; 部署方否決; 檢查之值即使用之值
+         MX-P7 標頭與本體為不同身分之組合(資料通道兩個身分來源各自完整驗證, 函數以本體身分執行): 服務身分／管理員交叉  [外審 sol F01]:
+
+      AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+true !== false
+
+      + expected - actual
+
+      -true
+      +false
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:467:19)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  24) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       M mappingBy 變體(email／name): 呼叫者分類不隨對應鍵改變; 稽核 id 為 perm 內 id; 外部 id 與 perm 主鍵衝突之服務身分各入口一致被拒
+         mappingBy=email
+           MX-M1 [email] 十五類呼叫者 × 後台登入檢查／應用路由查他人樹／資料通道(標頭、本體): 後台與資料通道看 svc 等級、應用路由看 app 等級, 與預設對應鍵(id)相同:
+
+      AssertionError [ERR_ASSERTION]: email NF getPermUserInfor: {"state":"error","msg":"userNotAdmin"}
+
+'error' !== 'success'
+
+      + expected - actual
+
+      -error
+      +success
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:534:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  25) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       M mappingBy 變體(email／name): 呼叫者分類不隨對應鍵改變; 稽核 id 為 perm 內 id; 外部 id 與 perm 主鍵衝突之服務身分各入口一致被拒
+         mappingBy=name
+           MX-M1 [name] 十五類呼叫者 × 後台登入檢查／應用路由查他人樹／資料通道(標頭、本體): 後台與資料通道看 svc 等級、應用路由看 app 等級, 與預設對應鍵(id)相同:
+
+      AssertionError [ERR_ASSERTION]: name NF getPermUserInfor: {"state":"error","msg":"userNotAdmin"}
+
+'error' !== 'success'
+
+      + expected - actual
+
+      -error
+      +success
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:534:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  26) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       M mappingBy 變體(email／name): 呼叫者分類不隨對應鍵改變; 稽核 id 為 perm 內 id; 外部 id 與 perm 主鍵衝突之服務身分各入口一致被拒
+         mappingBy=email 之稽核 id
+           MX-M6 [外審 sol F3] 近期系統服務用途登錄不得被「經 perm 列通過驗證、其後該列於 requireAdmin 讀取前被刪」之請求沿用: AS(app:key-ghost)先登錄 → perm 建立主鍵同為 app:key-ghost 之管理員列(email 對應) → 一般 sso 管理員經該列通過身分驗證(部署方驗證等待約 2 秒) → 等待期間該列被刪 → 寫入函數須 userNotAdmin、零寫入:
+
+      AssertionError [ERR_ASSERTION]: 寫入函數須被拒: {"ok":true,"state":"success","msg":"saveTabItemsSuccess","output":"saveTabItemsSuccess","raw":"@\u0010\u0000\u0000\u0000\u0000\u0000\u0000[91]{\"success\":{\"func\":\"updateGrups\",\"output\":{\"state\":\"success\",\"msg\":\"saveTabItemsSuccess\"}}}"}
+
+true !== false
+
+      + expected - actual
+
+      -true
+      +false
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:612:19)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  27) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       Q /syncAndReplaceTabs 先驗身分再驗 keyTable(P-5)
+         MX-Q1 未通過身分驗證者(無 token、無效 token、U、AUM、NFN、ASN、AUD)之回應與 srLog 皆與 keyTable 無關(有效表名／未知表名／空／未帶皆同一回應); 通過應用系統路由等級者才見 invalidKeyTable:
+
+      AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'userNotAdmin'
+- 'invalidKeyTable'
+
+      + expected - actual
+
+      -userNotAdmin
+      +invalidKeyTable
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:720:19)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  28) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       R perm-run02: ①應用系統路由相容認定  ②系統服務用途須 app: 前綴
+         MX-R1 ①相容: 不在表且 isAdmin y 而未轉傳 isApp 者(NF／NFV)於兩條應用系統路由放行(舊版 sso 之應用系統身分即 isAdmin y, 升版不中斷), 稽核欄記其外部 id; isApp y 與否結果相同:
+
+      AssertionError [ERR_ASSERTION]: NF: {"state":"error","msg":"userNotAdmin"}
+
+'error' !== 'success'
+
+      + expected - actual
+
+      -error
+      +success
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:744:19)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  29) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       R perm-run02: ①應用系統路由相容認定  ②系統服務用途須 app: 前綴
+         MX-R2 ①在表者以 perm 列為準(不看反查之 isAdmin): 同一外部身分 sso-admin-77(反查 isAdmin y)不在表時放行; 建為一般使用者列 → userNotAdmin; 改為有效管理員 → 放行; 停用 → cannotGetUserFromPerm; 刪除列 → 回到不在表而放行:
+
+      AssertionError [ERR_ASSERTION]: 不在表 getPermUserInfor: {"state":"error","msg":"userNotAdmin"}
+
+'error' !== 'success'
+
+      + expected - actual
+
+      -error
+      +success
+      
+      at okBoth (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:766:19)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:778:17)
+
+  30) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       R perm-run02: ①應用系統路由相容認定  ②系統服務用途須 app: 前綴
+         MX-R3 ②系統服務用途須 id 以 app: 開頭: 同為不在表、isApp y、isAdmin y, 僅 id 前綴不同 → AS(app:key-sys)可用後端管理員服務、AUX(sso-admin-77)與 APP(id-for-application)不可; 後台登入、資料通道標頭／本體、寫入函數皆然, 零寫入:
+
+      AssertionError [ERR_ASSERTION]: AUX 後台登入
+
+'success' !== 'error'
+
+      + expected - actual
+
+      -success
+      +error
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:805:19)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  31) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       R perm-run02: ①應用系統路由相容認定  ②系統服務用途須 app: 前綴
+         MX-R4 ②「二者一致」: 使用者用途綁不在表之 sso 管理員(AUX)的後端結果 ≡ 該管理員自身使用者 token(NFV)——後台登入、資料通道標頭／本體的拒絕鍵逐一相同; 兩者應用系統路由皆放行  [原則二之一: 使用者用途＝同綁定者]:
+
+      AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+'success' !== 'error'
+
+      + expected - actual
+
+      -success
+      +error
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:825:15)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+  32) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       R perm-run02: ①應用系統路由相容認定  ②系統服務用途須 app: 前綴
+         MX-R8 [外審 sol 增量輪 G5] ①的權限面: 不在表之 sso 管理員(NFV 自身 token／AUX 綁定 token)可經 /syncAndReplaceTabs 匯入自己的 users 列(srcKey ≡ 外部 id、isAdmin y)——之後同一 token 以該 perm 列通過後台與資料通道, 稽核欄由外部 id 轉為 perm 內部 id; 此為既定政策(應用系統路由＝管理員等級, 1.1.15 起即可寫 users), 以測試固定其結果:
+
+      AssertionError [ERR_ASSERTION]: 匯入前: 不在表, 後台拒
+
+'success' !== 'error'
+
+      + expected - actual
+
+      -success
+      +error
+      
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:880:19)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+
+
+

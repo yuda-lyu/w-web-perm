@@ -1,0 +1,65 @@
+[quiet-run] exit=30 time=24s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261024-205530-perm-run02-red.log (504 行, 29 KB)
+[quiet-run] cmd: npx mocha --no-parallel test/api-callerMatrix.test.mjs --timeout 300000 --reporter dot
+[quiet-run] lock: 取得並已釋放(等待 0s)
+== 統計 ==
+  14 passing (19s)
+  30 failing
+== 失敗段落(前 25 行) ==
+  1) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       H 靜態檔與 hapi 路由(5 入口 × 13 呼叫者)
+         MX-H2 GET /api/getUserByToken(後台登入檢查): 後端管理員服務等級(A／AUA／AS)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料(含 id 非 app: 開頭之 APP／AUX)  [P-2: AS 放行; perm-run02②: AS 須 app: 前綴]:
+      AssertionError [ERR_ASSERTION]: APP: {"state":"success","msg":{"id":"id-for-application","name":"application","email":"application@example.com","isAdmin":"y","isApp":"y"}}
+'success' !== 'error'
+      + expected - actual
+      -success
+      +error
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:177:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+  2) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       H 靜態檔與 hapi 路由(5 入口 × 13 呼叫者)
+         MX-H4 GET /api/getPermUserInfor(查他人權限樹): 在表者以 perm 列(A／AUA 通過)、不在表者只看反查 isAdmin y(AS／NF／NFV／APP／AUX 通過, 不要求 isApp 與 app: 前綴); 其餘拒  [P-1 + perm-run02①: 相容]:
+      AssertionError [ERR_ASSERTION]: NF: {"state":"error","msg":"userNotAdmin"}
+'error' !== 'success'
+      + expected - actual
+      -error
+      +success
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:224:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+  3) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       H 靜態檔與 hapi 路由(5 入口 × 13 呼叫者)
+         MX-H5 POST /syncAndReplaceTabs(整表覆寫): 通過應用系統路由等級者寫入(稽核欄 userId 在表者記 perm 列主鍵、不在表者記外部 id); 其餘拒且零寫入  [P-1; P-2 稽核欄記 app:…; perm-run02①相容]:
+      AssertionError [ERR_ASSERTION]: NF: {"state":"error","msg":"userNotAdmin"}
+'error' !== 'success'
+== 錯誤行(去重,至多 15) ==
+  AssertionError [ERR_ASSERTION]: APP: 回應本體同無效 token
+  AssertionError [ERR_ASSERTION]: APP: HTTP 狀態同無效 token
+  AssertionError [ERR_ASSERTION]: getWebInfor APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"{\"webLogo\":\"data:image/svg+xml;base64,PHN2ZyBmaWxsPSJub25lIiBoZWlnaHQ9IjQ4IiB3aWR0aD0iNDgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTQ4IDBIMHY
+  AssertionError [ERR_ASSERTION]: getStaEventTable APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"[{\"event\":\"verifyConn\",\"last1Day\":353262,\"last8Hour\":180566,\"last4Hour\":121728,\"last1Hour\":113559},{\"event\":\"updateUsers-success\",\"last1Day\":17665
+  AssertionError [ERR_ASSERTION]: getStaEvent APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"[{\"time\":\"2026-10-17T20\",\"data\":{\"count\":0}},{\"time\":\"2026-10-17T21\",\"data\":{\"count\":0}},{\"time\":\"2026-10-17T22\",\"data\":{\"count\":0}},{\"time
+  AssertionError [ERR_ASSERTION]: users.select APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"[{\"id\":\"id-for-admin\",\"order\":4,\"name\":\"admin\",\"email\":\"admin@example.com\",\"description\":\"\",\"from\":\"\",\"srcKey\":\"\",\"cgrups\":\"\\n
+  AssertionError [ERR_ASSERTION]: grups.select APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"[{\"id\":\"id-for-權限群組M1\",\"order\":1,\"name\":\"權限群組M1\",\"description\":\"權限群組M1的說明\",\"from\":\"\",\"srcKey\":\"\",\"cpemis\":\"\\n            {\\n
+  AssertionError [ERR_ASSERTION]: pemis.select APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"[{\"id\":\"id-for-權限P1\",\"order\":1,\"name\":\"權限P1\",\"description\":\"權限P1的說明\",\"from\":\"\",\"srcKey\":\"\",\"crules\":\"{  \\\"專案A/頁A/區塊A\\\": 'y', \\\"專案A/頁B
+  AssertionError [ERR_ASSERTION]: targets.select APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"[{\"id\":\"專案A/頁A/區塊A\",\"order\":1,\"description\":\"專案A/頁A/區塊A的說明\",\"from\":\"\",\"srcKey\":\"\",\"userId\":\"id-for-admin\",\"timeCreate\":\"2026-10-24T20:55:36
+  AssertionError [ERR_ASSERTION]: [sys:getFuncList] APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"[\"grups.select\",\"pemis.select\",\"targets.select\",\"users.select\",\"getWebInfor\",\"updateTargets\",\"updatePemis\",\"updateGrups\",\"updateUsers\",\"getStaEve
+  AssertionError [ERR_ASSERTION]: [sys:getTableTags] APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"{\"mode\":\"syncKpTable\",\"data\":{\"grups\":\"2026-10-24T20:55:37+08:00|8QwhG5\",\"pemis\":\"2026-10-24T20:55:37+08:00|oKoY9V\",\"targets\":\"2026-10-24T20:55:37+
+  AssertionError [ERR_ASSERTION]: [sys:polling] APP header: 不得成功, 實得 {"ok":true,"msg":"","raw":"@\u0010\u0000\u0000\u0000\u0000\u0000\u0000[48]{\"success\":{\"func\":\"[sys:polling]\",\"output\":[]}}"}
+  AssertionError [ERR_ASSERTION]: updateUsers APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"saveTabItemsSuccess","output":"saveTabItemsSuccess","raw":"@\u0010\u0000\u0000\u0000\u0000\u0000\u0000[91]{\"success\":{\"func\":\"updateUsers\",\"output\":{\"state
+  AssertionError [ERR_ASSERTION]: updateGrups APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"saveTabItemsSuccess","output":"saveTabItemsSuccess","raw":"@\u0010\u0000\u0000\u0000\u0000\u0000\u0000[91]{\"success\":{\"func\":\"updateGrups\",\"output\":{\"state
+  AssertionError [ERR_ASSERTION]: updatePemis APP header: 不得成功, 實得 {"ok":true,"state":"success","msg":"saveTabItemsSuccess","output":"saveTabItemsSuccess","raw":"@\u0010\u0000\u0000\u0000\u0000\u0000\u0000[91]{\"success\":{\"func\":\"updatePemis\",\"output\":{\"state
+== 最後 15 行(非空,不含上列失敗段落) ==
+      + expected - actual
+      -success
+      +error
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:752:19)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+  30) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
+       R perm-run02: ①應用系統路由相容認定  ②系統服務用途須 app: 前綴
+         MX-R4 ②「二者一致」: 使用者用途綁不在表之 sso 管理員(AUX)的後端結果 ≡ 該管理員自身使用者 token(NFV)——後台登入、資料通道標頭／本體的拒絕鍵逐一相同; 兩者應用系統路由皆放行  [原則二之一: 使用者用途＝同綁定者]:
+      AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+'success' !== 'error'
+      + expected - actual
+      -success
+      +error
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-callerMatrix.test.mjs:772:15)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)

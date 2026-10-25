@@ -2,6 +2,17 @@
 
 本檔記本套件**當前已開發功能之最新狀態**;與規則帳本(`sgud/rule/rulebook.md`,藍圖)比對即知尚未做到者,接續工作先讀此檔.2026-10-22 主控遷移為 sgud 配置時建立,先移入原帳本之「已知缺口 / 待辦」;**各功能之完成狀態整理為下一次派工之待辦**(主責 agent 依規則帳本各節之「狀態」行與近期報告彙整至本檔).
 
+## 近期進度(2026-10-24 第四輪 perm-run02〔任務 20261024182735〕:應用系統路由等級判定改相容＋系統服務用途須 `app:` 前綴; 修正輪＝單輪,未發布,待主控全套)
+
+> 注意: 承 perm-run01(第三輪, 檢查點 `daddd01`)之主控裁示; 證據目錄 `spec/evidence/perm-run02-20261024/`, ADR-040 Update(perm-run02, 決定 97～104), 規則 R-APP-TOKEN-01 補述規則 7～8(`sgud/rule/rulebook_security.md`), 報告 `C:\opensrcOper\dnow\20261024182735\agent-out\perm-run02-修正報告.md`.
+
+- **①應用系統路由相容**(主控裁示; 原則二.8): `/api/getPermUserInfor`、`/syncAndReplaceTabs`(`WWebPerm.mjs:getAndVerifyAppUser`)對『不在 perm 表』之呼叫者改用 `adminCheck.mjs:isExtAdminUser`——只看反查 `isAdmin==='y'`, 不要求 `isApp`、不要求 `app:` 前綴; 在表者仍以 perm 列(有效且 `isAdmin='y'`)。一般使用者仍拒(`userNotAdmin`), 部署方 `verifyAppUser` 與拒絕鍵次序不變。perm-run01 之『破壞性變更』(未轉傳 `isApp` 者被拒)取消。
+- **②系統服務用途收緊**: `isSystemAppUser` 增 `id` 以 `app:` 開頭(`SYSTEM_APP_ID_PREFIX`; 單一擁有者仍為 `adminCheck.mjs`)。後台登入檢查、資料通道、`requireAdmin` 之系統服務用途＝不在表＋`isApp` y＋`isAdmin` y＋`app:` 前綴; 使用者用途綁『不在表之 sso 管理員』不再被當成系統服務用途(後台與資料通道拒, 同其自身使用者 token; 應用系統路由仍放行)。perm-run01 之待裁示 ① 結案。
+- **外審採納(sol 第一輪, 7 條)**: F3 `getUserIdByToken` 對以 perm 列通過者清除同 id 之近期系統服務用途登錄(`clearSystemAppId`; 既有競態, 最小修, MX-M6 確定性競態測試); F1 補測試缺格(MX-R5～R7、MX-M5、呼叫者軸 AFN／AFO); F2 不改行為(備查); F4～F7 補測試／文件。
+- **測試**: `api-callerMatrix` 52 案(呼叫者 6＋相容 9 × 入口 24; `lvl` 拆 `svc`／`app`; 計數器 950 格)、`unit-appToken` 20 案; 修前紅 30 敗／14 過; 變異 21 個(含外審後新增 5)全被抓到(`mutation-results.md`)。標準圖 0 張改變, 無前端改動。
+- **測試端順帶修正**: `test/e2e-init.test.mjs` E2E-008(perm-run01 引入)之測試競態——回應本體於頁面轉址後讀取而失敗(單案重跑修前 24／30 案失敗、修後 0／30), 改於 `page.route` 內先讀本體(斷言不變); `e2e-init` 20 過、`e2e-external-rows` 60 過、unit 4297 過／1 pending／0 敗、api 486 過／0 敗。
+- **未做／待裁示**: ①`/api/getPermUserInfor` 不檢查呼叫者 id(不在表而缺 id 之管理員宣稱者放行; 維持 1.1.15 行為, 外審 F2 備查); ②`[sys:polling]` 本體 `__sysToken__` 身分檢查屬框架(排程第 128 項); ③perm-run01 之其餘備查項(同步路由缺 token 分支 `console.log` 含 query、`db/wperm/**` 為版控中之資料庫檔)不變; ④`dspec/w-web存取管控表.md` 第二節之對照由主控維護(本 repo 版見 `rulebook_security.md` 規則 8); ⑤(增量外審 G1／G2, 待裁示之建議)保留 `app:` 前綴——後台寫入拒收主鍵以 `app:` 開頭之 users 列, 可根治系統服務用途近期登錄(以 id 為鍵、跨請求共用)之兩個極端交錯時序, 本輪未改(見 `rulebook_security.md` 已知限制)。
+
 ## 近期進度(2026-10-24 第三輪 perm-run01〔任務 20261024182735〕:應用系統 token 之配合〔使用者用途／系統服務用途〕＋應用系統路由要求管理員等級＋連線閘須 Bearer＋`/syncAndReplaceTabs` 先驗身分＋路由失敗不回原文＋範例 `srv.mjs` 對齊; 修正輪＝單輪,未發布,待主控全套)
 
 > 注意: 本輪為同日第三個 `perm-run01`(任務 20261022221854、20261024105311 之後); 證據目錄 `spec/evidence/perm-run01-20261024b/`(帶 b), ADR-040, 規則 R-APP-TOKEN-01／R-BEARER-01／R-ROUTE-MSG-01(`sgud/rule/rulebook_security.md`), 報告 `C:\opensrcOper\dnow\20261024182735\agent-out\perm-run01-修正報告.md`.

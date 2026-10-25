@@ -27,7 +27,7 @@ let getUserByToken = async (token) => {
     // console.log('getUserByToken/token', token)
     // console.log('於生產環境時得加入SSO等驗證token機制')
     // return {} //測試無法登入
-    if (token === '{token-for-application}') { //提供外部應用系統作為存取使用者(應用系統token・系統服務用途: 部署方須轉傳上游反查結果之 isApp, 否則 perm 只認 users 表中有效之系統管理員, README Upgrade Notes)
+    if (token === '{token-for-application}') { //提供外部應用系統作為存取使用者(應用系統token: 部署方須轉傳上游反查結果之 isApp。此例的 id 不以 'app:' 開頭, 故只用於應用系統路由〔/api/getPermUserInfor、/syncAndReplaceTabs; 不在 users 表者只看 isAdmin 為 'y'〕, 後台與資料通道須系統服務用途〔isApp y、isAdmin y、id 以 'app:' 開頭〕, 見 {token-for-app-system}; README Upgrade Notes)
         return {
             id: 'id-for-application',
             name: 'application',
@@ -103,8 +103,41 @@ let getUserByToken = async (token) => {
         if (token === '{token-for-app-system-n}') { //系統服務用途形狀但 isAdmin='n'(不屬系統服務用途, 應被拒)
             return { id: 'app:key-n', name: 'key-n', email: '', isAdmin: 'n', isApp: 'y' }
         }
-        if (token === '{token-for-app-noflag}') { //AS 形狀但部署方未轉傳 isApp(視同 'n')——相容情形: 資料通道與應用系統路由皆不認
+        if (token === '{token-for-app-noflag}') { //AS 形狀但部署方未轉傳 isApp(視同 'n')——相容情形(perm-run02): 資料通道與後台登入不認(系統服務用途須 isApp='y'), 應用系統路由(getPermUserInfor、syncAndReplaceTabs)只看 isAdmin='y' 而放行(舊版 sso 之應用系統身分即 isAdmin='y')
             return { id: 'app:key-noflag', name: 'key-noflag', email: 'noflag@example.com', isAdmin: 'y' }
+        }
+        if (token === '{token-for-noflag-n}') { //不在 perm users 表、isAdmin='n'、未轉傳 isApp(perm-run02): 一般使用者之外部形狀, 各入口皆拒
+            return { id: 'sso-user-78', name: 'sso-user', email: 'sso-user@example.com', isAdmin: 'n' }
+        }
+        if (token === '{token-for-sso-admin}') { //不在 perm users 表之 sso 管理員, 以其**自身使用者 token**(perm-run02): 未轉傳 isApp; 與下一個權杖為同一人(id 同)
+            return { id: 'sso-admin-77', name: 'sso-admin', email: 'sso-admin@example.com', isAdmin: 'y' }
+        }
+        if (token === '{token-for-app-flag-n}') { //不在表、isAdmin='y'、isApp 明確為 'n'(perm-run02 外審 sol F1): 非系統服務用途(後端拒), 應用系統路由只看 isAdmin 而放行
+            return { id: 'app:key-flag-n', name: 'key-flag-n', email: '', isAdmin: 'y', isApp: 'n' }
+        }
+        if (token === '{token-for-app-flag-odd}') { //不在表、isAdmin='y'、isApp 為 'Y'(非嚴格 'y'; perm-run02 外審 sol F1): 同上
+            return { id: 'app:key-flag-odd', name: 'key-flag-odd', email: '', isAdmin: 'y', isApp: 'Y' }
+        }
+        if (token === '{token-for-app-deny-n}') { //不在表、isAdmin='n'、id 與 {token-for-app-deny} 同(verifyAppUser 因非角色因素否決; perm-run02 外審 sol F1): 驗拒絕鍵次序——部署方否決先於等級不足
+            return { id: 'app:key-deny', name: 'key-deny-n', email: '', isAdmin: 'n', isApp: 'y' }
+        }
+        if (token === '{token-for-ext-row}') { //外部列使用者(perm-run02 外審 sol F1): 外部 id 'sso-ext-5' 對應 perm 外部列之 srcKey(mappingBy='id'); 其 perm 列主鍵為系統配發, 稽核欄須記該主鍵而非外部 id
+            return { id: 'sso-ext-5', name: 'ext5', email: 'ext5@example.com', isAdmin: 'y' }
+        }
+        if (token === '{token-for-app-email}') { //嚴格系統服務形狀但帶有 email(perm-run02 外審 sol F1; 真實 sso 金鑰無 email, 此為人造形狀): 供『嚴格形狀×perm 有主鍵同為其 id 之停用列』案例, 使其能走到以列判定之關卡
+            return { id: 'app:key-email', name: 'key-email', email: 'key-email@example.com', isAdmin: 'y', isApp: 'y' }
+        }
+        if (token === '{token-for-app-email-alt}') { //嚴格系統服務形狀(id 'app:key-email-alt'、isApp y、isAdmin y)，但 email／name 與 perm 某停用列相同而主鍵不同(perm-run02 外審 sol 增量輪 G4): 只能靠 email／name 對應鍵命中該列(僅 mappingBy 為 email／name 之測試設定)
+            return { id: 'app:key-email-alt', name: 'key-email2', email: 'key-email2@example.com', isAdmin: 'y', isApp: 'y' }
+        }
+        if (token === '{token-for-app-ghost}') { //系統服務用途(perm-run02 外審 sol F3): 先以此權杖登錄近期系統服務用途 id 'app:key-ghost'
+            return { id: 'app:key-ghost', name: 'key-ghost', email: '', isAdmin: 'y', isApp: 'y' }
+        }
+        if (token === '{token-for-ghost-user}') { //一般 sso 管理員(perm-run02 外審 sol F3): email 對應 perm 列(主鍵恰為 'app:key-ghost'; 僅 mappingBy='email' 之測試設定), 經該列通過驗證後該列被刪
+            return { id: 'sso-ghost-1', name: 'ghost', email: 'ghost@example.com', isAdmin: 'y' }
+        }
+        if (token === '{token-for-app-bind-sso}') { //使用者用途(AU)綁定「不在 perm users 表之 sso 管理員」(perm-run02): 反查回該使用者實際資料(id 非 'app:' 開頭)＋isApp='y', isAdmin='y'; 不是系統服務用途(須 id 以 'app:' 開頭)
+            return { id: 'sso-admin-77', name: 'sso-admin', email: 'sso-admin@example.com', isAdmin: 'y', isApp: 'y' }
         }
         if (token === '{token-for-app-bind-admin}') { //使用者用途(AU)綁定管理員(base seed admin): 反查回該使用者實際資料＋isApp='y'
             return { id: 'id-for-admin', name: 'admin', email: 'admin@example.com', isAdmin: 'y', isApp: 'y' }
@@ -152,6 +185,9 @@ let verifyClientUser = (user, from) => {
     }
     if (process.env.NODE_ENV !== 'production' && user.id === 'id-for-slow') { //測試用: 見 '{token-for-slow}'——async 放行並等待約 1.5 秒
         return new Promise((resolve) => setTimeout(() => resolve(true), 1500))
+    }
+    if (process.env.NODE_ENV !== 'production' && user.id === 'app:key-ghost') { //測試用: 見 '{token-for-ghost-user}'——perm 列主鍵恰為 'app:key-ghost' 之使用者通過驗證前先等待約 4 秒(讓測試在等待期間刪列, 固定競態窗口; 外審 sol 增量輪 G3: 窗口放寬使慢速環境不致 flake; 系統服務用途 AS 不經本函數)
+        return new Promise((resolve) => setTimeout(() => resolve(true), 4000))
     }
     if (process.env.NODE_ENV !== 'production' && user.id === 'id-for-deny') { //測試用: 見 '{token-for-deny}'——部署方因非角色因素否決(例如來源網段不符)
         return false

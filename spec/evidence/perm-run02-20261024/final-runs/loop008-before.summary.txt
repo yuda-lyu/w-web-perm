@@ -1,0 +1,20 @@
+[quiet-run] exit=0 time=2m51s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261024-222336-perm-run02-loop008-before.log (16 行, 2 KB)
+[quiet-run] cmd: node tmp/perm-run02/loop008.mjs 15 before
+[quiet-run] lock: 取得並已釋放(等待 0s)
+== 最後 15 行(非空,不含上列失敗段落) ==
+[loop008:before] 2/15 exit=1 passing=1 failing=1 response.json: Protocol error (Network.getResponseBody): No resource with given identifier found
+[loop008:before] 3/15 exit=2 passing=0 failing=2 response.json: Protocol error (Network.getResponseBody): No resource with given identifier found
+[loop008:before] 4/15 exit=1 passing=1 failing=1 response.json: Protocol error (Network.getResponseBody): No resource with given identifier found
+[loop008:before] 5/15 exit=1 passing=1 failing=1 response.json: Protocol error (Network.getResponseBody): No resource with given identifier found
+[loop008:before] 6/15 exit=2 passing=0 failing=2 response.json: Protocol error (Network.getResponseBody): No resource with given identifier found
+[loop008:before] 7/15 exit=2 passing=0 failing=2 response.json: Protocol error (Network.getResponseBody): No resource with given identifier found
+[loop008:before] 8/15 exit=1 passing=1 failing=1 response.json: Protocol error (Network.getResponseBody): No resource with given identifier found
+[loop008:before] 9/15 exit=2 passing=0 failing=2 response.json: Protocol error (Network.getResponseBody): No resource with given identifier found
+[loop008:before] 10/15 exit=2 passing=0 failing=2 response.json: Protocol error (Network.getResponseBody): No resource with given identifier found
+[loop008:before] 11/15 exit=2 passing=0 failing=2 response.json: Protocol error (Network.getResponseBody): No resource with given identifier found
+[loop008:before] 12/15 exit=2 passing=0 failing=2 response.json: Protocol error (Network.getResponseBody): No resource with given identifier found
+[loop008:before] 13/15 exit=2 passing=0 failing=2 response.json: Protocol error (Network.getResponseBody): No resource with given identifier found
+[loop008:before] 14/15 exit=1 passing=1 failing=1 response.json: Protocol error (Network.getResponseBody): No resource with given identifier found
+[loop008:before] 15/15 exit=2 passing=0 failing=2 response.json: Protocol error (Network.getResponseBody): No resource with given identifier found
+[loop008:before] 結果: 0 次全過, 15 次含失敗(共 15 次, 每次 2 案〔eng、cht〕)
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)

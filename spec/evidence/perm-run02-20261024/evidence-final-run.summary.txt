@@ -1,0 +1,20 @@
+[quiet-run] exit=0 time=5m27s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261024-215205-perm-run02-evidence-final.log (57 行, 10 KB)
+[quiet-run] cmd: node spec/evidence/perm-run02-20261024/run-evidence.mjs all
+[quiet-run] lock: 取得並已釋放(等待 0s)
+== 最後 15 行(非空,不含上列失敗段落) ==
+warning: in the working copy of 'server/adminCheck.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'sgud/exp/experience.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'sgud/rule/rulebook.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'sgud/rule/rulebook_security.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'sgud/rule/rulebook_testscope.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'sgud/state/state.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec/流程_外部應用同步權限資料.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec/流程_應用啟動與登入.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec/流程_查詢指定使用者權限.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'spec/設計要點與取捨.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'srv.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/api-callerMatrix.test.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/tools/api-setup.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'test/unit-appToken.test.mjs', LF will be replaced by CRLF the next time Git touches it
+[restore] 工作樹 git diff --stat 與開始時一致
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)
