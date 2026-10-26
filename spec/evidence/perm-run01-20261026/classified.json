@@ -1,0 +1,907 @@
+{
+ "A": [
+  {
+   "name": "external-rows-cht-E2E-001-1-banner.png",
+   "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-001-1-banner.png",
+   "newPath": "tmp\\perm-run01\\new\\external-rows-cht-E2E-001-1-banner.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    225,
+    1415,
+    235
+   ]
+  },
+  {
+   "name": "external-rows-cht-E2E-001-2-lock-cell.png",
+   "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-001-2-lock-cell.png",
+   "newPath": "tmp\\perm-run01\\new\\external-rows-cht-E2E-001-2-lock-cell.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    225,
+    1415,
+    235
+   ]
+  },
+  {
+   "name": "external-rows-cht-E2E-004-1-click-delete.png",
+   "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-004-1-click-delete.png",
+   "newPath": "tmp\\perm-run01\\new\\external-rows-cht-E2E-004-1-click-delete.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    225,
+    1415,
+    235
+   ]
+  },
+  {
+   "name": "external-rows-cht-E2E-004-2-blocked-box.png",
+   "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-004-2-blocked-box.png",
+   "newPath": "tmp\\perm-run01\\new\\external-rows-cht-E2E-004-2-blocked-box.png",
+   "exactDiff": 108,
+   "pm": 63,
+   "bbox": [
+    1404,
+    225,
+    1415,
+    235
+   ]
+  },
+  {
+   "name": "external-rows-cht-E2E-006-1-click-copy.png",
+   "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-006-1-click-copy.png",
+   "newPath": "tmp\\perm-run01\\new\\external-rows-cht-E2E-006-1-click-copy.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    225,
+    1415,
+    235
+   ]
+  },
+  {
+   "name": "external-rows-cht-E2E-006-2-copied.png",
+   "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-006-2-copied.png",
+   "newPath": "tmp\\perm-run01\\new\\external-rows-cht-E2E-006-2-copied.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    225,
+    1415,
+    235
+   ]
+  },
+  {
+   "name": "external-rows-cht-E2E-016-1-stale-banner.png",
+   "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-016-1-stale-banner.png",
+   "newPath": "tmp\\perm-run01\\new\\external-rows-cht-E2E-016-1-stale-banner.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    228,
+    1415,
+    238
+   ]
+  },
+  {
+   "name": "rela-user-grup-cht-E2E-001-1-source-row.png",
+   "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-001-1-source-row.png",
+   "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-001-1-source-row.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "rela-user-grup-cht-E2E-001-2-dialog-open.png",
+   "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-001-2-dialog-open.png",
+   "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-001-2-dialog-open.png",
+   "exactDiff": 108,
+   "pm": 63,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "rela-user-grup-cht-E2E-002-1-source-row.png",
+   "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-002-1-source-row.png",
+   "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-002-1-source-row.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "rela-user-grup-cht-E2E-002-10-cgrups-saved.png",
+   "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-002-10-cgrups-saved.png",
+   "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-002-10-cgrups-saved.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "rela-user-grup-cht-E2E-002-2-dialog-open.png",
+   "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-002-2-dialog-open.png",
+   "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-002-2-dialog-open.png",
+   "exactDiff": 108,
+   "pm": 63,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "rela-user-grup-cht-E2E-002-3-click-enable.png",
+   "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-002-3-click-enable.png",
+   "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-002-3-click-enable.png",
+   "exactDiff": 108,
+   "pm": 63,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "rela-user-grup-cht-E2E-002-4-enable-checked.png",
+   "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-002-4-enable-checked.png",
+   "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-002-4-enable-checked.png",
+   "exactDiff": 108,
+   "pm": 63,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "rela-user-grup-cht-E2E-002-5-click-mode.png",
+   "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-002-5-click-mode.png",
+   "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-002-5-click-mode.png",
+   "exactDiff": 108,
+   "pm": 63,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "rela-user-grup-cht-E2E-002-6-list-open.png",
+   "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-002-6-list-open.png",
+   "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-002-6-list-open.png",
+   "exactDiff": 108,
+   "pm": 63,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "rela-user-grup-cht-E2E-002-7-click-and.png",
+   "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-002-7-click-and.png",
+   "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-002-7-click-and.png",
+   "exactDiff": 108,
+   "pm": 63,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "rela-user-grup-cht-E2E-002-8-row-toggled.png",
+   "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-002-8-row-toggled.png",
+   "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-002-8-row-toggled.png",
+   "exactDiff": 108,
+   "pm": 63,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "rela-user-grup-cht-E2E-002-9-click-save.png",
+   "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-002-9-click-save.png",
+   "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-002-9-click-save.png",
+   "exactDiff": 108,
+   "pm": 63,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "rela-user-grup-cht-E2E-003-1-source-row.png",
+   "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-003-1-source-row.png",
+   "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-003-1-source-row.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "rela-user-grup-cht-E2E-003-2-dialog-open.png",
+   "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-003-2-dialog-open.png",
+   "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-003-2-dialog-open.png",
+   "exactDiff": 108,
+   "pm": 63,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "rela-user-grup-cht-E2E-003-3-row-toggled.png",
+   "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-003-3-row-toggled.png",
+   "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-003-3-row-toggled.png",
+   "exactDiff": 108,
+   "pm": 63,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "rela-user-grup-cht-E2E-003-4-cancelled-grid.png",
+   "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-003-4-cancelled-grid.png",
+   "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-003-4-cancelled-grid.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "rela-user-grup-cht-E2E-007-readonly-view.png",
+   "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-007-readonly-view.png",
+   "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-007-readonly-view.png",
+   "exactDiff": 108,
+   "pm": 63,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-001-list-view.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-001-list-view.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-001-list-view.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-002-1-click-edit-mode.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-002-1-click-edit-mode.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-002-1-click-edit-mode.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-002-2-edit-mode-off.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-002-2-edit-mode-off.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-002-2-edit-mode-off.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-003-1-row-blank.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-003-1-row-blank.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-003-1-row-blank.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-003-2-row-filled.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-003-2-row-filled.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-003-2-row-filled.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-003-3-add-save.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-003-3-add-save.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-003-3-add-save.png",
+   "exactDiff": 108,
+   "pm": 63,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-004-1-row-checked.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-004-1-row-checked.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-004-1-row-checked.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-004-2-copied.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-004-2-copied.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-004-2-copied.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-004-3-filled.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-004-3-filled.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-004-3-filled.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-004-4-copy-save.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-004-4-copy-save.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-004-4-copy-save.png",
+   "exactDiff": 108,
+   "pm": 63,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-005-1-row-checked.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-005-1-row-checked.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-005-1-row-checked.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-005-2-deleted.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-005-2-deleted.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-005-2-deleted.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-005-3-delete-save.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-005-3-delete-save.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-005-3-delete-save.png",
+   "exactDiff": 108,
+   "pm": 63,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-006-1-toggled.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-006-1-toggled.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-006-1-toggled.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-006-2-toggle-isactive-save.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-006-2-toggle-isactive-save.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-006-2-toggle-isactive-save.png",
+   "exactDiff": 108,
+   "pm": 63,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-007-1-row-added.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-007-1-row-added.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-007-1-row-added.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-007-2-name-empty.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-007-2-name-empty.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-007-2-name-empty.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-008-1-row-added.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-008-1-row-added.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-008-1-row-added.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-008-2-email-format.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-008-2-email-format.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-008-2-email-format.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-009-1-row-added.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-009-1-row-added.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-009-1-row-added.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-009-2-email-dup.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-009-2-email-dup.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-009-2-email-dup.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-010-1-row-filled.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-010-1-row-filled.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-010-1-row-filled.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-010-2-fail-modal.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-010-2-fail-modal.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-010-2-fail-modal.png",
+   "exactDiff": 108,
+   "pm": 63,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-011-1-source-row.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-011-1-source-row.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-011-1-source-row.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-011-2-dialog-open.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-011-2-dialog-open.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-011-2-dialog-open.png",
+   "exactDiff": 108,
+   "pm": 63,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-012-1-toolbar-for-grups.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-012-1-toolbar-for-grups.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-012-1-toolbar-for-grups.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-012-2-click-cgrups.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-012-2-click-cgrups.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-012-2-click-cgrups.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-012-3-dialog-open.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-012-3-dialog-open.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-012-3-dialog-open.png",
+   "exactDiff": 108,
+   "pm": 63,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-012-4-row-toggled.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-012-4-row-toggled.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-012-4-row-toggled.png",
+   "exactDiff": 108,
+   "pm": 63,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-012-5-cgrups-filled.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-012-5-cgrups-filled.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-012-5-cgrups-filled.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-012-6-click-save.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-012-6-click-save.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-012-6-click-save.png",
+   "exactDiff": 108,
+   "pm": 74,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  },
+  {
+   "name": "users-cht-E2E-012-7-save-ok.png",
+   "basePath": "test\\pics\\users\\users-cht-E2E-012-7-save-ok.png",
+   "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-012-7-save-ok.png",
+   "exactDiff": 108,
+   "pm": 63,
+   "bbox": [
+    1404,
+    196,
+    1415,
+    206
+   ]
+  }
+ ],
+ "B": [
+  "layout-eng-E2E-001-1-click-hide.png",
+  "layout-eng-E2E-002-1-click-show.png",
+  "layout-eng-E2E-002-2-shown.png",
+  "layout-eng-E2E-003-2-widened.png",
+  "rela-user-grup-eng-E2E-001-1-source-row.png",
+  "rela-user-grup-eng-E2E-001-2-dialog-open.png",
+  "rela-user-grup-eng-E2E-002-1-source-row.png",
+  "rela-user-grup-eng-E2E-002-10-cgrups-saved.png",
+  "rela-user-grup-eng-E2E-002-2-dialog-open.png",
+  "rela-user-grup-eng-E2E-002-3-click-enable.png",
+  "rela-user-grup-eng-E2E-002-4-enable-checked.png",
+  "rela-user-grup-eng-E2E-002-5-click-mode.png",
+  "rela-user-grup-eng-E2E-002-8-row-toggled.png",
+  "rela-user-grup-eng-E2E-002-9-click-save.png",
+  "rela-user-grup-eng-E2E-003-1-source-row.png",
+  "rela-user-grup-eng-E2E-003-2-dialog-open.png",
+  "rela-user-grup-eng-E2E-003-3-row-toggled.png",
+  "rela-user-grup-eng-E2E-003-4-cancelled-grid.png",
+  "rela-user-grup-eng-E2E-004-1-source-row.png",
+  "rela-user-grup-eng-E2E-004-2-dialog-open.png",
+  "rela-user-grup-eng-E2E-005-1-source-row.png",
+  "rela-user-grup-eng-E2E-005-11-data-changed.png",
+  "rela-user-grup-eng-E2E-005-2-dialog-open.png",
+  "rela-user-grup-eng-E2E-005-3-click-enable.png",
+  "rela-user-grup-eng-E2E-005-4-enable-checked.png",
+  "rela-user-grup-eng-E2E-005-8-row-toggled.png",
+  "rela-user-grup-eng-E2E-005-9-click-save.png",
+  "rela-user-grup-eng-E2E-006-1-source-row.png",
+  "rela-user-grup-eng-E2E-006-2-dialog-open.png",
+  "rela-user-grup-eng-E2E-006-3-row-toggled.png",
+  "rela-user-grup-eng-E2E-006-4-cancelled-grid.png",
+  "rela-user-grup-eng-E2E-007-readonly-view.png",
+  "rela-user-grup-eng-E2E-008-readonly-view.png",
+  "rela-user-grup-eng-E2E-009-1-source-row.png",
+  "rela-user-grup-eng-E2E-009-12-row-expanded.png",
+  "rela-user-grup-eng-E2E-009-2-dialog-open.png",
+  "rela-user-grup-eng-E2E-009-3-click-enable.png",
+  "rela-user-grup-eng-E2E-009-4-enable-checked.png",
+  "rela-user-grup-eng-E2E-010-1-dialog-open.png",
+  "rela-user-grup-eng-E2E-010-2-click-enable.png",
+  "rela-user-grup-eng-E2E-010-3-enable-checked.png",
+  "rela-user-grup-eng-E2E-010-4-click-save.png",
+  "users-eng-E2E-003-1-row-blank.png",
+  "users-eng-E2E-003-2-row-filled.png",
+  "users-eng-E2E-003-3-add-save.png",
+  "users-eng-E2E-004-1-row-checked.png",
+  "users-eng-E2E-004-2-copied.png",
+  "users-eng-E2E-004-3-filled.png",
+  "users-eng-E2E-004-4-copy-save.png",
+  "users-eng-E2E-005-1-row-checked.png",
+  "users-eng-E2E-005-3-delete-save.png",
+  "users-eng-E2E-006-1-toggled.png",
+  "users-eng-E2E-006-2-toggle-isactive-save.png",
+  "users-eng-E2E-007-1-row-added.png",
+  "users-eng-E2E-007-2-name-empty.png",
+  "users-eng-E2E-008-1-row-added.png",
+  "users-eng-E2E-008-2-email-format.png",
+  "users-eng-E2E-009-1-row-added.png",
+  "users-eng-E2E-009-2-email-dup.png",
+  "users-eng-E2E-010-1-row-filled.png",
+  "users-eng-E2E-011-1-source-row.png",
+  "users-eng-E2E-011-2-dialog-open.png",
+  "users-eng-E2E-012-2-click-cgrups.png",
+  "users-eng-E2E-012-3-dialog-open.png",
+  "users-eng-E2E-012-4-row-toggled.png",
+  "users-eng-E2E-012-5-cgrups-filled.png",
+  "users-eng-E2E-012-6-click-save.png",
+  "users-eng-E2E-012-7-save-ok.png"
+ ],
+ "C": [],
+ "I": [
+  "external-rows-cht-E2E-007-1-banner.png",
+  "external-rows-cht-E2E-007-2-lock-cell.png",
+  "external-rows-cht-E2E-010-1-warn-banner.png",
+  "external-rows-cht-E2E-011-1-click-save.png",
+  "external-rows-cht-E2E-011-2-stale-box.png",
+  "external-rows-cht-E2E-020-1-stale-banner.png",
+  "external-rows-eng-E2E-001-1-banner.png",
+  "external-rows-eng-E2E-001-2-lock-cell.png",
+  "external-rows-eng-E2E-004-1-click-delete.png",
+  "external-rows-eng-E2E-004-2-blocked-box.png",
+  "external-rows-eng-E2E-006-1-click-copy.png",
+  "external-rows-eng-E2E-006-2-copied.png",
+  "external-rows-eng-E2E-007-1-banner.png",
+  "external-rows-eng-E2E-007-2-lock-cell.png",
+  "external-rows-eng-E2E-010-1-warn-banner.png",
+  "external-rows-eng-E2E-011-1-click-save.png",
+  "external-rows-eng-E2E-011-2-stale-box.png",
+  "external-rows-eng-E2E-016-1-stale-banner.png",
+  "external-rows-eng-E2E-020-1-stale-banner.png",
+  "layout-cht-E2E-001-1-click-hide.png",
+  "layout-cht-E2E-001-2-hidden.png",
+  "layout-cht-E2E-002-1-click-show.png",
+  "layout-cht-E2E-002-2-shown.png",
+  "layout-cht-E2E-003-1-narrowed.png",
+  "layout-cht-E2E-003-2-widened.png",
+  "layout-eng-E2E-001-2-hidden.png",
+  "layout-eng-E2E-003-1-narrowed.png",
+  "ref-cascade-cht-E2E-001-1-click-delete.png",
+  "ref-cascade-cht-E2E-001-2-confirm-box.png",
+  "ref-cascade-cht-E2E-003-1-click-save.png",
+  "ref-cascade-cht-E2E-003-2-rename-confirm.png",
+  "ref-cascade-cht-E2E-004-1-click-save.png",
+  "ref-cascade-cht-E2E-004-2-reject-box.png",
+  "ref-cascade-cht-E2E-005-1-click-save.png",
+  "ref-cascade-cht-E2E-005-2-confirm-box.png",
+  "ref-cascade-cht-E2E-006-1-click-save.png",
+  "ref-cascade-cht-E2E-006-2-add-confirm.png",
+  "ref-cascade-eng-E2E-001-1-click-delete.png",
+  "ref-cascade-eng-E2E-001-2-confirm-box.png",
+  "ref-cascade-eng-E2E-003-1-click-save.png",
+  "ref-cascade-eng-E2E-003-2-rename-confirm.png",
+  "ref-cascade-eng-E2E-004-1-click-save.png",
+  "ref-cascade-eng-E2E-004-2-reject-box.png",
+  "ref-cascade-eng-E2E-005-1-click-save.png",
+  "ref-cascade-eng-E2E-005-2-confirm-box.png",
+  "ref-cascade-eng-E2E-006-1-click-save.png",
+  "ref-cascade-eng-E2E-006-2-add-confirm.png",
+  "rela-user-grup-cht-E2E-004-1-source-row.png",
+  "rela-user-grup-cht-E2E-004-2-dialog-open.png",
+  "rela-user-grup-cht-E2E-005-1-source-row.png",
+  "rela-user-grup-cht-E2E-005-10-belong-saved.png",
+  "rela-user-grup-cht-E2E-005-11-data-changed.png",
+  "rela-user-grup-cht-E2E-005-2-dialog-open.png",
+  "rela-user-grup-cht-E2E-005-3-click-enable.png",
+  "rela-user-grup-cht-E2E-005-4-enable-checked.png",
+  "rela-user-grup-cht-E2E-005-5-click-mode.png",
+  "rela-user-grup-cht-E2E-005-6-list-open.png",
+  "rela-user-grup-cht-E2E-005-7-click-and.png",
+  "rela-user-grup-cht-E2E-005-8-row-toggled.png",
+  "rela-user-grup-cht-E2E-005-9-click-save.png",
+  "rela-user-grup-cht-E2E-006-1-source-row.png",
+  "rela-user-grup-cht-E2E-006-2-dialog-open.png",
+  "rela-user-grup-cht-E2E-006-3-row-toggled.png",
+  "rela-user-grup-cht-E2E-006-4-cancelled-grid.png",
+  "rela-user-grup-cht-E2E-008-readonly-view.png",
+  "rela-user-grup-cht-E2E-009-1-source-row.png",
+  "rela-user-grup-cht-E2E-009-10-click-and.png",
+  "rela-user-grup-cht-E2E-009-11-row-toggled.png",
+  "rela-user-grup-cht-E2E-009-12-row-expanded.png",
+  "rela-user-grup-cht-E2E-009-2-dialog-open.png",
+  "rela-user-grup-cht-E2E-009-3-click-enable.png",
+  "rela-user-grup-cht-E2E-009-4-enable-checked.png",
+  "rela-user-grup-cht-E2E-009-5-row-collapsed.png",
+  "rela-user-grup-cht-E2E-009-6-click-more.png",
+  "rela-user-grup-cht-E2E-009-7-popup-open.png",
+  "rela-user-grup-cht-E2E-009-8-click-mode.png",
+  "rela-user-grup-cht-E2E-009-9-list-open.png",
+  "rela-user-grup-cht-E2E-010-1-dialog-open.png",
+  "rela-user-grup-cht-E2E-010-2-click-enable.png",
+  "rela-user-grup-cht-E2E-010-3-enable-checked.png",
+  "rela-user-grup-cht-E2E-010-4-click-save.png",
+  "rela-user-grup-cht-E2E-010-5-belong-saved.png",
+  "rela-user-grup-eng-E2E-002-6-list-open.png",
+  "rela-user-grup-eng-E2E-002-7-click-and.png",
+  "rela-user-grup-eng-E2E-005-10-belong-saved.png",
+  "rela-user-grup-eng-E2E-005-5-click-mode.png",
+  "rela-user-grup-eng-E2E-005-6-list-open.png",
+  "rela-user-grup-eng-E2E-005-7-click-and.png",
+  "rela-user-grup-eng-E2E-009-10-click-and.png",
+  "rela-user-grup-eng-E2E-009-11-row-toggled.png",
+  "rela-user-grup-eng-E2E-009-5-row-collapsed.png",
+  "rela-user-grup-eng-E2E-009-6-click-more.png",
+  "rela-user-grup-eng-E2E-009-7-popup-open.png",
+  "rela-user-grup-eng-E2E-009-8-click-mode.png",
+  "rela-user-grup-eng-E2E-009-9-list-open.png",
+  "rela-user-grup-eng-E2E-010-5-belong-saved.png",
+  "users-eng-E2E-001-list-view.png",
+  "users-eng-E2E-002-1-click-edit-mode.png",
+  "users-eng-E2E-002-2-edit-mode-off.png",
+  "users-eng-E2E-005-2-deleted.png",
+  "users-eng-E2E-010-2-fail-modal.png",
+  "users-eng-E2E-012-1-toolbar-for-grups.png"
+ ]
+}

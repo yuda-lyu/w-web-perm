@@ -46,7 +46,7 @@ let settings = {
         type: 'TEXT',
     },
     isAdmin: {
-        name: '是否為系統管理員',
+        name: '是否為系統管理者',
         type: 'STRING',
     },
     userId: {

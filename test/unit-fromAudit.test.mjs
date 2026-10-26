@@ -1481,7 +1481,7 @@ describe('unit-fromAudit (來源欄 from 之稽核、型別正規化與整來源
             assert.strictEqual(res.ok, true)
             let txt = logs.join('\n')
             assert.ok(txt.includes('id="u2"') && txt.includes('id="u6"'))
-            assert.ok(txt.includes('被清除列中有 1 列為系統管理員'))
+            assert.ok(txt.includes('被清除列中有 1 列為系統管理者'))
             assert.ok(txt.includes('users 無引用端'))
             assert.ok(!txt.includes('secret-') && !txt.includes('NAME-'))
             let wo = mkWo(stdFx())

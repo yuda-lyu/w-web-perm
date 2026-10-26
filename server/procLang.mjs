@@ -481,7 +481,7 @@ let kpLang = {
     //perm-run01(R-ADMIN-ONLY-01): 同鍵亦為資料通道(連線閘、執行身分)與後台登入檢查拒絕非系統管理員之固定鍵, 文字涵蓋存取與變更
     userNotAdmin: {
         eng: `Only system administrators can access or change this data`,
-        cht: `僅系統管理員可存取或變更此資料`,
+        cht: `僅系統管理者可存取或變更此資料`,
     },
     //perm-run03 範圍二(外部匯入改依來源鍵 srcKey 差異同步; dspec/外部匯入之定義與機制.md 第 9 節):
     //  srcKeyInvalid 批次內有列缺 srcKey、srcKey 為空或非字串(含長度／字元不合) → 整批拒收、零寫入; srcKeyDuplicate 同批 srcKey 重複 → 整批拒收;
@@ -653,7 +653,7 @@ let kpLang = {
 
     isAdmin: {
         eng: `Administrator`,
-        cht: `是否為系統管理員`,
+        cht: `是否為系統管理者`,
     },
     isActive: {
         eng: `Active`,

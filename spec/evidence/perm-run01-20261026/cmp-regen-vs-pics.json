@@ -1,0 +1,3108 @@
+[
+ {
+  "name": "external-rows-cht-E2E-001-1-banner.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   225,
+   1415,
+   235
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-001-1-banner.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-cht-E2E-001-1-banner.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-001-2-lock-cell.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   225,
+   1415,
+   235
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-001-2-lock-cell.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-cht-E2E-001-2-lock-cell.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-004-1-click-delete.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   225,
+   1415,
+   235
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-004-1-click-delete.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-cht-E2E-004-1-click-delete.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-004-2-blocked-box.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 63,
+  "bbox": [
+   1404,
+   225,
+   1415,
+   235
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-004-2-blocked-box.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-cht-E2E-004-2-blocked-box.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-006-1-click-copy.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   225,
+   1415,
+   235
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-006-1-click-copy.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-cht-E2E-006-1-click-copy.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-006-2-copied.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   225,
+   1415,
+   235
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-006-2-copied.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-cht-E2E-006-2-copied.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-007-1-banner.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-007-1-banner.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-cht-E2E-007-1-banner.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-007-2-lock-cell.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-007-2-lock-cell.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-cht-E2E-007-2-lock-cell.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-010-1-warn-banner.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-010-1-warn-banner.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-cht-E2E-010-1-warn-banner.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-011-1-click-save.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-011-1-click-save.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-cht-E2E-011-1-click-save.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-011-2-stale-box.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-011-2-stale-box.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-cht-E2E-011-2-stale-box.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-016-1-stale-banner.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   228,
+   1415,
+   238
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-016-1-stale-banner.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-cht-E2E-016-1-stale-banner.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-020-1-stale-banner.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-020-1-stale-banner.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-cht-E2E-020-1-stale-banner.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-001-1-banner.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-001-1-banner.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-eng-E2E-001-1-banner.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-001-2-lock-cell.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-001-2-lock-cell.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-eng-E2E-001-2-lock-cell.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-004-1-click-delete.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-004-1-click-delete.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-eng-E2E-004-1-click-delete.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-004-2-blocked-box.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-004-2-blocked-box.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-eng-E2E-004-2-blocked-box.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-006-1-click-copy.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-006-1-click-copy.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-eng-E2E-006-1-click-copy.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-006-2-copied.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-006-2-copied.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-eng-E2E-006-2-copied.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-007-1-banner.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-007-1-banner.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-eng-E2E-007-1-banner.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-007-2-lock-cell.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-007-2-lock-cell.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-eng-E2E-007-2-lock-cell.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-010-1-warn-banner.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-010-1-warn-banner.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-eng-E2E-010-1-warn-banner.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-011-1-click-save.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-011-1-click-save.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-eng-E2E-011-1-click-save.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-011-2-stale-box.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-011-2-stale-box.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-eng-E2E-011-2-stale-box.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-016-1-stale-banner.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-016-1-stale-banner.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-eng-E2E-016-1-stale-banner.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-020-1-stale-banner.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-020-1-stale-banner.png",
+  "newPath": "tmp\\perm-run01\\new\\external-rows-eng-E2E-020-1-stale-banner.png"
+ },
+ {
+  "name": "layout-cht-E2E-001-1-click-hide.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\layout\\layout-cht-E2E-001-1-click-hide.png",
+  "newPath": "tmp\\perm-run01\\new\\layout-cht-E2E-001-1-click-hide.png"
+ },
+ {
+  "name": "layout-cht-E2E-001-2-hidden.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\layout\\layout-cht-E2E-001-2-hidden.png",
+  "newPath": "tmp\\perm-run01\\new\\layout-cht-E2E-001-2-hidden.png"
+ },
+ {
+  "name": "layout-cht-E2E-002-1-click-show.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\layout\\layout-cht-E2E-002-1-click-show.png",
+  "newPath": "tmp\\perm-run01\\new\\layout-cht-E2E-002-1-click-show.png"
+ },
+ {
+  "name": "layout-cht-E2E-002-2-shown.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\layout\\layout-cht-E2E-002-2-shown.png",
+  "newPath": "tmp\\perm-run01\\new\\layout-cht-E2E-002-2-shown.png"
+ },
+ {
+  "name": "layout-cht-E2E-003-1-narrowed.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 400,
+  "h": 900,
+  "basePath": "test\\pics\\layout\\layout-cht-E2E-003-1-narrowed.png",
+  "newPath": "tmp\\perm-run01\\new\\layout-cht-E2E-003-1-narrowed.png"
+ },
+ {
+  "name": "layout-cht-E2E-003-2-widened.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\layout\\layout-cht-E2E-003-2-widened.png",
+  "newPath": "tmp\\perm-run01\\new\\layout-cht-E2E-003-2-widened.png"
+ },
+ {
+  "name": "layout-eng-E2E-001-1-click-hide.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\layout\\layout-eng-E2E-001-1-click-hide.png",
+  "newPath": "tmp\\perm-run01\\new\\layout-eng-E2E-001-1-click-hide.png"
+ },
+ {
+  "name": "layout-eng-E2E-001-2-hidden.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\layout\\layout-eng-E2E-001-2-hidden.png",
+  "newPath": "tmp\\perm-run01\\new\\layout-eng-E2E-001-2-hidden.png"
+ },
+ {
+  "name": "layout-eng-E2E-002-1-click-show.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\layout\\layout-eng-E2E-002-1-click-show.png",
+  "newPath": "tmp\\perm-run01\\new\\layout-eng-E2E-002-1-click-show.png"
+ },
+ {
+  "name": "layout-eng-E2E-002-2-shown.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\layout\\layout-eng-E2E-002-2-shown.png",
+  "newPath": "tmp\\perm-run01\\new\\layout-eng-E2E-002-2-shown.png"
+ },
+ {
+  "name": "layout-eng-E2E-003-1-narrowed.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 400,
+  "h": 900,
+  "basePath": "test\\pics\\layout\\layout-eng-E2E-003-1-narrowed.png",
+  "newPath": "tmp\\perm-run01\\new\\layout-eng-E2E-003-1-narrowed.png"
+ },
+ {
+  "name": "layout-eng-E2E-003-2-widened.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\layout\\layout-eng-E2E-003-2-widened.png",
+  "newPath": "tmp\\perm-run01\\new\\layout-eng-E2E-003-2-widened.png"
+ },
+ {
+  "name": "ref-cascade-cht-E2E-001-1-click-delete.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\ref-cascade\\ref-cascade-cht-E2E-001-1-click-delete.png",
+  "newPath": "tmp\\perm-run01\\new\\ref-cascade-cht-E2E-001-1-click-delete.png"
+ },
+ {
+  "name": "ref-cascade-cht-E2E-001-2-confirm-box.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\ref-cascade\\ref-cascade-cht-E2E-001-2-confirm-box.png",
+  "newPath": "tmp\\perm-run01\\new\\ref-cascade-cht-E2E-001-2-confirm-box.png"
+ },
+ {
+  "name": "ref-cascade-cht-E2E-003-1-click-save.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\ref-cascade\\ref-cascade-cht-E2E-003-1-click-save.png",
+  "newPath": "tmp\\perm-run01\\new\\ref-cascade-cht-E2E-003-1-click-save.png"
+ },
+ {
+  "name": "ref-cascade-cht-E2E-003-2-rename-confirm.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\ref-cascade\\ref-cascade-cht-E2E-003-2-rename-confirm.png",
+  "newPath": "tmp\\perm-run01\\new\\ref-cascade-cht-E2E-003-2-rename-confirm.png"
+ },
+ {
+  "name": "ref-cascade-cht-E2E-004-1-click-save.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\ref-cascade\\ref-cascade-cht-E2E-004-1-click-save.png",
+  "newPath": "tmp\\perm-run01\\new\\ref-cascade-cht-E2E-004-1-click-save.png"
+ },
+ {
+  "name": "ref-cascade-cht-E2E-004-2-reject-box.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\ref-cascade\\ref-cascade-cht-E2E-004-2-reject-box.png",
+  "newPath": "tmp\\perm-run01\\new\\ref-cascade-cht-E2E-004-2-reject-box.png"
+ },
+ {
+  "name": "ref-cascade-cht-E2E-005-1-click-save.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\ref-cascade\\ref-cascade-cht-E2E-005-1-click-save.png",
+  "newPath": "tmp\\perm-run01\\new\\ref-cascade-cht-E2E-005-1-click-save.png"
+ },
+ {
+  "name": "ref-cascade-cht-E2E-005-2-confirm-box.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\ref-cascade\\ref-cascade-cht-E2E-005-2-confirm-box.png",
+  "newPath": "tmp\\perm-run01\\new\\ref-cascade-cht-E2E-005-2-confirm-box.png"
+ },
+ {
+  "name": "ref-cascade-cht-E2E-006-1-click-save.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\ref-cascade\\ref-cascade-cht-E2E-006-1-click-save.png",
+  "newPath": "tmp\\perm-run01\\new\\ref-cascade-cht-E2E-006-1-click-save.png"
+ },
+ {
+  "name": "ref-cascade-cht-E2E-006-2-add-confirm.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\ref-cascade\\ref-cascade-cht-E2E-006-2-add-confirm.png",
+  "newPath": "tmp\\perm-run01\\new\\ref-cascade-cht-E2E-006-2-add-confirm.png"
+ },
+ {
+  "name": "ref-cascade-eng-E2E-001-1-click-delete.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\ref-cascade\\ref-cascade-eng-E2E-001-1-click-delete.png",
+  "newPath": "tmp\\perm-run01\\new\\ref-cascade-eng-E2E-001-1-click-delete.png"
+ },
+ {
+  "name": "ref-cascade-eng-E2E-001-2-confirm-box.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\ref-cascade\\ref-cascade-eng-E2E-001-2-confirm-box.png",
+  "newPath": "tmp\\perm-run01\\new\\ref-cascade-eng-E2E-001-2-confirm-box.png"
+ },
+ {
+  "name": "ref-cascade-eng-E2E-003-1-click-save.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\ref-cascade\\ref-cascade-eng-E2E-003-1-click-save.png",
+  "newPath": "tmp\\perm-run01\\new\\ref-cascade-eng-E2E-003-1-click-save.png"
+ },
+ {
+  "name": "ref-cascade-eng-E2E-003-2-rename-confirm.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\ref-cascade\\ref-cascade-eng-E2E-003-2-rename-confirm.png",
+  "newPath": "tmp\\perm-run01\\new\\ref-cascade-eng-E2E-003-2-rename-confirm.png"
+ },
+ {
+  "name": "ref-cascade-eng-E2E-004-1-click-save.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\ref-cascade\\ref-cascade-eng-E2E-004-1-click-save.png",
+  "newPath": "tmp\\perm-run01\\new\\ref-cascade-eng-E2E-004-1-click-save.png"
+ },
+ {
+  "name": "ref-cascade-eng-E2E-004-2-reject-box.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\ref-cascade\\ref-cascade-eng-E2E-004-2-reject-box.png",
+  "newPath": "tmp\\perm-run01\\new\\ref-cascade-eng-E2E-004-2-reject-box.png"
+ },
+ {
+  "name": "ref-cascade-eng-E2E-005-1-click-save.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\ref-cascade\\ref-cascade-eng-E2E-005-1-click-save.png",
+  "newPath": "tmp\\perm-run01\\new\\ref-cascade-eng-E2E-005-1-click-save.png"
+ },
+ {
+  "name": "ref-cascade-eng-E2E-005-2-confirm-box.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\ref-cascade\\ref-cascade-eng-E2E-005-2-confirm-box.png",
+  "newPath": "tmp\\perm-run01\\new\\ref-cascade-eng-E2E-005-2-confirm-box.png"
+ },
+ {
+  "name": "ref-cascade-eng-E2E-006-1-click-save.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\ref-cascade\\ref-cascade-eng-E2E-006-1-click-save.png",
+  "newPath": "tmp\\perm-run01\\new\\ref-cascade-eng-E2E-006-1-click-save.png"
+ },
+ {
+  "name": "ref-cascade-eng-E2E-006-2-add-confirm.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\ref-cascade\\ref-cascade-eng-E2E-006-2-add-confirm.png",
+  "newPath": "tmp\\perm-run01\\new\\ref-cascade-eng-E2E-006-2-add-confirm.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-001-1-source-row.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-001-1-source-row.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-001-1-source-row.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-001-2-dialog-open.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 63,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-001-2-dialog-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-001-2-dialog-open.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-002-1-source-row.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-002-1-source-row.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-002-1-source-row.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-002-10-cgrups-saved.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-002-10-cgrups-saved.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-002-10-cgrups-saved.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-002-2-dialog-open.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 63,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-002-2-dialog-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-002-2-dialog-open.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-002-3-click-enable.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 63,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-002-3-click-enable.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-002-3-click-enable.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-002-4-enable-checked.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 63,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-002-4-enable-checked.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-002-4-enable-checked.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-002-5-click-mode.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 63,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-002-5-click-mode.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-002-5-click-mode.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-002-6-list-open.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 63,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-002-6-list-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-002-6-list-open.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-002-7-click-and.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 63,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-002-7-click-and.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-002-7-click-and.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-002-8-row-toggled.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 63,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-002-8-row-toggled.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-002-8-row-toggled.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-002-9-click-save.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 63,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-002-9-click-save.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-002-9-click-save.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-003-1-source-row.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-003-1-source-row.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-003-1-source-row.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-003-2-dialog-open.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 63,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-003-2-dialog-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-003-2-dialog-open.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-003-3-row-toggled.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 63,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-003-3-row-toggled.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-003-3-row-toggled.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-003-4-cancelled-grid.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-003-4-cancelled-grid.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-003-4-cancelled-grid.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-004-1-source-row.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-004-1-source-row.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-004-1-source-row.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-004-2-dialog-open.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-004-2-dialog-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-004-2-dialog-open.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-005-1-source-row.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-005-1-source-row.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-005-1-source-row.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-005-10-belong-saved.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-005-10-belong-saved.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-005-10-belong-saved.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-005-11-data-changed.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-005-11-data-changed.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-005-11-data-changed.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-005-2-dialog-open.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-005-2-dialog-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-005-2-dialog-open.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-005-3-click-enable.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-005-3-click-enable.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-005-3-click-enable.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-005-4-enable-checked.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-005-4-enable-checked.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-005-4-enable-checked.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-005-5-click-mode.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-005-5-click-mode.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-005-5-click-mode.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-005-6-list-open.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-005-6-list-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-005-6-list-open.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-005-7-click-and.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-005-7-click-and.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-005-7-click-and.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-005-8-row-toggled.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-005-8-row-toggled.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-005-8-row-toggled.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-005-9-click-save.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-005-9-click-save.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-005-9-click-save.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-006-1-source-row.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-006-1-source-row.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-006-1-source-row.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-006-2-dialog-open.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-006-2-dialog-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-006-2-dialog-open.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-006-3-row-toggled.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-006-3-row-toggled.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-006-3-row-toggled.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-006-4-cancelled-grid.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-006-4-cancelled-grid.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-006-4-cancelled-grid.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-007-readonly-view.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 63,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-007-readonly-view.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-007-readonly-view.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-008-readonly-view.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-008-readonly-view.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-008-readonly-view.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-009-1-source-row.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-009-1-source-row.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-009-1-source-row.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-009-10-click-and.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 480,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-009-10-click-and.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-009-10-click-and.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-009-11-row-toggled.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 480,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-009-11-row-toggled.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-009-11-row-toggled.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-009-12-row-expanded.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-009-12-row-expanded.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-009-12-row-expanded.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-009-2-dialog-open.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-009-2-dialog-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-009-2-dialog-open.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-009-3-click-enable.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-009-3-click-enable.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-009-3-click-enable.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-009-4-enable-checked.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-009-4-enable-checked.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-009-4-enable-checked.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-009-5-row-collapsed.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 480,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-009-5-row-collapsed.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-009-5-row-collapsed.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-009-6-click-more.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 480,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-009-6-click-more.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-009-6-click-more.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-009-7-popup-open.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 480,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-009-7-popup-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-009-7-popup-open.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-009-8-click-mode.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 480,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-009-8-click-mode.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-009-8-click-mode.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-009-9-list-open.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 480,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-009-9-list-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-009-9-list-open.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-010-1-dialog-open.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-010-1-dialog-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-010-1-dialog-open.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-010-2-click-enable.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-010-2-click-enable.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-010-2-click-enable.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-010-3-enable-checked.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-010-3-enable-checked.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-010-3-enable-checked.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-010-4-click-save.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-010-4-click-save.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-010-4-click-save.png"
+ },
+ {
+  "name": "rela-user-grup-cht-E2E-010-5-belong-saved.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-cht-E2E-010-5-belong-saved.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-cht-E2E-010-5-belong-saved.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-001-1-source-row.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-001-1-source-row.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-001-1-source-row.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-001-2-dialog-open.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-001-2-dialog-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-001-2-dialog-open.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-002-1-source-row.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-002-1-source-row.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-002-1-source-row.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-002-10-cgrups-saved.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-002-10-cgrups-saved.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-002-10-cgrups-saved.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-002-2-dialog-open.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-002-2-dialog-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-002-2-dialog-open.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-002-3-click-enable.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-002-3-click-enable.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-002-3-click-enable.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-002-4-enable-checked.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-002-4-enable-checked.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-002-4-enable-checked.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-002-5-click-mode.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-002-5-click-mode.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-002-5-click-mode.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-002-6-list-open.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-002-6-list-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-002-6-list-open.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-002-7-click-and.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-002-7-click-and.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-002-7-click-and.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-002-8-row-toggled.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-002-8-row-toggled.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-002-8-row-toggled.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-002-9-click-save.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-002-9-click-save.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-002-9-click-save.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-003-1-source-row.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-003-1-source-row.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-003-1-source-row.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-003-2-dialog-open.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-003-2-dialog-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-003-2-dialog-open.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-003-3-row-toggled.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-003-3-row-toggled.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-003-3-row-toggled.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-003-4-cancelled-grid.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-003-4-cancelled-grid.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-003-4-cancelled-grid.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-004-1-source-row.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-004-1-source-row.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-004-1-source-row.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-004-2-dialog-open.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-004-2-dialog-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-004-2-dialog-open.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-005-1-source-row.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-005-1-source-row.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-005-1-source-row.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-005-10-belong-saved.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-005-10-belong-saved.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-005-10-belong-saved.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-005-11-data-changed.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-005-11-data-changed.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-005-11-data-changed.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-005-2-dialog-open.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-005-2-dialog-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-005-2-dialog-open.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-005-3-click-enable.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-005-3-click-enable.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-005-3-click-enable.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-005-4-enable-checked.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-005-4-enable-checked.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-005-4-enable-checked.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-005-5-click-mode.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-005-5-click-mode.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-005-5-click-mode.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-005-6-list-open.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-005-6-list-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-005-6-list-open.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-005-7-click-and.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-005-7-click-and.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-005-7-click-and.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-005-8-row-toggled.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-005-8-row-toggled.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-005-8-row-toggled.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-005-9-click-save.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-005-9-click-save.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-005-9-click-save.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-006-1-source-row.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-006-1-source-row.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-006-1-source-row.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-006-2-dialog-open.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-006-2-dialog-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-006-2-dialog-open.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-006-3-row-toggled.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-006-3-row-toggled.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-006-3-row-toggled.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-006-4-cancelled-grid.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-006-4-cancelled-grid.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-006-4-cancelled-grid.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-007-readonly-view.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-007-readonly-view.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-007-readonly-view.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-008-readonly-view.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-008-readonly-view.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-008-readonly-view.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-009-1-source-row.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-009-1-source-row.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-009-1-source-row.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-009-10-click-and.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 480,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-009-10-click-and.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-009-10-click-and.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-009-11-row-toggled.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 480,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-009-11-row-toggled.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-009-11-row-toggled.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-009-12-row-expanded.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-009-12-row-expanded.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-009-12-row-expanded.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-009-2-dialog-open.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-009-2-dialog-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-009-2-dialog-open.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-009-3-click-enable.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-009-3-click-enable.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-009-3-click-enable.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-009-4-enable-checked.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-009-4-enable-checked.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-009-4-enable-checked.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-009-5-row-collapsed.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 480,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-009-5-row-collapsed.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-009-5-row-collapsed.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-009-6-click-more.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 480,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-009-6-click-more.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-009-6-click-more.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-009-7-popup-open.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 480,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-009-7-popup-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-009-7-popup-open.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-009-8-click-mode.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 480,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-009-8-click-mode.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-009-8-click-mode.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-009-9-list-open.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 480,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-009-9-list-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-009-9-list-open.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-010-1-dialog-open.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-010-1-dialog-open.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-010-1-dialog-open.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-010-2-click-enable.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-010-2-click-enable.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-010-2-click-enable.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-010-3-enable-checked.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-010-3-enable-checked.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-010-3-enable-checked.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-010-4-click-save.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-010-4-click-save.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-010-4-click-save.png"
+ },
+ {
+  "name": "rela-user-grup-eng-E2E-010-5-belong-saved.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\rela-user-grup\\rela-user-grup-eng-E2E-010-5-belong-saved.png",
+  "newPath": "tmp\\perm-run01\\new\\rela-user-grup-eng-E2E-010-5-belong-saved.png"
+ },
+ {
+  "name": "users-cht-E2E-001-list-view.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-001-list-view.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-001-list-view.png"
+ },
+ {
+  "name": "users-cht-E2E-002-1-click-edit-mode.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-002-1-click-edit-mode.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-002-1-click-edit-mode.png"
+ },
+ {
+  "name": "users-cht-E2E-002-2-edit-mode-off.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-002-2-edit-mode-off.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-002-2-edit-mode-off.png"
+ },
+ {
+  "name": "users-cht-E2E-003-1-row-blank.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-003-1-row-blank.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-003-1-row-blank.png"
+ },
+ {
+  "name": "users-cht-E2E-003-2-row-filled.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-003-2-row-filled.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-003-2-row-filled.png"
+ },
+ {
+  "name": "users-cht-E2E-003-3-add-save.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 63,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-003-3-add-save.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-003-3-add-save.png"
+ },
+ {
+  "name": "users-cht-E2E-004-1-row-checked.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-004-1-row-checked.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-004-1-row-checked.png"
+ },
+ {
+  "name": "users-cht-E2E-004-2-copied.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-004-2-copied.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-004-2-copied.png"
+ },
+ {
+  "name": "users-cht-E2E-004-3-filled.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-004-3-filled.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-004-3-filled.png"
+ },
+ {
+  "name": "users-cht-E2E-004-4-copy-save.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 63,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-004-4-copy-save.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-004-4-copy-save.png"
+ },
+ {
+  "name": "users-cht-E2E-005-1-row-checked.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-005-1-row-checked.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-005-1-row-checked.png"
+ },
+ {
+  "name": "users-cht-E2E-005-2-deleted.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-005-2-deleted.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-005-2-deleted.png"
+ },
+ {
+  "name": "users-cht-E2E-005-3-delete-save.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 63,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-005-3-delete-save.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-005-3-delete-save.png"
+ },
+ {
+  "name": "users-cht-E2E-006-1-toggled.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-006-1-toggled.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-006-1-toggled.png"
+ },
+ {
+  "name": "users-cht-E2E-006-2-toggle-isactive-save.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 63,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-006-2-toggle-isactive-save.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-006-2-toggle-isactive-save.png"
+ },
+ {
+  "name": "users-cht-E2E-007-1-row-added.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-007-1-row-added.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-007-1-row-added.png"
+ },
+ {
+  "name": "users-cht-E2E-007-2-name-empty.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-007-2-name-empty.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-007-2-name-empty.png"
+ },
+ {
+  "name": "users-cht-E2E-008-1-row-added.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-008-1-row-added.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-008-1-row-added.png"
+ },
+ {
+  "name": "users-cht-E2E-008-2-email-format.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-008-2-email-format.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-008-2-email-format.png"
+ },
+ {
+  "name": "users-cht-E2E-009-1-row-added.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-009-1-row-added.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-009-1-row-added.png"
+ },
+ {
+  "name": "users-cht-E2E-009-2-email-dup.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-009-2-email-dup.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-009-2-email-dup.png"
+ },
+ {
+  "name": "users-cht-E2E-010-1-row-filled.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-010-1-row-filled.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-010-1-row-filled.png"
+ },
+ {
+  "name": "users-cht-E2E-010-2-fail-modal.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 63,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-010-2-fail-modal.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-010-2-fail-modal.png"
+ },
+ {
+  "name": "users-cht-E2E-011-1-source-row.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-011-1-source-row.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-011-1-source-row.png"
+ },
+ {
+  "name": "users-cht-E2E-011-2-dialog-open.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 63,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-011-2-dialog-open.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-011-2-dialog-open.png"
+ },
+ {
+  "name": "users-cht-E2E-012-1-toolbar-for-grups.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-012-1-toolbar-for-grups.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-012-1-toolbar-for-grups.png"
+ },
+ {
+  "name": "users-cht-E2E-012-2-click-cgrups.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-012-2-click-cgrups.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-012-2-click-cgrups.png"
+ },
+ {
+  "name": "users-cht-E2E-012-3-dialog-open.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 63,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-012-3-dialog-open.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-012-3-dialog-open.png"
+ },
+ {
+  "name": "users-cht-E2E-012-4-row-toggled.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 63,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-012-4-row-toggled.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-012-4-row-toggled.png"
+ },
+ {
+  "name": "users-cht-E2E-012-5-cgrups-filled.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-012-5-cgrups-filled.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-012-5-cgrups-filled.png"
+ },
+ {
+  "name": "users-cht-E2E-012-6-click-save.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 74,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-012-6-click-save.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-012-6-click-save.png"
+ },
+ {
+  "name": "users-cht-E2E-012-7-save-ok.png",
+  "status": "DIFF",
+  "exactDiff": 108,
+  "pm": 63,
+  "bbox": [
+   1404,
+   196,
+   1415,
+   206
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-cht-E2E-012-7-save-ok.png",
+  "newPath": "tmp\\perm-run01\\new\\users-cht-E2E-012-7-save-ok.png"
+ },
+ {
+  "name": "users-eng-E2E-001-list-view.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-001-list-view.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-001-list-view.png"
+ },
+ {
+  "name": "users-eng-E2E-002-1-click-edit-mode.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-002-1-click-edit-mode.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-002-1-click-edit-mode.png"
+ },
+ {
+  "name": "users-eng-E2E-002-2-edit-mode-off.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-002-2-edit-mode-off.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-002-2-edit-mode-off.png"
+ },
+ {
+  "name": "users-eng-E2E-003-1-row-blank.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-003-1-row-blank.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-003-1-row-blank.png"
+ },
+ {
+  "name": "users-eng-E2E-003-2-row-filled.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-003-2-row-filled.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-003-2-row-filled.png"
+ },
+ {
+  "name": "users-eng-E2E-003-3-add-save.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-003-3-add-save.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-003-3-add-save.png"
+ },
+ {
+  "name": "users-eng-E2E-004-1-row-checked.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-004-1-row-checked.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-004-1-row-checked.png"
+ },
+ {
+  "name": "users-eng-E2E-004-2-copied.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-004-2-copied.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-004-2-copied.png"
+ },
+ {
+  "name": "users-eng-E2E-004-3-filled.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-004-3-filled.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-004-3-filled.png"
+ },
+ {
+  "name": "users-eng-E2E-004-4-copy-save.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-004-4-copy-save.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-004-4-copy-save.png"
+ },
+ {
+  "name": "users-eng-E2E-005-1-row-checked.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-005-1-row-checked.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-005-1-row-checked.png"
+ },
+ {
+  "name": "users-eng-E2E-005-2-deleted.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-005-2-deleted.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-005-2-deleted.png"
+ },
+ {
+  "name": "users-eng-E2E-005-3-delete-save.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-005-3-delete-save.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-005-3-delete-save.png"
+ },
+ {
+  "name": "users-eng-E2E-006-1-toggled.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-006-1-toggled.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-006-1-toggled.png"
+ },
+ {
+  "name": "users-eng-E2E-006-2-toggle-isactive-save.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-006-2-toggle-isactive-save.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-006-2-toggle-isactive-save.png"
+ },
+ {
+  "name": "users-eng-E2E-007-1-row-added.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-007-1-row-added.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-007-1-row-added.png"
+ },
+ {
+  "name": "users-eng-E2E-007-2-name-empty.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-007-2-name-empty.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-007-2-name-empty.png"
+ },
+ {
+  "name": "users-eng-E2E-008-1-row-added.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-008-1-row-added.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-008-1-row-added.png"
+ },
+ {
+  "name": "users-eng-E2E-008-2-email-format.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-008-2-email-format.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-008-2-email-format.png"
+ },
+ {
+  "name": "users-eng-E2E-009-1-row-added.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-009-1-row-added.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-009-1-row-added.png"
+ },
+ {
+  "name": "users-eng-E2E-009-2-email-dup.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-009-2-email-dup.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-009-2-email-dup.png"
+ },
+ {
+  "name": "users-eng-E2E-010-1-row-filled.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-010-1-row-filled.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-010-1-row-filled.png"
+ },
+ {
+  "name": "users-eng-E2E-010-2-fail-modal.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-010-2-fail-modal.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-010-2-fail-modal.png"
+ },
+ {
+  "name": "users-eng-E2E-011-1-source-row.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-011-1-source-row.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-011-1-source-row.png"
+ },
+ {
+  "name": "users-eng-E2E-011-2-dialog-open.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-011-2-dialog-open.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-011-2-dialog-open.png"
+ },
+ {
+  "name": "users-eng-E2E-012-1-toolbar-for-grups.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-012-1-toolbar-for-grups.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-012-1-toolbar-for-grups.png"
+ },
+ {
+  "name": "users-eng-E2E-012-2-click-cgrups.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-012-2-click-cgrups.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-012-2-click-cgrups.png"
+ },
+ {
+  "name": "users-eng-E2E-012-3-dialog-open.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-012-3-dialog-open.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-012-3-dialog-open.png"
+ },
+ {
+  "name": "users-eng-E2E-012-4-row-toggled.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-012-4-row-toggled.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-012-4-row-toggled.png"
+ },
+ {
+  "name": "users-eng-E2E-012-5-cgrups-filled.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-012-5-cgrups-filled.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-012-5-cgrups-filled.png"
+ },
+ {
+  "name": "users-eng-E2E-012-6-click-save.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-012-6-click-save.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-012-6-click-save.png"
+ },
+ {
+  "name": "users-eng-E2E-012-7-save-ok.png",
+  "status": "DIFF",
+  "exactDiff": 1,
+  "pm": 0,
+  "bbox": [
+   60,
+   47,
+   60,
+   47
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\users\\users-eng-E2E-012-7-save-ok.png",
+  "newPath": "tmp\\perm-run01\\new\\users-eng-E2E-012-7-save-ok.png"
+ }
+]

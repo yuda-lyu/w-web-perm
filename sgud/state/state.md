@@ -2,6 +2,15 @@
 
 本檔記本套件**當前已開發功能之最新狀態**;與規則帳本(`sgud/rule/rulebook.md`,藍圖)比對即知尚未做到者,接續工作先讀此檔.2026-10-22 主控遷移為 sgud 配置時建立,先移入原帳本之「已知缺口 / 待辦」;**各功能之完成狀態整理為下一次派工之待辦**(主責 agent 依規則帳本各節之「狀態」行與近期報告彙整至本檔).
 
+## 近期進度(2026-10-26 perm-run01〔任務 20261026143318〕:角色名稱統一為「系統管理者」; 修正輪＝單輪,未發布,待主控全套)
+
+> 注意: 來源為整合者 rddmanager 之建議書(Gitea #16)與使用者「全系統角色名稱統一為系統管理者」之裁定; 證據目錄 `spec/evidence/perm-run01-20261026/`(逐張標準圖之舊／新／差異放大圖 `diff/`、清單 `regen-list.json`、腳本 `scripts/`、測試摘要 `logs/`), 報告 `C:\opensrcOper\dnow\20261026143318\agent-out\perm-run01-修正報告.md`. 只改顯示文字: 欄位鍵名 `isAdmin`、資料、存取規則、`version`、eng 文字皆不動.
+
+- **改動(完成)**: ①`server/procLang.mjs` cht `isAdmin`「是否為系統管理員」→「是否為系統管理者」(「管理使用者」表頭); ②`src/schema/tables/users.mjs` `isAdmin.name` 同改; ③`server/procLang.mjs` cht `userNotAdmin`「僅系統管理員可存取或變更此資料」→「…系統管理者…」; ④`server/tools/fromTools.mjs` 離線工具輸出「列為系統管理員」→「…者」＋其斷言 `test/unit-fromAudit.test.mjs:1484`; ⑤`server/adminCheck.mjs` JSDoc 摘要與 `@returns` 兩行(為使建議書 §2 驗證 2 之 `git grep -n "是否為系統管理員" -- src server` 字面為 0); ⑥spec 引述畫面／訊息文字與案例 description 之處(`流程_多人同時編輯` 訊息對照列〔附留痕〕、`流程_應用啟動與登入` E2E 兩案 description、`流程_後台使用者清單` 一案 description). `git grep -n "系統管理員" -- src server` 現只剩註解(19 行, 皆 `//`／JSDoc; 由 `unit-roleName` RN-S1 以可執行碼盤點證明), `是否為系統管理員` 為 0.
+- **標準圖**: 主控授權重產僅限「差異僅為此用詞」者——受影響流程 5 個(`users`、`external-rows`、`layout`、`rela-user-grup`、`ref-cascade`; 共 226 張)全產到暫存目錄後與 `test/pics` 精確逐張比對: 102 張位元相同、**56 張 cht 圖差異外框恰為表頭最末一字(員→者, 108 像素, 外框 12×11)→ 已覆蓋**(users 32、external-rows 7、rela-user-grup 17)、68 張 eng 圖僅左上 `[60,47]` 1 像素既有渲染雜訊(pixelmatch 0)→ 不動、超出範圍 0 張. 其餘 e2e 流程之標準圖 0 改變.
+- **測試**: unit＋api 全跑 4808 過／1 pending／0 敗(基準 4803 過／2 pending; 該次全跑發生於新增 `unit-roleName` 之前, 其 6 案另跑 6 過／0 敗, 並對 HEAD 舊碼副本跑實證修前紅); e2e 受影響 5 檔於更新後標準圖上全綠: `e2e-users` 24、`e2e-external-rows` 60、`e2e-layout` 6、`e2e-rela-user-grup` 20、`e2e-ref-cascade` 16, 共 126 過／0 敗, `[baseline-headroom]` 告警 0. 新增 `test/unit-roleName.test.mjs`(RN-001～003b、RN-S1 站點不變式、RN-S2 掃描器自測).
+- **未做／備查**: ①其餘「管理員」(無「系統」前綴: `procLang` 之「請洽管理員」「請聯絡管理員處置」、eng `Administrator`)非本次裁定字串, 未改, 待主控／使用者裁示是否一併統一; ②`README.md`、`dist/`、`docs/` 未改(README 兩處為程式碼範例註解; dist／docs 於發布時自動產製, 發布前 `dist/` 之表頭仍為舊稱); ③w-web-sso `procLang.mjs:410` 為他套件, 本機未安裝, 未核對; ④`db/wperm/**` 為版控中之資料庫檔, 測試後顯示 modified, 非本輪修改.
+
 ## 近期進度(2026-10-25 perm-run01〔任務 20261025161334〕:系統函數身分關卡 `sysFuncsPublic` 只公開 `[sys:getFuncList]`＋升 `w-serv-hapi ^1.1.8`; 修正輪＝單輪,未發布,待主控全套)
 
 > 注意: 承 2026-10-24 perm-run02; 證據目錄 `spec/evidence/perm-run01-20261025/`, ADR-041, 規則 R-SYSFUNCS-01(`sgud/rule/rulebook_security.md`), 報告 `C:\opensrcOper\dnow\20261025161334\agent-out\perm-run01-修正報告.md`.

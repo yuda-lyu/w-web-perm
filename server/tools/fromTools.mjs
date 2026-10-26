@@ -334,7 +334,7 @@ function formatPurgeReport(chain, opt = {}) {
             L.push('   (users 無引用端, 不連帶清理)')
         }
         if (pl.keyTable === 'users' && pl.nAdmin > 0) {
-            L.push(`   注意: 被清除列中有 ${pl.nAdmin} 列為系統管理員(isAdmin='y')`)
+            L.push(`   注意: 被清除列中有 ${pl.nAdmin} 列為系統管理者(isAdmin='y')`)
         }
         if (pl.similar.length > 0) {
             L.push(`   提示: 另有相近但不相同之來源(不會被清除): ${pl.similar.map((s) => `${j(s.from)} ${s.n} 列`).join('、')}`)
