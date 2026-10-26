@@ -5,7 +5,7 @@ const RE_PUB = /\bsysFuncsPublic\s*:\s*\[((?:\s*'[^']*'\s*,?)*)\s*\]/g //值須�
 
 ### G1 | 中 | test/api-sysFuncs.test.mjs:253、test/api-sysFuncs.test.mjs:268
 
-情境：驗證「invalid clientId／invalid input 先於身分反查」的案例，本體皆使用有效管理員 token。→ 實際：即使實作錯將身分反查提前，反查成功後仍回相同錯誤，這些斷言會繼續通過；目前沒有守住宣稱的檢查次序。
+情境：驗證「invalid clientId／invalid input 先於身分反查」的案例，本體皆使用有效系統管理者 token。→ 實際：即使實作錯將身分反查提前，反查成功後仍回相同錯誤，這些斷言會繼續通過；目前沒有守住宣稱的檢查次序。
 
 具體缺格：標頭 `Bearer sys`，輪詢本體 `{clientId:null,__sysToken__:'nope-invalid'}`，現行框架回 `{error:'[sys:polling] invalid clientId'}`；函數本體 `{__sysInputArgs__:null,__sysToken__:'nope-invalid'}`，回 `output:{state:'error',msg:'invalid input'}`。依據為 `node_modules/w-serv-broadcast/src/WServBroadcastServer.mjs:213`、`node_modules/w-serv-webdata/src/WServWebdataServerExec.mjs:329`。
 

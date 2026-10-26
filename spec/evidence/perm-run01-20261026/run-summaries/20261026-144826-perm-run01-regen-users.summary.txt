@@ -1,0 +1,20 @@
+[quiet-run] exit=0 time=10m32s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261026-144826-perm-run01-regen-users.log (129 行, 9 KB)
+[quiet-run] cmd: node test/e2e-users.test.mjs --baseline
+[quiet-run] lock: 取得並已釋放(等待 20s)
+== 最後 15 行(非空,不含上列失敗段落) ==
+  [write] cht-E2E-004-4-copy-save (all)
+  E2E-010-save-token-fail
+[box-scroll] 目標比其可視區大且已部分入鏡，捲入會改變版面(假畫面)；框整個檢視區宜傳 itemsUnionBox(loc, { scroll: null }) 或 scrollTall:false
+  [write] cht-E2E-010-1-row-filled (all)
+  [write] cht-E2E-010-2-fail-modal (all)
+  E2E-012-for-grups-mode
+[box-scroll] 目標比其可視區大且已部分入鏡，捲入會改變版面(假畫面)；框整個檢視區宜傳 itemsUnionBox(loc, { scroll: null }) 或 scrollTall:false
+  [write] cht-E2E-012-1-toolbar-for-grups (all)
+  [write] cht-E2E-012-2-click-cgrups (all)
+  [write] cht-E2E-012-3-dialog-open (all)
+  [write] cht-E2E-012-4-row-toggled (all)
+  [write] cht-E2E-012-5-cgrups-filled (all)
+  [write] cht-E2E-012-6-click-save (all)
+  [write] cht-E2E-012-7-save-ok (all)
+=== 產製 users baseline 完成 ===
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)

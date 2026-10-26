@@ -1,12 +1,12 @@
 //外部列夾具收尾之單一入口 cleanExternalFixtures(test/tools/api-setup.mjs; 規則帳本 R-TEST-EXT-CLEAN-01; run09)之行為契約, 真後端.
 //
-//背景(2026-10-22 全套): e2e-init E2E-006 以外部同步灌入 id-mk-dup(from=appE2eInit006), 收尾退而以管理者寫入移除 → 後台不得刪外部列(Lv1 saveExternalRowChanged), 夾具殘留,
+//背景(2026-10-22 全套): e2e-init E2E-006 以外部同步灌入 id-mk-dup(from=appE2eInit006), 收尾退而以系統管理者寫入移除 → 後台不得刪外部列(Lv1 saveExternalRowChanged), 夾具殘留,
 //  其後 e2e-ref-cascade／e2e-rela-user-grup／e2e-targets／e2e-users 之 captureBaseSeedOnce 擷取到 5 筆而 12 案失敗。外部同步端點又拒空 rows(isearr 閘, ADR-008), 且單一 mocha 行程內
 //  restartBackend({ reseed:true }) 刪不掉 ./db(api 檔使本行程持有 lmdb 映射)而退化為 upsert, 皆不能移除夾具 → 收尾只能經測試框架之直接重置, 並由單一入口提供, 各檔不再自寫。
 //述語:
 //  CE-001 froms 限定分區: 只移除指定 from 之外部列, 其他分區與後台列不動(跨表, 回傳各表移除筆數)
 //  CE-002 不限分區＋pristine: 移除全部外部列後四表回到 base seed(主鍵集合＝種子、from 皆為空字串)
-//  CE-003 不放寬產品: 管理者寫入無法移除外部列(回 saveExternalRowChanged、列仍在), 唯有本入口移除
+//  CE-003 不放寬產品: 系統管理者寫入無法移除外部列(回 saveExternalRowChanged、列仍在), 唯有本入口移除
 //  CE-004 keepIds: 指定 id 之外部列保留
 //  CE-005 pristine 回驗不放寬: 種子以外之列仍在即拋錯, 訊息含多出主鍵與其 from 分區
 //  CE-006 froms 含空字串即拋錯(from 為空字串者是後台列, 不是外部列); purgeExternalRows 同
@@ -84,11 +84,11 @@ describe('api-cleanExternal (外部列夾具收尾之單一入口 cleanExternalF
         }
     })
 
-    it('CE-003 不放寬產品: 管理者寫入無法移除外部列(回 saveExternalRowChanged、列仍在); 唯有本入口移除', async function() {
+    it('CE-003 不放寬產品: 系統管理者寫入無法移除外部列(回 saveExternalRowChanged、列仍在); 唯有本入口移除', async function() {
         await postSync('users', F1, [mkU('ce-u1')])
         let rows = (await selectAllRows('users')).filter((x) => x.srcKey !== 'ce-u1').sort((a, b) => (a.order || 0) - (b.order || 0))
         let res = await callRpc('updateUsers', [rows], TOKEN_ADMIN)
-        A.equal(res.ok, false, `管理者寫入應拒絕, 實得 ${JSON.stringify(res).slice(0, 200)}`)
+        A.equal(res.ok, false, `系統管理者寫入應拒絕, 實得 ${JSON.stringify(res).slice(0, 200)}`)
         A.equal(res.msg, 'saveExternalRowChanged', '拒絕鍵')
         A.deepEqual(await srcsOf('users', F1), ['ce-u1'], '外部列仍在')
         A.deepEqual(await cleanExternalFixtures({ kts: ['users'], froms: [F1], pristine: true }), { users: 1 })

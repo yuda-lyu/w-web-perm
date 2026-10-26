@@ -7,7 +7,7 @@
 == 失敗段落(前 25 行) ==
   1) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
        H 靜態檔與 hapi 路由(5 入口 × 13 呼叫者)
-         MX-H2 GET /api/getUserByToken(後台登入檢查): 後端管理員服務等級(A／AUA／AS)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料(含 id 非 app: 開頭之 APP／AUX)  [P-2: AS 放行; perm-run02②: AS 須 app: 前綴]:
+         MX-H2 GET /api/getUserByToken(後台登入檢查): 後端系統管理者服務等級(A／AUA／AS)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料(含 id 非 app: 開頭之 APP／AUX)  [P-2: AS 放行; perm-run02②: AS 須 app: 前綴]:
       AssertionError [ERR_ASSERTION]: APP: {"state":"success","msg":{"id":"id-for-application","name":"application","email":"application@example.com","isAdmin":"y","isApp":"y"}}
 'success' !== 'error'
       + expected - actual
@@ -54,7 +54,7 @@
       at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
   30) api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-TOKEN-01, 真後端)
        R perm-run02: ①應用系統路由相容認定  ②系統服務用途須 app: 前綴
-         MX-R4 ②「二者一致」: 使用者用途綁不在表之 sso 管理員(AUX)的後端結果 ≡ 該管理員自身使用者 token(NFV)——後台登入、資料通道標頭／本體的拒絕鍵逐一相同; 兩者應用系統路由皆放行  [原則二之一: 使用者用途＝同綁定者]:
+         MX-R4 ②「二者一致」: 使用者用途綁不在表之 sso 系統管理者(AUX)的後端結果 ≡ 該系統管理者自身使用者 token(NFV)——後台登入、資料通道標頭／本體的拒絕鍵逐一相同; 兩者應用系統路由皆放行  [原則二之一: 使用者用途＝同綁定者]:
       AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
 'success' !== 'error'
       + expected - actual

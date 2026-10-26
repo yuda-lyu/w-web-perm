@@ -8,9 +8,9 @@
 //本檔: ①純函數契約(ER-*、RV-*); ②往返不變式(RT-*): 以「與 .vue 膠合碼逐行對應之編輯器模型」(SITE-ER-* 靜態守護兩者一致), 對窮舉＋隨機之引用字串,
 //  直接編輯器「開啟 → 不改值 → 存檔」後授權(getUserRules)與存檔前相等(有損者回原字串); 改一列者授權等於「只改該名稱」之參考構造(oracle);
 //  反向關聯對話框之改寫(putRefEntry)授權等於 oracle(其餘引用項之效果不變), 本項未變更者字串逐字元不動; ③靜態站點(SITE-ER-*);
-//  ④第三格放寬之證明(RT-LOSSY3-*、EX-LOSSY3-*; run06, ADR-035 Update 2026-10-22): 原 getKpLossy 第三格(該層啟用項皆 mode 缺／非法 → 拒存)改為可存; 依據為方案 A(未被管理者改動之限制項原樣寫回
+//  ④第三格放寬之證明(RT-LOSSY3-*、EX-LOSSY3-*; run06, ADR-035 Update 2026-10-22): 原 getKpLossy 第三格(該層啟用項皆 mode 缺／非法 → 拒存)改為可存; 依據為方案 A(未被系統管理者改動之限制項原樣寫回
 //  其原始 mode, getRawModeMap／putRowsToKp／putRefEntry). 本組以真 getUserRules 窮舉＋隨機(固定種子)證明: 凡「該層啟用項皆 mode 缺／非法」之輸入(物件與陣列形式、單一／多個啟用項、混停用項／懸空引用／
-//  名稱 ''／同名重複、含歷史同名表), 或「原層有合法項而管理者於同一次編輯停用之而使該層只剩限制項」者, 經直接編輯器與反向關聯對話框存檔後之授權: 未改動 → 等於存檔前; 有改動 → 等於同一編輯套用於
+//  名稱 ''／同名重複、含歷史同名表), 或「原層有合法項而系統管理者於同一次編輯停用之而使該層只剩限制項」者, 經直接編輯器與反向關聯對話框存檔後之授權: 未改動 → 等於存檔前; 有改動 → 等於同一編輯套用於
 //  原資料(oracleEdits; 未被改動之項逐字保留, 限制項不被升格為合法 AND), 且不多於「對話框所示狀態」之伺服端解讀(所見之上界). 變異驗證(≥5 個自植缺陷須使本組變紅)見 run06 報告.
 //跑法: node node_modules/mocha/bin/mocha.js test/unit-editorRows.test.mjs --timeout 300000
 import assert from 'assert'
@@ -169,7 +169,7 @@ function decodeArr(c) {
 }
 
 //參考構造(多列版, 不經編輯器任何函數): 同 oracle, 但一次套用多個名稱之編輯 edits [{ name, enable, mode }]: 原元素(cvKpToArr)去掉名稱為被編輯者, 被編輯而歸屬者再各加一個 { name, mode, isActive: 'y' };
-//未被編輯之元素(含 mode 缺／非法之限制項)逐字保留——此即「凡未被管理者改動之項目不得放寬」之判準(限制項不被升格為可當基底之合法 AND). 以陣列形式寫出
+//未被編輯之元素(含 mode 缺／非法之限制項)逐字保留——此即「凡未被系統管理者改動之項目不得放寬」之判準(限制項不被升格為可當基底之合法 AND). 以陣列形式寫出
 function oracleEditsArr(arr0, edits) {
     let names = new Set(edits.map((e) => e.name))
     let arr = arr0.filter((e) => !names.has(e.name))
@@ -458,7 +458,7 @@ describe('unit-editorRows (編輯對話框之引用清單 ↔ 列, 存檔不丟�
         assert.deepStrictEqual(Object.keys(p), ['__proto__', ''])
     })
 
-    it('ER-006-putRowsToKp(含 rawModeMap): 限制項之列仍為「AND、啟用」(開啟時之狀態)者寫回原始 mode(缺則不寫 mode 鍵); 管理者改為 OR 或停用者照列寫出; 不在 map 者照列; 未給 map 為現行行為', function() {
+    it('ER-006-putRowsToKp(含 rawModeMap): 限制項之列仍為「AND、啟用」(開啟時之狀態)者寫回原始 mode(缺則不寫 mode 鍵); 系統管理者改為 OR 或停用者照列寫出; 不在 map 者照列; 未給 map 為現行行為', function() {
         let rm = getRawModeMap(JSON5.parse('{"A":{"isActive":"y"},"B":{"mode":"or","isActive":"y"},"C":{"mode":null,"isActive":"y"},"D":"y"}'))
         let rows = [
             { name: 'A', mode: 'AND', enable: 'y' },
@@ -472,7 +472,7 @@ describe('unit-editorRows (編輯對話框之引用清單 ↔ 列, 存檔不丟�
         assert.strictEqual(JSON.stringify(putRowsToKp(Object.create(null), rows.slice(0, 2))), '{"A":{"mode":"AND","isActive":"y"},"B":{"mode":"AND","isActive":"y"}}', '未給 map: 照列寫出')
     })
 
-    it('RV-002-putRefEntry(含 rawModeMap): 複製其餘項時啟用中之限制項寫回原始 mode(停用者原樣); 本項照目標寫出(管理者改過則不還原); 本項為限制項而目標同顯示狀態(AND、啟用)→ 未變更', function() {
+    it('RV-002-putRefEntry(含 rawModeMap): 複製其餘項時啟用中之限制項寫回原始 mode(停用者原樣); 本項照目標寫出(系統管理者改過則不還原); 本項為限制項而目標同顯示狀態(AND、啟用)→ 未變更', function() {
         let c = '{"G1":{"isActive":"y","extra":1},"G2":{"mode":"AND","isActive":"y"},"G3":{"mode":"or","isActive":"n"}}'
         let kp = cvKpToObj(JSON5.parse(c), HM)
         let rm = getRawModeMap(JSON5.parse(c))
@@ -487,7 +487,7 @@ describe('unit-editorRows (編輯對話框之引用清單 ↔ 列, 存檔不丟�
         assert.strictEqual(putRefEntry(Object.create(null), kp, 'G1', 'y', 'AND', rm), false, '限制項之顯示狀態即 AND、啟用: 未變更')
         let o2 = Object.create(null)
         assert.strictEqual(putRefEntry(o2, kp, 'G1', 'y', 'OR', rm), true)
-        assert.deepStrictEqual(o2.G1, { mode: 'OR', isActive: 'y' }, '管理者改為 OR: 照選擇寫出')
+        assert.deepStrictEqual(o2.G1, { mode: 'OR', isActive: 'y' }, '系統管理者改為 OR: 照選擇寫出')
     })
 
     it('ER-007-getRowIdxs: row[key] 精確 === 之全部索引(undefined 不等於 \'\'、5 不等於 \'5\'); 非物件列略過', function() {
@@ -514,7 +514,7 @@ describe('unit-editorRows (編輯對話框之引用清單 ↔ 列, 存檔不丟�
         assert.deepStrictEqual(authG('A')(s), authG('A')(oracle(c, 'G2', 'n', 'AND')))
         let sNo = JSON.stringify(putRowsToKp(Object.create(null), st.rows))
         assert.strictEqual(yOf(authG('A')(sNo)), 'T1,T2', '未給 rawModeMap(修前)多給')
-        //管理者把 G1 改為 OR: 照選擇寫出 OR(明確操作)
+        //系統管理者把 G1 改為 OR: 照選擇寫出 OR(明確操作)
         editorToggle(st, 'G1', 'y', 'OR')
         assert.deepStrictEqual(JSON.parse(editorSave(c, st)).G1, { mode: 'OR', isActive: 'y' })
     })
@@ -562,7 +562,7 @@ describe('unit-editorRows (編輯對話框之引用清單 ↔ 列, 存檔不丟�
         assert.deepStrictEqual(JSON.parse(s).GX, { mode: 'AND', isActive: 'y' })
         assert.strictEqual(yOf(authG('A')(c)), '')
         assert.strictEqual(yOf(authG('A')(s)), '', '存檔後仍為空(不得放寬)')
-        //管理者把懸空列改為停用以解除 → 得 G1 之授權(使用者明確操作)
+        //系統管理者把懸空列改為停用以解除 → 得 G1 之授權(使用者明確操作)
         editorToggle(st, 'GX', 'n', 'AND')
         assert.strictEqual(yOf(authG('A')(editorSave(c, st))), 'T1,T2')
     })
@@ -712,7 +712,7 @@ describe('unit-editorRows (編輯對話框之引用清單 ↔ 列, 存檔不丟�
                             stat.rewritten++
                         }
                         //期望: 目標＝該名稱「限制項」(啟用而 mode 缺／非法)之對話框所示狀態(啟用、AND)者為未變更, 授權同原字串(run06 第三格放寬: 該層全為限制項時, 「所示之 AND」
-                        //若以真合法 AND 解讀, 會成為唯一基底而多給, 並非管理者之改動); 其餘照舊為同一編輯套用於原資料之 oracle
+                        //若以真合法 AND 解讀, 會成為唯一基底而多給, 並非系統管理者之改動); 其餘照舊為同一編輯套用於原資料之 oracle
                         let sh = shownOf(c, name)
                         let sameLim = isLimName(c, name) && enable === 'y' && sh.enable === 'y' && mode === sh.mode
                         if (sameLim) {
@@ -834,7 +834,7 @@ describe('unit-editorRows (編輯對話框之引用清單 ↔ 列, 存檔不丟�
 
 
     // ===== run06 第三格放寬: 「該層啟用項皆 mode 缺／非法」存檔不多給之證明(窮舉＋隨機; ADR-035 Update 2026-10-22, 規則帳本 R-EDIT-KEEP-01 ③) =====
-    //放寬前 getKpLossy 對此格判有損而整格拒存(管理者無法存任何變更); 放寬後存檔須不多給. 判準(對 getUserRules 之真授權):
+    //放寬前 getKpLossy 對此格判有損而整格拒存(系統管理者無法存任何變更); 放寬後存檔須不多給. 判準(對 getUserRules 之真授權):
     //  ①未改動(各列終態＝開啟時所示狀態): 存檔後授權＝存檔前(限制項原樣寫回, 不被升格為可當基底之合法 AND);
     //  ②有改動: 授權＝同一編輯套用於原資料(oracleEditsArr: 被編輯之名稱以新狀態取代, 未被編輯之項逐字保留);
     //  ③上界: 授權不多於「對話框所示狀態」之伺服端解讀(所示之限制項 ＝ 合法 AND, 為最寬之解讀);
@@ -1018,7 +1018,7 @@ describe('unit-editorRows (編輯對話框之引用清單 ↔ 列, 存檔不丟�
             //③上界: 不多於所示狀態(限制項視為合法 AND)之解讀
             let shown = JSON.stringify(names.map((n) => st.rows.find((v) => v.name === n)).filter((v) => v.enable === 'y').map((v) => ({ name: v.name, mode: v.mode, isActive: 'y' })))
             l3Ok(!moreY(got, auth(tk)(shown)), () => `授權不得多於對話框所示狀態之解讀: ${tag()} → ${s}`)
-            //空化: 原層有合法項, 管理者之編輯使該層啟用項皆為限制項
+            //空化: 原層有合法項, 系統管理者之編輯使該層啟用項皆為限制項
             if (originHasValid) {
                 let act = JSON.parse(os).filter((e) => e.isActive === 'y')
                 if (act.length > 0 && act.every((e) => e.mode !== 'OR' && e.mode !== 'AND')) {
@@ -1118,7 +1118,7 @@ describe('unit-editorRows (編輯對話框之引用清單 ↔ 列, 存檔不丟�
         assert.ok(stat.naiveDiff > 0 && stat.naiveGain > 0, JSON.stringify(stat))
     })
 
-    it('RT-LOSSY3-005-群組層「原層有合法項, 管理者編輯後只剩限制項」窮舉(物件形式 3 名稱 × 13 值, 原字串為合法項與限制項並存; 全 3^k 終態含停用全部合法項): 存檔不多給, 授權＝同一編輯套用於原資料', function() {
+    it('RT-LOSSY3-005-群組層「原層有合法項, 系統管理者編輯後只剩限制項」窮舉(物件形式 3 名稱 × 13 值, 原字串為合法項與限制項並存; 全 3^k 終態含停用全部合法項): 存檔不多給, 授權＝同一編輯套用於原資料', function() {
         let plans = [
             { tk: 'A', strings: l3Strings('mix', n3(TABS_G, 'A', 3), 'mixed'), vectors: l3Full },
             { tk: 'B', strings: l3Strings('mix', n3(TABS_G, 'B', 3), 'mixed'), vectors: l3Full },
@@ -1131,7 +1131,7 @@ describe('unit-editorRows (編輯對話框之引用清單 ↔ 列, 存檔不丟�
         assert.ok(stat.naiveDiff > 0 && stat.naiveGain > 0, JSON.stringify(stat))
     })
 
-    it('RT-LOSSY3-006-權限層「原層有合法項, 管理者編輯後只剩限制項」窮舉: 同 RT-LOSSY3-005', function() {
+    it('RT-LOSSY3-006-權限層「原層有合法項, 系統管理者編輯後只剩限制項」窮舉: 同 RT-LOSSY3-005', function() {
         let plans = [
             { tk: 'A', strings: l3Strings('mix', n3(TABS_P, 'A', 3), 'mixed'), vectors: l3Full },
             { tk: 'B', strings: l3Strings('mix', n3(TABS_P, 'B', 3), 'mixed'), vectors: l3Full },
@@ -1153,7 +1153,7 @@ describe('unit-editorRows (編輯對話框之引用清單 ↔ 列, 存檔不丟�
         }
     })
 
-    it('RT-LOSSY3-008-陣列形式「原層有合法項, 管理者編輯後只剩限制項」窮舉(含同名重複: 同名限制項與合法項並存): 2 名稱 × {啟用限制項 4 種, 啟用 OR／AND, 停用 OR} 長度 ≤ 3 之全部「合法項與限制項並存」序列(表 A, 群組層與權限層) × 全 3^k 終態', function() {
+    it('RT-LOSSY3-008-陣列形式「原層有合法項, 系統管理者編輯後只剩限制項」窮舉(含同名重複: 同名限制項與合法項並存): 2 名稱 × {啟用限制項 4 種, 啟用 OR／AND, 停用 OR} 長度 ≤ 3 之全部「合法項與限制項並存」序列(表 A, 群組層與權限層) × 全 3^k 終態', function() {
         let pool = []
         for (let nm of ['G1', 'G2']) {
             for (let e of [...L3_ARR_ELEMS.slice(0, 4), { mode: 'OR', isActive: 'y' }, { mode: 'AND', isActive: 'y' }, { mode: 'OR', isActive: 'n' }]) {
@@ -1222,7 +1222,7 @@ describe('unit-editorRows (編輯對話框之引用清單 ↔ 列, 存檔不丟�
         assert.deepStrictEqual(st.lossy, [])
         assert.deepStrictEqual(st.rows.find((r) => r.name === 'G1'), { name: 'G1', mode: 'AND', enable: 'y' }, '所示為啟用 AND')
         assert.deepStrictEqual(getRefWarns(c, TABS_G.A.rows).byCode.modeInvalid, ['G1'], '警告圖示(modeInvalid)保留')
-        editorToggle(st, 'G2', 'y', 'OR') //管理者勾選 G2 又取消: 終態同開啟時, 視為未改動(列狀態為終態之函數, 不記操作歷程)
+        editorToggle(st, 'G2', 'y', 'OR') //系統管理者勾選 G2 又取消: 終態同開啟時, 視為未改動(列狀態為終態之函數, 不記操作歷程)
         editorToggle(st, 'G2', 'n', 'OR')
         let s = editorSave(c, st)
         assert.notStrictEqual(s, false, '不拒存')
@@ -1233,7 +1233,7 @@ describe('unit-editorRows (編輯對話框之引用清單 ↔ 列, 存檔不丟�
         assert.strictEqual(yOf(authG('A')(sNo)), 'T1,T2', '照列寫出為合法 AND: 放寬前拒存之理由(現由方案 A 避免)')
     })
 
-    it('EX-LOSSY3-002-直接編輯器: 兩個限制項 { G1 缺 mode, G2 \'or\' }, 管理者停用 G1 → 只剩限制項 G2, 授權全 n(不是 G2 之 T2,T3); G2 之 mode 原樣(\'or\')', function() {
+    it('EX-LOSSY3-002-直接編輯器: 兩個限制項 { G1 缺 mode, G2 \'or\' }, 系統管理者停用 G1 → 只剩限制項 G2, 授權全 n(不是 G2 之 T2,T3); G2 之 mode 原樣(\'or\')', function() {
         let c = '{"G1":{"isActive":"y"},"G2":{"mode":"or","isActive":"y"}}'
         let st = editorOpen(c, TABS_G.A.rows)
         editorToggle(st, 'G1', 'n', 'AND')
@@ -1245,7 +1245,7 @@ describe('unit-editorRows (編輯對話框之引用清單 ↔ 列, 存檔不丟�
         assert.strictEqual(yOf(authG('A')(JSON.stringify(putRowsToKp(Object.create(null), st.rows)))), 'T2,T3', '照列寫出: G2 成為唯一 AND 基底而多給')
     })
 
-    it('EX-LOSSY3-003-直接編輯器: 限制項 { G1 } 之層, 管理者勾選 G2(OR 或 AND) → 授權＝G2 與 G1(限制項, 交集)之 T2, 等於同一編輯套用於原資料; G1 仍為缺 mode 之限制項', function() {
+    it('EX-LOSSY3-003-直接編輯器: 限制項 { G1 } 之層, 系統管理者勾選 G2(OR 或 AND) → 授權＝G2 與 G1(限制項, 交集)之 T2, 等於同一編輯套用於原資料; G1 仍為缺 mode 之限制項', function() {
         let c = '{"G1":{"isActive":"y"}}'
         for (let md of ['OR', 'AND']) {
             let st = editorOpen(c, TABS_G.A.rows)
@@ -1258,7 +1258,7 @@ describe('unit-editorRows (編輯對話框之引用清單 ↔ 列, 存檔不丟�
         }
     })
 
-    it('EX-LOSSY3-004-直接編輯器: 管理者把限制項 G1 改為 OR → 照選擇寫出 OR(明確操作: 授予 T1,T2); 改成 OR 再改回 AND 視為未改, 仍寫回原始 mode(已知限制①: 無法由編輯器把限制項明確轉成合法 AND)', function() {
+    it('EX-LOSSY3-004-直接編輯器: 系統管理者把限制項 G1 改為 OR → 照選擇寫出 OR(明確操作: 授予 T1,T2); 改成 OR 再改回 AND 視為未改, 仍寫回原始 mode(已知限制①: 無法由編輯器把限制項明確轉成合法 AND)', function() {
         let c = '{"G1":{"isActive":"y"}}'
         let st = editorOpen(c, TABS_G.A.rows)
         editorToggle(st, 'G1', 'y', 'OR')
@@ -1271,7 +1271,7 @@ describe('unit-editorRows (編輯對話框之引用清單 ↔ 列, 存檔不丟�
         assert.strictEqual(yOf(authG('A')(s2)), '')
     })
 
-    it('EX-LOSSY3-005-權限層(直接編輯器 VeCpemis, cpemis): 原層有合法項 P2(AND)與限制項 P1(\'or\'), 管理者停用 P2 → 只剩限制項 P1, 授權全 n; 照列寫出則 P1 成為唯一 AND 基底而多給 T1,T2', function() {
+    it('EX-LOSSY3-005-權限層(直接編輯器 VeCpemis, cpemis): 原層有合法項 P2(AND)與限制項 P1(\'or\'), 系統管理者停用 P2 → 只剩限制項 P1, 授權全 n; 照列寫出則 P1 成為唯一 AND 基底而多給 T1,T2', function() {
         let c = '[{"name":"P1","mode":"or","isActive":"y"},{"name":"P2","mode":"AND","isActive":"y"}]'
         assert.strictEqual(yOf(authP('A')(c)), 'T2', '原: P2 為基底{T2,T3} ∩ P1 限制項{T1,T2}')
         let st = editorOpen(c, TABS_P.A.rows)

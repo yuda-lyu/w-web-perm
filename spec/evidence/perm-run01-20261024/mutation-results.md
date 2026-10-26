@@ -10,8 +10,8 @@
 | M2 | 拿掉反查之角色檢查(`getUserIdByToken` 改回 `getAndVerifyClientUser`) | 同上 | 抓到(4 敗) |
 | M3 | 拿掉後台登入之角色檢查(`/api/getUserByToken` 改回 `getAndVerifyClientUser`) | 同上 | 抓到(5 敗) |
 | M4 | 核心關卡不檢查角色(`adminOnly && !isAdmin` 恆假) | 同上 | 抓到(26 敗) |
-| M5 | 角色恆為管理員(`let isAdmin = true`) | 同上 | 抓到(26 敗) |
-| M6 | 過度收緊: `/api/getPerm` 也要求管理員 | 同上 | 抓到(3 敗) |
+| M5 | 角色恆為系統管理者(`let isAdmin = true`) | 同上 | 抓到(26 敗) |
+| M6 | 過度收緊: `/api/getPerm` 也要求系統管理者 | 同上 | 抓到(3 敗) |
 | M7 | `requireAdmin` 恆通過 | unit-adminOnlySite | 抓到(AOS-S6) |
 | M8 | `isAdminRow` 不檢查 `isActive` | unit-adminOnlySite | 抓到(AOS-001) |
 | M9 | `isAdminRow` 改認繼承屬性 | unit-adminOnlySite | 抓到(AOS-001c) |

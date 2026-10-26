@@ -30,7 +30,7 @@
 //    既有 E2E-001～037 的意圖不變且不倚賴「不帶宣告」: 清單頁（瀏覽器）本來就送 refs、兩反向對話框本來就送 subject; wrapFapi 只記錄後照原 opt 轉呼叫（不改 refs／subject）; 他人變更／夾具／還原皆經 editTableRows（api-setup.callRpc 自動附宣告）。
 //    E2E-005～008／014～016／025～026 之反向對話框存檔只改動主體名稱本身之引用（含取消勾選之移除）, 由 opt.subject 涵蓋（subject 只涵蓋其主體名稱）。
 //
-//手段說明（setup，非使用者動作）：「他人」＝經管理者寫入 RPC（editTableRows）或外部同步端點；「推播尚未抵達」＝攔住網路推播（holdNetPushes：store.commit 攔下 tableName+data 之 payload，
+//手段說明（setup，非使用者動作）：「他人」＝經系統管理者寫入 RPC（editTableRows）或外部同步端點；「推播尚未抵達」＝攔住網路推播（holdNetPushes：store.commit 攔下 tableName+data 之 payload，
 //  但放行 payload.source==='savedRows'——頁面套用自己存檔回傳列之 commit），模擬「存檔成功後約 2 秒輪詢尚未送達」之窗口；e2e 不 import src／server（R-TEST-SCOPE-01 盤點指令 4），故 V10 以黑箱比對（id 序、格式、伺服端接受）。
 //  perm-run02: wrapFapi 另記每次呼叫之 opt.refs／opt.subject 與累計次數（window.__sentAll; 只讀取）, 供 E2E-025～036 斷言「請求確實送出 1 次」「前端攔下故為 0 次」與宣告內容;
 //  「推播已抵達但被攔住」以 window.__heldPushes 計數增加偵測（waitHeldMore）, 確認前端 store 看不到變動是因被攔住而非推播根本未發生;
@@ -613,7 +613,7 @@ const isOn = (v) => v === 'y' || (v !== null && typeof v === 'object' && v.isAct
 //三清單頁之指派欄組態:
 //  refCol／dlgKey: 指派欄 col-id 與編輯器標題鍵; refKt: 被引用表; refField: 授權欄; pick: 內容欄清單;
 //  ok: 正常路徑所選之既存被引用實體（row 為編輯器列次）; fx: 被他人取代／刪除之被引用實體（id 為案前或 base seed 之 id, newId 為同名重建後之 id, 無則為刪除）;
-//  mkFixture: 開瀏覽器前追加 fx（pemis 頁之 fx 為 base seed 既有對象, 不須追加）; other: 他人取代／刪除 fx（經管理者寫入 RPC）
+//  mkFixture: 開瀏覽器前追加 fx（pemis 頁之 fx 為 base seed 既有對象, 不須追加）; other: 他人取代／刪除 fx（經系統管理者寫入 RPC）
 const REF_PAGES = [
     {
         kt: 'users', enter: PAGES[0].enter, nameCol: 'name', rowName: 'mary', refCol: 'cgrups', dlgKey: 'userEditCgrups', refKt: 'grups', refField: 'cgrups', pick: PICK_U,
@@ -981,7 +981,7 @@ CASES.push({
 //檔級收尾對稱（R-E2E-ISO-01）
 //共用 createIsolation 之快照只含 users／grups／pemis 三表（api-setup TABLE_FN），不含 targets; 本檔 E2E-009～016 之 targets 輪會改標的列說明，
 //  若不還原，同案第二輪（另一語系或重複）寫入之內容與庫內相同 → 無變更、不產生推播 → 橫幅永不出現（2026-10-23 重複量測 11/12 失敗之根因: 測試隔離缺口, 非產品問題）。
-//  故於本檔加 targets 之擷取／還原（經管理者寫入 RPC 整表寫回, 與 restoreTables 同法; 還原後逐列回驗）。
+//  故於本檔加 targets 之擷取／還原（經系統管理者寫入 RPC 整表寫回, 與 restoreTables 同法; 還原後逐列回驗）。
 const isoBase = createIsolation()
 const byOrder = (a, b) => (a.order || 0) - (b.order || 0)
 const clone = (v) => JSON.parse(JSON.stringify(v))

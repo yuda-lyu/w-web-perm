@@ -1,13 +1,13 @@
 //呼叫者 × 入口 存取矩陣(perm-run01 本輪; 使用者 2026-10-24 定案之 token 權責; 真後端)。
 //規格: C:\opensrcOper\dspec\w-web存取管控表.md 第二節(w-web-perm; AU＝使用者用途、AS＝系統服務用途)、dspec/使用者身分驗證原則.md 二之一; 規則帳本 R-APP-TOKEN-01(sgud/rule/rulebook_security.md)。
 //
-//定義: 管理員之判準為 perm 自身 users 表(isAdmin='y' 且 isActive='y'); 使用者用途之應用系統 token(AU)以所綁使用者之 perm 列判定(同其使用者 token); 系統服務用途(AS)須同時: 不在 perm users 表、
-//      部署方 getUserByToken 轉傳 isApp='y'、isAdmin='y'、且反查 id 以 'app:' 開頭('app:<金鑰主鍵>'; sso 拒收以 app: 開頭之使用者主鍵), 可用管理員之後端服務, 稽核欄記其 id; 不可用 /api/getPerm(無「本人」權限樹)。
+//定義: 系統管理者之判準為 perm 自身 users 表(isAdmin='y' 且 isActive='y'); 使用者用途之應用系統 token(AU)以所綁使用者之 perm 列判定(同其使用者 token); 系統服務用途(AS)須同時: 不在 perm users 表、
+//      部署方 getUserByToken 轉傳 isApp='y'、isAdmin='y'、且反查 id 以 'app:' 開頭('app:<金鑰主鍵>'; sso 拒收以 app: 開頭之使用者主鍵), 可用系統管理者之後端服務, 稽核欄記其 id; 不可用 /api/getPerm(無「本人」權限樹)。
 //等級有兩套判準(perm-run02, 主控裁示): svc＝後台登入檢查／資料通道／requireAdmin 用「系統服務用途」之嚴格認定(上述四條件); app＝應用系統路由(getPermUserInfor、syncAndReplaceTabs)用相容認定——
 //      在表者以 perm 列(有效且 isAdmin y), 不在表者只看反查 isAdmin='y'(不要求 isApp、不要求 app: 前綴; 舊版 sso 之應用系統身分即 isAdmin y, 升版不中斷)。
-//呼叫者軸: N 無 token、U 一般使用者、A 管理員、AUA 使用者用途綁管理員、AUM 使用者用途綁一般使用者、AS 系統服務用途;
-//          相容軸: NF isApp 未轉傳(AS 形狀, app: 前綴)、NFV 不在表之 sso 管理員自身使用者 token(未轉傳 isApp)、NFN 不在表且 isAdmin n 未轉傳 isApp、ASN AS 形狀但 isAdmin n、AUD 使用者用途綁停用之使用者、
-//          APP 虛擬應用系統(TOKEN_APP; isApp y、isAdmin y 但 id 非 app: 開頭)、AUX 使用者用途綁不在表之 sso 管理員(isApp y、isAdmin y、id 非 app: 開頭)。
+//呼叫者軸: N 無 token、U 一般使用者、A 系統管理者、AUA 使用者用途綁系統管理者、AUM 使用者用途綁一般使用者、AS 系統服務用途;
+//          相容軸: NF isApp 未轉傳(AS 形狀, app: 前綴)、NFV 不在表之 sso 系統管理者自身使用者 token(未轉傳 isApp)、NFN 不在表且 isAdmin n 未轉傳 isApp、ASN AS 形狀但 isAdmin n、AUD 使用者用途綁停用之使用者、
+//          APP 虛擬應用系統(TOKEN_APP; isApp y、isAdmin y 但 id 非 app: 開頭)、AUX 使用者用途綁不在表之 sso 系統管理者(isApp y、isAdmin y、id 非 app: 開頭)。
 //入口軸(24): 靜態檔 1、hapi 路由 4(getUserByToken／getPerm／getPermUserInfor／syncAndReplaceTabs)、通訊路由 5(ulctr／slc／dwgfn／dwgf／dw)、資料通道函數 14
 //          (表 select ×4、getWebInfor、updateTargets／Pemis／Grups／Users、getStaEvent／getStaEventTable、系統函數 ×3); 資料通道每格另分「標頭 token(連線閘)」「本體 __sysToken__(執行身分)」兩個身分來源。
 //跑法(需測試鎖): node C:/opensrcOper/tools/quiet-run.mjs --name tmatrix --lock --timeout 3000 -- npx mocha --no-parallel test/api-callerMatrix.test.mjs --timeout 300000
@@ -38,30 +38,30 @@ let snap4 = async () => JSON.stringify(await Promise.all(KTS.map(snapKt)))
 let sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 let userRow = (id, name, isAdmin, isActive, cgrups) => ({ id, order: 50, name, email: `${name}@example.com`, description: '', from: '', cgrups, isAdmin, isActive })
 
-//呼叫者: svc＝是否為「後端管理員服務」等級(後台登入檢查、資料通道各入口、requireAdmin; 系統服務用途須 isApp y＋isAdmin y＋id 以 app: 開頭＋不在表); app＝是否通過應用系統路由之等級(在表以 perm 列, 不在表只看 isAdmin y);
+//呼叫者: svc＝是否為「後端系統管理者服務」等級(後台登入檢查、資料通道各入口、requireAdmin; 系統服務用途須 isApp y＋isAdmin y＋id 以 app: 開頭＋不在表); app＝是否通過應用系統路由之等級(在表以 perm 列, 不在表只看 isAdmin y);
 //        own＝可用 /api/getPerm 者其本人 id; aud＝其寫入之稽核欄 id(userId／userIdUpdate)
 const CALLERS = [
     { k: 'N', label: '無 token', token: '', svc: false, app: false, own: null, aud: null },
     { k: 'U', label: '一般使用者', token: TOKEN_MEMBER, svc: false, app: false, own: 'id-for-member', aud: null },
-    { k: 'A', label: '管理員', token: TOKEN_ADMIN, svc: true, app: true, own: 'id-for-admin', aud: 'id-for-admin' },
-    { k: 'AUA', label: '使用者用途綁管理員', token: TOKEN_AU_ADMIN, svc: true, app: true, own: 'id-for-admin', aud: 'id-for-admin' },
+    { k: 'A', label: '系統管理者', token: TOKEN_ADMIN, svc: true, app: true, own: 'id-for-admin', aud: 'id-for-admin' },
+    { k: 'AUA', label: '使用者用途綁系統管理者', token: TOKEN_AU_ADMIN, svc: true, app: true, own: 'id-for-admin', aud: 'id-for-admin' },
     { k: 'AUM', label: '使用者用途綁一般使用者', token: TOKEN_AU_MEMBER, svc: false, app: false, own: 'id-for-peter', aud: null },
     { k: 'AS', label: '系統服務用途', token: TOKEN_AS, svc: true, app: true, own: null, aud: 'app:key-sys' },
 ]
 const COMPAT = [
     { k: 'NF', label: 'isApp 未轉傳(AS 形狀, app: 前綴)', token: TOKEN_NOFLAG, svc: false, app: true, own: null, aud: 'app:key-noflag' },
-    { k: 'NFV', label: '不在表之 sso 管理員自身使用者 token(未轉傳 isApp)', token: TOKEN_SSO_ADMIN, svc: false, app: true, own: null, aud: 'sso-admin-77' },
+    { k: 'NFV', label: '不在表之 sso 系統管理者自身使用者 token(未轉傳 isApp)', token: TOKEN_SSO_ADMIN, svc: false, app: true, own: null, aud: 'sso-admin-77' },
     { k: 'NFN', label: '不在表且 isAdmin n(未轉傳 isApp)', token: TOKEN_NOFLAG_N, svc: false, app: false, own: null, aud: null },
     { k: 'ASN', label: 'AS 形狀但 isAdmin n', token: TOKEN_AS_N, svc: false, app: false, own: null, aud: null },
     { k: 'AUD', label: '使用者用途綁停用之使用者', token: TOKEN_AU_DISABLED, svc: false, app: false, own: null, aud: null },
     { k: 'APP', label: '虛擬應用系統 TOKEN_APP(isApp y、isAdmin y、id 非 app: 開頭)', token: TOKEN_APP, svc: false, app: true, own: null, aud: 'id-for-application' },
-    { k: 'AUX', label: '使用者用途綁不在表之 sso 管理員(isApp y、id 非 app: 開頭)', token: TOKEN_AU_SSO, svc: false, app: true, own: null, aud: 'sso-admin-77' },
+    { k: 'AUX', label: '使用者用途綁不在表之 sso 系統管理者(isApp y、id 非 app: 開頭)', token: TOKEN_AU_SSO, svc: false, app: true, own: null, aud: 'sso-admin-77' },
     { k: 'AFN', label: 'app: 前綴、isAdmin y、isApp 明確 n、不在表', token: TOKEN_FLAG_N, svc: false, app: true, own: null, aud: 'app:key-flag-n' }, //外審 sol F1
     { k: 'AFO', label: 'app: 前綴、isAdmin y、isApp 為大寫 Y(非嚴格 y)、不在表', token: TOKEN_FLAG_ODD, svc: false, app: true, own: null, aud: 'app:key-flag-odd' }, //外審 sol F1
 ]
 const ALL = [...CALLERS, ...COMPAT]
 
-//回應不得含之資料特徵(管理員視角之 base seed 資料)
+//回應不得含之資料特徵(系統管理者視角之 base seed 資料)
 const LEAK = ['admin@example.com', 'peter@example.com', 'mary@example.com', 'john@example.com', '權限群組M1', '權限群組M4']
 
 let getJson = async (path) => {
@@ -167,7 +167,7 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
             }
         })
 
-        it('MX-H2 GET /api/getUserByToken(後台登入檢查): 後端管理員服務等級(A／AUA／AS)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料(含 id 非 app: 開頭之 APP／AUX)  [P-2: AS 放行; perm-run02②: AS 須 app: 前綴]', async function() {
+        it('MX-H2 GET /api/getUserByToken(後台登入檢查): 後端系統管理者服務等級(A／AUA／AS)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料(含 id 非 app: 開頭之 APP／AUX)  [P-2: AS 放行; perm-run02②: AS 須 app: 前綴]', async function() {
             for (let c of ALL) {
                 let r = await getJson(`/api/getUserByToken?token=${q(c.token)}`)
                 if (c.svc) {
@@ -184,14 +184,14 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
                 }
                 stat.cells++
             }
-            //固定鍵(各拒絕原因): 無 token tokenNoPermission、一般使用者與 AU 綁一般使用者 userNotAdmin、isApp 未轉傳者與 AS 形狀非管理員、AU 綁停用者不在有效 perm 列 → cannotGetUserFromPerm／cannotGetUserEmail
+            //固定鍵(各拒絕原因): 無 token tokenNoPermission、一般使用者與 AU 綁一般使用者 userNotAdmin、isApp 未轉傳者與 AS 形狀非系統管理者、AU 綁停用者不在有效 perm 列 → cannotGetUserFromPerm／cannotGetUserEmail
             A.equal((await getJson(`/api/getUserByToken?token=`)).msg, 'tokenNoPermission')
             A.equal((await getJson(`/api/getUserByToken?token=${q(TOKEN_MEMBER)}`)).msg, 'userNotAdmin')
             A.equal((await getJson(`/api/getUserByToken?token=${q(TOKEN_AU_MEMBER)}`)).msg, 'userNotAdmin')
             A.equal((await getJson(`/api/getUserByToken?token=${q(TOKEN_NOFLAG)}`)).msg, 'cannotGetUserFromPerm')
             A.equal((await getJson(`/api/getUserByToken?token=${q(TOKEN_AU_DISABLED)}`)).msg, 'cannotGetUserFromPerm')
             A.equal((await getJson(`/api/getUserByToken?token=${q(TOKEN_AS_N)}`)).msg, 'cannotGetUserEmail')
-            //perm-run02②: 不在表、isApp y、isAdmin y 但 id 非 app: 開頭(APP／AUX)與不在表 sso 管理員自身使用者 token(NFV)、不在表一般使用者(NFN)皆非系統服務用途 → 同為「perm 查無此使用者」
+            //perm-run02②: 不在表、isApp y、isAdmin y 但 id 非 app: 開頭(APP／AUX)與不在表 sso 系統管理者自身使用者 token(NFV)、不在表一般使用者(NFN)皆非系統服務用途 → 同為「perm 查無此使用者」
             for (let [k, tk] of [['APP', TOKEN_APP], ['AUX', TOKEN_AU_SSO], ['NFV', TOKEN_SSO_ADMIN], ['NFN', TOKEN_NOFLAG_N]]) {
                 A.equal((await getJson(`/api/getUserByToken?token=${q(tk)}`)).msg, 'cannotGetUserFromPerm', k)
             }
@@ -269,7 +269,7 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
 
 
     // ===== [C] 通訊路由 =====
-    describe('C 通訊路由(ulctr／slc／dwgfn／dwgf／dw × 15 呼叫者): 同一連線閘, 後端管理員服務等級過閘, 其餘 permission denied', function() {
+    describe('C 通訊路由(ulctr／slc／dwgfn／dwgf／dw × 15 呼叫者): 同一連線閘, 後端系統管理者服務等級過閘, 其餘 permission denied', function() {
         let routes = [
             { name: '/api/ulctr(upload-controller)', path: '/api/ulctr', method: 'POST' },
             { name: '/api/slc(upload-slice)', path: '/api/slc', method: 'POST' },
@@ -284,7 +284,7 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
             return { status: r.status, body }
         }
         for (let rt of routes) {
-            it(`MX-C ${rt.name}: 非後端管理員服務等級之回應 ≡ 無效 token 之回應(permission denied); A／AUA／AS 已過閘; id 非 app: 開頭之 APP／AUX 與相容軸皆被擋`, async function() {
+            it(`MX-C ${rt.name}: 非後端系統管理者服務等級之回應 ≡ 無效 token 之回應(permission denied); A／AUA／AS 已過閘; id 非 app: 開頭之 APP／AUX 與相容軸皆被擋`, async function() {
                 let bad = await callRoute(rt, TOKEN_BAD)
                 A.ok(bad.body.includes('permission denied'), `無效 token 應為 permission denied: ${bad.body.slice(0, 100)}`)
                 for (let c of ALL) {
@@ -317,7 +317,7 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
             { name: '[sys:getFuncList]', fn: '[sys:getFuncList]', args: async () => [] },
             { name: '[sys:getTableTags]', fn: '[sys:getTableTags]', args: async () => [] },
             //[sys:polling](w-serv-broadcast 輪詢; 輸入為 { clientId, __sysToken__ }): 連線閘(標頭)與其他入口同; 其本體 __sysToken__ 之身分檢查由框架(w-serv-webdata ≥1.1.16 之 verifyPolling)經 getUserIdByToken 為之,
-            //  本套件 sysFuncsPublic 只公開 [sys:getFuncList](perm-run01 2026-10-25, R-SYSFUNCS-01), 故兩個身分來源皆測(標頭來源之本體為有效管理員; 本體來源之標頭為有效管理員)。
+            //  本套件 sysFuncsPublic 只公開 [sys:getFuncList](perm-run01 2026-10-25, R-SYSFUNCS-01), 故兩個身分來源皆測(標頭來源之本體為有效系統管理者; 本體來源之標頭為有效系統管理者)。
             //  clientId 含來源: 同一 clientId 換身分輪詢會被框架拒(clientId 與身分綁定), 兩個來源之身分不同。新舊協定(缺 __sysToken__ 鍵等)之完整矩陣見 api-sysFuncs.test.mjs
             {
                 name: '[sys:polling]',
@@ -333,7 +333,7 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
         ]
 
         for (let e of entries) {
-            it(`MX-D ${e.name}: 後端管理員服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]`, async function() {
+            it(`MX-D ${e.name}: 後端系統管理者服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]`, async function() {
                 for (let c of ALL) {
                     for (let src of ['header', 'body']) {
                         let s0 = await snap4()
@@ -374,15 +374,15 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
     // ===== [P] 使用者用途跟隨所綁使用者之 perm 列; 部署方否決; 檢查之值即使用之值 =====
     describe('P 使用者用途跟隨所綁使用者; 部署方否決; 檢查之值即使用之值', function() {
 
-        it('MX-P1 AU 綁管理員: 該管理員被降為一般使用者 → AU 同步失去管理員服務(資料通道、後台登入、應用路由皆拒); 升回後恢復  [AU＝同綁定者, perm 列為權威]', async function() {
+        it('MX-P1 AU 綁系統管理者: 該系統管理者被降為一般使用者 → AU 同步失去系統管理者服務(資料通道、後台登入、應用路由皆拒); 升回後恢復  [AU＝同綁定者, perm 列為權威]', async function() {
             let setAdmin = async (id, isAdmin) => {
                 let users = (await rowsOf('users')).map((u) => (u.id === id ? { ...u, isAdmin } : u))
                 let r = await callRpc('updateUsers', [users], TOKEN_ADMIN)
                 A.equal(r.ok, true, JSON.stringify(r).slice(0, 300))
             }
-            //peter 升為管理員 → AUM(綁 peter)得管理員服務
+            //peter 升為系統管理者 → AUM(綁 peter)得系統管理者服務
             await setAdmin('id-for-peter', 'y')
-            A.equal((await callRpc('getWebInfor', [], TOKEN_AU_MEMBER)).ok, true, 'AUM 綁定者升為管理員後應可用資料通道')
+            A.equal((await callRpc('getWebInfor', [], TOKEN_AU_MEMBER)).ok, true, 'AUM 綁定者升為系統管理者後應可用資料通道')
             A.equal((await getJson(`/api/getUserByToken?token=${q(TOKEN_AU_MEMBER)}`)).state, 'success')
             A.equal((await getJson(`/api/getPermUserInfor?token=${q(TOKEN_AU_MEMBER)}&userId=id-for-admin`)).state, 'success')
             //降回 → 失去
@@ -393,7 +393,7 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
             stat.cells += 6
         })
 
-        it('MX-P2 AU 綁停用之使用者: 不因「停用視同查無」落入系統服務用途; 該使用者啟用且為管理員後可用, 停用後又拒  [AU 在表者以 perm 列為準]', async function() {
+        it('MX-P2 AU 綁停用之使用者: 不因「停用視同查無」落入系統服務用途; 該使用者啟用且為系統管理者後可用, 停用後又拒  [AU 在表者以 perm 列為準]', async function() {
             let setRow = async (patch) => {
                 let users = (await rowsOf('users')).map((u) => (u.id === 'id-for-appdis' ? { ...u, ...patch } : u))
                 let r = await callRpc('updateUsers', [users], TOKEN_ADMIN)
@@ -430,23 +430,23 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
             stat.cells += 6
         })
 
-        it('MX-P4 管理員之 perm 列因非角色因素被 verifyClientUser 否決(TOKEN_DENY): userNoPermission  [P-7: 部署方否決者之固定鍵]', async function() {
+        it('MX-P4 系統管理者之 perm 列因非角色因素被 verifyClientUser 否決(TOKEN_DENY): userNoPermission  [P-7: 部署方否決者之固定鍵]', async function() {
             let users = [...(await rowsOf('users')), userRow('id-for-deny', 'deny', 'y', 'y', '{}')]
             A.equal((await callRpc('updateUsers', [users], TOKEN_ADMIN)).ok, true)
             A.equal((await getJson(`/api/getUserByToken?token=${q(TOKEN_DENY)}`)).msg, 'userNoPermission')
             A.equal((await callRpc('getWebInfor', [], TOKEN_DENY)).msg, 'permission denied')
             A.equal((await callRpc('getWebInfor', [], TOKEN_ADMIN, { sysToken: TOKEN_DENY })).msg, 'userNoPermission')
-            //拒絕鍵次序(1.1.15 行為不變): 同時『部署方否決』與『非管理員』→ 部署方否決先(userNoPermission), 不是 userNotAdmin  [外審 sol F09]
+            //拒絕鍵次序(1.1.15 行為不變): 同時『部署方否決』與『非系統管理者』→ 部署方否決先(userNoPermission), 不是 userNotAdmin  [外審 sol F09]
             //  deny 之 perm 列降為一般使用者後: 後台登入檢查(client 路徑)與應用路由(srv.mjs 之 verifyAppUser 亦否決 id-for-deny)皆先見 userNoPermission
             let users2 = (await rowsOf('users')).map((u) => (u.id === 'id-for-deny' ? { ...u, isAdmin: 'n' } : u))
             A.equal((await callRpc('updateUsers', [users2], TOKEN_ADMIN)).ok, true)
-            A.equal((await getJson(`/api/getUserByToken?token=${q(TOKEN_DENY)}`)).msg, 'userNoPermission', '雙原因(否決＋非管理員): 部署方否決先')
+            A.equal((await getJson(`/api/getUserByToken?token=${q(TOKEN_DENY)}`)).msg, 'userNoPermission', '雙原因(否決＋非系統管理者): 部署方否決先')
             A.equal((await getJson(`/api/getPermUserInfor?token=${q(TOKEN_DENY)}&userId=id-for-peter`)).msg, 'userNoPermission', '應用路由雙原因: 部署方否決先')
             A.equal((await callRpc('getWebInfor', [], TOKEN_ADMIN, { sysToken: TOKEN_DENY })).msg, 'userNoPermission', '執行身分雙原因: 部署方否決先')
             stat.cells += 6
         })
 
-        it('MX-P7 標頭與本體為不同身分之組合(資料通道兩個身分來源各自完整驗證, 函數以本體身分執行): 服務身分／管理員交叉  [外審 sol F01]', async function() {
+        it('MX-P7 標頭與本體為不同身分之組合(資料通道兩個身分來源各自完整驗證, 函數以本體身分執行): 服務身分／系統管理者交叉  [外審 sol F01]', async function() {
             let addGrup = async (id) => (await rowsOf('grups')).concat([{ id, order: 0, name: id, description: '', from: '', cpemis: '{}' }])
             let runAs = async (hdr, body, id) => {
                 let w = await callRpc('updateGrups', [await addGrup(id)], hdr, { sysToken: body })
@@ -460,22 +460,22 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
             let w2 = await runAs(TOKEN_ADMIN, TOKEN_AS, 'id-mx-p7b')
             A.equal(w2.ok, true, JSON.stringify(w2).slice(0, 300))
             A.equal((await rowsOf('grups')).find((g) => g.id === 'id-mx-p7b').userId, 'app:key-sys')
-            //標頭 AUA＋本體 AS → 以 AS 執行; 標頭 AS＋本體 AUA → 以 AUA(所綁管理員)執行
+            //標頭 AUA＋本體 AS → 以 AS 執行; 標頭 AS＋本體 AUA → 以 AUA(所綁系統管理者)執行
             let w3 = await runAs(TOKEN_AU_ADMIN, TOKEN_AS, 'id-mx-p7c')
             A.equal(w3.ok, true)
             A.equal((await rowsOf('grups')).find((g) => g.id === 'id-mx-p7c').userId, 'app:key-sys')
             let w4 = await runAs(TOKEN_AS, TOKEN_AU_ADMIN, 'id-mx-p7d')
             A.equal(w4.ok, true)
             A.equal((await rowsOf('grups')).find((g) => g.id === 'id-mx-p7d').userId, 'id-for-admin')
-            //任一邊為非管理員等級 → 拒、零寫入: 標頭 U／AUM／NF 於連線閘; 本體 U／AUM／NF 於執行身分
+            //任一邊為非系統管理者等級 → 拒、零寫入: 標頭 U／AUM／NF 於連線閘; 本體 U／AUM／NF 於執行身分
             let s0 = await snap4()
             for (let bad of [TOKEN_MEMBER, TOKEN_AU_MEMBER, TOKEN_NOFLAG, TOKEN_APP, TOKEN_AU_SSO]) { //perm-run02②: APP／AUX(isApp y、isAdmin y 但 id 非 app: 開頭)亦非系統服務用途
                 let g = await runAs(bad, TOKEN_AS, 'id-mx-p7x')
                 A.equal(g.ok, false)
-                A.equal(g.msg, 'permission denied', '標頭為非管理員等級: 連線閘')
+                A.equal(g.msg, 'permission denied', '標頭為非系統管理者等級: 連線閘')
                 let b = await runAs(TOKEN_AS, bad, 'id-mx-p7y')
                 A.equal(b.ok, false)
-                A.ok(KEYS.has(b.msg), `本體為非管理員等級: 執行身分拒絕鍵 ${b.msg}`)
+                A.ok(KEYS.has(b.msg), `本體為非系統管理者等級: 執行身分拒絕鍵 ${b.msg}`)
             }
             A.equal(await snap4(), s0, '零寫入')
             stat.cells += 21
@@ -501,7 +501,7 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
             stat.cells += 4
         })
 
-        it('MX-P6 AS 新增資料: 新列建立者與更新者皆為 app:…, 且可被管理員讀回; AS 之寫入與管理員同一契約(同批重複 id 仍整批拒收)', async function() {
+        it('MX-P6 AS 新增資料: 新列建立者與更新者皆為 app:…, 且可被系統管理者讀回; AS 之寫入與系統管理者同一契約(同批重複 id 仍整批拒收)', async function() {
             let rows = (await rowsOf('grups')).concat([{ id: 'id-mx-p6', order: 0, name: 'mx-p6', description: '', from: '', cpemis: '{}' }])
             let w = await callRpc('updateGrups', [rows], TOKEN_AS)
             A.equal(w.ok, true, JSON.stringify(w).slice(0, 300))
@@ -562,7 +562,7 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
                     stat.cells += 5
                 })
 
-                it(`MX-M5 [${mb}] 主鍵同為服務身分 id 之**停用管理員**列(外審 sol F1: 嚴格系統服務形狀×停用列): 在表以列為準, 各入口一致被拒(不得因停用而落入系統服務用途), 零寫入`, async function() {
+                it(`MX-M5 [${mb}] 主鍵同為服務身分 id 之**停用系統管理者**列(外審 sol F1: 嚴格系統服務形狀×停用列): 在表以列為準, 各入口一致被拒(不得因停用而落入系統服務用途), 零寫入`, async function() {
                     let users = [...(await rowsOf('users')), userRow('app:key-sys', 'collide', 'y', 'n', '{}')]
                     A.equal((await callRpc('updateUsers', [users], TOKEN_ADMIN)).ok, true)
                     let s0 = await snap4()
@@ -588,7 +588,7 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
                 await restartBackend('./settings.json')
             })
 
-            it('MX-M3 外部 id(sso-admin-9)與 perm 主鍵(id-for-admin)不同之管理員: 資料通道與應用路由之稽核欄皆記 perm 內 id; 後台登入檢查回 perm 列  [外審 sol F02]', async function() {
+            it('MX-M3 外部 id(sso-admin-9)與 perm 主鍵(id-for-admin)不同之系統管理者: 資料通道與應用路由之稽核欄皆記 perm 內 id; 後台登入檢查回 perm 列  [外審 sol F02]', async function() {
                 let lg = await getJson(`/api/getUserByToken?token=${q(TOKEN_ALT_ADMIN)}`)
                 A.equal(lg.state, 'success', JSON.stringify(lg).slice(0, 200))
                 A.equal(lg.msg.id, 'id-for-admin', '登入檢查回 perm 列')
@@ -604,11 +604,11 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
                 stat.cells += 4
             })
 
-            it('MX-M6 [外審 sol F3] 近期系統服務用途登錄不得被「經 perm 列通過驗證、其後該列於 requireAdmin 讀取前被刪」之請求沿用: AS(app:key-ghost)先登錄 → perm 建立主鍵同為 app:key-ghost 之管理員列(email 對應) → 一般 sso 管理員經該列通過身分驗證(部署方驗證等待約 2 秒) → 等待期間該列被刪 → 寫入函數須 userNotAdmin、零寫入', async function() {
+            it('MX-M6 [外審 sol F3] 近期系統服務用途登錄不得被「經 perm 列通過驗證、其後該列於 requireAdmin 讀取前被刪」之請求沿用: AS(app:key-ghost)先登錄 → perm 建立主鍵同為 app:key-ghost 之系統管理者列(email 對應) → 一般 sso 系統管理者經該列通過身分驗證(部署方驗證等待約 2 秒) → 等待期間該列被刪 → 寫入函數須 userNotAdmin、零寫入', async function() {
                 this.timeout(120000)
                 A.equal((await callRpc('getWebInfor', [], TOKEN_AS_GHOST)).ok, true, '前置: AS 通過並登錄近期 id')
                 let users = [...(await rowsOf('users')), { ...userRow('app:key-ghost', 'ghost', 'y', 'y', '{}'), email: 'ghost@example.com' }]
-                A.equal((await callRpc('updateUsers', [users], TOKEN_ADMIN)).ok, true, '前置: 建立主鍵同為服務 id 之管理員列')
+                A.equal((await callRpc('updateUsers', [users], TOKEN_ADMIN)).ok, true, '前置: 建立主鍵同為服務 id 之系統管理者列')
                 let rows = (await rowsOf('grups')).concat([{ id: 'id-mx-m6', order: 0, name: 'mx-m6', description: '', from: '', cpemis: '{}' }])
                 let mark = await markSrLog()
                 let pending = callRpc('updateGrups', [rows], TOKEN_ADMIN, { sysToken: TOKEN_GHOST_USER })
@@ -660,7 +660,7 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
 
     // ===== [B] Authorization 標頭須為 Bearer 方案(P-3) =====
     describe('B 連線閘之 Authorization 須為 Bearer 方案(P-3)', function() {
-        //getWebInfor 之 input 與 callRpc 同(本體 __sysToken__ 為 sys, 即管理員), 只改 Authorization 標頭
+        //getWebInfor 之 input 與 callRpc 同(本體 __sysToken__ 為 sys, 即系統管理者), 只改 Authorization 標頭
         let bearerRpc = async (headers) => rawRpc('getWebInfor', { __sysInputArgs__: [], __sysToken__: 'sys' }, headers)
 
         it('MX-B1 Bearer 方案(大小寫不敏感、單一空白)通過; Basic／Token／無方案／多空白／Tab／缺憑證／無標頭 → 視同無 token(permission denied)', async function() {
@@ -678,7 +678,7 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
             stat.cells += 17
         })
 
-        it('MX-B2 通訊路由同一規則: Basic 方案帶管理員 token 亦視同無 token(回應 ≡ 無效 token)', async function() {
+        it('MX-B2 通訊路由同一規則: Basic 方案帶系統管理者 token 亦視同無 token(回應 ≡ 無效 token)', async function() {
             for (let path of ['/api/ulctr', '/api/slc', '/api/dwgfn', '/api/dw']) {
                 let call = async (auth) => {
                     let r = await fetch(`${apiBaseUrl}${path}`, { method: 'POST', headers: { Authorization: auth, 'Content-Type': 'application/octet-stream' }, body: Buffer.from('x') })
@@ -722,7 +722,7 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
             A.ok(mark2 !== null)
             let lines = readSrLogSince(mark)
             A.ok(!lines.some((l) => l.keyTable === 'zz-bogus-table'), '未驗證者之請求不得在 srLog 留下 keyTable(以未知表名為記號)')
-            //通過應用系統路由等級者(管理員、AS、相容放行之 NF／NFV／APP／AUX): 才走到 keyTable 檢查
+            //通過應用系統路由等級者(系統管理者、AS、相容放行之 NF／NFV／APP／AUX): 才走到 keyTable 檢查
             for (let tk of [TOKEN_ADMIN, TOKEN_AS, TOKEN_NOFLAG, TOKEN_SSO_ADMIN, TOKEN_APP, TOKEN_AU_SSO]) {
                 A.equal((await post('keyTable=zz-bogus-table&', tk)).msg, 'invalidKeyTable')
                 A.equal((await post('keyTable=&', tk)).msg, 'tokenNoPermission')
@@ -766,7 +766,7 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
             stat.cells += 4
         })
 
-        it('MX-R2 ①在表者以 perm 列為準(不看反查之 isAdmin): 同一外部身分 sso-admin-77(反查 isAdmin y)不在表時放行; 建為一般使用者列 → userNotAdmin; 改為有效管理員 → 放行; 停用 → cannotGetUserFromPerm; 刪除列 → 回到不在表而放行', async function() {
+        it('MX-R2 ①在表者以 perm 列為準(不看反查之 isAdmin): 同一外部身分 sso-admin-77(反查 isAdmin y)不在表時放行; 建為一般使用者列 → userNotAdmin; 改為有效系統管理者 → 放行; 停用 → cannotGetUserFromPerm; 刪除列 → 回到不在表而放行', async function() {
             let probe = async (tk) => ({ p: await getJson(`/api/getPermUserInfor?token=${q(tk)}&userId=id-for-peter`), s: await syncRow(tk, 'sk-r2') })
             let okBoth = async (tk, label) => {
                 let r = await probe(tk)
@@ -790,7 +790,7 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
             }
             await setUsers((us) => us.map((u) => (u.id === 'sso-admin-77' ? { ...u, isAdmin: 'y' } : u)))
             for (let tk of [TOKEN_SSO_ADMIN, TOKEN_AU_SSO]) {
-                await okBoth(tk, '在表有效管理員')
+                await okBoth(tk, '在表有效系統管理者')
             }
             await setUsers((us) => us.map((u) => (u.id === 'sso-admin-77' ? { ...u, isActive: 'n' } : u)))
             for (let tk of [TOKEN_SSO_ADMIN, TOKEN_AU_SSO]) {
@@ -803,7 +803,7 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
             stat.cells += 22
         })
 
-        it('MX-R3 ②系統服務用途須 id 以 app: 開頭: 同為不在表、isApp y、isAdmin y, 僅 id 前綴不同 → AS(app:key-sys)可用後端管理員服務、AUX(sso-admin-77)與 APP(id-for-application)不可; 後台登入、資料通道標頭／本體、寫入函數皆然, 零寫入', async function() {
+        it('MX-R3 ②系統服務用途須 id 以 app: 開頭: 同為不在表、isApp y、isAdmin y, 僅 id 前綴不同 → AS(app:key-sys)可用後端系統管理者服務、AUX(sso-admin-77)與 APP(id-for-application)不可; 後台登入、資料通道標頭／本體、寫入函數皆然, 零寫入', async function() {
             let s0 = await snap4()
             A.equal((await getJson(`/api/getUserByToken?token=${q(TOKEN_AS)}`)).state, 'success')
             A.equal((await callRpc('getWebInfor', [], TOKEN_AS)).ok, true, 'AS 標頭')
@@ -826,7 +826,7 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
             stat.cells += 13
         })
 
-        it('MX-R4 ②「二者一致」: 使用者用途綁不在表之 sso 管理員(AUX)的後端結果 ≡ 該管理員自身使用者 token(NFV)——後台登入、資料通道標頭／本體的拒絕鍵逐一相同; 兩者應用系統路由皆放行  [原則二之一: 使用者用途＝同綁定者]', async function() {
+        it('MX-R4 ②「二者一致」: 使用者用途綁不在表之 sso 系統管理者(AUX)的後端結果 ≡ 該系統管理者自身使用者 token(NFV)——後台登入、資料通道標頭／本體的拒絕鍵逐一相同; 兩者應用系統路由皆放行  [原則二之一: 使用者用途＝同綁定者]', async function() {
             let lgA = await getJson(`/api/getUserByToken?token=${q(TOKEN_AU_SSO)}`)
             let lgB = await getJson(`/api/getUserByToken?token=${q(TOKEN_SSO_ADMIN)}`)
             A.equal(lgA.state, 'error')
@@ -846,7 +846,7 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
         })
 
         it('MX-R5 [外審 sol F1] 嚴格系統服務形狀(AS: app:key-sys、isApp y、isAdmin y)而 perm 有主鍵同為其 id 之停用列 → 在表, 不落入系統服務用途: 後台登入、資料通道(標頭／本體)、應用路由皆拒(固定語系鍵)、零寫入', async function() {
-            //人造帶 email 之嚴格形狀(TOKEN_AS_EMAIL: app:key-email、isApp y、isAdmin y), perm 有主鍵同為其 id 之停用管理員列
+            //人造帶 email 之嚴格形狀(TOKEN_AS_EMAIL: app:key-email、isApp y、isAdmin y), perm 有主鍵同為其 id 之停用系統管理者列
             let setRow = async (patch) => setUsers((us) => us.map((u) => (u.id === 'app:key-email' ? { ...u, ...patch } : u)))
             await setUsers((us) => [...us, { ...userRow('app:key-email', 'key-email', 'y', 'n', '{}'), email: 'key-email@example.com' }])
             let s0 = await snap4()
@@ -860,11 +860,11 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
             A.equal(b.ok, false)
             A.ok(KEYS.has(b.msg), `本體: 執行身分拒絕鍵 ${b.msg}`)
             A.equal(await snap4(), s0, '零寫入')
-            //啟用且為管理員: 以列通過(回 perm 列, 不經 verifyAppUser 之系統服務用途); 降為一般使用者: 依列拒
+            //啟用且為系統管理者: 以列通過(回 perm 列, 不經 verifyAppUser 之系統服務用途); 降為一般使用者: 依列拒
             await setRow({ isActive: 'y' })
             let ok = await getJson(`/api/getUserByToken?token=${q(TOKEN_AS_EMAIL)}`)
             A.equal(ok.state, 'success', JSON.stringify(ok).slice(0, 200))
-            A.equal((await callRpc('getWebInfor', [], TOKEN_AS_EMAIL)).ok, true, '啟用且為管理員後以列通過')
+            A.equal((await callRpc('getWebInfor', [], TOKEN_AS_EMAIL)).ok, true, '啟用且為系統管理者後以列通過')
             await setRow({ isAdmin: 'n' })
             A.equal((await getJson(`/api/getUserByToken?token=${q(TOKEN_AS_EMAIL)}`)).msg, 'userNotAdmin')
             A.equal((await getJson(`/api/getPermUserInfor?token=${q(TOKEN_AS_EMAIL)}&userId=id-for-peter`)).msg, 'userNotAdmin', '在表以列為準, 反查之 isAdmin y 不採信')
@@ -882,7 +882,7 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
             stat.cells += 5
         })
 
-        it('MX-R8 [外審 sol 增量輪 G5] ①的權限面: 不在表之 sso 管理員(NFV 自身 token／AUX 綁定 token)可經 /syncAndReplaceTabs 匯入自己的 users 列(srcKey ≡ 外部 id、isAdmin y)——之後同一 token 以該 perm 列通過後台與資料通道, 稽核欄由外部 id 轉為 perm 內部 id; 此為既定政策(應用系統路由＝管理員等級, 1.1.15 起即可寫 users), 以測試固定其結果', async function() {
+        it('MX-R8 [外審 sol 增量輪 G5] ①的權限面: 不在表之 sso 系統管理者(NFV 自身 token／AUX 綁定 token)可經 /syncAndReplaceTabs 匯入自己的 users 列(srcKey ≡ 外部 id、isAdmin y)——之後同一 token 以該 perm 列通過後台與資料通道, 稽核欄由外部 id 轉為 perm 內部 id; 此為既定政策(應用系統路由＝系統管理者等級, 1.1.15 起即可寫 users), 以測試固定其結果', async function() {
             for (let tk of [TOKEN_SSO_ADMIN, TOKEN_AU_SSO]) {
                 A.equal((await getJson(`/api/getUserByToken?token=${q(tk)}`)).state, 'error', '匯入前: 不在表, 後台拒')
             }
@@ -904,7 +904,7 @@ describe('api-callerMatrix (呼叫者 × 入口 存取矩陣, perm-run01 R-APP-T
             stat.cells += 9
         })
 
-        it('MX-R7 [外審 sol F1] 外部列管理員(經匯入建立, srcKey ≡ 外部 id sso-ext-5, 內部 id 為系統配發): 後台登入、資料通道、兩條應用系統路由皆通過, 稽核欄一律記 perm 內部 id(≠ srcKey)', async function() {
+        it('MX-R7 [外審 sol F1] 外部列系統管理者(經匯入建立, srcKey ≡ 外部 id sso-ext-5, 內部 id 為系統配發): 後台登入、資料通道、兩條應用系統路由皆通過, 稽核欄一律記 perm 內部 id(≠ srcKey)', async function() {
             let imp = await (await fetch(urlSync.replace('{keyTable}', 'users').replace('{token}', q(TOKEN_ADMIN)), { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify({ from: 'appMatrixU', rows: [{ srcKey: 'sso-ext-5', order: 0, name: 'ext5', email: 'ext5@example.com', description: 'ext', cgrups: '{}', isAdmin: 'y', isActive: 'y' }] }) })).json()
             A.equal(imp.state, 'success', JSON.stringify(imp).slice(0, 300))
             let ur = (await rowsOf('users')).find((r) => r.srcKey === 'sso-ext-5')

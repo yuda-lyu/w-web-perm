@@ -7,7 +7,7 @@
 | 軸 | 成員 | 數量 |
 |---|---|---|
 | 入口 | 靜態檔 1；hapi 路由 4(`/api/getUserByToken`、`/api/getPerm`、`/api/getPermUserInfor`、`/syncAndReplaceTabs`)；通訊路由 5(`ulctr`、`slc`、`dwgfn`、`dwgf`、`dw`)；資料通道函數 14(表 `select` ×4、`getWebInfor`、`updateTargets／Pemis／Grups／Users`、`getStaEvent`／`getStaEventTable`、系統函數 `[sys:getFuncList]`／`[sys:getTableTags]`／`[sys:polling]`) | 24(dspec 另列第 6 條通訊路由＝`/api/main` 本身, 其連線閘由 14 個函數格逐格經過, 不另設格) |
-| 呼叫者(目標) | N 無 token、U 一般使用者、A 管理員、AUA 使用者用途綁管理員、AUM 使用者用途綁一般使用者、AS 系統服務用途(dspec 之 AU 一欄依綁定者拆為 AUA／AUM) | 6 |
+| 呼叫者(目標) | N 無 token、U 一般使用者、A 系統管理者、AUA 使用者用途綁系統管理者、AUM 使用者用途綁一般使用者、AS 系統服務用途(dspec 之 AU 一欄依綁定者拆為 AUA／AUM) | 6 |
 | 呼叫者(相容) | NF `isApp` 未轉傳(AS 形狀)、ASN AS 形狀但 `isAdmin='n'`、AUD 使用者用途綁停用之使用者、APP 虛擬應用系統〔`TOKEN_APP` 現轉傳 `isApp`〕 | 4 |
 | 身分來源(資料通道) | 標頭 `Authorization`(連線閘)、本體 `__sysToken__`(執行身分) | 2 |
 | 對應鍵 | `mappingBy` ＝ `id`(預設)／`email`／`name` | 3 |

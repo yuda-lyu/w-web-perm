@@ -6,7 +6,7 @@
     "caught": true,
     "passing": 3,
     "failing": 1,
-    "firstFail": "MX-H4 GET /api/getPermUserInfor(查他人權限樹): 管理員等級(A／AUA／AS／APP)通過; 其餘拒  [P-1: 套件自行要求管理員等級]",
+    "firstFail": "MX-H4 GET /api/getPermUserInfor(查他人權限樹): 系統管理者等級(A／AUA／AS／APP)通過; 其餘拒  [P-1: 套件自行要求系統管理者等級]",
     "sec": 4
   },
   {
@@ -16,7 +16,7 @@
     "caught": true,
     "passing": 3,
     "failing": 1,
-    "firstFail": "MX-H4 GET /api/getPermUserInfor(查他人權限樹): 管理員等級(A／AUA／AS／APP)通過; 其餘拒  [P-1: 套件自行要求管理員等級]",
+    "firstFail": "MX-H4 GET /api/getPermUserInfor(查他人權限樹): 系統管理者等級(A／AUA／AS／APP)通過; 其餘拒  [P-1: 套件自行要求系統管理者等級]",
     "sec": 4
   },
   {
@@ -26,7 +26,7 @@
     "caught": true,
     "passing": 3,
     "failing": 1,
-    "firstFail": "MX-H4 GET /api/getPermUserInfor(查他人權限樹): 管理員等級(A／AUA／AS／APP)通過; 其餘拒  [P-1: 套件自行要求管理員等級]",
+    "firstFail": "MX-H4 GET /api/getPermUserInfor(查他人權限樹): 系統管理者等級(A／AUA／AS／APP)通過; 其餘拒  [P-1: 套件自行要求系統管理者等級]",
     "sec": 4
   },
   {
@@ -36,7 +36,7 @@
     "caught": true,
     "passing": 1,
     "failing": 1,
-    "firstFail": "MX-H2 GET /api/getUserByToken(後台登入檢查): 管理員等級(A／AUA／AS／APP)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料  [P-2: AS 放行]",
+    "firstFail": "MX-H2 GET /api/getUserByToken(後台登入檢查): 系統管理者等級(A／AUA／AS／APP)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料  [P-2: AS 放行]",
     "sec": 4
   },
   {
@@ -46,7 +46,7 @@
     "caught": true,
     "passing": 1,
     "failing": 1,
-    "firstFail": "MX-H2 GET /api/getUserByToken(後台登入檢查): 管理員等級(A／AUA／AS／APP)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料  [P-2: AS 放行]",
+    "firstFail": "MX-H2 GET /api/getUserByToken(後台登入檢查): 系統管理者等級(A／AUA／AS／APP)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料  [P-2: AS 放行]",
     "sec": 4
   },
   {
@@ -67,7 +67,7 @@
     "caught": true,
     "passing": 20,
     "failing": 1,
-    "firstFail": "MX-D updateUsers: 管理員等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2]",
+    "firstFail": "MX-D updateUsers: 系統管理者等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2]",
     "sec": 9
   },
   {
@@ -77,7 +77,7 @@
     "caught": true,
     "passing": 20,
     "failing": 1,
-    "firstFail": "MX-D updateUsers: 管理員等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2]",
+    "firstFail": "MX-D updateUsers: 系統管理者等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2]",
     "sec": 8
   },
   {
@@ -117,7 +117,7 @@
     "caught": true,
     "passing": 35,
     "failing": 1,
-    "firstFail": "MX-M3 外部 id(sso-admin-9)與 perm 主鍵(id-for-admin)不同之管理員: 資料通道與應用路由之稽核欄皆記 perm 內 id; 後台登入檢查回 perm 列  [外審 sol F02]",
+    "firstFail": "MX-M3 外部 id(sso-admin-9)與 perm 主鍵(id-for-admin)不同之系統管理者: 資料通道與應用路由之稽核欄皆記 perm 內 id; 後台登入檢查回 perm 列  [外審 sol F02]",
     "sec": 17
   },
   {
@@ -228,7 +228,7 @@
     "caught": true,
     "passing": 1,
     "failing": 1,
-    "firstFail": "MX-H2 GET /api/getUserByToken(後台登入檢查): 管理員等級(A／AUA／AS／APP)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料  [P-2: AS 放行]",
+    "firstFail": "MX-H2 GET /api/getUserByToken(後台登入檢查): 系統管理者等級(A／AUA／AS／APP)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料  [P-2: AS 放行]",
     "sec": 4
   },
   {

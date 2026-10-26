@@ -1,0 +1,28 @@
+[quiet-run] exit=2 time=13m26s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261026-172830-perm-run02-mocha-external-rows.log (37 行, 3 KB)
+[quiet-run] cmd: npx mocha --no-parallel test/e2e-external-rows.test.mjs --timeout 180000 --reporter dot
+[quiet-run] lock: 取得並已釋放(等待 0s)
+== 統計 ==
+  58 passing (13m)
+  2 failing
+== 失敗段落(前 20 行) ==
+  1) e2e-external-rows (eng)
+       E2E-016-users-stale-draft-kept:
+     Error: 截圖與標準圖不一致 (diff=643px > maxDiffPixels=100): external-rows-eng-E2E-016-1-stale-banner — capture/baseline/diff 已存 ./testPending/external-rows-eng-E2E-016-1-stale-banner__2026-10-26_09-32-31-839__*.png 供 diff
+      at dump (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/node_modules/w-package-tools-e2e/src/assertBaselineMatch.mjs:68:15)
+      at assertBaselineMatch (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/node_modules/w-package-tools-e2e/src/assertBaselineMatch.mjs:86:5)
+      at assertBaselineMatch (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/tools/e2e-setup.mjs:1150:12)
+      at runBaselineCase (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/node_modules/w-package-tools-e2e/src/runBaselineCase.mjs:169:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async runCase (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/tools/e2eExt.mjs:181:16)
+      at async Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/e2e-external-rows.test.mjs:1375:21)
+  2) e2e-external-rows (cht)
+       E2E-016-users-stale-draft-kept:
+     Error: 截圖與標準圖不一致 (diff=643px > maxDiffPixels=100): external-rows-cht-E2E-016-1-stale-banner — capture/baseline/diff 已存 ./testPending/external-rows-cht-E2E-016-1-stale-banner__2026-10-26_09-39-08-015__*.png 供 diff
+      at dump (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/node_modules/w-package-tools-e2e/src/assertBaselineMatch.mjs:68:15)
+      at assertBaselineMatch (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/node_modules/w-package-tools-e2e/src/assertBaselineMatch.mjs:86:5)
+      at assertBaselineMatch (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/tools/e2e-setup.mjs:1150:12)
+      at runBaselineCase (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/node_modules/w-package-tools-e2e/src/runBaselineCase.mjs:169:23)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async runCase (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/tools/e2eExt.mjs:181:16)
+      at async Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/e2e-external-rows.test.mjs:1375:21)
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)

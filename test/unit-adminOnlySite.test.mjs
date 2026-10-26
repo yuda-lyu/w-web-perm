@@ -1,4 +1,4 @@
-//權限後台與資料通道只限系統管理員之判準與站點不變式(perm-run01; 規則帳本 R-ADMIN-ONLY-01; 使用者 2026-10-24 裁示)
+//權限後台與資料通道只限系統管理者之判準與站點不變式(perm-run01; 規則帳本 R-ADMIN-ONLY-01; 使用者 2026-10-24 裁示)
 //
 //受測: server/adminCheck.mjs(isAdminRow, 單一擁有者)、server/WWebPerm.mjs(getAndVerifyClientUser／getAndVerifyAdminUser／checkToken／getUserIdByToken／/api/getUserByToken／/api/getPerm／requireAdmin).
 //述語:
@@ -35,10 +35,10 @@ let takeBody = (code, startRe, endRe = /\n    \}\n/) => {
 let count = (s, re) => (s.match(re) || []).length
 
 
-describe('unit-adminOnlySite (權限後台與資料通道只限系統管理員之判準與站點, perm-run01)', function() {
+describe('unit-adminOnlySite (權限後台與資料通道只限系統管理者之判準與站點, perm-run01)', function() {
 
     describe('isAdminRow 判準(AOS-001)', function() {
-        it('AOS-001a 有效之系統管理員 → true', function() {
+        it('AOS-001a 有效之系統管理者 → true', function() {
             A.equal(isAdminRow({ id: 'a', isActive: 'y', isAdmin: 'y' }), true)
             A.equal(isAdminRow({ isAdmin: 'y', isActive: 'y', extra: 1 }), true)
         })

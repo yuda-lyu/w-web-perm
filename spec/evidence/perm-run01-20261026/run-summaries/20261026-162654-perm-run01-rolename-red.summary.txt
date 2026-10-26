@@ -1,0 +1,54 @@
+[quiet-run] exit=5 time=25m02s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261026-162654-perm-run01-rolename-red.log (121 行, 5 KB)
+[quiet-run] cmd: npx mocha --no-parallel tmp/perm-run01/head/test/unit-roleName.test.mjs --reporter dot --timeout 30000
+[quiet-run] lock: 取得並已釋放(等待 25m01s)
+== 統計 ==
+  1 passing (163ms)
+  5 failing
+== 失敗段落(前 27 行) ==
+  1) unit-roleName (角色名稱統一為「系統管理者」之顯示文字與站點, perm-run01 2026-10-26)
+       顯示文字(RN-001～003)
+         RN-001 procLang: cht.isAdmin 為「是否為系統管理者」、eng.isAdmin 不動、鍵名 isAdmin 仍存在  [建議書 §1; 欄位標題來源]:
+      AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
++ '是否為系統管理者'
+- '是否為系統管理者'
+          ^
+      + expected - actual
+      -是否為系統管理者
+      +是否為系統管理者
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/tmp/perm-run01/head/test/unit-roleName.test.mjs:68:15)
+      at process.processImmediate (node:internal/timers:574:21)
+  2) unit-roleName (角色名稱統一為「系統管理者」之顯示文字與站點, perm-run01 2026-10-26)
+       顯示文字(RN-001～003)
+         RN-002 schema users: settings.isAdmin.name 與 procLang cht.isAdmin 同字、鍵名 isAdmin 不變  [建議書 §1 兩處同改]:
+      AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
++ '是否為系統管理者'
+- '是否為系統管理者'
+          ^
+      + expected - actual
+      -是否為系統管理者
+      +是否為系統管理者
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/tmp/perm-run01/head/test/unit-roleName.test.mjs:74:15)
+      at process.processImmediate (node:internal/timers:574:21)
+  3) unit-roleName (角色名稱統一為「系統管理者」之顯示文字與站點, perm-run01 2026-10-26)
+== 錯誤行(去重,至多 15) ==
+  AssertionError [ERR_ASSERTION]: 含舊稱之語系鍵: userNotAdmin, isAdmin
+  AssertionError [ERR_ASSERTION]: 可執行碼仍含舊稱:
+== 最後 15 行(非空,不含上列失敗段落) ==
++   'server/procLang.mjs:484: cht: `僅系統管理者可存取或變更此資料`,',
++   'server/procLang.mjs:656: cht: `是否為系統管理者`,',
++   "server/tools/fromTools.mjs:337: L.push(`   注意: 被清除列中有 ${pl.nAdmin} 列為系統管理者(isAdmin='y')`)"
++ ]
+- []
+      + expected - actual
+      -[
+      -  "src/schema/tables/users.mjs:49: name: '是否為系統管理者',"
+      -  "server/procLang.mjs:484: cht: `僅系統管理者可存取或變更此資料`,"
+      -  "server/procLang.mjs:656: cht: `是否為系統管理者`,"
+      -  "server/tools/fromTools.mjs:337: L.push(`   注意: 被清除列中有 ${pl.nAdmin} 列為系統管理者(isAdmin='y')`)"
+      -]
+      +[]
+      at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/tmp/perm-run01/head/test/unit-roleName.test.mjs:97:15)
+      at process.processImmediate (node:internal/timers:574:21)
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)

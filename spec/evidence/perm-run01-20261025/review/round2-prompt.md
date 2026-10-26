@@ -13,11 +13,11 @@
 
 ## 背景(只供定位,請以程式碼為準)
 
-這是權限管理後端 `server/WWebPerm.mjs`(建於 w-serv-hapi → w-serv-webdata → w-serv-broadcast 之上)與其 Vue 前端。框架選項 `sysFuncsPublic` 決定哪些系統函數(`[sys:getFuncList]`、`[sys:getTableTags]`、`[sys:polling]`)免身分;**預設三者皆公開**。本套件設定為只公開 `[sys:getFuncList]`,且 `getUserIdByToken` 對空 token/非管理員 reject、連線閘只放管理員,故能分辨『預設』與『嚴格設定』的行為只剩『標頭有效管理員、本體缺 `__sysToken__` 鍵之 `[sys:polling]`』。前端 `src/main.js` 以 `useWaitToken: true` 使登入前不連線。上一輪我請另一位審查者看過全部變更;本輪**產品程式碼沒有改動**(只有 `server/WWebPerm.mjs` 的一句 JSDoc),修改的是測試與 README。
+這是權限管理後端 `server/WWebPerm.mjs`(建於 w-serv-hapi → w-serv-webdata → w-serv-broadcast 之上)與其 Vue 前端。框架選項 `sysFuncsPublic` 決定哪些系統函數(`[sys:getFuncList]`、`[sys:getTableTags]`、`[sys:polling]`)免身分;**預設三者皆公開**。本套件設定為只公開 `[sys:getFuncList]`,且 `getUserIdByToken` 對空 token/非系統管理者 reject、連線閘只放系統管理者,故能分辨『預設』與『嚴格設定』的行為只剩『標頭有效系統管理者、本體缺 `__sysToken__` 鍵之 `[sys:polling]`』。前端 `src/main.js` 以 `useWaitToken: true` 使登入前不連線。上一輪我請另一位審查者看過全部變更;本輪**產品程式碼沒有改動**(只有 `server/WWebPerm.mjs` 的一句 JSDoc),修改的是測試與 README。
 
 上一輪採納的意見與我的處理(請檢查處理是否正確、完整,有無引入新問題):
 - F1 測試缺格 → `test/api-sysFuncs.test.mjs` 新增四個「邊界」案: 本體 `__sysToken__` 非字串(`cstr` 把非字串/數字/符號/bigint 以外轉為空字串)、輪詢 `clientId` 缺失/非字串(`invalid clientId` 先於反查)、函數輸入封裝缺 `__sysInputArgs__`/型別錯(`invalid input`)與 input 本身非物件、函數名變體。
-- F2 clientId 綁定案原本第二次請求缺 token 先被空身分檢查擋下 → 改測兩個「有效但 userId 不同」的呼叫者(管理員 id-for-admin、系統服務用途 app:key-sys)重用同一 clientId,以及同 userId 之 AUA token 續輪詢。
+- F2 clientId 綁定案原本第二次請求缺 token 先被空身分檢查擋下 → 改測兩個「有效但 userId 不同」的呼叫者(系統管理者 id-for-admin、系統服務用途 app:key-sys)重用同一 clientId,以及同 userId 之 AUA token 續輪詢。
 - F5 `test/unit-sysFuncsSite.test.mjs` SFS-002 改固定 `getToken` 的 `let token = get(…userToken…)`/`return token`,並固定 `updateUserToken` 呼叫點恰為 `App.vue` 兩處;F6 SFS-003 範圍限單純 `^/~/精確` 版本。
 - F7 放行判斷強化: 輪詢須 `output` 為陣列、函數須內容正確;拒絕鍵逐呼叫者固定(`expectOf`);真前端元件案斷言四表 `recvData` 到齊。
 - F8 開機逾時計時器隨 `stop()` 清除;固定 sleep 改為有截止期限的條件等待 `waitUntil`;「登入前零紀錄」與「輪詢輪數」用第二個 `markSrLog()` 哨兵確保窗口內紀錄已落檔後才讀。

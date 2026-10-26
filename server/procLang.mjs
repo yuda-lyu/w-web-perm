@@ -25,7 +25,7 @@ let kpLang = {
         eng: 'Login denied',
         cht: '拒絕登入',
     },
-    //perm-run01(R-ADMIN-ONLY-01): 後台登入檢查回 userNotAdmin(登入者不是系統管理員, 即使部署方放行)時前端顯示之連線狀態文字; 同鍵另置於 src/plugins/mUI.mjs 之 kpFallback(被拒者連不上資料通道, 取不到本字典)
+    //perm-run01(R-ADMIN-ONLY-01): 後台登入檢查回 userNotAdmin(登入者不是系統管理者, 即使部署方放行)時前端顯示之連線狀態文字; 同鍵另置於 src/plugins/mUI.mjs 之 kpFallback(被拒者連不上資料通道, 取不到本字典)
     csErrNotAdmin: {
         eng: 'No permission to enter the permission console',
         cht: '無權進入權限後台',
@@ -135,7 +135,7 @@ let kpLang = {
     },
     anUnexpectedErrorOccurred: {
         eng: `An unexpected error occurred, please contact the administrator`,
-        cht: `發生非預期錯誤，請洽管理員`,
+        cht: `發生非預期錯誤，請洽系統管理者`,
     },
 
     //後端 reject 之 err key (eng + cht), 前端 .catch 依 lang 用 $tErr 反查顯示
@@ -477,8 +477,8 @@ let kpLang = {
         eng: `Not saved: the data was updated or this page is out of date (the request did not carry the identity of the groups, permissions or targets it changes). Nothing was changed. Please reload the page and try again.`,
         cht: `未儲存：資料已更新或頁面過舊（此次請求未附所異動之群組、權限或標的之身分資訊）。資料未變更，請重新整理頁面後再操作。`,
     },
-    //perm-run03 範圍四(寫入函數之角色檢查; dspec/使用者身分驗證原則.md 二.4): userNotAdmin 呼叫 updateTargets／updatePemis／updateGrups／updateUsers 者不是 perm users 表中有效之系統管理員(isAdmin='y') → 拒收、零寫入
-    //perm-run01(R-ADMIN-ONLY-01): 同鍵亦為資料通道(連線閘、執行身分)與後台登入檢查拒絕非系統管理員之固定鍵, 文字涵蓋存取與變更
+    //perm-run03 範圍四(寫入函數之角色檢查; dspec/使用者身分驗證原則.md 二.4): userNotAdmin 呼叫 updateTargets／updatePemis／updateGrups／updateUsers 者不是 perm users 表中有效之系統管理者(isAdmin='y') → 拒收、零寫入
+    //perm-run01(R-ADMIN-ONLY-01): 同鍵亦為資料通道(連線閘、執行身分)與後台登入檢查拒絕非系統管理者之固定鍵, 文字涵蓋存取與變更
     userNotAdmin: {
         eng: `Only system administrators can access or change this data`,
         cht: `僅系統管理者可存取或變更此資料`,
@@ -503,7 +503,7 @@ let kpLang = {
     },
     srcKeyConflict: {
         eng: `The existing data of this source cannot be matched uniquely by srcKey. Nothing was changed. Please contact the administrator`,
-        cht: `此來源之既有資料無法依 srcKey 唯一配對。資料未變更，請聯絡管理員處置`,
+        cht: `此來源之既有資料無法依 srcKey 唯一配對。資料未變更，請聯絡系統管理者處置`,
     },
     loginIdCollision: {
         eng: `Nothing was changed: a login identifier (the id of an administrator-managed user, or the srcKey of a user synchronized from an external source) is also used by another user or another source, whether or not either user is enabled, so a login by id would match more than one user. Please use a value that identifies the user uniquely, or ask the deployer to map users by another unique key (for example the email)`,

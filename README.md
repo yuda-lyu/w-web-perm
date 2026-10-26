@@ -77,7 +77,7 @@ let verifyClientUser = (user, from) => {
     console.log('verifyClientUser/user', user)
     // return false //測試無法登入
     console.log('於生產環境時得加入限制瀏覽器使用者身份機制')
-    //本套件於此函數通過後，另要求資料通道與後台登入限系統管理員(perm users 表之 isAdmin 為 'y')，一般使用者仍可經 /api/getPerm(from 為 'getPerm')以 token 查本人權限樹，
+    //本套件於此函數通過後，另要求資料通道與後台登入限系統管理者(perm users 表之 isAdmin 為 'y')，一般使用者仍可經 /api/getPerm(from 為 'getPerm')以 token 查本人權限樹，
     //故此處不可回傳 user.isAdmin === 'y'(會擋掉一般使用者之 /api/getPerm); 僅需放行有效之瀏覽使用者，或依 from 與自家政策再收緊
     return true
 }
@@ -86,7 +86,7 @@ let verifyAppUser = (user, from) => {
     console.log('verifyAppUser/user', user)
     // return false //測試無法登入
     console.log('於生產環境時得加入限制應用程式使用者身份機制')
-    //本套件於此函數通過後另自行要求管理員等級(users表有效之系統管理員，或系統服務用途之應用系統token)，一般使用者即使本函數放行亦被拒(userNotAdmin)，故不必再以isAdmin判斷；
+    //本套件於此函數通過後另自行要求系統管理者等級(users表有效之系統管理者，或系統服務用途之應用系統token)，一般使用者即使本函數放行亦被拒(userNotAdmin)，故不必再以isAdmin判斷；
     //僅需放行有效之應用系統，或依from與自家政策再收緊
     return true
 }

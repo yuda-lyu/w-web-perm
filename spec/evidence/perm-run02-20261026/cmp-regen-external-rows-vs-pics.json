@@ -1,0 +1,298 @@
+[
+ {
+  "name": "external-rows-cht-E2E-001-1-banner.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-001-1-banner.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-cht-E2E-001-1-banner.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-001-2-lock-cell.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-001-2-lock-cell.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-cht-E2E-001-2-lock-cell.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-004-1-click-delete.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-004-1-click-delete.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-cht-E2E-004-1-click-delete.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-004-2-blocked-box.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-004-2-blocked-box.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-cht-E2E-004-2-blocked-box.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-006-1-click-copy.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-006-1-click-copy.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-cht-E2E-006-1-click-copy.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-006-2-copied.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-006-2-copied.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-cht-E2E-006-2-copied.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-007-1-banner.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-007-1-banner.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-cht-E2E-007-1-banner.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-007-2-lock-cell.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-007-2-lock-cell.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-cht-E2E-007-2-lock-cell.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-010-1-warn-banner.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-010-1-warn-banner.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-cht-E2E-010-1-warn-banner.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-011-1-click-save.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-011-1-click-save.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-cht-E2E-011-1-click-save.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-011-2-stale-box.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-011-2-stale-box.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-cht-E2E-011-2-stale-box.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-016-1-stale-banner.png",
+  "status": "DIFF",
+  "exactDiff": 1056,
+  "pm": 643,
+  "bbox": [
+   721,
+   319,
+   852,
+   329
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-016-1-stale-banner.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-cht-E2E-016-1-stale-banner.png"
+ },
+ {
+  "name": "external-rows-cht-E2E-020-1-stale-banner.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-cht-E2E-020-1-stale-banner.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-cht-E2E-020-1-stale-banner.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-001-1-banner.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-001-1-banner.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-eng-E2E-001-1-banner.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-001-2-lock-cell.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-001-2-lock-cell.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-eng-E2E-001-2-lock-cell.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-004-1-click-delete.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-004-1-click-delete.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-eng-E2E-004-1-click-delete.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-004-2-blocked-box.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-004-2-blocked-box.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-eng-E2E-004-2-blocked-box.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-006-1-click-copy.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-006-1-click-copy.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-eng-E2E-006-1-click-copy.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-006-2-copied.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-006-2-copied.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-eng-E2E-006-2-copied.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-007-1-banner.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-007-1-banner.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-eng-E2E-007-1-banner.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-007-2-lock-cell.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-007-2-lock-cell.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-eng-E2E-007-2-lock-cell.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-010-1-warn-banner.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-010-1-warn-banner.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-eng-E2E-010-1-warn-banner.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-011-1-click-save.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-011-1-click-save.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-eng-E2E-011-1-click-save.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-011-2-stale-box.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-011-2-stale-box.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-eng-E2E-011-2-stale-box.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-016-1-stale-banner.png",
+  "status": "DIFF",
+  "exactDiff": 1056,
+  "pm": 643,
+  "bbox": [
+   721,
+   337,
+   852,
+   347
+  ],
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-016-1-stale-banner.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-eng-E2E-016-1-stale-banner.png"
+ },
+ {
+  "name": "external-rows-eng-E2E-020-1-stale-banner.png",
+  "status": "IDENTICAL",
+  "exactDiff": 0,
+  "pm": 0,
+  "bbox": null,
+  "w": 1440,
+  "h": 900,
+  "basePath": "test\\pics\\external-rows\\external-rows-eng-E2E-020-1-stale-banner.png",
+  "newPath": "tmp\\perm-run02\\new\\external-rows-eng-E2E-020-1-stale-banner.png"
+ }
+]

@@ -2,15 +2,15 @@
 //
 // 規格: C:\opensrcOper\dspec\使用者身分驗證原則.md 二.7、二.8(系統函數依作用分類: 只回名稱等公開資訊者可公開, 其餘須身分; 框架預設三者公開〔相容〕, 使用方於前端改用新元件之同一版本顯式設定);
 //       規則帳本 R-SYSFUNCS-01(sgud/rule/rulebook_security.md); 先例 w-web-task 1.0.37(只公開 getFuncList)。
-// 本套件設定: `sysFuncsPublic: ['[sys:getFuncList]']`(server/WWebPerm.mjs); `getUserIdByToken` 為真實反查(與 task 同型)且對空 token / 非管理員 fail-closed——
-//   故「公開 getFuncList」在本套件只是設定之表述, 實際仍須有效管理員身分(連線閘 verifyConn 先擋; 本體 token 再經 getUserIdByToken)。登入前不連線: src/main.js 之 `useWaitToken: true`
+// 本套件設定: `sysFuncsPublic: ['[sys:getFuncList]']`(server/WWebPerm.mjs); `getUserIdByToken` 為真實反查(與 task 同型)且對空 token / 非系統管理者 fail-closed——
+//   故「公開 getFuncList」在本套件只是設定之表述, 實際仍須有效系統管理者身分(連線閘 verifyConn 先擋; 本體 token 再經 getUserIdByToken)。登入前不連線: src/main.js 之 `useWaitToken: true`
 //   使前端元件在有 token 之前不輪詢、不呼叫任何系統函數(unit-sysFuncsSite 守護; 真瀏覽器見 spec/evidence/perm-run01-20261025/)。
 //
-// 呼叫者軸(7): N 無 token、U 一般使用者(perm 列 isAdmin n, 部署方放行)、A 系統管理員、AUA 使用者用途之應用系統綁管理員、AUM 使用者用途綁一般使用者、AS 系統服務用途、BAD 未知 token。
-//   「通過」＝管理員服務等級(A／AUA／AS; 與 api-callerMatrix 之 svc 同); 其餘於連線閘(標頭)或執行身分(本體)被拒。
+// 呼叫者軸(7): N 無 token、U 一般使用者(perm 列 isAdmin n, 部署方放行)、A 系統管理者、AUA 使用者用途之應用系統綁系統管理者、AUM 使用者用途綁一般使用者、AS 系統服務用途、BAD 未知 token。
+//   「通過」＝系統管理者服務等級(A／AUA／AS; 與 api-callerMatrix 之 svc 同); 其餘於連線閘(標頭)或執行身分(本體)被拒。
 // 協定軸(4):
 //   new   新協定(w-serv-hapi ≥1.1.8 之前端元件): 標頭 Authorization 與本體 `__sysToken__` 皆為呼叫者 token(輪詢本體為 { clientId, __sysToken__ }, 函數為 { __sysInputArgs__, __sysToken__ });
-//   body  本體來源: 標頭為有效管理員, 本體 `__sysToken__` 為呼叫者 token(兩個身分來源各自完整驗證, 框架不比對);
+//   body  本體來源: 標頭為有效系統管理者, 本體 `__sysToken__` 為呼叫者 token(兩個身分來源各自完整驗證, 框架不比對);
 //   old   舊協定(已發布之舊前端建置檔的輪詢): 本體不帶 `__sysToken__` 鍵(輪詢輸入恰為 { clientId }; 函數輸入恰為 { __sysInputArgs__ }), 標頭為呼叫者 token;
 //   empty 本體 `__sysToken__` 為空字串(未登入但連上之前端), 標頭為呼叫者 token。
 // 預期: 只有 (通過者 × new／body) 放行且回應內容正確(函數名稱清單含 getWebInfor／updateUsers／users.select; 同步表時間戳含四表; 輪詢回陣列); old／empty 對任何呼叫者皆拒、被拒回應不含資料,
@@ -40,12 +40,12 @@ const POLL_DENIED = '[sys:polling] permission denied' //輪詢被拒時前端只
 //回應不得含之資料特徵: 函數名稱清單(getFuncList)、同步表時間戳(getTableTags)
 const LEAK = ['updateUsers', 'getWebInfor', 'syncKpTable', 'users.select']
 
-//ok: 是否為管理員服務等級(通過連線閘與執行身分); 其餘皆拒
+//ok: 是否為系統管理者服務等級(通過連線閘與執行身分); 其餘皆拒
 const CALLERS = [
     { k: 'N', label: '無 token', token: '', ok: false },
     { k: 'U', label: '一般使用者', token: TOKEN_MEMBER, ok: false },
-    { k: 'A', label: '系統管理員', token: TOKEN_ADMIN, ok: true },
-    { k: 'AUA', label: '使用者用途之應用系統(綁管理員)', token: TOKEN_AU_ADMIN, ok: true },
+    { k: 'A', label: '系統管理者', token: TOKEN_ADMIN, ok: true },
+    { k: 'AUA', label: '使用者用途之應用系統(綁系統管理者)', token: TOKEN_AU_ADMIN, ok: true },
     { k: 'AUM', label: '使用者用途之應用系統(綁一般使用者)', token: TOKEN_AU_MEMBER, ok: false },
     { k: 'AS', label: '系統服務用途', token: TOKEN_AS, ok: true },
     { k: 'BAD', label: '未知 token', token: TOKEN_BAD, ok: false }
@@ -123,18 +123,18 @@ let expectOf = (func, c, proto) => {
     if (c.ok && (proto === 'new' || proto === 'body')) {
         return { kind: 'allow' }
     }
-    //標頭為呼叫者 token 且非管理員等級(含無 token、未知 token): 連線閘
+    //標頭為呼叫者 token 且非系統管理者等級(含無 token、未知 token): 連線閘
     if (proto !== 'body' && !c.ok) {
         return { kind: 'gate' }
     }
-    //標頭有效(A／AUA／AS 之 old／empty; 或 body 協定之標頭為管理員而本體為非管理員／空): 框架或執行身分拒
+    //標頭有效(A／AUA／AS 之 old／empty; 或 body 協定之標頭為系統管理者而本體為非系統管理者／空): 框架或執行身分拒
     if (proto === 'old' && func !== '[sys:polling]') {
         return { kind: 'body', msg: 'invalid token' } //函數必須帶 __sysToken__ 鍵(框架封裝鍵, 先於身分關卡)
     }
     if (func === '[sys:polling]') {
         return { kind: 'body', msg: POLL_DENIED } //輪詢身分關卡之固定訊息(前端只見此訊息)
     }
-    //函數: 執行身分(getUserIdByToken)拒絕之固定語系鍵——一般使用者(在表、非管理員)本體 → userNotAdmin; 空／未知／無 token → cannotFindUserFromToken
+    //函數: 執行身分(getUserIdByToken)拒絕之固定語系鍵——一般使用者(在表、非系統管理者)本體 → userNotAdmin; 空／未知／無 token → cannotFindUserFromToken
     return { kind: 'body', msg: (proto === 'body' && (c.k === 'U' || c.k === 'AUM')) ? 'userNotAdmin' : 'cannotFindUserFromToken' }
 }
 
@@ -154,7 +154,7 @@ describe('api-sysFuncs (系統函數 × 呼叫者 × 新舊協定, perm-run01 R-
         }
         let cur = (await selectAllRows('users')).slice().sort((a, b) => (a.order || 0) - (b.order || 0)).map(clone)
         USERS0 = cur
-        //夾具: id-for-member(perm 列 isAdmin n; srv.mjs 之 verifyClientUser 放行 → 通過部署方但非管理員)
+        //夾具: id-for-member(perm 列 isAdmin n; srv.mjs 之 verifyClientUser 放行 → 通過部署方但非系統管理者)
         let peter = cur.find((u) => u.id === 'id-for-peter')
         let member = { id: 'id-for-member', order: 50, name: 'member', email: 'member@example.com', description: '', from: '', cgrups: peter.cgrups, isAdmin: 'n', isActive: 'y' }
         let r = await callRpc('updateUsers', [[...cur, member]], TOKEN_ADMIN)
@@ -172,7 +172,7 @@ describe('api-sysFuncs (系統函數 × 呼叫者 × 新舊協定, perm-run01 R-
     //函數 × 協定一個 it, 內含 7 類呼叫者之格
     for (let func of FUNCS) {
         for (let proto of PROTOS) {
-            it(`${func} × 協定 ${proto}: 管理員服務等級(A／AUA／AS)只在 new／body 放行(內容正確), 其餘一律拒(固定鍵)、不回資料`, async function() {
+            it(`${func} × 協定 ${proto}: 系統管理者服務等級(A／AUA／AS)只在 new／body 放行(內容正確), 其餘一律拒(固定鍵)、不回資料`, async function() {
                 let fails = []
                 for (let c of CALLERS) {
                     let { hdr, input } = sendOf(func, c, proto)
@@ -207,7 +207,7 @@ describe('api-sysFuncs (系統函數 × 呼叫者 × 新舊協定, perm-run01 R-
         }
     }
 
-    it('標頭缺失／Basic 方案／空 Bearer／雙空白: 三個系統函數(本體帶有效管理員 token)一律於連線閘被拒', async function() {
+    it('標頭缺失／Basic 方案／空 Bearer／雙空白: 三個系統函數(本體帶有效系統管理者 token)一律於連線閘被拒', async function() {
         for (let func of FUNCS) {
             for (let hdrRaw of [null, 'Basic sys', 'Bearer', 'Bearer  sys']) {
                 let input = (func === '[sys:polling]') ? { clientId: `sf-hdr-${++seq}`, __sysToken__: TOKEN_ADMIN } : { __sysInputArgs__: [], __sysToken__: TOKEN_ADMIN }
@@ -223,7 +223,7 @@ describe('api-sysFuncs (系統函數 × 呼叫者 × 新舊協定, perm-run01 R-
         }
     })
 
-    //邊界(外審 sol F1): 標頭為有效管理員; 以下輸入皆不得放行
+    //邊界(外審 sol F1): 標頭為有效系統管理者; 以下輸入皆不得放行
     it('邊界: 本體 __sysToken__ 非字串(null、數字、布林、物件、陣列、含有效 token 之陣列)→ 經 cstr 轉為空字串或數字字串, 三個系統函數一律不放行', async function() {
         let toks = [null, 123, true, {}, [], ['sys'], ['nope-invalid']]
         let fails = []
@@ -302,7 +302,7 @@ describe('api-sysFuncs (系統函數 × 呼叫者 × 新舊協定, perm-run01 R-
     })
 
     //clientId 與身分綁定(外審 sol F2): 兩個「有效但身分不同」的呼叫者之間的轉換, 才分得出所有權檢查是否存在
-    it('輪詢之 clientId 與身分綁定: 管理員(userId id-for-admin)綁定後, 系統服務用途(app:key-sys)重用同一 clientId 被拒但其函數呼叫照常放行; 同 userId 之 AUA token 續輪詢放行; 舊協定重用亦被拒', async function() {
+    it('輪詢之 clientId 與身分綁定: 系統管理者(userId id-for-admin)綁定後, 系統服務用途(app:key-sys)重用同一 clientId 被拒但其函數呼叫照常放行; 同 userId 之 AUA token 續輪詢放行; 舊協定重用亦被拒', async function() {
         let id = `sf-bind-${++seq}`
         let poll = (tok, withKey = true) => rawRpc('[sys:polling]', withKey ? { clientId: id, __sysToken__: tok } : { clientId: id }, tok)
         A.equal(outcomeOf('[sys:polling]', await poll(TOKEN_ADMIN)), 'allow', '首次輪詢綁定 id-for-admin')
@@ -312,7 +312,7 @@ describe('api-sysFuncs (系統函數 × 呼叫者 × 新舊協定, perm-run01 R-
         A.equal(outcomeOf('[sys:polling]', await poll(TOKEN_AU_ADMIN)), 'allow', 'AUA 反查為同一 userId(id-for-admin), 續輪詢放行')
         A.equal(outcomeOf('[sys:polling]', await poll(TOKEN_ADMIN)), 'allow', '原 token 續輪詢仍放行')
         A.equal(outcomeOf('[sys:polling]', await poll(TOKEN_ADMIN, false)), `body:${POLL_DENIED}`, '舊協定(缺 token 鍵)重用已綁定之 clientId 被拒')
-        //反向: 先由 AS 綁定, 管理員重用被拒
+        //反向: 先由 AS 綁定, 系統管理者重用被拒
         let id2 = `sf-bind-${++seq}`
         let poll2 = (tok) => rawRpc('[sys:polling]', { clientId: id2, __sysToken__: tok }, tok)
         A.equal(outcomeOf('[sys:polling]', await poll2(TOKEN_AS)), 'allow')
@@ -321,7 +321,7 @@ describe('api-sysFuncs (系統函數 × 呼叫者 × 新舊協定, perm-run01 R-
         cells += 9
     })
 
-    it('被拒者零副作用: 舊協定輪詢被拒後, 該 clientId 不綁定空身分(之後以新協定管理員身分首次輪詢仍可綁定)', async function() {
+    it('被拒者零副作用: 舊協定輪詢被拒後, 該 clientId 不綁定空身分(之後以新協定系統管理者身分首次輪詢仍可綁定)', async function() {
         let id = `sf-nobind-${++seq}`
         let r1 = await rawRpc('[sys:polling]', { clientId: id }, TOKEN_ADMIN)
         A.equal(outcomeOf('[sys:polling]', r1), `body:${POLL_DENIED}`)
@@ -385,7 +385,7 @@ describe('api-sysFuncs (系統函數 × 呼叫者 × 新舊協定, perm-run01 R-
         //gateLines: 自標記起之連線閘紀錄(markSrLog 於動作前取、動作後再取一次以確保窗口內各行已落檔)
         let gateLines = (mark) => readSrLogSince(mark).filter((l) => l.event === 'verifyConn' || l.event === 'verifyConn-error' || l.event === 'getUserIdByToken-error')
 
-        it('登入前(getToken 回空字串)不連線: 等待期間後端零連線閘紀錄; 取得管理員 token 後才開機、四表同步完成, 其後輪詢至少兩輪且無 error 事件', async function() {
+        it('登入前(getToken 回空字串)不連線: 等待期間後端零連線閘紀錄; 取得系統管理者 token 後才開機、四表同步完成, 其後輪詢至少兩輪且無 error 事件', async function() {
             this.timeout(120000)
             let tok = ''
             let mark0 = await markSrLog()
@@ -417,7 +417,7 @@ describe('api-sysFuncs (系統函數 × 呼叫者 × 新舊協定, perm-run01 R-
             }
         })
 
-        it('一般使用者 token(通過部署方、非管理員)交給前端元件: 不開機、不取得資料——error 事件皆為連線閘之 permission denied', async function() {
+        it('一般使用者 token(通過部署方、非系統管理者)交給前端元件: 不開機、不取得資料——error 事件皆為連線閘之 permission denied', async function() {
             this.timeout(120000)
             let st = bootClient(() => TOKEN_MEMBER)
             try {

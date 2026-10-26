@@ -9,24 +9,24 @@
 | R1 | 給定呼叫者不在 perm users 表、反查 `isAdmin='y'`、未給 `isApp` → `/api/getPermUserInfor` 與 `/syncAndReplaceTabs` 放行(稽核欄記外部 id) | MX-H4、MX-H5、MX-R1(NF、NFV) |
 | R1b | 給定不在表、`isAdmin='n'`(未給 `isApp` 或 `isApp='y'`) → `userNotAdmin`、零寫入 | MX-H4、MX-H5、MX-R1(NFN、ASN) |
 | R1c | 給定在表之一般使用者(含使用者用途綁一般使用者) → `userNotAdmin` | MX-H4、MX-H5(U、AUM) |
-| R1d | 給定在表之管理員(含使用者用途綁管理員) → 放行, 稽核欄記 perm 列主鍵 | MX-H4、MX-H5(A、AUA)、MX-M3 |
+| R1d | 給定在表之系統管理者(含使用者用途綁系統管理者) → 放行, 稽核欄記 perm 列主鍵 | MX-H4、MX-H5(A、AUA)、MX-M3 |
 | R1e | 給定系統服務用途(`app:` 前綴、`isApp` y、`isAdmin` y、不在表) → 放行 | MX-H4、MX-H5(AS) |
-| R1f | 給定使用者用途綁不在表之 sso 管理員 → 放行(與其自身使用者 token 一致) | MX-H4、MX-H5、MX-R1(AUX)、MX-R4 |
-| R1g | 給定同一外部身分: 不在表放行 → 建成在表一般使用者(反查 `isAdmin` y 不採信)拒 → 在表有效管理員放行 → 停用拒(`cannotGetUserFromPerm`) → 刪列後放行 | MX-R2 |
-| R1h | 給定 `isAdmin` 為 `'y'` 以外之各值(`'Y'`、`' y'`、`true`、`1`、缺欄、繼承屬性、陣列…) → 不算管理員宣稱 | AT-003a～c |
+| R1f | 給定使用者用途綁不在表之 sso 系統管理者 → 放行(與其自身使用者 token 一致) | MX-H4、MX-H5、MX-R1(AUX)、MX-R4 |
+| R1g | 給定同一外部身分: 不在表放行 → 建成在表一般使用者(反查 `isAdmin` y 不採信)拒 → 在表有效系統管理者放行 → 停用拒(`cannotGetUserFromPerm`) → 刪列後放行 | MX-R2 |
+| R1h | 給定 `isAdmin` 為 `'y'` 以外之各值(`'Y'`、`' y'`、`true`、`1`、缺欄、繼承屬性、陣列…) → 不算系統管理者宣稱 | AT-003a～c |
 | R2 | 給定系統服務用途四條件(不在表、`isApp` y、`isAdmin` y、`id` 以 `app:` 開頭) → 後台登入檢查、資料通道(標頭／本體)、四個寫入函數通過; 缺任一條件 → 拒 | MX-H2、MX-C、MX-D、MX-R3、MX-M1 |
 | R2b | 給定 `isApp` y、`isAdmin` y 但 id 不以 `app:` 開頭(APP、AUX) → 後台與資料通道拒, 回應與無效 token 相同(通訊路由 ≡ `permission denied`) | MX-H2、MX-C、MX-D、MX-R3 |
-| R2c | 給定使用者用途綁不在表之 sso 管理員(AUX)與該管理員自身使用者 token(NFV) → 後台登入檢查回應逐字相同、資料通道標頭／本體拒絕鍵相同 | MX-R4 |
+| R2c | 給定使用者用途綁不在表之 sso 系統管理者(AUX)與該系統管理者自身使用者 token(NFV) → 後台登入檢查回應逐字相同、資料通道標頭／本體拒絕鍵相同 | MX-R4 |
 | R2d | `id` 前綴的近似形(`App:`、`APP:`、` app:`、`xapp:`、`app`、`app-k`、全形冒號、數字／null／陣列) → 非系統服務用途 | AT-001b(22×13×13 格) |
 | R2e | 前綴比對只在 `adminCheck.mjs`; 應用系統路由不使用 `isSystemAppUser`、不出現 `isApp` | AT-S2、AT-S8、AT-S9 |
 | R2f | `requireAdmin` 對不在表者仍須為近期登錄之系統服務用途 id(登錄點唯一) | AT-S5 |
-| R2g | 給定嚴格系統服務形狀而 perm 有主鍵同為其 id 之停用列 → 在表, 以列為準(不落入系統服務用途); 啟用且管理員 → 以列通過; 降為一般使用者 → `userNotAdmin`(反查 `isAdmin` y 不採信) | MX-R5(帶 email 之嚴格形狀)、MX-M2／M5(email／name 對應鍵) |
-| R2h | 給定 `isApp` 明確 `'n'` 或 `'Y'`、`isAdmin` y、不在表 → 後端管理員服務拒、應用系統路由放行 | 呼叫者軸 AFN／AFO 全入口 |
+| R2g | 給定嚴格系統服務形狀而 perm 有主鍵同為其 id 之停用列 → 在表, 以列為準(不落入系統服務用途); 啟用且系統管理者 → 以列通過; 降為一般使用者 → `userNotAdmin`(反查 `isAdmin` y 不採信) | MX-R5(帶 email 之嚴格形狀)、MX-M2／M5(email／name 對應鍵) |
+| R2h | 給定 `isApp` 明確 `'n'` 或 `'Y'`、`isAdmin` y、不在表 → 後端系統管理者服務拒、應用系統路由放行 | 呼叫者軸 AFN／AFO 全入口 |
 | R2i | 給定不在表且 `isAdmin` n 而 `verifyAppUser` 否決 → `userNoPermission`(部署方否決先於等級不足) | MX-R6 |
-| R2j | 給定外部列管理員(srcKey 對應, 內部 id 系統配發) → 各入口通過, 稽核欄記 perm 內部 id | MX-R7 |
-| R2k | 給定不在表之 sso 管理員(NFV／AUX)經 `/syncAndReplaceTabs?keyTable=users` 匯入自己的 users 列 → 之後同一 token 以該列通過後台與資料通道, 稽核欄由外部 id 轉 perm 內部 id(①的權限面, 既定政策, 固定其結果) | MX-R8 |
+| R2j | 給定外部列系統管理者(srcKey 對應, 內部 id 系統配發) → 各入口通過, 稽核欄記 perm 內部 id | MX-R7 |
+| R2k | 給定不在表之 sso 系統管理者(NFV／AUX)經 `/syncAndReplaceTabs?keyTable=users` 匯入自己的 users 列 → 之後同一 token 以該列通過後台與資料通道, 稽核欄由外部 id 轉 perm 內部 id(①的權限面, 既定政策, 固定其結果) | MX-R8 |
 | R2l | 給定嚴格系統服務形狀、外部 id≠列主鍵、只靠 email／name 命中停用列 → 在表, 各入口拒 | MX-M7(mappingBy=email) |
-| R3 | 給定系統服務用途 id 近期已登錄、perm 其後建立主鍵同為該 id 之管理員列、一般 sso 管理員經該列通過驗證、列於 `requireAdmin` 讀取前被刪 → 寫入函數 `userNotAdmin`、零寫入(外審 sol F3) | MX-M6(確定性競態) |
+| R3 | 給定系統服務用途 id 近期已登錄、perm 其後建立主鍵同為該 id 之系統管理者列、一般 sso 系統管理者經該列通過驗證、列於 `requireAdmin` 讀取前被刪 → 寫入函數 `userNotAdmin`、零寫入(外審 sol F3) | MX-M6(確定性競態) |
 | N | 不得改變: P-3 Bearer(MX-B1／B2)、P-5 先驗身分(MX-Q1)、sol#5 固定鍵(各格失敗 msg 皆為語系鍵)、稽核 id 記 perm 列主鍵(MX-M3)、1.1.15 行為(`api-adminOnly` 等既有 api 全跑) | 見報告 |
 
 ## 二、輸入空間表: 呼叫者 15 × 入口
@@ -52,8 +52,8 @@
 | 呼叫者 | 入口 | 檢查點 → 本輪 | 對應裁示 |
 |---|---|---|---|
 | NF(`app:` id、`isApp` 未轉傳、`isAdmin` y、不在表) | 應用系統路由 | 拒 → 放行 | ① |
-| NFV(sso 管理員自身 token; 新增軸) | 應用系統路由 | 拒 → 放行 | ① |
+| NFV(sso 系統管理者自身 token; 新增軸) | 應用系統路由 | 拒 → 放行 | ① |
 | APP(`id-for-application`、`isApp` y、`isAdmin` y) | 後台登入檢查、資料通道 | 放行 → 拒 | ② |
-| AUX(使用者用途綁不在表 sso 管理員; 新增軸) | 後台登入檢查、資料通道 | 放行 → 拒 | ② |
+| AUX(使用者用途綁不在表 sso 系統管理者; 新增軸) | 後台登入檢查、資料通道 | 放行 → 拒 | ② |
 
 未列入之軸(誠實記載): 未對 `mappingBy='id'` 以外之對應鍵逐軸測「id 恰等於某列主鍵」(僅 MX-M2〔email／name 各一〕涵蓋); `verifyClientUser` 的各種回傳值對 AS 無影響(AS 不經 `verifyClientUser`)，未獨立列格。

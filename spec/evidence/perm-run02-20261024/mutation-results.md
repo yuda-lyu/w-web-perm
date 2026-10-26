@@ -21,7 +21,7 @@
 | MA3 | ①不在表分支不判等級(恆真) | MX-H4(一般使用者 NFN／ASN 被放行) |
 | MA4 | ①`isExtAdminUser` 另要求 `app:` 前綴 | MX-H4 |
 | MA5 | ①`isExtAdminUser` 恆真 | MX-H4 |
-| MA6 | ①在表者改採反查之 `isAdmin`(不以 perm 列為準) | MX-P1(AU 綁管理員降級後仍放行) |
+| MA6 | ①在表者改採反查之 `isAdmin`(不以 perm 列為準) | MX-P1(AU 綁系統管理者降級後仍放行) |
 | MB1 | ②系統服務用途拿掉 `app:` 前綴條件 | MX-H2 |
 | MB2 | ②前綴比對不分大小寫 | `unit-appToken` AT-001b(輸入空間含 `App:k`／`APP:k`) |
 | MB3 | ②前綴比對改 `includes` | AT-001b(`xapp:k`) |

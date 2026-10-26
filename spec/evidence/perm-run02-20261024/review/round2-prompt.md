@@ -13,8 +13,8 @@
 本輪(perm-run02)要求: **① 應用系統路由**(`/api/getPermUserInfor`、`/syncAndReplaceTabs`; `server/WWebPerm.mjs:getAndVerifyAppUser`)對『不在 perm users 表』之呼叫者改為只看部署方 `getUserByToken` 反查之 `isAdmin==='y'`(不要求 `isApp`、不要求 id 前綴; `server/adminCheck.mjs:isExtAdminUser`), 在表者仍以 perm 列為準; **② 系統服務用途**(後台登入檢查、資料通道、`requireAdmin`)須同時: 不在表、`isApp==='y'`、`isAdmin==='y'`、`id` 以 `app:` 開頭(`isSystemAppUser`)。完整變更在 `diff.patch`(第一版快照時), 本次增量在 `delta.patch`(第一版快照 → 第二版快照之差異, 含程式、測試、文件)。
 
 第一輪審查意見與我的處置(請你獨立驗證處置是否妥當, 不要照單接受):
-- F1(測試缺格): 補了 MX-R5(嚴格系統服務形狀而 perm 有主鍵同為其 id 之停用列)、MX-R6(不在表且 isAdmin n 而被 verifyAppUser 否決 → 拒絕鍵次序)、MX-R7(外部列管理員 srcKey 登入, 稽核欄記 perm 內部 id)、MX-M5(email／name 對應鍵下之停用列)、呼叫者軸新增 isApp 明確 'n' 與 'Y'。
-- F2(`/api/getPermUserInfor` 不檢查呼叫者 id, 缺 id 之不在表管理員宣稱者放行): **不改行為**(1.1.15 行為; `getUserByToken` 契約本就要求 id; 主控裁示『不在表只看 isAdmin』), 只更正文件過廣之敘述。請你評估此處置。
+- F1(測試缺格): 補了 MX-R5(嚴格系統服務形狀而 perm 有主鍵同為其 id 之停用列)、MX-R6(不在表且 isAdmin n 而被 verifyAppUser 否決 → 拒絕鍵次序)、MX-R7(外部列系統管理者 srcKey 登入, 稽核欄記 perm 內部 id)、MX-M5(email／name 對應鍵下之停用列)、呼叫者軸新增 isApp 明確 'n' 與 'Y'。
+- F2(`/api/getPermUserInfor` 不檢查呼叫者 id, 缺 id 之不在表系統管理者宣稱者放行): **不改行為**(1.1.15 行為; `getUserByToken` 契約本就要求 id; 主控裁示『不在表只看 isAdmin』), 只更正文件過廣之敘述。請你評估此處置。
 - F3(系統服務用途近期登錄被同 id 之 perm 列請求沿用): 採納最小修——`getUserIdByToken` 對以 perm 列通過者清除同 id 之登錄(`clearSystemAppId`), 並以確定性競態測試 MX-M6(srv.mjs 對 `app:key-ghost` 列的 `verifyClientUser` 等待 2 秒, 測試於等待中刪列)守護。請審這個修正有無引入新缺陷、有無遺漏之情境。
 - F4(`requireAdmin` 提前放行之變異抓不到): 由 MX-M6 行為測試補抓; 站點字串守護保留。
 - F5(`[sys:polling]` 本體來源未測): 屬框架(排程第 128 項), README 補註例外。

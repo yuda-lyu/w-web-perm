@@ -1648,7 +1648,7 @@ describe('unit-procCore-external (外部列保護與過期快照基準之伺服�
             })
 
             //perm-run03 範圍四(函數層級角色檢查; dspec/使用者身分驗證原則.md 二.4): 四個寫入函數的第一個敘述即 `await requireAdmin(userId, '<自身函數名>')`, 其後才可呼叫 pc.updateXxx(
-            //(先於 pickClientOpt、lockSave、表鎖與任何讀庫——非管理員零寫入、零讀庫); requireAdmin 本體以 perm users 表之 isAdmin==='y' 為準, 不符 reject 固定鍵 userNotAdmin(行為面見 api 層)
+            //(先於 pickClientOpt、lockSave、表鎖與任何讀庫——非系統管理者零寫入、零讀庫); requireAdmin 本體以 perm users 表之 isAdmin==='y' 為準, 不符 reject 固定鍵 userNotAdmin(行為面見 api 層)
             it('SITE-EX-013 kpFunExt 四個 updateXxx 皆先 await requireAdmin(userId, 自身函數名) 再呼叫 pc.updateXxx(; requireAdmin 不符即 reject userNotAdmin', function() {
                 assert.strict.ok(iK > 0)
                 let seg = wcode.slice(iK, iK + 3000)

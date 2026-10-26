@@ -76,12 +76,12 @@ let restoreLim = (v, lim) => {
 
 
 /**
- * 取得「mode 缺或非法之啟用引用」(伺服端之限制項)之原始 mode, 供存檔時原樣寫回(R-PRINCIPLE-00 e; 未被管理者改動之項寫回其原始 mode)
+ * 取得「mode 缺或非法之啟用引用」(伺服端之限制項)之原始 mode, 供存檔時原樣寫回(R-PRINCIPLE-00 e; 未被系統管理者改動之項寫回其原始 mode)
  *
  * 伺服端 mergeRules 把 mode 缺或非 OR／AND 之啟用項當「限制項」: 只當 AND 交集項、不單獨當基底, 該層沒有任何 mode 合法之啟用項時全 n.
- * 編輯器(cvKpToObj)把此類項顯示為「AND、啟用」; 存檔若寫出合法 AND, 限制項即變成可當基底之 AND——例: { G1: 缺 mode, G2: AND } 管理者停用唯一合法項 G2 後存檔,
+ * 編輯器(cvKpToObj)把此類項顯示為「AND、啟用」; 存檔若寫出合法 AND, 限制項即變成可當基底之 AND——例: { G1: 缺 mode, G2: AND } 系統管理者停用唯一合法項 G2 後存檔,
  * G1 成為唯一基底而授予其內容(預期為全 n, 多給). 故記下原始 mode, 存檔時對仍為「AND、啟用」(開啟時之狀態, 視為未改)者寫回原始 mode(putRowsToKp／putRefEntry);
- * 管理者改過 mode 或停用者照其選擇寫出.
+ * 系統管理者改過 mode 或停用者照其選擇寫出.
  * 只記「該名稱所有啟用元素皆 mode 缺或非法」者: 同名另有 mode 合法之啟用元素時(如陣列 [AND, 缺 mode]), 伺服端結果同該合法項, 寫出合法 mode 即授權不變, 寫回限制項反而收回.
  * 純量值({ "G1": "y" })伺服端解為 { isActive: 'y' }(無 mode), 視同缺 mode. 名稱非字串之元素不記(由 getKpLossy 拒存).
  *
@@ -219,7 +219,7 @@ function getDupRowsInconsistent(rows) {
  * 名稱為字串者(含 '', R-PRINCIPLE-00 f: 原樣保留; 含懸空之額外列)寫出; 名稱非字串、mode 非 OR／AND、enable 非非空字串之列略過(對話框不會產生此類列).
  * 同名多列後者覆蓋前者(呼叫端須先以 getDupRowsInconsistent 拒存不一致者; 一致者覆蓋結果相同).
  * rawModeMap(getRawModeMap 之結果, 選填): 限制項之列仍為「啟用、mode 為其有效值(AND)」(開啟時之狀態, 視為未改)者寫回原始 mode(restoreLim), 不寫成合法 AND——
- * 否則限制項變為可當基底之 AND 而多給(見 getRawModeMap); 管理者改過 mode 或停用者照列寫出. 不給＝一律照列寫出.
+ * 否則限制項變為可當基底之 AND 而多給(見 getRawModeMap); 系統管理者改過 mode 或停用者照列寫出. 不給＝一律照列寫出.
  *
  * @param {Object} kpOut 輸入寫出用之無原型容器(呼叫端建立)
  * @param {Array} rows 輸入對話框之列 [{ name, mode, enable }]

@@ -56,7 +56,7 @@ let getUserByToken = async (token) => {
         if (token === '{token-for-reject}') { //模擬部署方以舊版 w-web-sso helper(≤1.1.4)注入: 失敗時 reject 之字串含已代入系統介接權杖(合成秘密)與使用者權杖之完整網址
             return Promise.reject(`can not get user data by url[http://127.0.0.1:11007/api/getSsoUserInfor?token=SYNTH-SYS-SECRET-FOR-TEST&key=token&value=${token}]`)
         }
-        if (token === '{token-for-admin2}') { //測試用(perm-run03 範圍三): 第二位系統管理員, 供「標頭 token 與本體 __sysToken__ 為不同使用者」「本體 token 之使用者被停用」等 getUserIdByToken 完整驗證案例(其 perm users 列由測試自行建立／停用)
+        if (token === '{token-for-admin2}') { //測試用(perm-run03 範圍三): 第二位系統管理者, 供「標頭 token 與本體 __sysToken__ 為不同使用者」「本體 token 之使用者被停用」等 getUserIdByToken 完整驗證案例(其 perm users 列由測試自行建立／停用)
             return {
                 id: 'id-for-admin2',
                 name: 'admin2',
@@ -64,7 +64,7 @@ let getUserByToken = async (token) => {
                 isAdmin: 'y',
             }
         }
-        if (token === '{token-for-member}') { //測試用(perm-run03 範圍四): 在 perm users 表內(測試自行建立)、有效、isAdmin='n' 但**通過** verifyClientUser(見下方)之瀏覽使用者, 供「通過連線閘之非管理員呼叫寫入函數被 requireAdmin 拒收」案例
+        if (token === '{token-for-member}') { //測試用(perm-run03 範圍四): 在 perm users 表內(測試自行建立)、有效、isAdmin='n' 但**通過** verifyClientUser(見下方)之瀏覽使用者, 供「通過連線閘之非系統管理者呼叫寫入函數被 requireAdmin 拒收」案例
             return {
                 id: 'id-for-member',
                 name: 'member',
@@ -72,7 +72,7 @@ let getUserByToken = async (token) => {
                 isAdmin: 'n',
             }
         }
-        if (token === '{token-for-mutate}') { //測試用(perm-run01 外審 sol#2): perm 列為管理員, 但 verifyClientUser 會改寫其收到之 user 物件(id、isAdmin), 模擬行為不良之部署方回呼; 套件須以驗證當下之 perm 列為準
+        if (token === '{token-for-mutate}') { //測試用(perm-run01 外審 sol#2): perm 列為系統管理者, 但 verifyClientUser 會改寫其收到之 user 物件(id、isAdmin), 模擬行為不良之部署方回呼; 套件須以驗證當下之 perm 列為準
             return {
                 id: 'id-for-mutate',
                 name: 'mutate',
@@ -109,7 +109,7 @@ let getUserByToken = async (token) => {
         if (token === '{token-for-noflag-n}') { //不在 perm users 表、isAdmin='n'、未轉傳 isApp(perm-run02): 一般使用者之外部形狀, 各入口皆拒
             return { id: 'sso-user-78', name: 'sso-user', email: 'sso-user@example.com', isAdmin: 'n' }
         }
-        if (token === '{token-for-sso-admin}') { //不在 perm users 表之 sso 管理員, 以其**自身使用者 token**(perm-run02): 未轉傳 isApp; 與下一個權杖為同一人(id 同)
+        if (token === '{token-for-sso-admin}') { //不在 perm users 表之 sso 系統管理者, 以其**自身使用者 token**(perm-run02): 未轉傳 isApp; 與下一個權杖為同一人(id 同)
             return { id: 'sso-admin-77', name: 'sso-admin', email: 'sso-admin@example.com', isAdmin: 'y' }
         }
         if (token === '{token-for-app-flag-n}') { //不在表、isAdmin='y'、isApp 明確為 'n'(perm-run02 外審 sol F1): 非系統服務用途(後端拒), 應用系統路由只看 isAdmin 而放行
@@ -133,13 +133,13 @@ let getUserByToken = async (token) => {
         if (token === '{token-for-app-ghost}') { //系統服務用途(perm-run02 外審 sol F3): 先以此權杖登錄近期系統服務用途 id 'app:key-ghost'
             return { id: 'app:key-ghost', name: 'key-ghost', email: '', isAdmin: 'y', isApp: 'y' }
         }
-        if (token === '{token-for-ghost-user}') { //一般 sso 管理員(perm-run02 外審 sol F3): email 對應 perm 列(主鍵恰為 'app:key-ghost'; 僅 mappingBy='email' 之測試設定), 經該列通過驗證後該列被刪
+        if (token === '{token-for-ghost-user}') { //一般 sso 系統管理者(perm-run02 外審 sol F3): email 對應 perm 列(主鍵恰為 'app:key-ghost'; 僅 mappingBy='email' 之測試設定), 經該列通過驗證後該列被刪
             return { id: 'sso-ghost-1', name: 'ghost', email: 'ghost@example.com', isAdmin: 'y' }
         }
-        if (token === '{token-for-app-bind-sso}') { //使用者用途(AU)綁定「不在 perm users 表之 sso 管理員」(perm-run02): 反查回該使用者實際資料(id 非 'app:' 開頭)＋isApp='y', isAdmin='y'; 不是系統服務用途(須 id 以 'app:' 開頭)
+        if (token === '{token-for-app-bind-sso}') { //使用者用途(AU)綁定「不在 perm users 表之 sso 系統管理者」(perm-run02): 反查回該使用者實際資料(id 非 'app:' 開頭)＋isApp='y', isAdmin='y'; 不是系統服務用途(須 id 以 'app:' 開頭)
             return { id: 'sso-admin-77', name: 'sso-admin', email: 'sso-admin@example.com', isAdmin: 'y', isApp: 'y' }
         }
-        if (token === '{token-for-app-bind-admin}') { //使用者用途(AU)綁定管理員(base seed admin): 反查回該使用者實際資料＋isApp='y'
+        if (token === '{token-for-app-bind-admin}') { //使用者用途(AU)綁定系統管理者(base seed admin): 反查回該使用者實際資料＋isApp='y'
             return { id: 'id-for-admin', name: 'admin', email: 'admin@example.com', isAdmin: 'y', isApp: 'y' }
         }
         if (token === '{token-for-app-bind-member}') { //使用者用途(AU)綁定一般使用者(base seed peter)
@@ -148,13 +148,13 @@ let getUserByToken = async (token) => {
         if (token === '{token-for-app-bind-disabled}') { //使用者用途(AU)綁定之使用者在 perm users 表但被停用(列由測試自建), 上游 isAdmin='y': 不得因「停用視同查無」而落入系統服務用途
             return { id: 'id-for-appdis', name: 'appdis', email: 'appdis@example.com', isAdmin: 'y', isApp: 'y' }
         }
-        if (token === '{token-for-alt-admin}') { //外部 id 與 perm 主鍵不同之管理員(外審 sol F02): 以 email 對應 perm 列 id-for-admin(僅 mappingBy 為 email 之測試設定有效); 稽核欄須記 perm 內之 id-for-admin, 不是外部 id
+        if (token === '{token-for-alt-admin}') { //外部 id 與 perm 主鍵不同之系統管理者(外審 sol F02): 以 email 對應 perm 列 id-for-admin(僅 mappingBy 為 email 之測試設定有效); 稽核欄須記 perm 內之 id-for-admin, 不是外部 id
             return { id: 'sso-admin-9', name: 'admin-alt', email: 'admin@example.com', isAdmin: 'y' }
         }
         if (token === '{token-for-app-bind-disabled-alt}') { //使用者用途綁定之使用者在 perm 表但停用, 且外部 id(sso-appdis-9)與 perm 主鍵(id-for-appdis)不同: 只能靠對應鍵 email 找到該列(僅 mappingBy 為 email 之測試設定); 停用之列也算在表中, 不得落入系統服務用途
             return { id: 'sso-appdis-9', name: 'appdis-alt', email: 'appdis@example.com', isAdmin: 'y', isApp: 'y' }
         }
-        if (token === '{token-for-deny}') { //perm 列為管理員(列由測試自建), 但 verifyClientUser 因非角色因素(模擬來源網段)否決
+        if (token === '{token-for-deny}') { //perm 列為系統管理者(列由測試自建), 但 verifyClientUser 因非角色因素(模擬來源網段)否決
             return { id: 'id-for-deny', name: 'deny', email: 'deny@example.com', isAdmin: 'y' }
         }
         if (token === '{token-for-app-deny}') { //系統服務用途, 但 verifyAppUser 因非角色因素否決
@@ -175,7 +175,7 @@ let verifyClientUser = (user, from) => {
     if (process.env.NODE_ENV !== 'production' && user.id === 'id-for-verify-throw') { //測試用: 見 getUserByToken 之 '{token-for-verify-throw}'
         throw new Error('SYNTH-VERIFY-SECRET-FOR-TEST')
     }
-    if (process.env.NODE_ENV !== 'production' && user.id === 'id-for-member') { //測試用: 見 getUserByToken 之 '{token-for-member}'(部署方放行非管理員, 套件仍須於函數層級另檢查角色)
+    if (process.env.NODE_ENV !== 'production' && user.id === 'id-for-member') { //測試用: 見 getUserByToken 之 '{token-for-member}'(部署方放行非系統管理者, 套件仍須於函數層級另檢查角色)
         return true
     }
     if (process.env.NODE_ENV !== 'production' && user.id === 'id-for-mutate') { //測試用: 見 '{token-for-mutate}'——改寫收到之 user 物件後放行(套件傳給本函數的是副本, 改寫不得影響執行身分與角色)
@@ -192,7 +192,7 @@ let verifyClientUser = (user, from) => {
     if (process.env.NODE_ENV !== 'production' && user.id === 'id-for-deny') { //測試用: 見 '{token-for-deny}'——部署方因非角色因素否決(例如來源網段不符)
         return false
     }
-    //只放行有效之瀏覽使用者, 不以 isAdmin 判斷(P-7): 非管理員由本套件統一拒絕並使畫面顯示「無權進入權限後台」(userNotAdmin); 若在此先否決非管理員, 使用者只會看到「拒絕登入」並被轉址; 部署方可依 from 與自家政策(來源網段、系統別)再收緊
+    //只放行有效之瀏覽使用者, 不以 isAdmin 判斷(P-7): 非系統管理者由本套件統一拒絕並使畫面顯示「無權進入權限後台」(userNotAdmin); 若在此先否決非系統管理者, 使用者只會看到「拒絕登入」並被轉址; 部署方可依 from 與自家政策(來源網段、系統別)再收緊
     return true
 }
 
@@ -203,7 +203,7 @@ let verifyAppUser = (user, from) => {
     if (process.env.NODE_ENV !== 'production' && user.id === 'id-for-verify-throw') { //測試用: 見 getUserByToken 之 '{token-for-verify-throw}'
         throw new Error('SYNTH-VERIFY-SECRET-FOR-TEST')
     }
-    if (process.env.NODE_ENV !== 'production' && (user.id === 'app:key-deny' || user.id === 'id-for-deny')) { //測試用: 見 '{token-for-app-deny}'、'{token-for-deny}'——部署方因非角色因素否決(id-for-deny 之 perm 列可由測試設為非管理員, 驗拒絕鍵次序: 部署方否決先於等級不足)
+    if (process.env.NODE_ENV !== 'production' && (user.id === 'app:key-deny' || user.id === 'id-for-deny')) { //測試用: 見 '{token-for-app-deny}'、'{token-for-deny}'——部署方因非角色因素否決(id-for-deny 之 perm 列可由測試設為非系統管理者, 驗拒絕鍵次序: 部署方否決先於等級不足)
         return false
     }
     if (process.env.NODE_ENV !== 'production' && user.id === 'app:key-mutate') { //測試用: 見 '{token-for-app-mutate}'——改寫收到之 user 物件後放行(套件傳的是副本, 改寫不得影響稽核欄所記之 id 與等級)
@@ -211,7 +211,7 @@ let verifyAppUser = (user, from) => {
         user.isAdmin = 'n'
         return true
     }
-    //套件已自行要求管理員等級(users 表中有效之系統管理員, 或系統服務用途之應用系統 token; P-1), 不必再以 isAdmin 判斷; 部署方可依 from 與自家政策再收緊
+    //套件已自行要求系統管理者等級(users 表中有效之系統管理者, 或系統服務用途之應用系統 token; P-1), 不必再以 isAdmin 判斷; 部署方可依 from 與自家政策再收緊
     return true
 }
 

@@ -1,7 +1,7 @@
 //反向關聯對話框之「列 ↔ 存檔快照」身分配對(規則帳本 R-REL-PAIR-01, ADR-032; 來源: run02 設計一致性盤查 F-24)
 //
 //背景: VeGrupBlngUsers／VePemiBlngGrups 開框時依 store 當時的列序產生對話框的列; 存檔時重新取 store 快照. 修前以「開框時的列索引」配對兩者,
-//store 於開框期間被更新(另一位管理者增刪或改 order)時, 關聯寫到另一個使用者／群組. 修後以列身分(id; 群組另驗 name)配對, 找不到者回報為 missing, 由元件整次拒存.
+//store 於開框期間被更新(另一位系統管理者增刪或改 order)時, 關聯寫到另一個使用者／群組. 修後以列身分(id; 群組另驗 name)配對, 找不到者回報為 missing, 由元件整次拒存.
 //
 //本檔驗純函數 pairRowsToSnapshot(src/js/pairRowsToSnapshot.mjs)的契約; 元件接線由 unit-relDialogs(靜態站點不變式)與 e2e-array-form AF-014(真瀏覽器)守護.
 //跑法: npx mocha test/unit-pairRowsToSnapshot.test.mjs --timeout 30000

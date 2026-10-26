@@ -1,0 +1,20 @@
+[quiet-run] exit=0 time=3m30s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261026-151217-perm-run01-regen-layout.log (31 行, 2 KB)
+[quiet-run] cmd: node test/e2e-layout.test.mjs --baseline
+[quiet-run] lock: 取得並已釋放(等待 0s)
+== 最後 15 行(非空,不含上列失敗段落) ==
+  [write] eng-E2E-003-2-widened (all)
+  ✔ eng/E2E-003-resize-narrow-wide（寫出 2 張，略過 0，保留 0）
+  cht/E2E-001-hide-menu
+  [write] cht-E2E-001-1-click-hide (all)
+  [write] cht-E2E-001-2-hidden (all)
+  ✔ cht/E2E-001-hide-menu（寫出 2 張，略過 0，保留 0）
+  cht/E2E-002-show-menu
+  [write] cht-E2E-002-1-click-show (all)
+  [write] cht-E2E-002-2-shown (all)
+  ✔ cht/E2E-002-show-menu（寫出 2 張，略過 0，保留 0）
+  cht/E2E-003-resize-narrow-wide
+  [write] cht-E2E-003-1-narrowed (all)
+  [write] cht-E2E-003-2-widened (all)
+  ✔ cht/E2E-003-resize-narrow-wide（寫出 2 張，略過 0，保留 0）
+=== 產製 layout baseline 完成 ===
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)

@@ -1,7 +1,7 @@
 //後台整表寫入之同批重複 id(perm-run01 範圍二; 真後端, 經資料通道 RPC): 四表一併檢查, 同批兩列同 id 即整批拒收 saveRowFieldDuplicate、零寫入。
 //來源: perm-run05 確證 users 整表寫入時同批兩列同 id 被合併為一列而回成功、靜默遺失其一(pemis／grups／targets 早已拒收; 規則帳本 R-WRITE-ID-UNIQ-01)。
 //輸入空間: 表 {users, grups, pemis, targets} × 形狀 {既有 id 在批內出現兩次〔內容不同〕, 兩列新增列同一個庫內不存在之 id} × 模式 {整表 diff, users 之 pickKeysOnly(modeEditUsers=for:grups)}。
-//單元層(含數字／字串同值 id、srLog 不含資料值)見 unit-procCore-writeValidate WV-DUPID-*; 本檔驗證端到端: 回前端之 key、資料表零變更、管理員對照組成功。
+//單元層(含數字／字串同值 id、srLog 不含資料值)見 unit-procCore-writeValidate WV-DUPID-*; 本檔驗證端到端: 回前端之 key、資料表零變更、系統管理者對照組成功。
 //跑法(需測試鎖): node C:/opensrcOper/tools/quiet-run.mjs --name tdup --lock --timeout 1800 -- npx mocha test/api-batchIdDup.test.mjs --timeout 300000
 import assert from 'assert'
 import { assertPristineSeed } from './tools/baseSeed.mjs'

@@ -57,7 +57,7 @@ import getPropKey from './getPropKey.mjs'
  * 授權資料(JSON5.parse(cgrups／cpemis／crules) 之結果)統一為以名稱為鍵之物件形式, 供編輯對話框依名稱查值(getOwn／getRuleEnable)
  *
  * 外部應用可直接寫入陣列形式 [{ "name": "A", "isActive": "y" }], 伺服端 getUserRules 相容並授權(規則帳本 R-AUTH-DECODE-01);
- * 編輯對話框若依名稱為鍵查值會查不到陣列元素 → 顯示停用 → 管理者存檔即撤銷有效授權. 本函數與伺服端共用 cvKpToArr 之解碼(單一擁有者),
+ * 編輯對話框若依名稱為鍵查值會查不到陣列元素 → 顯示停用 → 系統管理者存檔即撤銷有效授權. 本函數與伺服端共用 cvKpToArr 之解碼(單一擁有者),
  * 並使「編輯器顯示啟用 ⇔ 該元素被伺服端採納(納入合併; 元素層級, 非最終權限樹)」.
  *
  * 存檔後授權不變(複審 R3／R4, 規則帳本 R-AUTH-LOSSY-01): 合併規則與項目之儲存順序、物件鍵序、陣列元素序無關(R-AUTH-MERGE-00 第 4 條), 故編輯器不需保留原鍵序;

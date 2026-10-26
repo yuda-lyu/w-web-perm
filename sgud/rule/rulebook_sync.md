@@ -40,7 +40,7 @@
 
 ### R-NAME-UNIQ-03 已存在同名資料之清理: 唯讀稽核工具, 不提供自動刪除
 
-- **規則**: `server/tools/nameDupReport.mjs`(唯讀; 輸入 `{ users, grups, pemis, targets }` 匯出檔)列出 `grups`／`pemis` 同名組(各筆 `id`／`from`／`isActive`／`order`、被哪些 `users.cgrups`／`grups.cpemis` 以該名引用)以及 F-14 之 users 對應鍵空值／重複; 引用解碼用 `src/js/cvKpToArr.mjs`(壞 JSON 容錯, 不拋). 清理一律由管理者於後台改名／刪除並逐一確認授權(**引用以名稱比對, F-07 改名級聯尚未實作**: 改名或刪除其一會使引用該名者全部指向剩下的那一筆或失效), 見 README Upgrade Notes.
+- **規則**: `server/tools/nameDupReport.mjs`(唯讀; 輸入 `{ users, grups, pemis, targets }` 匯出檔)列出 `grups`／`pemis` 同名組(各筆 `id`／`from`／`isActive`／`order`、被哪些 `users.cgrups`／`grups.cpemis` 以該名引用)以及 F-14 之 users 對應鍵空值／重複; 引用解碼用 `src/js/cvKpToArr.mjs`(壞 JSON 容錯, 不拋). 清理一律由系統管理者於後台改名／刪除並逐一確認授權(**引用以名稱比對, F-07 改名級聯尚未實作**: 改名或刪除其一會使引用該名者全部指向剩下的那一筆或失效), 見 README Upgrade Notes.
 - 測試: `unit-nameDupReport`(小型夾具: 同名組、引用解碼含壞 JSON／陣列形式、`--mapping-by` 三態).
 
 ### R-MAPKEY-01 外部同步 users: 對應鍵（mappingBy）須非空且唯一（僅 active 列）

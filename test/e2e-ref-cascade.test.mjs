@@ -20,7 +20,7 @@
 //  軸 F 語系(2 格): eng、cht → 全測(每案兩語系)
 //  已測案例 8 × 語系 2 = 16 個 it。
 //
-//夾具(後台列由管理者寫入 RPC(editTableRows)先建, 外部列經真 /syncAndReplaceTabs 後建): 群組 rc-del-g／rc-lone／rc-ren-g; 使用者 rc-del-uo(後台)、rc-del-ua(外部)、rc-ren-u(後台)、rc-ren-ext(外部)、
+//夾具(後台列由系統管理者寫入 RPC(editTableRows)先建, 外部列經真 /syncAndReplaceTabs 後建): 群組 rc-del-g／rc-lone／rc-ren-g; 使用者 rc-del-uo(後台)、rc-del-ua(外部)、rc-ren-u(後台)、rc-ren-ext(外部)、
 //  rc-dg-u1／rc-dg-u2(外部, 引用不存在之群組 rc-ghost-g); 外部群組 rc-dang-g(引用不存在之權限 rc-ghost-p)。收尾 restoreTables(purgeExternalRows 直刪外部列夾具 → 整表寫回快照)並回驗(R-E2E-ISO-01)。
 //授權樹期望值由 base seed 規則集依 R-AUTH-MERGE-00 推導(見 test/tools/e2eExt.mjs 之 TREE), 不抄實測值。
 //perm-run03(外部匯入改依 srcKey 差異同步, R-IMPORT-01): 外部列夾具之標籤(id-rc-ua／id-rc-rx／id-rc-dg1／id-rc-dg2 等)是送入同步端點之 srcKey, 其真實 id 由伺服端產生(不等於標籤);
@@ -390,7 +390,7 @@ const CASES = [
     {
         //E2E-008(spec E2E-008; 對稱既有 e2e-array-form AF-041): 後端設定 cascadeRename:false 下, 群組頁把被引用之 rc-ren-g 改名為 rc-ren-g-new 後按儲存 → 不彈改名預覽確認框、直接出現成功訊息(原文字, 不附筆數);
         //庫內引用端未被改寫(仍引用舊名稱)而成為懸空 → 授權依懸空收嚴(rc-ren-u 與 rc-ren-ext 皆為空); 使用者頁該兩位之 cgrups 儲存格出現懸空警告圖示。純語意。
-        //6 步 user path: ①部署方已設 cascadeRename 為 false, 管理員登入點「權限群組」②雙擊 rc-ren-g 名稱儲存格改名(Enter) ③按儲存 ④沒有確認框, 直接看到成功訊息 ⑤按確認, 點「使用者」⑥看到兩位引用者之「權限群組」欄出現警告圖示(tooltip 說明在清單中找不到 rc-ren-g)
+        //6 步 user path: ①部署方已設 cascadeRename 為 false, 系統管理者登入點「權限群組」②雙擊 rc-ren-g 名稱儲存格改名(Enter) ③按儲存 ④沒有確認框, 直接看到成功訊息 ⑤按確認, 點「使用者」⑥看到兩位引用者之「權限群組」欄出現警告圖示(tooltip 說明在清單中找不到 rc-ren-g)
         name: 'E2E-008-cascade-off-rename',
         stages: [],
         settings: { cascadeRename: false },

@@ -170,7 +170,7 @@ describe('unit-e2e-lifecycle (e2e 檔 DB 收尾對稱, R-E2E-ISO-01)', function(
         assert.strict.ok(/assertPristineSeed\(key,/.test(m[0]), 'captureBaseSeedOnce 須以 assertPristineSeed 守門')
     })
 
-    //LC-004～005: 外部列夾具之收尾(規則帳本 R-TEST-EXT-CLEAN-01; run09)——2026-10-22 全套: e2e-init E2E-006 以管理者寫入移除外部列 id-mk-dup → saveExternalRowChanged, 夾具殘留致其後 12 案失敗
+    //LC-004～005: 外部列夾具之收尾(規則帳本 R-TEST-EXT-CLEAN-01; run09)——2026-10-22 全套: e2e-init E2E-006 以系統管理者寫入移除外部列 id-mk-dup → saveExternalRowChanged, 夾具殘留致其後 12 案失敗
     let testCode = (fn) => sourceLines(path.join(fdTest, fn), 'code').map((l) => l.text).join('\n')
     let testFilesApiE2e = () => fs.readdirSync(fdTest).filter((f) => /^(api|e2e)-.*\.test\.mjs$/.test(f)).sort()
     //直接以 delAll({ from … }) 刪外部分區(各檔自寫收尾); 收尾一律經 test/tools/api-setup.mjs 之 cleanExternalFixtures／purgeExternalRows
@@ -219,7 +219,7 @@ describe('unit-e2e-lifecycle (e2e 檔 DB 收尾對稱, R-E2E-ISO-01)', function(
         assert.strict.equal(RE_MAKES_EXT.test('await syncRows(\'users\', rows, F)'), true)
         assert.strict.equal(RE_MAKES_EXT.test('await callRpc(\'updateUsers\', [rows], TOKEN_ADMIN)'), false)
         assert.strict.equal(RE_CLEANS_EXT.test('await cleanExternalFixtures({ froms: [F] })'), true)
-        assert.strict.equal(RE_CLEANS_EXT.test('await callRpc(\'updateUsers\', [rowsBase], TOKEN_ADMIN)'), false, '管理者寫入不是外部列收尾')
+        assert.strict.equal(RE_CLEANS_EXT.test('await callRpc(\'updateUsers\', [rowsBase], TOKEN_ADMIN)'), false, '系統管理者寫入不是外部列收尾')
         //import 偵測: 單行與多行之具名 import 皆算; 只在註解／字串以外之 import 清單中出現才算(此處以 code 模式文字測)
         let imp1 = 'import { startApi, cleanExternalFixtures } from \'./tools/api-setup.mjs\'\nawait cleanExternalFixtures({})'
         let imp2 = 'import {\n    startApi,\n    cleanExternalFixtures,\n} from \'./tools/api-setup.mjs\'\nawait cleanExternalFixtures({})'
@@ -229,10 +229,10 @@ describe('unit-e2e-lifecycle (e2e 檔 DB 收尾對稱, R-E2E-ISO-01)', function(
         assert.strict.equal(callsName(noImp, 'cleanExternalFixtures') && !importsName(noImp, 'cleanExternalFixtures'), true, '呼叫而未 import 須被抓到')
     })
 
-    it('LC-005 站點不變式: e2e-init E2E-006 之 finally 以 cleanExternalFixtures 移除本案外部分區(froms: [FROM_006])並回驗 pristine, 不以管理者寫入 updateUsers 移除', function() {
+    it('LC-005 站點不變式: e2e-init E2E-006 之 finally 以 cleanExternalFixtures 移除本案外部分區(froms: [FROM_006])並回驗 pristine, 不以系統管理者寫入 updateUsers 移除', function() {
         let code = testCode('e2e-init.test.mjs')
         assert.strict.ok(/await cleanExternalFixtures\(\{ kts: \['users'\], froms: \[FROM_006\], pristine: true \}\)/.test(code), 'E2E-006 收尾須呼叫 cleanExternalFixtures({ kts: [\'users\'], froms: [FROM_006], pristine: true })')
-        assert.strict.ok(!/['"`]updateUsers['"`]/.test(code), 'e2e-init 不得以管理者寫入(updateUsers)做收尾: 外部列後台不得刪(Lv1 saveExternalRowChanged)')
+        assert.strict.ok(!/['"`]updateUsers['"`]/.test(code), 'e2e-init 不得以系統管理者寫入(updateUsers)做收尾: 外部列後台不得刪(Lv1 saveExternalRowChanged)')
     })
 
     //以真種子 id 組出 seed(列只需 id／name)

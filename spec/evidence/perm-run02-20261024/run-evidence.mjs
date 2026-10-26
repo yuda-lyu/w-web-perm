@@ -108,7 +108,7 @@ const MUT = [
     { id: 'MA2', desc: '①應用系統路由不在表分支改回嚴格認定 isSystemAppUser(須 isApp y、id 以 app: 開頭)', file: 'server/WWebPerm.mjs', pairs: [[APP_LEVEL, 'isLevel = isSystemAppUser(user)']] },
     { id: 'MA3', desc: '①應用系統路由不在表分支不判等級(恆真)', file: 'server/WWebPerm.mjs', pairs: [[APP_LEVEL, 'isLevel = true']] },
     { id: 'MA4', desc: '①isExtAdminUser 另要求 id 以 app: 開頭(路由仍要求前綴)', file: 'server/adminCheck.mjs', pairs: [["return Object.prototype.hasOwnProperty.call(user, 'isAdmin') && user.isAdmin === 'y'", "return Object.prototype.hasOwnProperty.call(user, 'isAdmin') && user.isAdmin === 'y' && typeof user.id === 'string' && user.id.startsWith(SYSTEM_APP_ID_PREFIX)"]] },
-    { id: 'MA5', desc: '①isExtAdminUser 恆真(任何物件皆為管理員)', file: 'server/adminCheck.mjs', pairs: [["return Object.prototype.hasOwnProperty.call(user, 'isAdmin') && user.isAdmin === 'y'", 'return true']] },
+    { id: 'MA5', desc: '①isExtAdminUser 恆真(任何物件皆為系統管理者)', file: 'server/adminCheck.mjs', pairs: [["return Object.prototype.hasOwnProperty.call(user, 'isAdmin') && user.isAdmin === 'y'", 'return true']] },
     { id: 'MA6', desc: '①應用系統路由在表者改採反查之 isAdmin(不以 perm 列為準)', file: 'server/WWebPerm.mjs', pairs: [['isLevel = isAdminRow(userPerm)', 'isLevel = isExtAdminUser(user)']] },
     // ② 系統服務用途(須 app: 前綴)
     { id: 'MB1', desc: '②系統服務用途拿掉 app: 前綴條件(改回只要非空字串 id)', file: 'server/adminCheck.mjs', pairs: [['user.id.startsWith(SYSTEM_APP_ID_PREFIX)', "user.id !== ''"]] },

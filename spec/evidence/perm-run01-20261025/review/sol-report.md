@@ -7,11 +7,11 @@ const PROTOS = ['new', 'body', 'old', 'empty']
 
 目前矩陣固定使用字串 token、完整函數封裝及新的有效 clientId；在這些限制下，`expectOf` 與讀到的處理流程相符，但尚未涵蓋下列分支。
 
-| 缺的軸／格（標頭均為有效管理員，除非另註） | 程式碼所示的實際處理／輸出 | 應補的預期 |
+| 缺的軸／格（標頭均為有效系統管理者，除非另註） | 程式碼所示的實際處理／輸出 | 應補的預期 |
 |---|---|---|
 | `__sysToken__` 為 `null`、數字、物件、陣列，特別是 `['sys']` | 一般函數與輪詢分別在 `WServWebdataServerExec.mjs:319`、`genPollingGate.mjs:43` 經 `cstr`，沒有直接拒絕非字串型別 | 驗證實際轉換值及轉換後的反查結果，不能一律預期拒絕。快照未含 `wsemi/src/cstr.mjs`；`['sys']` 是否轉成 `'sys'` 仍屬推測，不能據此宣稱已確認繞過 |
 | 輪詢的 `clientId` 缺失、`''`、`null`、數字、物件、陣列；以及 `input` 本身為 `null`、純量或陣列 | `WServBroadcastServer.mjs:211` 先取 clientId，無效者回 `[sys:polling] invalid clientId`，不進 token 反查，也不發輪詢 error 事件 | 應斷言此回應，並驗證反查次數為零；不能套用 `[sys:polling] permission denied` |
-| 過長 clientId，例如一百萬個 `x` | `WServBroadcastServer.mjs:213` 只檢查非空字串，沒有長度上限；有效管理員可建立該識別的在線狀態及佇列 | 定義長度契約並測邊界；目前測試完全避開此資源邊界 |
+| 過長 clientId，例如一百萬個 `x` | `WServBroadcastServer.mjs:213` 只檢查非空字串，沒有長度上限；有效系統管理者可建立該識別的在線狀態及佇列 | 定義長度契約並測邊界；目前測試完全避開此資源邊界 |
 | 一般系統函數只有 `{__sysToken__:'sys'}`，或 `__sysInputArgs__` 為 `null`、字串、物件 | `WServWebdataServerExec.mjs:322`、`:329` 回 `{state:'error',msg:'invalid input'}`，先於反查 | 應測缺鍵與錯誤型別，並斷言不反查 |
 | 大小寫、前後空白、未知 `[sys:xxx]` | 名稱精確比對。例如 `[sys:Polling]` 配輪詢形狀會先得到 `invalid input`；補齊參數陣列後才得到 `invalid func[`＋名稱＋`]`（`WServWebdataServerExec.mjs:305`、`:384`） | 應按封裝與檢查順序分格，不能預期所有未知系統名稱都得到同一錯誤 |
 | 同一請求不同位置各有 token，例如 `input.__sysToken__='sys'`，而參數內另有 `__sysToken__='nope-invalid'` | 只使用前者；`getTableTags` 不使用該多餘參數，仍可成功（`WServWebdataServerExec.mjs:319`、`WServWebdataServer.mjs:535`） | 明確斷言身分來源。相同物件的重複鍵另須手工建構線上封包；目前 JS 物件 helper 無法保留重名鍵，解碼器的選值行為也未附於快照 |
@@ -29,7 +29,7 @@ const PROTOS = ['new', 'body', 'old', 'empty']
 - `sys` 換成 AUA token → 兩者反查為同一 userId，應持續放行。
 - 不同 userId 在綁定解除前／後重用、同時首次輪詢 → 應分別驗證所有權及先到先綁。
 
-此外，`:213` 的「零副作用」只由之後能綁定管理員推論，沒有檢查在線名單、佇列、廣播是否被取走或在線期限是否刷新。應直接觀察這些狀態；資料庫零寫入也不能代替廣播狀態斷言。
+此外，`:213` 的「零副作用」只由之後能綁定系統管理者推論，沒有檢查在線名單、佇列、廣播是否被取走或在線期限是否刷新。應直接觀察這些狀態；資料庫零寫入也不能代替廣播狀態斷言。
 
 ### F3 | 高 | node_modules/w-serv-webdata/src/WServWebdataServer.mjs:529 | 延後送達的舊 clientLeave → 可能解除已重新在線的身分綁定，讓另一身分取得該佇列 | 建議以在線世代識別解除綁定
 

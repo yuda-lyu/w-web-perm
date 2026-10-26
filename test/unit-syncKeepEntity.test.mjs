@@ -4,7 +4,7 @@
 //
 //規格句(期望由下列規則推導, 不抄實作):
 //  KE-S1 三個指派欄(users.cgrups／grups.cpemis／pemis.crules)同為後台可寫(Lv1): 外部同步 payload 之列「缺該鍵」時保留庫內值, 「含該鍵」(含 ''／undefined／null)則以外部為準(原則 5);
-//        每次同步清空等於靜默丟棄管理者之指派(原則 3). users 之行為不變(unit-syncKeep).
+//        每次同步清空等於靜默丟棄系統管理者之指派(原則 3). users 之行為不變(unit-syncKeep).
 //  KE-S2 實體身分(群組／權限無登入對應鍵, 不適用 users 之 mappingBy 矛盾檢查): 有 id 者依 id 對到庫內同一 from 之列; id 不在庫內＝新實體, 維持缺鍵之預設('');
 //        無 id 者(含 NaN／Infinity／''／null／布林／物件等無效 id; 寫入時 ORM 補隨機主鍵)依名稱, 與引用連帶(refCascade.fillIdlessIds)同一口徑:
 //        對庫內同一 from 中 id 未被本批帶用、名稱 === 相同之列, 須恰 1 筆(同名多筆為歷史同名, 不取首筆, 不保留並計入 nConflict); 0 筆＝新實體(不計 nConflict).

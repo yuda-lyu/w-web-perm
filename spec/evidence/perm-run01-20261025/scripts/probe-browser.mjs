@@ -1,6 +1,6 @@
 //真瀏覽器探測(perm-run01 本輪, 任務 20261025161334): sysFuncsPublic 收緊為 ['[sys:getFuncList]'] 後, 未登入／登入前各畫面與登入後是否照常。
 //作法: 後端(11006, 現行原始碼)serve 重建後之 dist; headless Chromium(launchBrowser)走五種進站狀態, 擷取每個 /api/ 請求(解碼 w-converhp 封包: func、本體是否帶 __sysToken__、回應 success/error)與畫面連線狀態(store.connState)。
-//  S0 無 token 進站(127.0.0.1, 非 localhost 不自動給 sys) / S1 帶已發 token(?token=sys) 進站, 登入後各頁籤與推播 / S2 一般使用者(部署方放行之非管理員)進站「無權進入」/ S3 無效 token 進站 / S4 舊前端建置檔(重建前之 dist)+ 升版後後端。
+//  S0 無 token 進站(127.0.0.1, 非 localhost 不自動給 sys) / S1 帶已發 token(?token=sys) 進站, 登入後各頁籤與推播 / S2 一般使用者(部署方放行之非系統管理者)進站「無權進入」/ S3 無效 token 進站 / S4 舊前端建置檔(重建前之 dist)+ 升版後後端。
 //  urlRedirect(https://www.google.com/)以 context.route 攔下回空頁, 不連外。
 //用法: node spec/evidence/perm-run01-20261025/scripts/probe-browser.mjs [--out <json>] (以專案根為 cwd; 需測試鎖)
 import fs from 'fs'
@@ -159,7 +159,7 @@ async function main() {
             out.scenarios.S0_noToken = { redirectedToUrlRedirect: rec.redirectedToUrlRedirect, redirectAfterMs: rec.redirectAfterMs, apiSummary: summarize(rec.api), apiCount: rec.api.length, consoleErrors: rec.consoleErrors }
         }
 
-        //S1 帶已發 token 進站(sys: 管理員), 登入後各頁籤與推播
+        //S1 帶已發 token 進站(sys: 系統管理者), 登入後各頁籤與推播
         {
             const rec = { t0: Date.now(), api: [], token: 'sys' }
             const { context, page } = await newPage(browser, rec)
@@ -181,7 +181,7 @@ async function main() {
                 await sleep(700)
                 rec.tabsVisited.push({ tab: t, bodyHas: (await page.evaluate(() => document.body.innerText || '')).includes(t) })
             }
-            //推播: 另一個用戶(API, 管理員)改 grups 第 1 列 description → 瀏覽器 store 於輪詢內收到
+            //推播: 另一個用戶(API, 系統管理者)改 grups 第 1 列 description → 瀏覽器 store 於輪詢內收到
             const before = await selectAllRows('grups')
             const sorted = before.slice().sort((a, b) => (a.order || 0) - (b.order || 0)).map((r) => JSON.parse(JSON.stringify(r)))
             const marker = `probe-${Date.now()}`
@@ -208,7 +208,7 @@ async function main() {
             out.scenarios.S1_validToken = { readyAtMs: rec.readyAtMs, tables: rec.tables, bodyAfterReady: rec.bodyAfterReady, tabsVisited: rec.tabsVisited, pushWriteOk: rec.pushWriteOk, pushReceived: rec.pushReceived, pushLatencyMs: rec.pushLatencyMs, pushRestoreOk: rec.pushRestoreOk, connStateEnd: rec.connStateEnd, apiSummary: summarize(rec.api), consoleErrors: rec.consoleErrors }
         }
 
-        //S2 一般使用者(部署方放行之非管理員): 「無權進入」
+        //S2 一般使用者(部署方放行之非系統管理者): 「無權進入」
         {
             const users = (await selectAllRows('users')).slice().sort((a, b) => (a.order || 0) - (b.order || 0)).map((r) => JSON.parse(JSON.stringify(r)))
             const base = users

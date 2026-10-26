@@ -1,4 +1,4 @@
-# 功能正確性審查:w-web-perm「權限後台與資料通道只限系統管理員」+「後台整表寫入同批重複 id」+「isSameFile 精度」
+# 功能正確性審查:w-web-perm「權限後台與資料通道只限系統管理者」+「後台整表寫入同批重複 id」+「isSameFile 精度」
 
 你是獨立的功能正確性審查者。被審對象是一份 Node.js(ESM)套件 w-web-perm 的工作樹副本,位於:
 
@@ -14,9 +14,9 @@
 
 ## 背景(使用者 2026-10-24 裁示)
 
-「數據傳輸都要通過 token 識別身份,也都要按權限設定產製對應權限樹;系統管理員才能讀寫 4 表,一般使用者是沒法進權限後台的,故只能用 token 查自己權限樹。」
+「數據傳輸都要通過 token 識別身份,也都要按權限設定產製對應權限樹;系統管理者才能讀寫 4 表,一般使用者是沒法進權限後台的,故只能用 token 查自己權限樹。」
 
-定義:系統管理員＝perm 自己的 `users` 表中 `isAdmin='y'` 且 `isActive='y'` 之列(以 perm 自身的表為權威,不採外部 token 回報的 isAdmin 值);一般使用者＝`isAdmin='n'` 者。
+定義:系統管理者＝perm 自己的 `users` 表中 `isAdmin='y'` 且 `isActive='y'` 之列(以 perm 自身的表為權威,不採外部 token 回報的 isAdmin 值);一般使用者＝`isAdmin='n'` 者。
 
 ## 本輪變更(請用 `rg` 在副本內自行定位,以下僅為導覽)
 
@@ -39,7 +39,7 @@
 下表是我自己列的「入口 × 角色」表。**我的表一定有洞**,請找出我漏的軸、漏的格、以及格內現況不屬實的地方(附 `file:line`):
 
 - 入口軸(我列的):`/api/main` 的 RPC 唯讀(`getWebInfor`/`getStaEvent`/`getStaEventTable`)、寫入(`updateTargets/Pemis/Grups/Users`)、表 `select`(四表)、系統函數(`[sys:getFuncList]`/`[sys:getTableTags]`/`[sys:polling]`)、上傳下載五條路由(ulctr/slc/dwgfn/dwgf/dw)、本體 `__sysToken__`(執行身分)、`/api/getUserByToken`、`/api/getPerm`、`/api/getPermUserInfor`、`/syncAndReplaceTabs`、靜態檔。
-- 角色軸(我列的):管理員、部署方放行之一般使用者、被升為管理員者、停用之管理員、部署方拒絕者、不在 perm 表者(應用系統 token)、無效 token。
+- 角色軸(我列的):系統管理者、部署方放行之一般使用者、被升為系統管理者、停用之系統管理者、部署方拒絕者、不在 perm 表者(應用系統 token)、無效 token。
 - 驗證關軸:外部 `getUserByToken` → perm users 存在且啟用 → 部署方 `verifyClientUser` → 角色。
 
 請特別檢查:(a) 是否還有任何「一般使用者可讀到 4 表資料或權限管理資料」的路徑未經 `getAndVerifyAdminUser`(包含 hapi 其他路由、`WServHapiServer` 選項、`kpFunExt`、事件監聽、輪詢/廣播、`provideTabs`、`g_*.mjs`)?(b) 角色判定的「檢查之值」與「使用之值」是否同一個(例如 `getTokenUser` 回傳的列、`mappingBy` 為 `id`/`email`/`name` 時的對應、同一請求內兩個 token)?(c) 角色在連線後被降級的競態,`requireAdmin` 是否真的能補上?(d) 各 `from`/`apiType` 值是否都走到同一道閘?

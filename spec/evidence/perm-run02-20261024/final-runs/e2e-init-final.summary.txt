@@ -6,7 +6,7 @@
   1 failing
 == 失敗段落(前 5 行) ==
   1) Init E2E — 應用啟動畫面（server 注入語系）
-       E2E-008-veto-by-deployer [eng]: 管理員之 perm 列因非角色因素被部署方 verifyClientUser 否決 → 後端 userNoPermission、轉址至 urlRedirect（非「無權進入權限後台」）:
+       E2E-008-veto-by-deployer [eng]: 系統管理者之 perm 列因非角色因素被部署方 verifyClientUser 否決 → 後端 userNoPermission、轉址至 urlRedirect（非「無權進入權限後台」）:
      response.json: Protocol error (Network.getResponseBody): No resource with given identifier found
 Response body is not available for a response that was navigated away from. Read response.body() before triggering any navigation.
       at Context.<anonymous> (test\e2e-init.test.mjs:512:58)

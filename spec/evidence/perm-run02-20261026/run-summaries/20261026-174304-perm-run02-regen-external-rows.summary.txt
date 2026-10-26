@@ -1,0 +1,20 @@
+[quiet-run] exit=0 time=22m58s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261026-174304-perm-run02-regen-external-rows.log (97 行, 4 KB)
+[quiet-run] cmd: node test/e2e-external-rows.test.mjs --baseline
+[quiet-run] lock: 取得並已釋放(等待 9m40s)
+== 最後 15 行(非空,不含上列失敗段落) ==
+  E2E-018-pemis-stale-other-added
+  E2E-019-targets-stale-other-deleted
+  E2E-020-users-dialog-stale-notice
+  [write] cht-E2E-020-1-stale-banner (all)
+  E2E-021-grups-dialog-stale-notice
+  E2E-022-users-external-rewrite-unchanged
+  E2E-023-users-no-draft-rebuild
+  E2E-024-users-lang-switch-headers
+  E2E-025-users-reload-then-lang-switch
+  E2E-026-users-editor-backfill-table-stale
+  E2E-027-users-own-save-late-double-push
+  E2E-028-users-own-save-push-before-response
+  E2E-029-users-dialog-own-save-push-before-response
+  E2E-030-grups-dialog-own-save-push-before-response
+=== 產製 external-rows baseline 完成 ===
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)

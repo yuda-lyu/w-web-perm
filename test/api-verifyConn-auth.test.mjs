@@ -13,7 +13,7 @@
 
 import assert from 'assert'
 import { startApi, TOKEN_ADMIN, TOKEN_ADMIN2, TOKEN_NOFLAG, TOKEN_PETER, TOKEN_BAD, getWoItems, callRpc } from './tools/api-setup.mjs'
-//perm-run01 本輪(R-APP-TOKEN-01、P-7): 原以 TOKEN_APP 代表「外部有效但不在 perm users 表」; TOKEN_APP 現轉傳 isApp='y' 屬系統服務用途(可用管理員之服務, 見 api-callerMatrix),
+//perm-run01 本輪(R-APP-TOKEN-01、P-7): 原以 TOKEN_APP 代表「外部有效但不在 perm users 表」; TOKEN_APP 現轉傳 isApp='y' 屬系統服務用途(可用系統管理者之服務, 見 api-callerMatrix),
 //  故此處改用 TOKEN_NOFLAG(isApp 未轉傳, 視同非應用系統: 不在表一律被拒). srv.mjs 之 verifyClientUser 不再以 isAdmin 否決, peter(一般使用者)通過部署方、由本套件以 userNotAdmin 拒絕.
 import { restartBackend } from './tools/e2e-setup.mjs'
 
@@ -80,11 +80,11 @@ describe('api-verifyConn-auth', function() {
         assert.strict.equal(after[0].description, grupsBase[0].description, 'DB grups 不得被改')
     })
 
-    //spec: 在表、有效、通過部署方、但非系統管理員(perm-run01 P-7: 範例 verifyClientUser 不再以 isAdmin 否決, 由套件於連線閘以 userNotAdmin 拒絕) → 拒
+    //spec: 在表、有效、通過部署方、但非系統管理者(perm-run01 P-7: 範例 verifyClientUser 不再以 isAdmin 否決, 由套件於連線閘以 userNotAdmin 拒絕) → 拒
     it('AUTH-004-peter-in-table-active-but-not-admin-rejects', async function() {
         let users = await readTable('users')
         let peter = users.find((u) => u.id === 'id-for-peter')
-        assert.strict.ok(peter && peter.isActive === 'y' && peter.isAdmin === 'n', 'base seed peter 應為有效非管理者')
+        assert.strict.ok(peter && peter.isActive === 'y' && peter.isAdmin === 'n', 'base seed peter 應為有效非系統管理者')
 
         let rRead = await callRpc('getWebInfor', [], TOKEN_PETER)
         assert.strict.equal(rRead.ok, false, `verifyClientUser 拒絕之使用者不得讀資料通道, 實得 ${JSON.stringify(rRead)}`)
@@ -154,14 +154,14 @@ describe('api-verifyConn-auth', function() {
     //修正後：本體 token 之使用者亦經完整驗證（外部 getUserByToken → perm users 存在且 isActive='y' → verifyClientUser），任一關不過即 reject 固定語系鍵、函數不執行（零寫入），並回 perm users 內該使用者之 id 作為執行身分。
     //opt.sysToken 給本體 token（api-setup callRpc 預設同標頭 token）。
 
-    const ID_ADMIN2 = 'id-for-admin2' //srv.mjs '{token-for-admin2}' 之使用者 id（測試用第二位系統管理員; 其 perm users 列由本檔案例自建並於收尾移除）
+    const ID_ADMIN2 = 'id-for-admin2' //srv.mjs '{token-for-admin2}' 之使用者 id（測試用第二位系統管理者; 其 perm users 列由本檔案例自建並於收尾移除）
     const ROW_ADMIN2 = { id: ID_ADMIN2, order: 99, name: 'admin2', email: 'admin2@example.com', description: '', from: '', cgrups: '{}', isAdmin: 'y', isActive: 'y' }
 
     it('AUTH-BODY-001-body-token-fully-validated-rejected：標頭 token 有效(admin)、本體 token 無效／外部有效但不在 perm users／在表啟用但 verifyClientUser 拒 → 讀與寫皆拒、回固定語系鍵、函數不執行(DB 不變)', async function() {
         let cases = [
             { label: '本體 token 無效', sysToken: TOKEN_BAD, key: 'cannotFindUserFromToken' },
             { label: '本體 token 為外部有效但不在 perm users 表者(isApp 未轉傳)', sysToken: TOKEN_NOFLAG, key: 'cannotGetUserFromPerm' },
-            { label: '本體 token 為在表、啟用、通過部署方但非系統管理員者(peter)', sysToken: TOKEN_PETER, key: 'userNotAdmin' },
+            { label: '本體 token 為在表、啟用、通過部署方但非系統管理者(peter)', sysToken: TOKEN_PETER, key: 'userNotAdmin' },
         ]
         let rowsMod = grupsBase.map((g, k) => (k === 0 ? { ...g, description: String(g.description || '') + '_BODY001' } : { ...g }))
         let snap0 = JSON.stringify(sortByOrder(await readTable('grups')))
@@ -176,19 +176,19 @@ describe('api-verifyConn-auth', function() {
         assert.strict.equal(JSON.stringify(sortByOrder(await readTable('grups'))), snap0, 'DB grups 不得被改')
     })
 
-    it('AUTH-BODY-002-body-token-other-admin-identity-and-disabled：本體 token 為另一位有效管理員(admin2)→ 以該使用者之 perm id 執行(新增列建立者為 id-for-admin2); 將其停用後同一本體 token → 拒(cannotGetUserFromPerm)、函數不執行', async function() {
+    it('AUTH-BODY-002-body-token-other-admin-identity-and-disabled：本體 token 為另一位有效系統管理者(admin2)→ 以該使用者之 perm id 執行(新增列建立者為 id-for-admin2); 將其停用後同一本體 token → 拒(cannotGetUserFromPerm)、函數不執行', async function() {
         let usersBase = sortByOrder(await readTable('users'))
         assert.strict.ok(!usersBase.some((u) => u.id === ID_ADMIN2), `前置: perm users 不得已有 ${ID_ADMIN2}`)
         let grupsBefore = sortByOrder(await readTable('grups'))
         let newG = (id, name) => ({ id, order: 99, name, description: '', from: '', cpemis: '{}' })
         try {
-            //建立 admin2(後台列, 啟用, isAdmin='y'), 由 admin 經管理者寫入 RPC
+            //建立 admin2(後台列, 啟用, isAdmin='y'), 由 admin 經系統管理者寫入 RPC
             let rAdd = await callRpc('updateUsers', [[...usersBase.map((u) => ({ ...u })), { ...ROW_ADMIN2 }]], TOKEN_ADMIN)
             assert.strict.ok(rAdd.ok, `前置: 建立 admin2 應成功, 實得 ${JSON.stringify(rAdd)}`)
 
             //(1) 標頭 admin、本體 admin2(有效): 通過完整驗證, 以 admin2 之 perm id 執行(寫入之新列建立者為 id-for-admin2, 非標頭使用者 id-for-admin)
             let r1 = await callRpc('updateGrups', [[...grupsBefore.map((g) => ({ ...g })), newG('id-vc-body-g1', 'vcBodyG1')]], TOKEN_ADMIN, { sysToken: TOKEN_ADMIN2 })
-            assert.strict.ok(r1.ok, `(1) 本體 token 為有效管理員應可執行, 實得 ${JSON.stringify(r1)}`)
+            assert.strict.ok(r1.ok, `(1) 本體 token 為有效系統管理者應可執行, 實得 ${JSON.stringify(r1)}`)
             let g1 = (await readTable('grups')).find((g) => g.name === 'vcBodyG1')
             assert.strict.ok(g1, '(1) 新列應已寫入')
             assert.strict.equal(g1.userId, ID_ADMIN2, `(1) 執行身分應為本體 token 之使用者(perm id ${ID_ADMIN2}), 實得建立者「${g1.userId}」`)
@@ -204,7 +204,7 @@ describe('api-verifyConn-auth', function() {
             assert.strict.equal(JSON.stringify(sortByOrder(await readTable('grups'))), snap2, '(2) 被拒時 DB grups 不得被改')
         }
         finally {
-            //收尾(失敗時亦還原): 移除本案新增之群組列與 admin2 列(皆為後台列, 經 admin 之管理者寫入 RPC)
+            //收尾(失敗時亦還原): 移除本案新增之群組列與 admin2 列(皆為後台列, 經 admin 之系統管理者寫入 RPC)
             let rG = await callRpc('updateGrups', [grupsBefore.map((g) => ({ ...g }))], TOKEN_ADMIN)
             let rU = await callRpc('updateUsers', [sortByOrder(await readTable('users')).filter((u) => u.id !== ID_ADMIN2).map((u) => ({ ...u }))], TOKEN_ADMIN)
             assert.strict.ok(rG.ok && rU.ok, `收尾還原 grups／users 應成功, 實得 ${JSON.stringify([rG, rU])}`)

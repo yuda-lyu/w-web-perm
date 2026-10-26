@@ -1,0 +1,20 @@
+[quiet-run] exit=0 time=3m59s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261026-152555-perm-run01-regen-ref-cascade.log (45 行, 2 KB)
+[quiet-run] cmd: node test/e2e-ref-cascade.test.mjs --baseline
+[quiet-run] lock: 取得並已釋放(等待 0s)
+== 最後 15 行(非空,不含上列失敗段落) ==
+  E2E-003-grup-rename-referenced
+  [write] cht-E2E-003-1-click-save (all)
+  [write] cht-E2E-003-2-rename-confirm (all)
+  E2E-004-pemi-rename-ghost-rejected
+  [write] cht-E2E-004-1-click-save (all)
+  [write] cht-E2E-004-2-reject-box (all)
+  E2E-005-target-delete-confirm-cancel
+  [write] cht-E2E-005-1-click-save (all)
+  [write] cht-E2E-005-2-confirm-box (all)
+  E2E-006-grup-add-dangling-confirm
+  [write] cht-E2E-006-1-click-save (all)
+  [write] cht-E2E-006-2-add-confirm (all)
+  E2E-007-grup-add-fresh-noconfirm
+  E2E-008-cascade-off-rename
+=== 產製 ref-cascade baseline 完成 ===
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)

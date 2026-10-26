@@ -117,7 +117,7 @@ const MUT = [
     { id: 'M7', desc: 'sol#5 routeResult 不收斂(key = raw)', file: 'server/routeResult.mjs', pairs: [["let key = toOutKey(raw, 'anUnexpectedErrorOccurred')", 'let key = raw']] },
     { id: 'M8', desc: '檢查之值即使用之值: getAndVerifyAppUser 把原物件交部署方並回傳原物件', file: 'server/WWebPerm.mjs', pairs: [['verifyAppUser({ ...user }, from)', 'verifyAppUser(user, from)'], ['let userUse = (userPerm !== null) ? { ...user, id: userPerm.id } : { ...user }', 'let userUse = user']] },
     { id: 'M15', desc: 'P-2 countLoginRows(email／name 路徑)只計有效列(停用者視同不在表)', file: 'server/keyCheck.mjs', pairs: [['return Array.isArray(rs) ? rs.filter((r) => isObj(r)).length : 0\n    }\n    let rsId = await tabUsers.select({ id: vSelf })\n    let rsSrc = await tabUsers.select({ srcKey: vSelf })\n    let kp = new Map()', "return Array.isArray(rs) ? rs.filter((r) => isObj(r) && r.isActive === 'y').length : 0\n    }\n    let rsId = await tabUsers.select({ id: vSelf })\n    let rsSrc = await tabUsers.select({ srcKey: vSelf })\n    let kp = new Map()"]] },
-    { id: 'M9', desc: 'P-7 範例 verifyClientUser 還原以 isAdmin 否決', file: 'srv.mjs', pairs: [["    //只放行有效之瀏覽使用者, 不以 isAdmin 判斷(P-7): 非管理員由本套件統一拒絕並使畫面顯示「無權進入權限後台」(userNotAdmin); 若在此先否決非管理員, 使用者只會看到「拒絕登入」並被轉址; 部署方可依 from 與自家政策(來源網段、系統別)再收緊\n    return true", "    return user.isAdmin === 'y'"]] },
+    { id: 'M9', desc: 'P-7 範例 verifyClientUser 還原以 isAdmin 否決', file: 'srv.mjs', pairs: [["    //只放行有效之瀏覽使用者, 不以 isAdmin 判斷(P-7): 非系統管理者由本套件統一拒絕並使畫面顯示「無權進入權限後台」(userNotAdmin); 若在此先否決非系統管理者, 使用者只會看到「拒絕登入」並被轉址; 部署方可依 from 與自家政策(來源網段、系統別)再收緊\n    return true", "    return user.isAdmin === 'y'"]] },
 ]
 
 if (mode === 'mut' || mode === 'all') {

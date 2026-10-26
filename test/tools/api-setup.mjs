@@ -39,17 +39,17 @@ export async function startApi() {
 export const TOKEN_ADMIN = 'sys'                       // → id-for-admin（client 使用者，過 verifyClientUser）
 export const TOKEN_APP = '{token-for-application}'     // → id-for-application（app 使用者，過 verifyAppUser；不在 perm users 表）
 export const TOKEN_PETER = '{token-for-peter}'         // → id-for-peter（在表、有效、isAdmin='n' → verifyClientUser 拒）
-export const TOKEN_ADMIN2 = '{token-for-admin2}'       // → id-for-admin2（perm-run03 範圍三：第二位管理員；其 perm users 列由測試自建／停用，過 verifyClientUser 需該列 isAdmin='y'）
-export const TOKEN_MEMBER = '{token-for-member}'       // → id-for-member（perm-run03 範圍四：perm users 列〔測試自建〕isAdmin='n'，但 srv.mjs 之 verifyClientUser 放行 → 通過連線閘之非管理員）
-export const TOKEN_MUTATE = '{token-for-mutate}'       // → id-for-mutate（perm-run01 外審 sol#2：perm 列〔測試自建〕為管理員, 但 srv.mjs 之 verifyClientUser 會改寫其收到之 user 物件〔id→id-for-peter、isAdmin→n〕後放行；套件傳副本, 改寫不得影響執行身分與角色）
+export const TOKEN_ADMIN2 = '{token-for-admin2}'       // → id-for-admin2（perm-run03 範圍三：第二位系統管理者；其 perm users 列由測試自建／停用，過 verifyClientUser 需該列 isAdmin='y'）
+export const TOKEN_MEMBER = '{token-for-member}'       // → id-for-member（perm-run03 範圍四：perm users 列〔測試自建〕isAdmin='n'，但 srv.mjs 之 verifyClientUser 放行 → 通過連線閘之非系統管理者）
+export const TOKEN_MUTATE = '{token-for-mutate}'       // → id-for-mutate（perm-run01 外審 sol#2：perm 列〔測試自建〕為系統管理者, 但 srv.mjs 之 verifyClientUser 會改寫其收到之 user 物件〔id→id-for-peter、isAdmin→n〕後放行；套件傳副本, 改寫不得影響執行身分與角色）
 export const TOKEN_SLOW = '{token-for-slow}'           // → id-for-slow（perm-run01 外審 sol#3：perm 列〔測試自建〕isAdmin='n', verifyClientUser 為 async 並等待約 1.5 秒, 供 /api/getPerm「驗證後該列被改動」案例）
 //應用系統 token 測試權杖(perm-run01 本輪, R-APP-TOKEN-01; 對照 dspec/w-web存取管控表.md 第二節 AU／AS)。TOKEN_APP 即系統服務用途(isApp='y'、isAdmin='y'、不在 perm users 表)。
 export const TOKEN_AS = '{token-for-app-system}'              // → id 'app:key-sys'、email 空、isApp y、isAdmin y（系統服務用途真實形狀, 不在 perm users 表）
 export const TOKEN_AS_N = '{token-for-app-system-n}'          // → 同上但 isAdmin n（不屬系統服務用途）
 export const TOKEN_NOFLAG = '{token-for-app-noflag}'          // → AS 形狀但 getUserByToken 未轉傳 isApp（視同 n; 舊版 TOKEN_APP 之語意: 不在 perm users 表、非應用系統; perm-run02: 資料通道／後台登入拒, 應用系統路由因 isAdmin y 放行）
 export const TOKEN_NOFLAG_N = '{token-for-noflag-n}'          // → perm-run02: 不在 perm users 表、isAdmin n、未轉傳 isApp（各入口皆拒）
-export const TOKEN_SSO_ADMIN = '{token-for-sso-admin}'        // → perm-run02: 不在 perm users 表之 sso 管理員以自身使用者 token（id 'sso-admin-77'、未轉傳 isApp）
-export const TOKEN_AU_SSO = '{token-for-app-bind-sso}'        // → perm-run02: 使用者用途綁「不在 perm users 表之 sso 管理員」（同上 id＋isApp y; id 非 'app:' 開頭, 不是系統服務用途）
+export const TOKEN_SSO_ADMIN = '{token-for-sso-admin}'        // → perm-run02: 不在 perm users 表之 sso 系統管理者以自身使用者 token（id 'sso-admin-77'、未轉傳 isApp）
+export const TOKEN_AU_SSO = '{token-for-app-bind-sso}'        // → perm-run02: 使用者用途綁「不在 perm users 表之 sso 系統管理者」（同上 id＋isApp y; id 非 'app:' 開頭, 不是系統服務用途）
 export const TOKEN_FLAG_N = '{token-for-app-flag-n}'          // → perm-run02 外審 F1: 'app:key-flag-n'、isAdmin y、isApp 明確 'n'（非系統服務用途; 應用系統路由只看 isAdmin 而放行）
 export const TOKEN_FLAG_ODD = '{token-for-app-flag-odd}'      // → perm-run02 外審 F1: 'app:key-flag-odd'、isAdmin y、isApp 'Y'（非嚴格 'y'）
 export const TOKEN_APP_DENY_N = '{token-for-app-deny-n}'      // → perm-run02 外審 F1: id 'app:key-deny'（verifyAppUser 否決）、isAdmin n、不在表: 拒絕鍵次序（部署方否決先於等級不足）
@@ -57,11 +57,11 @@ export const TOKEN_EXT_ROW = '{token-for-ext-row}'            // → perm-run02 
 export const TOKEN_AS_EMAIL = '{token-for-app-email}'         // → perm-run02 外審 F1: 'app:key-email'、email 非空、isApp y、isAdmin y（嚴格系統服務形狀; 人造帶 email, 供停用列案例）
 export const TOKEN_AS_EMAIL_ALT = '{token-for-app-email-alt}' // → perm-run02 增量外審 G4: 嚴格系統服務形狀（app:key-email-alt）, email／name 同 perm 某停用列而主鍵不同（僅 mappingBy=email／name 以對應鍵命中）
 export const TOKEN_AS_GHOST = '{token-for-app-ghost}'       // → perm-run02 外審 F3: 系統服務用途 'app:key-ghost'（登錄近期系統服務用途 id）
-export const TOKEN_GHOST_USER = '{token-for-ghost-user}'      // → perm-run02 外審 F3: 一般 sso 管理員（email ghost@example.com）, 經 perm 列（主鍵 'app:key-ghost', mappingBy=email）通過驗證; srv.mjs 之 verifyClientUser 對該列等待約 2 秒
-export const TOKEN_AU_ADMIN = '{token-for-app-bind-admin}'    // → 使用者用途綁管理員（base seed admin 之實際資料 + isApp y）
+export const TOKEN_GHOST_USER = '{token-for-ghost-user}'      // → perm-run02 外審 F3: 一般 sso 系統管理者（email ghost@example.com）, 經 perm 列（主鍵 'app:key-ghost', mappingBy=email）通過驗證; srv.mjs 之 verifyClientUser 對該列等待約 2 秒
+export const TOKEN_AU_ADMIN = '{token-for-app-bind-admin}'    // → 使用者用途綁系統管理者（base seed admin 之實際資料 + isApp y）
 export const TOKEN_AU_MEMBER = '{token-for-app-bind-member}'  // → 使用者用途綁一般使用者（base seed peter 之實際資料 + isApp y）
 export const TOKEN_AU_DISABLED = '{token-for-app-bind-disabled}' // → 使用者用途綁定之使用者在 perm users 表但停用（列由測試自建; 上游 isAdmin y）
-export const TOKEN_DENY = '{token-for-deny}'                  // → perm 列〔測試自建〕為管理員, 但 srv.mjs 之 verifyClientUser 因非角色因素否決
+export const TOKEN_DENY = '{token-for-deny}'                  // → perm 列〔測試自建〕為系統管理者, 但 srv.mjs 之 verifyClientUser 因非角色因素否決
 export const TOKEN_AU_DISABLED_ALT = '{token-for-app-bind-disabled-alt}' // → 使用者用途綁停用之使用者, 外部 id 'sso-appdis-9'≠perm 主鍵 id-for-appdis（僅 mappingBy=email 以 email 找到該列; 停用之列也算在表中）
 export const TOKEN_ALT_ADMIN = '{token-for-alt-admin}'        // → 外部 id 'sso-admin-9'、email 同 admin（僅 mappingBy=email 時對應 perm 列 id-for-admin; 外審 sol F02: 稽核欄須記 perm 內之 id）
 export const TOKEN_AS_DENY = '{token-for-app-deny}'           // → 系統服務用途, 但 srv.mjs 之 verifyAppUser 因非角色因素否決
@@ -169,7 +169,7 @@ export async function readTables() {
     return out
 }
 //收尾(與 readTables 對稱): 把三表還原為擷取時之現況(含夾具以外各列之原文欄位), 不留測試加入的列, 也不改動 base seed 列之序與原文
-//(經管理者寫入 RPC, 與 api-updateTabs 之 restoreBaseSeed 同法; sync 端點拒絕空 rows 故不能用它清)
+//(經系統管理者寫入 RPC, 與 api-updateTabs 之 restoreBaseSeed 同法; sync 端點拒絕空 rows 故不能用它清)
 //purgeExternalRows(run07, F-23): 測試框架之收尾／重置工具——刪除「外部列」(from 為非空字串者; 經 /syncAndReplaceTabs 灌入之夾具)。
 //  why: 後台整表寫入 updateXxx 自 run07 起不得刪除外部列(saveExternalRowChanged), 故「以整表寫入把表還原為 base seed」之收尾無法移除測試以同步灌入之夾具列;
 //  外部同步端點又拒絕空 rows(isearr 安全閘), 亦不能用它清。與 api-syncAndReplaceTabs／api-mapKey 之 after 同法, 由測試行程直接以 woItems.delAll 刪除(測試框架之重置, 非測試中手動改寫資料庫)。
@@ -206,8 +206,8 @@ export async function purgeExternalRows(kts = ['users', 'grups', 'pemis', 'targe
 //  why: 外部列受產品保護(R-EXT-OWN-01 Lv1: 後台整表寫入不得刪, 回 saveExternalRowChanged), 外部同步端點又拒空 rows(isearr 閘, ADR-008), 故
 //    「同一 from 重送不含該列之批次」只在分區仍保留 ≥1 列時可用, 要清空整個分區只剩測試框架之直接重置(purgeExternalRows);
 //    restartBackend({ reseed:true }) 在單一 mocha 行程內亦不能指望: api 檔已使本行程持有 lmdb 映射, 刪不掉 ./db 而退化為 upsert(只補種子列, 不移除多餘列)。
-//    (2026-10-22 全套: e2e-init E2E-006 收尾退而以管理者寫入移除 id-mk-dup → saveExternalRowChanged, 夾具殘留, 其後 4 個檔 12 案失敗。)
-//  不放寬產品: 本函式只動測試資料庫, 產品之 Lv1 守門不變(對照: api-cleanExternal CE-003 驗管理者寫入仍刪不掉外部列)。
+//    (2026-10-22 全套: e2e-init E2E-006 收尾退而以系統管理者寫入移除 id-mk-dup → saveExternalRowChanged, 夾具殘留, 其後 4 個檔 12 案失敗。)
+//  不放寬產品: 本函式只動測試資料庫, 產品之 Lv1 守門不變(對照: api-cleanExternal CE-003 驗系統管理者寫入仍刪不掉外部列)。
 //  步驟: ①經資料通道 select 偵測(無待清者不 import g_mOrm, 不使本行程新增 lmdb 映射) ②有則 purgeExternalRows(只清 opt.froms 之分區) ③再經 select 回驗無殘留;
 //    opt.pristine 時並以 assertPristineSeed 回驗各表主鍵集合＝種子(整檔只動外部夾具之收尾用; 後台列有多餘則拋錯, 不放寬)。
 //  opt.kts: 要清理之表名陣列(預設四表); opt.froms: 只清這些 from 分區(預設不限分區); opt.keepIds: 同 purgeExternalRows; opt.pristine: 預設 false。回傳 { 表名: 移除筆數 }。
@@ -282,7 +282,7 @@ export async function selectAllRows(kt) {
     }
     return r.output
 }
-//  editTableRows: 以管理者寫入 RPC 在某表現況之上追加(或改)列: fn(依 order 排序之現況列複本) → 新整表(回傳 undefined 視為就地修改); 失敗即拋錯。
+//  editTableRows: 以系統管理者寫入 RPC 在某表現況之上追加(或改)列: fn(依 order 排序之現況列複本) → 新整表(回傳 undefined 視為就地修改); 失敗即拋錯。
 //  整表寫入會依陣列位置重給 order(供案例把夾具列置於最上方, 免虛擬捲動未渲染)
 const EDIT_FN = { users: 'updateUsers', grups: 'updateGrups', pemis: 'updatePemis', targets: 'updateTargets' }
 export async function editTableRows(kt, fn) {
@@ -319,7 +319,7 @@ export async function markSrLog() {
     return await markAfterSentinel({
         dir: srLogDir(),
         send: async () => {
-            //應用系統路由先驗身分再驗參數(perm-run01 P-5): 哨兵須帶有效之管理員等級 token 才會走到 keyTable 檢查並記 srLog(event api/syncAndReplaceTabs-error、keyTable 為哨兵)
+            //應用系統路由先驗身分再驗參數(perm-run01 P-5): 哨兵須帶有效之系統管理者等級 token 才會走到 keyTable 檢查並記 srLog(event api/syncAndReplaceTabs-error、keyTable 為哨兵)
             const r = await fetch(`${apiBaseUrl}/syncAndReplaceTabs?keyTable=${sentinel}&token=${encodeURIComponent(TOKEN_APP)}`, { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: '{}' })
             await r.text()
         },

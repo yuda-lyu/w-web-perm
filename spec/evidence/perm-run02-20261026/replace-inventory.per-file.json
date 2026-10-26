@@ -1,0 +1,926 @@
+[
+ {
+  "f": "README.md",
+  "K1": 2,
+  "K2": 1,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "dist/js/app-legacy.a9d18af3.js",
+  "K1": 1,
+  "K2": 0,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "dist/js/app.a9d18af3.js",
+  "K1": 1,
+  "K2": 0,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "dist/w-web-perm.umd.js",
+  "K1": 3,
+  "K2": 2,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "docs/WWebPerm.html",
+  "K1": 5,
+  "K2": 13,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "docs/global.html",
+  "K1": 2,
+  "K2": 4,
+  "K3": 9,
+  "enc": "utf8"
+ },
+ {
+  "f": "docs/server_WWebPerm.mjs.html",
+  "K1": 14,
+  "K2": 25,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "docs/server_adminCheck.mjs.html",
+  "K1": 2,
+  "K2": 3,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "docs/server_dataChannel.mjs.html",
+  "K1": 1,
+  "K2": 0,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "docs/server_tools_fromTools.mjs.html",
+  "K1": 1,
+  "K2": 0,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "docs/server_tools_nameDupReport.mjs.html",
+  "K1": 0,
+  "K2": 0,
+  "K3": 1,
+  "enc": "utf8"
+ },
+ {
+  "f": "docs/src_js_cvKpToObj.mjs.html",
+  "K1": 0,
+  "K2": 0,
+  "K3": 1,
+  "enc": "utf8"
+ },
+ {
+  "f": "docs/src_js_draftSync.mjs.html",
+  "K1": 0,
+  "K2": 1,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "docs/src_js_editorRefRows.mjs.html",
+  "K1": 0,
+  "K2": 0,
+  "K3": 4,
+  "enc": "utf8"
+ },
+ {
+  "f": "docs/src_js_getKpLossy.mjs.html",
+  "K1": 0,
+  "K2": 0,
+  "K3": 3,
+  "enc": "utf8"
+ },
+ {
+  "f": "docs/src_js_pairRowsToSnapshot.mjs.html",
+  "K1": 0,
+  "K2": 0,
+  "K3": 1,
+  "enc": "utf8"
+ },
+ {
+  "f": "server/WWebPerm.mjs",
+  "K1": 14,
+  "K2": 25,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "server/adminCheck.mjs",
+  "K1": 0,
+  "K2": 3,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "server/dataChannel.mjs",
+  "K1": 1,
+  "K2": 0,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "server/procLang.mjs",
+  "K1": 3,
+  "K2": 2,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "server/tools/nameDupReport.mjs",
+  "K1": 0,
+  "K2": 0,
+  "K3": 1,
+  "enc": "utf8"
+ },
+ {
+  "f": "sgud/exp/experience.md",
+  "K1": 2,
+  "K2": 12,
+  "K3": 3,
+  "enc": "utf8"
+ },
+ {
+  "f": "sgud/exp/experience_20261022.md",
+  "K1": 0,
+  "K2": 0,
+  "K3": 1,
+  "enc": "utf8"
+ },
+ {
+  "f": "sgud/rule/rulebook.md",
+  "K1": 2,
+  "K2": 5,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "sgud/rule/rulebook_editor.md",
+  "K1": 0,
+  "K2": 1,
+  "K3": 2,
+  "enc": "utf8"
+ },
+ {
+  "f": "sgud/rule/rulebook_principle.md",
+  "K1": 0,
+  "K2": 1,
+  "K3": 10,
+  "enc": "utf8"
+ },
+ {
+  "f": "sgud/rule/rulebook_security.md",
+  "K1": 4,
+  "K2": 53,
+  "K3": 2,
+  "enc": "utf8"
+ },
+ {
+  "f": "sgud/rule/rulebook_sync.md",
+  "K1": 0,
+  "K2": 0,
+  "K3": 1,
+  "enc": "utf8"
+ },
+ {
+  "f": "sgud/rule/rulebook_sync_external.md",
+  "K1": 0,
+  "K2": 0,
+  "K3": 1,
+  "enc": "utf8"
+ },
+ {
+  "f": "sgud/rule/rulebook_test.md",
+  "K1": 0,
+  "K2": 0,
+  "K3": 13,
+  "enc": "utf8"
+ },
+ {
+  "f": "sgud/rule/rulebook_testscope.md",
+  "K1": 1,
+  "K2": 4,
+  "K3": 3,
+  "enc": "utf8"
+ },
+ {
+  "f": "sgud/state/state.md",
+  "K1": 9,
+  "K2": 13,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run01-20261024/mutation-results.json",
+  "K1": 0,
+  "K2": 2,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run01-20261024/mutation-results.md",
+  "K1": 0,
+  "K2": 2,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run01-20261024/red-evidence.md",
+  "K1": 0,
+  "K2": 1,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run01-20261024/review/sol-prompt.md",
+  "K1": 3,
+  "K2": 3,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run01-20261024/review/sol-report.md",
+  "K1": 0,
+  "K2": 21,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run01-20261024/review/sol-result.json",
+  "K1": 54,
+  "K2": 157,
+  "K3": 26,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run01-20261024/runMutations.mjs",
+  "K1": 0,
+  "K2": 2,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run01-20261024b/input-space.md",
+  "K1": 0,
+  "K2": 2,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run01-20261024b/mutation-results.json",
+  "K1": 0,
+  "K2": 12,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run01-20261024b/mutation-results.md",
+  "K1": 0,
+  "K2": 12,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run01-20261024b/red-evidence.md",
+  "K1": 0,
+  "K2": 40,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run01-20261024b/review/sol-prompt.md",
+  "K1": 0,
+  "K2": 11,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run01-20261024b/review/sol-report.md",
+  "K1": 0,
+  "K2": 12,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run01-20261024b/run-evidence.mjs",
+  "K1": 0,
+  "K2": 2,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run01-20261025/green-final.summary.txt",
+  "K1": 0,
+  "K2": 8,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run01-20261025/input-space.md",
+  "K1": 1,
+  "K2": 12,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run01-20261025/red-api-sysFuncs-default-final.summary.txt",
+  "K1": 0,
+  "K2": 2,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run01-20261025/red-api-sysFuncs-default.summary.txt",
+  "K1": 0,
+  "K2": 2,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run01-20261025/review/round2-prompt.md",
+  "K1": 0,
+  "K2": 4,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run01-20261025/review/round2-sol-report.md",
+  "K1": 0,
+  "K2": 1,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run01-20261025/review/sol-prompt.md",
+  "K1": 2,
+  "K2": 5,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run01-20261025/review/sol-report.md",
+  "K1": 0,
+  "K2": 3,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run01-20261025/scripts/probe-browser.mjs",
+  "K1": 0,
+  "K2": 4,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run02-20261024/final-runs/e2e-init-final.summary.txt",
+  "K1": 0,
+  "K2": 1,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run02-20261024/input-space.md",
+  "K1": 0,
+  "K2": 15,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run02-20261024/mutation-results.json",
+  "K1": 0,
+  "K2": 22,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run02-20261024/mutation-results.md",
+  "K1": 0,
+  "K2": 1,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run02-20261024/old-code-results.json",
+  "K1": 0,
+  "K2": 29,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run02-20261024/red-api-callerMatrix.summary.txt",
+  "K1": 0,
+  "K2": 3,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run02-20261024/red-old-api-full.log",
+  "K1": 0,
+  "K2": 76,
+  "K3": 0,
+  "enc": "latin1"
+ },
+ {
+  "f": "spec/evidence/perm-run02-20261024/review/round1-prompt.md",
+  "K1": 0,
+  "K2": 4,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run02-20261024/review/round1-sol-report.md",
+  "K1": 0,
+  "K2": 5,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run02-20261024/review/round2-delta.patch",
+  "K1": 3,
+  "K2": 60,
+  "K3": 0,
+  "enc": "latin1"
+ },
+ {
+  "f": "spec/evidence/perm-run02-20261024/review/round2-prompt.md",
+  "K1": 0,
+  "K2": 2,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run02-20261024/review/round2-sol-report.md",
+  "K1": 0,
+  "K2": 6,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run02-20261024/run-evidence.mjs",
+  "K1": 0,
+  "K2": 1,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run03/review/sol-1.md",
+  "K1": 0,
+  "K2": 1,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run04/red-evidence.md",
+  "K1": 0,
+  "K2": 1,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run04/review/BRIEF-r1.md",
+  "K1": 0,
+  "K2": 1,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run04/review/sol-1.md",
+  "K1": 0,
+  "K2": 2,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run05/review/BRIEF-r1.md",
+  "K1": 0,
+  "K2": 1,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/evidence/perm-run05/review/sol-1.md",
+  "K1": 0,
+  "K2": 1,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/流程_使用者群組關聯.md",
+  "K1": 0,
+  "K2": 50,
+  "K3": 13,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/流程_外部列保護與過期快照.md",
+  "K1": 0,
+  "K2": 113,
+  "K3": 19,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/流程_外部應用同步權限資料.md",
+  "K1": 0,
+  "K2": 11,
+  "K3": 16,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/流程_多人同時編輯.md",
+  "K1": 1,
+  "K2": 158,
+  "K3": 60,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/流程_引用連帶確認框.md",
+  "K1": 0,
+  "K2": 20,
+  "K3": 9,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/流程_後台使用者清單.md",
+  "K1": 0,
+  "K2": 32,
+  "K3": 3,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/流程_後台導覽版面.md",
+  "K1": 0,
+  "K2": 3,
+  "K3": 3,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/流程_後台標的清單.md",
+  "K1": 0,
+  "K2": 23,
+  "K3": 1,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/流程_後台權限清單.md",
+  "K1": 0,
+  "K2": 32,
+  "K3": 2,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/流程_後台群組清單.md",
+  "K1": 0,
+  "K2": 37,
+  "K3": 2,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/流程_應用啟動與登入.md",
+  "K1": 6,
+  "K2": 13,
+  "K3": 1,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/流程_查詢使用者權限.md",
+  "K1": 1,
+  "K2": 1,
+  "K3": 1,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/流程_查詢指定使用者權限.md",
+  "K1": 0,
+  "K2": 7,
+  "K3": 1,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/流程_權限規則合併計算.md",
+  "K1": 0,
+  "K2": 1,
+  "K3": 2,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/流程_權限規則關聯.md",
+  "K1": 0,
+  "K2": 19,
+  "K3": 1,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/流程_統計資訊事件展示.md",
+  "K1": 0,
+  "K2": 1,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/流程_群組權限關聯.md",
+  "K1": 0,
+  "K2": 36,
+  "K3": 7,
+  "enc": "utf8"
+ },
+ {
+  "f": "spec/設計要點與取捨.md",
+  "K1": 3,
+  "K2": 62,
+  "K3": 32,
+  "enc": "utf8"
+ },
+ {
+  "f": "src/App.vue",
+  "K1": 1,
+  "K2": 0,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "src/js/cvKpToObj.mjs",
+  "K1": 0,
+  "K2": 0,
+  "K3": 1,
+  "enc": "utf8"
+ },
+ {
+  "f": "src/js/draftSync.mjs",
+  "K1": 0,
+  "K2": 1,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "src/js/editorRefRows.mjs",
+  "K1": 0,
+  "K2": 0,
+  "K3": 4,
+  "enc": "utf8"
+ },
+ {
+  "f": "src/js/getKpLossy.mjs",
+  "K1": 0,
+  "K2": 0,
+  "K3": 3,
+  "enc": "utf8"
+ },
+ {
+  "f": "src/js/pairRowsToSnapshot.mjs",
+  "K1": 0,
+  "K2": 0,
+  "K3": 1,
+  "enc": "utf8"
+ },
+ {
+  "f": "src/plugins/mUI.mjs",
+  "K1": 1,
+  "K2": 0,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "srv.mjs",
+  "K1": 2,
+  "K2": 13,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/api-adminOnly.test.mjs",
+  "K1": 5,
+  "K2": 26,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/api-batchIdDup.test.mjs",
+  "K1": 0,
+  "K2": 1,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/api-callerIdentity.test.mjs",
+  "K1": 3,
+  "K2": 16,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/api-callerMatrix.test.mjs",
+  "K1": 0,
+  "K2": 56,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/api-cleanExternal.test.mjs",
+  "K1": 0,
+  "K2": 0,
+  "K3": 4,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/api-externalRows.test.mjs",
+  "K1": 0,
+  "K2": 0,
+  "K3": 2,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/api-mapKeyId.test.mjs",
+  "K1": 0,
+  "K2": 4,
+  "K3": 3,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/api-refCascade.test.mjs",
+  "K1": 0,
+  "K2": 0,
+  "K3": 2,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/api-sysFuncs.test.mjs",
+  "K1": 2,
+  "K2": 20,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/api-tokenSafety.test.mjs",
+  "K1": 0,
+  "K2": 1,
+  "K3": 3,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/api-updateUsers-forGrups.test.mjs",
+  "K1": 1,
+  "K2": 0,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/api-verifyConn-auth.test.mjs",
+  "K1": 3,
+  "K2": 3,
+  "K3": 3,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/e2e-array-form.test.mjs",
+  "K1": 0,
+  "K2": 0,
+  "K3": 10,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/e2e-concurrent-edit.test.mjs",
+  "K1": 0,
+  "K2": 0,
+  "K3": 3,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/e2e-external-rows.test.mjs",
+  "K1": 0,
+  "K2": 17,
+  "K3": 3,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/e2e-init.test.mjs",
+  "K1": 0,
+  "K2": 4,
+  "K3": 2,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/e2e-ref-cascade.test.mjs",
+  "K1": 0,
+  "K2": 1,
+  "K3": 1,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/e2e-targets.test.mjs",
+  "K1": 0,
+  "K2": 0,
+  "K3": 1,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/e2e-users.test.mjs",
+  "K1": 0,
+  "K2": 1,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/tools/api-setup.mjs",
+  "K1": 0,
+  "K2": 9,
+  "K3": 4,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/tools/e2eExt.mjs",
+  "K1": 0,
+  "K2": 0,
+  "K3": 2,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/unit-adminOnlySite.test.mjs",
+  "K1": 3,
+  "K2": 0,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/unit-appToken.test.mjs",
+  "K1": 0,
+  "K2": 1,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/unit-cvKpToObj.test.mjs",
+  "K1": 0,
+  "K2": 0,
+  "K3": 2,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/unit-e2e-lifecycle.test.mjs",
+  "K1": 0,
+  "K2": 0,
+  "K3": 4,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/unit-editorRows.test.mjs",
+  "K1": 0,
+  "K2": 0,
+  "K3": 19,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/unit-fromAudit.test.mjs",
+  "K1": 0,
+  "K2": 1,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/unit-pairRowsToSnapshot.test.mjs",
+  "K1": 0,
+  "K2": 0,
+  "K3": 1,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/unit-procCore-external.test.mjs",
+  "K1": 0,
+  "K2": 1,
+  "K3": 0,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/unit-roleName.test.mjs",
+  "K1": 0,
+  "K2": 0,
+  "K3": 1,
+  "enc": "utf8"
+ },
+ {
+  "f": "test/unit-syncKeepEntity.test.mjs",
+  "K1": 0,
+  "K2": 0,
+  "K3": 1,
+  "enc": "utf8"
+ },
+ {
+  "f": "建議w-web-perm修正.md",
+  "K1": 6,
+  "K2": 0,
+  "K3": 0,
+  "enc": "utf8"
+ }
+]

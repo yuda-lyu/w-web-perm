@@ -17,16 +17,16 @@
 
 1. 升 `w-serv-hapi` 至 `^1.1.8`(連帶 w-serv-webdata 1.1.16、w-serv-broadcast 1.1.12), 後端設 `sysFuncsPublic: ['[sys:getFuncList]']`; 重建前端 `dist/` 與後端 umd。
 2. 前端新元件的輪詢於本體帶 `__sysToken__`; 輪詢經 `getUserIdByToken` 每輪反查(`genPollingGate.mjs`)。**缺 `__sysToken__` 鍵之輪詢(已發布之舊前端建置檔)被框架當成無身分: 預設公開時放行, 嚴格設定時拒絕。**
-3. 本套件的 `getUserIdByToken`(`server/WWebPerm.mjs`)為真實反查且對空 token/非管理員 fail-closed(reject), 連線閘 `verifyConn` 亦只放行管理員。因此在本套件, 「列為公開」的 `[sys:getFuncList]` 實際仍須管理員身分; 可分辨『預設』與『嚴格設定』的行為只剩『標頭有效、本體缺 `__sysToken__` 鍵的輪詢』。
+3. 本套件的 `getUserIdByToken`(`server/WWebPerm.mjs`)為真實反查且對空 token/非系統管理者 fail-closed(reject), 連線閘 `verifyConn` 亦只放行系統管理者。因此在本套件, 「列為公開」的 `[sys:getFuncList]` 實際仍須系統管理者身分; 可分辨『預設』與『嚴格設定』的行為只剩『標頭有效、本體缺 `__sysToken__` 鍵的輪詢』。
 4. 前端 `src/main.js` 以 `useWaitToken: true` 建立 `WServHapiClient`, 登入成功(token 寫入 store)前不輪詢、不呼叫任何系統函數。我已用真瀏覽器確認: 無 token 進站、無效 token、一般使用者「無權進入」三種登入前畫面零 `/api/main` 請求; 登入後輪詢六輪皆帶 token 成功; 舊建置檔(重建前 dist)升版後輪詢每輪被拒(畫面停在「已登入」)。證據 `spec/evidence/perm-run01-20261025/browser-probe.json`。
 
-不得改變: 1.1.16 既有存取規則與行為(後台與資料通道限系統管理員、`/api/getPerm`、應用系統路由等級、系統服務用途之認定)。
+不得改變: 1.1.16 既有存取規則與行為(後台與資料通道限系統管理者、`/api/getPerm`、應用系統路由等級、系統服務用途之認定)。
 
 主要變更檔: `server/WWebPerm.mjs`(`sysFuncsPublic` 一行與註解/JSDoc)、`package.json`、`test/api-sysFuncs.test.mjs`(新)、`test/unit-sysFuncsSite.test.mjs`(新)、`test/api-callerMatrix.test.mjs`(`[sys:polling]` 入口改兩個身分來源皆測)、`README.md`(Security 入口表、Upgrade Notes 第一節)。全貌見 `diff.patch`(相對上一檢查點, 不含 dist 與 node_modules)。
 
 ## 請依下列順序審查(最後才審方案)
 
-**(一) 挑戰輸入空間表的完整性**: 本輪的表為 呼叫者(無 token、一般使用者、系統管理員、使用者用途之應用系統綁管理員/綁一般使用者、系統服務用途、未知 token) × 協定(new: 標頭與本體同 token; body: 標頭管理員、本體為呼叫者; old: 本體缺 `__sysToken__` 鍵; empty: 本體 `__sysToken__` 為 '') × 三個系統函數, 共 84 格(`test/api-sysFuncs.test.mjs`)。指出**缺的軸與缺的格**, 以及「預期與框架實際行為不符」者, 附 `file:line` 與具體輸入→實際輸出。請特別思考: `__sysToken__` 為非字串(null、數字、物件、陣列)時 `cstr` 的轉換; `clientId` 為空/非字串/過長; 輸入本身非物件或缺 `__sysInputArgs__`; 函數名大小寫/前後空白/未知 `[sys:xxx]`; `Authorization` 的各種變體; 同一請求兩個 `__sysToken__`; 輪詢與一般函數呼叫之間身分判定是否對稱(例如輪詢通過、同 token 之 `[sys:getTableTags]` 卻被拒或反之); `getUserIdByToken` 拋錯 vs reject 的處理。
+**(一) 挑戰輸入空間表的完整性**: 本輪的表為 呼叫者(無 token、一般使用者、系統管理者、使用者用途之應用系統綁系統管理者/綁一般使用者、系統服務用途、未知 token) × 協定(new: 標頭與本體同 token; body: 標頭系統管理者、本體為呼叫者; old: 本體缺 `__sysToken__` 鍵; empty: 本體 `__sysToken__` 為 '') × 三個系統函數, 共 84 格(`test/api-sysFuncs.test.mjs`)。指出**缺的軸與缺的格**, 以及「預期與框架實際行為不符」者, 附 `file:line` 與具體輸入→實際輸出。請特別思考: `__sysToken__` 為非字串(null、數字、物件、陣列)時 `cstr` 的轉換; `clientId` 為空/非字串/過長; 輸入本身非物件或缺 `__sysInputArgs__`; 函數名大小寫/前後空白/未知 `[sys:xxx]`; `Authorization` 的各種變體; 同一請求兩個 `__sysToken__`; 輪詢與一般函數呼叫之間身分判定是否對稱(例如輪詢通過、同 token 之 `[sys:getTableTags]` 卻被拒或反之); `getUserIdByToken` 拋錯 vs reject 的處理。
 **(二) 前提是否成立**: 我主張『本套件前端在 token 存在前不呼叫任何系統函數』(`src/main.js` 之 `useWaitToken: true`)。請讀 `node_modules/w-serv-hapi/src/WServHapiClient.mjs`、`w-serv-webdata/src/WServWebdataClient.mjs`、`src/main.js`、`src/App.vue`, 找出任何在登入成功前就會呼叫資料通道/系統函數的路徑(含 token 被清空/登出/登入失敗後是否停止輪詢、換 token 後 clientId 綁定被拒的情境), 以及 `src/`、`server/` 內其他會用到 `[sys:` 的站點。
 **(三) 測試是否真能抓到**: 逐一思考下列變異是否會被 `test/api-sysFuncs.test.mjs` 或 `test/unit-sysFuncsSite.test.mjs` 抓到, 抓不到者說明缺的斷言: ①拿掉 `sysFuncsPublic`(退回預設); ②多列 `[sys:polling]`; ③多列 `[sys:getTableTags]`; ④改空陣列; ⑤鍵名打錯; ⑥明列三者; ⑦`getUserIdByToken` 對空 token 改回空字串(fail-open); ⑧`useWaitToken` 改 false; ⑨`package.json` 之 w-serv-hapi 範圍退回 ^1.1.7。另指出測試斷言是否有「現狀指紋」而非對應規則的句子, 以及可能的 flake(時序、clientId 重複、在線逾時)。
 **(四) 文件與程式碼是否一致**: `README.md`(Security 入口表新增列、Public entries 段、Upgrade Notes 第一節)與 `server/WWebPerm.mjs` 的註解/JSDoc, 與程式碼及框架實際行為逐句核對, 指出不一致、誇大或遺漏之處(例如 error 事件的描述是否正確)。

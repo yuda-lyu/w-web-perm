@@ -2,7 +2,7 @@
 //
 //外部應用經 /syncAndReplaceTabs 直接寫入「陣列形式」之授權資料(cgrups／cpemis／crules 為 [{ "name": "A", "isActive": "y", "mode": "OR" }]),
 //伺服端 getUserRules 相容並授權(UNIT-OI-006a); 修正前五個編輯元件(VeCgrups／VeCpemis／VeCrules／VeGrupBlngUsers／VePemiBlngGrups)
-//依名稱為鍵查值, 查不到陣列元素 → 顯示停用 → 管理者存檔即撤銷有效授權.
+//依名稱為鍵查值, 查不到陣列元素 → 顯示停用 → 系統管理者存檔即撤銷有效授權.
 //本檔經真後端、真瀏覽器、真 UI 驗: ①對話框顯示與伺服端授權一致(啟用者顯示啟用) ②存檔後「外部應用實際查到的權限樹」不變(getPermUserInfor) ③存出形式為物件形式.
 //
 //語意斷言為主, 不產標準圖(此檔驗授權語意, 不是外觀; 標準圖產製須另行取得授權): 每案 fresh browser + 以同步端點重寫陣列形式夾具(from=appArrForm).
@@ -23,7 +23,7 @@
 //  按是只自清單移除、儲存後引用被連帶清理(其餘項目逐字不動), 授權為 AND 限制解除之結果(期望由 base seed 規則集依 R-AUTH-MERGE-00 推導); expWarn 擴充為可代入 {m}／{w}／{e}／{list}(等價於 fmtWarn 單趟代入).
 //  ②檔尾新增 describe「run06 引用連帶」: AF-036／037 群組／權限改名之儲存前預覽確認框(筆數、舊→新名單、外部來源警示; 按否不送出、按是附筆數之成功訊息、引用端已改寫、各使用者授權不變)、AF-038／039 刪除確認之筆數(OR 與停用者計入 n、只有啟用之 AND 計入 m)與清理、
 //  AF-040 預檢被伺服端拒絕時不彈確認框而顯示失敗彈窗、AF-042 名單超過 5 個之截斷、AF-041 cascadeRename:false(restartBackend(genTempSettings(…)); 不彈框、引用未改寫而懸空、使用者頁出現警告圖示; 案後 restartBackend('./settings.json') 還原). 皆為語意斷言、不產標準圖;
-//  資料前置以管理者寫入 RPC(含 from 非空之外部來源列), 案後 restoreTables 還原並回驗筆數(R-E2E-ISO-01).
+//  資料前置以系統管理者寫入 RPC(含 from 非空之外部來源列), 案後 restoreTables 還原並回驗筆數(R-E2E-ISO-01).
 //run07(F-23 外部列受保護; R-EXT-OWN-01、ADR-037; 2026-10-22): 後台不得新增／改／刪外部列(from 為非空字串者; 指派欄 cgrups／cpemis／crules 除外), 外部列之 order 由外部擁有(後台儲存不改).
 //  原以「同步端點建夾具、後台 RPC 模擬另一端」之 15 案前提失效, 修測試夾具與流程(產品行為不變、斷言不放寬):
 //  ①AF-014a／b／e「另一端把整表反序」: 後台整表寫入不改外部列 order, 改以兩個合法管道合成整表反序——後台列走 updateXxx、外部列走同步端點重送並給反序 order(reverseTableByOtherEnd);
@@ -35,7 +35,7 @@
 //  ②凡以標籤當真實 id 者(readDbField、rowOfSnap、列比對)一律先經 realId／srcKey 解析——見檔內 realId、keyOf; getResolvedActiveTargets〔getPermUserInfor〕perm-run05 起 userId 依登入對應解析(外部列傳 srcKey、後台列傳 id), 包裝改經 loginKeyOf;
 //  ③同分區再送一批為差異同步(依 srcKey 新增／修改／刪除／不變), 不再整批取代: 每案 beforeEach 重送夾具 → 被前案改過之夾具列依 srcKey 還原為夾具值(夾具各列皆帶 cgrups／cpemis／crules 鍵, 指派欄亦被還原);
 //  ④AF-014a／b／e 之 reverseTableByOtherEnd: 外部列以同 srcKey 重送並給反序 order(依 srcKey 對應, 非依 id)。
-//  後台列夾具(editTable／seedExtra 旁路寫庫)之 id 不變, 仍以 id 比對。本檔無「以外部同步建立之使用者登入」之案例(全程以預設管理者登入), 故不受 users.mappingBy='id' 待裁示之影響。
+//  後台列夾具(editTable／seedExtra 旁路寫庫)之 id 不變, 仍以 id 比對。本檔無「以外部同步建立之使用者登入」之案例(全程以預設系統管理者登入), 故不受 users.mappingBy='id' 待裁示之影響。
 //跑法: npx mocha test/e2e-array-form.test.mjs --timeout 300000
 import assert from 'assert'
 import fs from 'fs'
@@ -163,7 +163,7 @@ async function getResolvedActiveTargets(page, idOrLabel) {
 
 //「另一端把 users／grups 整表反序」(AF-014a／b／e; run07): 外部列之 order 由外部擁有, 後台整表寫入(updateXxx)不改其 order(伺服端還原為庫內值, R-EXT-OWN-01), 單以 updateXxx 反序只會重排後台列、外部列不動;
 //  故由兩個合法管道合成「整表反序」(結果等同假設全部列皆可由後台改序時 updateXxx 所得):
-//  ①後台列——另一位管理者之整表寫入(updateXxx 依陣列位置重給後台列之 order);
+//  ①後台列——另一位系統管理者之整表寫入(updateXxx 依陣列位置重給後台列之 order);
 //  ②外部列——外部應用以同步端點對同一批外部列(夾具分區 FROM)重送, 並給「其在反序整表中之位置」為 order(外部擁有 order, 同步是改變外部列順序之合法途徑).
 //  驗收: DB 之新序確為整表反序(否則等待 store 重排之同步點會空等)。回傳反序後之整表(含各列整列資料, 依新 order 由小到大)
 async function reverseTableByOtherEnd(kt) {
@@ -174,7 +174,7 @@ async function reverseTableByOtherEnd(kt) {
     const exts = cur.filter((v) => typeof v.from === 'string' && v.from !== '')
     assert.ok(exts.length > 0 && exts.every((v) => v.from === FROM), `前提: ${kt} 之外部列皆屬夾具分區 ${FROM}(其他分區之列不在本函式之重排範圍), 實得 ${JSON.stringify(exts.map((v) => [v.id, v.from]))}`)
     const resp = await callRpc(fn, [reversed], TOKEN_ADMIN)
-    assert.ok(resp.ok, `另一端(另一位管理者)重排後台列 ${fn} 應成功, 實得 ${JSON.stringify(resp)}`)
+    assert.ok(resp.ok, `另一端(另一位系統管理者)重排後台列 ${fn} 應成功, 實得 ${JSON.stringify(resp)}`)
     //perm-run03: 外部列之 id 由伺服端產生, 夾具標籤是 srcKey → 以 srcKey 對應其在反序整表中之位置(外部列 srcKey 非空; 後台列 srcKey 空, 不入此表)
     const pos = new Map(reversed.filter((v) => typeof v.srcKey === 'string' && v.srcKey !== '').map((v) => [v.srcKey, reversed.indexOf(v) + 1]))
     assert.ok(FIX[kt].every((v) => pos.has(v.id)), `前提: 夾具分區 ${FROM} 之 ${kt} 皆在現況表內(依 srcKey)`)
@@ -2080,7 +2080,7 @@ describe('e2e-array-form run05 衝突之收嚴與提示 (R-PRINCIPLE-00; 語意�
                 await restartBackend('./settings.json', { reseed: true })
                 let t = await readTables()
                 //單一 mocha 行程全跑(npm test)時, 持有 lmdb 映射者為 mocha 行程自身, reseed 之刪庫失敗而退化為 upsert, 旁路寫入之同名列不會被移除
-                //(2026-10-22 全套實測 after-hook 失敗): 仍有殘留則以 restoreTables(base 快照, 管理者寫入 RPC)還原
+                //(2026-10-22 全套實測 after-hook 失敗): 仍有殘留則以 restoreTables(base 快照, 系統管理者寫入 RPC)還原
                 if (t.grups.some((g) => g.name === 'dup-g') || t.pemis.some((p) => p.name === 'dup-pm') || t.users.some((u) => u.id === 'id-dup-u')) {
                     await restoreTables(snap)
                     t = await readTables()
@@ -2312,7 +2312,7 @@ describe('e2e-array-form run05 衝突之收嚴與提示 (R-PRINCIPLE-00; 語意�
 // =====================================================================================================================
 // run06: 引用連帶(改名級聯＋刪除連帶清理; R-PRINCIPLE-00 原則 6、適用表 m／n; R-REF-CASCADE-01; ADR-036; 2026-10-22)——清單頁儲存前之改名預覽確認框、刪除確認框之筆數與連帶清理、
 // 預檢被伺服端拒絕時不彈確認框、cascadeRename:false 之行為(語意斷言, 不產標準圖; 各案之 spec 編號為暫定, spec 由主責撰寫).
-// 資料前置一律以管理者寫入 RPC(資料通道 updateUsers／updateGrups／updatePemis; 非使用者操作, 含 from 非空之外部來源列)推入本段專屬之 id-ren-*／id-del-*／id-rej-*／id-tr-* 列;
+// 資料前置一律以系統管理者寫入 RPC(資料通道 updateUsers／updateGrups／updatePemis; 非使用者操作, 含 from 非空之外部來源列)推入本段專屬之 id-ren-*／id-del-*／id-rej-*／id-tr-* 列;
 // 操作走真 UI(雙擊名稱格改名、勾選＋垃圾桶刪除、儲存鈕、確認框之否／是); 每案後 restoreTables 還原並回驗筆數(R-E2E-ISO-01).
 // 期望之授權樹皆由 base seed 之規則集依 R-AUTH-MERGE-00 推導(OR 聯集、AND 交集、懸空引用內容全 n), 不抄實測值: 啟用之管控對象 P1 { A }、P2 { C, BA, BB }、P3 { C, BB, BC }、P4 { TODO }(A＝T_A、C＝T_C 見檔首常數);
 //   M1 = P1 ∪ P2 = PETER_TREE、M2 = P2 ∪ P3 = M2_TREE.
@@ -2325,14 +2325,14 @@ const T_TODO = '專案B/頁B/區塊A/待辦事項清單'
 const srt = (a) => a.slice().sort()
 const BASE_UIDS6 = ['id-for-peter', 'id-for-mary', 'id-for-john', 'id-for-admin']
 const OFF5 = (mode) => ({ mode, isActive: 'n' })
-//整列夾具(供管理者寫入 RPC; order 由伺服器依陣列位置重給; from 非空者為外部來源)
+//整列夾具(供系統管理者寫入 RPC; order 由伺服器依陣列位置重給; from 非空者為外部來源)
 const rowU6 = (id, name, cgrups, o = {}) => ({ id, order: 0, name, email: `${id}@example.com`, description: '', from: '', cgrups: typeof cgrups === 'string' ? cgrups : JSON.stringify(cgrups), isAdmin: 'n', isActive: 'y', ...o })
 const rowG6 = (id, name, cpemis, o = {}) => ({ id, order: 0, name, description: `${name}說明`, from: '', cpemis: typeof cpemis === 'string' ? cpemis : JSON.stringify(cpemis), ...o })
 const rowP6 = (id, name, crules, o = {}) => ({ id, order: 0, name, description: `${name}說明`, from: '', crules: typeof crules === 'string' ? crules : JSON.stringify(crules), ...o })
 const omitKeys = (o, ks) => Object.fromEntries(Object.entries(o).filter(([k]) => !ks.includes(k)))
 const AUDIT6 = ['userIdUpdate', 'timeUpdate'] //寫入時由伺服器改寫之更新者欄位
 
-//以管理者寫入 RPC 在某表現況之上追加(或改)列: fn(現況列複本) → 新整表(回傳 undefined 視為就地修改); 失敗即拋錯
+//以系統管理者寫入 RPC 在某表現況之上追加(或改)列: fn(現況列複本) → 新整表(回傳 undefined 視為就地修改); 失敗即拋錯
 async function editTable(kt, fn) {
     const fnName = { users: 'updateUsers', grups: 'updateGrups', pemis: 'updatePemis' }[kt]
     const rows = (await selectAll(kt)).slice().sort((a, b) => (a.order || 0) - (b.order || 0)).map((v) => JSON.parse(JSON.stringify(v)))
@@ -2341,7 +2341,7 @@ async function editTable(kt, fn) {
 }
 
 //run07(F-23 外部列受保護): 後台寫入 RPC(updateXxx)不得新增外部列(from 非空者被拒 saveFromNotAllowed), 故本段夾具之「外部來源列」(ren-ext、ren-gx、del-ue、del-ge)改經外部同步端點建立於分區 EXT6;
-//  其餘(被改名／被刪除之主體與其他引用端)一律為後台列(from ''), 以管理者寫入 RPC 新增——改名／刪除之主體須後台可改可刪; 外部來源引用端之 cgrups／cpemis 為指派欄, 由伺服端引用連帶改寫(不受守門限制).
+//  其餘(被改名／被刪除之主體與其他引用端)一律為後台列(from ''), 以系統管理者寫入 RPC 新增——改名／刪除之主體須後台可改可刪; 外部來源引用端之 cgrups／cpemis 為指派欄, 由伺服端引用連帶改寫(不受守門限制).
 //  外部列之 order 由外部給(EXT6_ORDER 大於後台列之陣列位置, 使其排在清單最後, 與修前「追加於表尾」之列序一致); 案後 restoreTables 先以 purgeExternalRows 清外部夾具再還原(R-E2E-ISO-01)
 const EXT6 = 'teamA'
 const EXT6_ORDER = 300

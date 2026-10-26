@@ -1,0 +1,1268 @@
+file	line	kinds	after(新形, 截 140 字)
+README.md	80	K1x1	//本套件於此函數通過後，另要求資料通道與後台登入限系統管理者(perm users 表之 isAdmin 為 'y')，一般使用者仍可經 /api/getPerm(from 為 'getPerm')以 token 查本人權限樹，
+README.md	89	K1x1+K2x1	//本套件於此函數通過後另自行要求系統管理者等級(users表有效之系統管理者，或系統服務用途之應用系統token)，一般使用者即使本函數放行亦被拒(userNotAdmin)，故不必再以isAdmin判斷；
+dist/js/app-legacy.a9d18af3.js	1	K1x1	(function(){var e={4976:function(e,t,r){"use strict";var n={};r.r(n),r.d(n,{UpdateConnState:function(){return Ea},UpdateHeightApp:function()
+dist/js/app.a9d18af3.js	1	K1x1	(function(){var e={4976:function(e,t,r){"use strict";var n={};r.r(n),r.d(n,{UpdateConnState:function(){return Ea},UpdateHeightApp:function()
+dist/w-web-perm.umd.js	6	K1x3+K2x2	!function(e,t){"object"==typeof exports&&"undefined"!=typeof module?module.exports=t(require("path"),require("fs"),require("@hapi/hapi"),req
+docs/WWebPerm.html	80	K1x1	本套件之落實(perm-run01 起「權限後台與資料通道只限系統管理者」, 規則帳本 R-ADMIN-ONLY-01): 資料通道之連線閘(標頭 token, 所有入口: main 之 RPC／表 select／系統函數, 上傳下載各 apiType)與執行身分(請求本體 <s
+docs/WWebPerm.html	83	K2x2	hapi apis 路由: getUserByToken(只限系統管理者)／getPerm(任何通過 verifyClientUser 之有效使用者, 回本人權限樹)驗 client 使用者, getPermUserInfor／syncAndReplaceTabs 驗 app 使
+docs/WWebPerm.html	85	K1x1+K2x2	前端元件(w-serv-hapi 1.1.8／w-serv-webdata 1.1.16／w-serv-broadcast 1.1.12 起)於輪詢本體帶 <strong>sysToken</strong>, 每輪經 getUserIdByToken 反查(須為系統管理者; 缺 
+docs/WWebPerm.html	87	K1x1	<p>token 種類與等級(使用者 2026-10-24 定案, dspec/使用者身分驗證原則.md 二之一; 規則帳本 R-APP-TOKEN-01): 使用者 token(一般使用者／系統管理者)代表登入者, 等級以 perm users 表之列判定; 應用系統 toke
+docs/WWebPerm.html	89	K2x1	系統服務用途(不綁使用者, 代表外部應用系統本身)須同時: 不在 perm users 表、反查回 isApp='y'、isAdmin='y'、id 以 'app:' 開頭('app:&lt;金鑰主鍵&gt;'; sso 拒收以 app: 開頭之使用者主鍵): 可用系統管理者之後
+docs/WWebPerm.html	90	K2x1	使用者用途綁定「不在 perm users 表之使用者」(如只存在於 sso 之系統管理者)不是系統服務用途(其 id 是該使用者之主鍵, 不以 'app:' 開頭), 於後台與資料通道被拒, 與其自身使用者 token 相同.
+docs/WWebPerm.html	201	K1x1	//本套件於此函數通過後，另要求資料通道與後台登入限系統管理者(perm users 表之 isAdmin 為 'y')，一般使用者仍可經 /api/getPerm(from 為 'getPerm')以 token 查本人權限樹，
+docs/WWebPerm.html	210	K1x1+K2x1	//本套件於此函數通過後另自行要求系統管理者等級(在users表者須為有效之系統管理者；不在表者只看getUserByToken反查之isAdmin為'y'，不要求isApp與'app:'前綴)，一般使用者即使本函數放行亦被拒(userNotAdmin)，故不必再以isAdmin
+docs/WWebPerm.html	390	K2x2	<td class="description last"><p>輸入處理函數，函數會傳入使用者token，通過此函數處理後並回傳使用者資訊物件，並至少須提供'id'、'email'、'name'、'isAdmin'欄位，且'isAdmin'限輸入'y'或'n'。另可選提供'isA
+docs/WWebPerm.html	426	K2x3	<td class="description last"><p>輸入驗證瀏覽使用者身份之處理函數，函數會傳入使用者資訊物件(perm users 表之列)與來源字串from，通過此函數識別後回傳布林值(可為Promise)，允許使用者回傳true，反之回傳false。from 值
+docs/WWebPerm.html	462	K2x1	<td class="description last"><p>輸入驗證應用程序使用者身份之處理函數，函數會傳入使用者資訊物件(外部getUserByToken反查結果之淺層副本)與來源字串from，通過此函數識別後回傳布林值(可為Promise)，允許使用者回傳true，反之回
+docs/global.html	138	K2x1	故以此前綴開頭之 id 不可能是一般使用者(perm-run02②; 使用者用途綁定之 sso 系統管理者其 id 是該使用者之主鍵, 不以此前綴開頭).
+docs/global.html	186	K2x1	故以此前綴開頭之 id 不可能是一般使用者(perm-run02②; 使用者用途綁定之 sso 系統管理者其 id 是該使用者之主鍵, 不以此前綴開頭).
+docs/global.html	7846	K3x1	編輯對話框若依名稱為鍵查值會查不到陣列元素 → 顯示停用 → 系統管理者存檔即撤銷有效授權. 本函數與伺服端共用 cvKpToArr 之解碼(單一擁有者),
+docs/global.html	15603	K3x1	(R-PRINCIPLE-00 e, 該層無任何 mode 合法之啟用項時結果全 n), 編輯器雖顯示為「AND、啟用」, 但存檔時對未被系統管理者改動者原樣寫回其原始 mode(editorRefRows 之
+docs/global.html	15604	K3x1	getRawModeMap／putRowsToKp／putRefEntry, 方案 A; R-EDIT-KEEP-01), 故未改動時存檔前後授權相等、不會成為唯一 AND 基底而多給; 放寬前此格拒存只會使系統管理者無法存任何變更.
+docs/global.html	15605	K3x1	該項之 mode 缺漏提示仍由 getAuthWarn 之 modeInvalid 警告圖示承擔(不變). 系統管理者在對話框內明確改動(改為 OR／AND、啟用其他項)之結果, 等於伺服端對「改動後之狀態」之解讀,
+docs/global.html	17168	K3x1	<dd class="tag-description"><ul class="dummy"><li><p>取得「mode 缺或非法之啟用引用」(伺服端之限制項)之原始 mode, 供存檔時原樣寫回(R-PRINCIPLE-00 e; 未被系統管理者改動之項寫回其原始 mode)<
+docs/global.html	17170	K3x1	編輯器(cvKpToObj)把此類項顯示為「AND、啟用」; 存檔若寫出合法 AND, 限制項即變成可當基底之 AND——例: { G1: 缺 mode, G2: AND } 系統管理者停用唯一合法項 G2 後存檔,
+docs/global.html	17172	K3x1	系統管理者改過 mode 或停用者照其選擇寫出.
+docs/global.html	20735	K1x1	<dd class="tag-description"><ul class="dummy"><li><p>是否為系統管理者: perm users 表之列 isActive 為 'y' 且 isAdmin 為 'y'(自有屬性、嚴格相等, 其餘值一律視為否)</p>
+docs/global.html	20859	K1x1	<p>回傳是否為有效之系統管理者</p>
+docs/global.html	21635	K2x1	<dd class="tag-description"><ul class="dummy"><li><p>外部反查結果是否宣稱為系統管理者(僅供應用系統路由對「不在 perm users 表」之呼叫者做相容認定; perm-run02①, 原則二.8 改版預設相容)</p>
+docs/global.html	22639	K2x1	不在表者(如只存在於 sso 之系統管理者)不是系統服務用途, 於後台與資料通道被拒, 與其自身使用者 token 相同.</p></li></ul></dd>
+docs/global.html	26180	K3x1	兩者以列索引配對時, store 於開框期間被更新(另一位系統管理者增刪列或改 order)即錯位, 關聯寫到另一個使用者／群組(規則帳本 R-REL-PAIR-01).
+docs/global.html	29441	K3x1	否則限制項變為可當基底之 AND 而多給(見 getRawModeMap); 系統管理者改過 mode 或停用者照列寫出. 不給＝一律照列寫出.</p></li></ul></dd>
+docs/server_WWebPerm.mjs.html	94	K1x1	* 本套件之落實(perm-run01 起「權限後台與資料通道只限系統管理者」, 規則帳本 R-ADMIN-ONLY-01): 資料通道之連線閘(標頭 token, 所有入口: main 之 RPC／表 select／系統函數, 上傳下載各 apiType)與執行身分(請求本體 
+docs/server_WWebPerm.mjs.html	97	K2x2	* hapi apis 路由: getUserByToken(只限系統管理者)／getPerm(任何通過 verifyClientUser 之有效使用者, 回本人權限樹)驗 client 使用者, getPermUserInfor／syncAndReplaceTabs 驗 app
+docs/server_WWebPerm.mjs.html	99	K1x1+K2x2	* 前端元件(w-serv-hapi 1.1.8／w-serv-webdata 1.1.16／w-serv-broadcast 1.1.12 起)於輪詢本體帶 __sysToken__, 每輪經 getUserIdByToken 反查(須為系統管理者; 缺 __sysToken_
+docs/server_WWebPerm.mjs.html	102	K1x1	* token 種類與等級(使用者 2026-10-24 定案, dspec/使用者身分驗證原則.md 二之一; 規則帳本 R-APP-TOKEN-01): 使用者 token(一般使用者／系統管理者)代表登入者, 等級以 perm users 表之列判定; 應用系統 token
+docs/server_WWebPerm.mjs.html	104	K2x1	* 系統服務用途(不綁使用者, 代表外部應用系統本身)須同時: 不在 perm users 表、反查回 isApp='y'、isAdmin='y'、id 以 'app:' 開頭('app:&lt;金鑰主鍵>'; sso 拒收以 app: 開頭之使用者主鍵): 可用系統管理者之後端
+docs/server_WWebPerm.mjs.html	105	K2x1	* 使用者用途綁定「不在 perm users 表之使用者」(如只存在於 sso 之系統管理者)不是系統服務用途(其 id 是該使用者之主鍵, 不以 'app:' 開頭), 於後台與資料通道被拒, 與其自身使用者 token 相同.
+docs/server_WWebPerm.mjs.html	113	K2x2	* @param {Function} getUserByToken 輸入處理函數，函數會傳入使用者token，通過此函數處理後並回傳使用者資訊物件，並至少須提供'id'、'email'、'name'、'isAdmin'欄位，且'isAdmin'限輸入'y'或'n'。另可選提供'
+docs/server_WWebPerm.mjs.html	114	K2x3	* @param {Function} verifyClientUser 輸入驗證瀏覽使用者身份之處理函數，函數會傳入使用者資訊物件(perm users 表之列)與來源字串from，通過此函數識別後回傳布林值(可為Promise)，允許使用者回傳true，反之回傳false。f
+docs/server_WWebPerm.mjs.html	115	K2x1	* @param {Function} verifyAppUser 輸入驗證應用程序使用者身份之處理函數，函數會傳入使用者資訊物件(外部getUserByToken反查結果之淺層副本)與來源字串from，通過此函數識別後回傳布林值(可為Promise)，允許使用者回傳true，反
+docs/server_WWebPerm.mjs.html	188	K1x1	*     //本套件於此函數通過後，另要求資料通道與後台登入限系統管理者(perm users 表之 isAdmin 為 'y')，一般使用者仍可經 /api/getPerm(from 為 'getPerm')以 token 查本人權限樹，
+docs/server_WWebPerm.mjs.html	197	K1x1+K2x1	*     //本套件於此函數通過後另自行要求系統管理者等級(在users表者須為有效之系統管理者；不在表者只看getUserByToken反查之isAdmin為'y'，不要求isApp與'app:'前綴)，一般使用者即使本函數放行亦被拒(userNotAdmin)，故不必再以i
+docs/server_WWebPerm.mjs.html	625	K1x1	//adminOnly 為 true 時(經 getAndVerifyAdminUser)於完整驗證通過後另要求 perm 列為有效之系統管理者(R-ADMIN-ONLY-01); 預設 false 者(/api/getPerm)一般使用者照常
+docs/server_WWebPerm.mjs.html	658	K1x2	//getAndVerifyAdminUser: 權限後台與資料通道只限系統管理者(perm-run01; 使用者 2026-10-24 裁示「系統管理者才能讀寫 4 表, 一般使用者是沒法進權限後台的, 故只能用 token 查自己權限樹」; 規則帳本 R-ADMIN-ONLY
+docs/server_WWebPerm.mjs.html	661	K2x1	//部署方 verifyClientUser 仍照常套用(只能再收緊), 不必再以 from 區分系統管理者與一般使用者. 唯一不經本函數之使用者入口為 /api/getPerm(一般使用者以 token 查本人權限樹), 以及應用系統路由(verifyAppUser).
+docs/server_WWebPerm.mjs.html	664	K2x1	//perm-run01(R-APP-TOKEN-01, P-2)＋perm-run02②: 應用系統 token・系統服務用途(不綁使用者, 代表外部應用系統本身, 能用系統管理者之服務)——外部反查結果 isApp='y'、isAdmin='y'、**id 以 'app:' 
+docs/server_WWebPerm.mjs.html	666	K2x1	//  使用者用途綁定不在表之 sso 系統管理者(id 非 'app:' 開頭)、isApp 未轉傳(視同 'n')、id 非 'app:' 開頭之虛擬應用系統, 皆不進系統服務用途, 落入 getAndVerifyClientUser(adminOnly) 而被拒(其自身使用
+docs/server_WWebPerm.mjs.html	677	K2x1	//getAndVerifyAppUser: 應用系統路由(/api/getPermUserInfor、/syncAndReplaceTabs)之呼叫者驗證——套件自行要求系統管理者等級(perm-run01 P-1, R-APP-TOKEN-01; w-web呼叫者身分驗證.m
+docs/server_WWebPerm.mjs.html	680	K2x2	//  不在表之 sso 系統管理者以其自身 token 呼叫亦放行(與使用者用途綁定該系統管理者一致); 在表之一般使用者、使用者用途綁一般使用者、不在表且 isAdmin 非 'y' 者皆拒(固定鍵 userNotAdmin).
+docs/server_WWebPerm.mjs.html	689	K2x1	//isLevel, 系統管理者等級
+docs/server_WWebPerm.mjs.html	736	K1x1	//perm-run01(R-ADMIN-ONLY-01): 資料通道只限系統管理者——完整驗證通過後另要求 perm 列 isAdmin='y' 且 isActive='y', 所有入口(main 之 RPC／表 select／系統函數, 上傳下載各 apiType)同一道閘;
+docs/server_WWebPerm.mjs.html	822	K2x1	//  kpSystemAppIds 僅作縱深防禦之憑據(每個函數呼叫前 getUserIdByToken 已重新驗證 token 並更新登錄, 金鑰被撤銷後無法再抵達此處); perm 系統管理者之列被刪除後不因此退化為系統服務用途(其 id 不在登錄中; 外部 id 等於表中
+docs/server_WWebPerm.mjs.html	833	K2x1	if (!ok) { //縱深防禦: 資料通道已於連線閘與執行身分要求系統管理者(R-ADMIN-ONLY-01), 此處對新鮮讀取之列再判一次(連線後角色被降級之競態)
+docs/server_WWebPerm.mjs.html	999	K1x1	//getAndVerifyAdminUser, 後台登入檢查只限系統管理者(perm-run01, R-ADMIN-ONLY-01): 一般使用者即使部署方放行亦拒絕(userNotAdmin, 前端顯示「無權進入權限後台」); 一般使用者查本人權限樹走 /api/getPer
+docs/server_WWebPerm.mjs.html	1199	K2x1	//getAndVerifyAppUser, 先驗身分(含系統管理者等級, R-APP-TOKEN-01)再驗 keyTable 等參數(P-5): 未通過驗證者之回應與 srLog 皆與 keyTable 無關, 不得由參數錯誤鍵之差異探測表名
+docs/server_WWebPerm.mjs.html	1285	K1x1	//本函數: 驗連線標頭之 token(getAndVerifyAdminUser: 外部 getUserByToken → perm users 存在且 isActive='y' → 部署方 verifyClientUser(user, apiType) → perm 列 is
+docs/server_WWebPerm.mjs.html	1345	K1x1	//perm-run01(R-ADMIN-ONLY-01): 與連線閘同為「只限系統管理者」——另要求 perm 列 isAdmin='y' 且 isActive='y'(getAndVerifyAdminUser), 否則 reject userNotAdmin, 框架即不執行
+docs/server_WWebPerm.mjs.html	1372	K2x2	//本套件 getUserIdByToken 為真實反查且對空 token／非系統管理者 fail-closed, 連線閘亦先擋: 所列 [sys:getFuncList] 實際仍須有效系統管理者身分, 只是設定之表述.
+docs/server_WWebPerm.mjs.html	1386	K1x1	//連線者身分之授權在 verifyConn(getAndVerifyAdminUser: 完整驗證＋限系統管理者), 此處不重做
+docs/server_WWebPerm.mjs.html	1394	K1x1	//四個寫入函數皆先經 requireAdmin(函數層級角色檢查, perm-run03 範圍四): 非 perm users 表中有效之系統管理者 → userNotAdmin、零寫入
+docs/server_adminCheck.mjs.html	49	K1x1	* 是否為系統管理者: perm users 表之列 isActive 為 'y' 且 isAdmin 為 'y'(自有屬性、嚴格相等, 其餘值一律視為否)
+docs/server_adminCheck.mjs.html	56	K1x1	* @returns {Boolean} 回傳是否為有效之系統管理者
+docs/server_adminCheck.mjs.html	69	K2x1	* 故以此前綴開頭之 id 不可能是一般使用者(perm-run02②; 使用者用途綁定之 sso 系統管理者其 id 是該使用者之主鍵, 不以此前綴開頭).
+docs/server_adminCheck.mjs.html	83	K2x1	* 不在表者(如只存在於 sso 之系統管理者)不是系統服務用途, 於後台與資料通道被拒, 與其自身使用者 token 相同.
+docs/server_adminCheck.mjs.html	98	K2x1	* 外部反查結果是否宣稱為系統管理者(僅供應用系統路由對「不在 perm users 表」之呼叫者做相容認定; perm-run02①, 原則二.8 改版預設相容)
+docs/server_dataChannel.mjs.html	56	K1x1	//連線者之身分授權仍在 verifyConn(getAndVerifyAdminUser: 完整驗證＋限系統管理者), 本函數不重做.
+docs/server_tools_fromTools.mjs.html	384	K1x1	L.push(`   注意: 被清除列中有 ${pl.nAdmin} 列為系統管理者(isAdmin='y')`)
+docs/server_tools_nameDupReport.mjs.html	48	K3x1	<pre class="prettyprint source linenums"><code>//名稱重複與使用者對應鍵之唯讀稽核工具(F-02／F-14; 規則帳本 R-NAME-UNIQ-03; ADR-034). 不屬測試, 不寫任何資料, 不提供自動刪除/改名——清理由系
+docs/src_js_cvKpToObj.mjs.html	60	K3x1	* 編輯對話框若依名稱為鍵查值會查不到陣列元素 → 顯示停用 → 系統管理者存檔即撤銷有效授權. 本函數與伺服端共用 cvKpToArr 之解碼(單一擁有者),
+docs/src_js_draftSync.mjs.html	50	K2x1	//背景: 清單頁以 computed(changeParams)監看 store, 資料推播(伺服器約 2 秒輪詢, 他人或外部同步改了表)使 store 變新時, 修改前一律重建 items 與基準, 使系統管理者尚未儲存之編輯被靜默丟棄,
+docs/src_js_editorRefRows.mjs.html	79	K3x1	* 取得「mode 缺或非法之啟用引用」(伺服端之限制項)之原始 mode, 供存檔時原樣寫回(R-PRINCIPLE-00 e; 未被系統管理者改動之項寫回其原始 mode)
+docs/src_js_editorRefRows.mjs.html	82	K3x1	* 編輯器(cvKpToObj)把此類項顯示為「AND、啟用」; 存檔若寫出合法 AND, 限制項即變成可當基底之 AND——例: { G1: 缺 mode, G2: AND } 系統管理者停用唯一合法項 G2 後存檔,
+docs/src_js_editorRefRows.mjs.html	84	K3x1	* 系統管理者改過 mode 或停用者照其選擇寫出.
+docs/src_js_editorRefRows.mjs.html	222	K3x1	* 否則限制項變為可當基底之 AND 而多給(見 getRawModeMap); 系統管理者改過 mode 或停用者照列寫出. 不給＝一律照列寫出.
+docs/src_js_getKpLossy.mjs.html	64	K3x1	* (R-PRINCIPLE-00 e, 該層無任何 mode 合法之啟用項時結果全 n), 編輯器雖顯示為「AND、啟用」, 但存檔時對未被系統管理者改動者原樣寫回其原始 mode(editorRefRows 之
+docs/src_js_getKpLossy.mjs.html	65	K3x1	* getRawModeMap／putRowsToKp／putRefEntry, 方案 A; R-EDIT-KEEP-01), 故未改動時存檔前後授權相等、不會成為唯一 AND 基底而多給; 放寬前此格拒存只會使系統管理者無法存任何變更.
+docs/src_js_getKpLossy.mjs.html	66	K3x1	* 該項之 mode 缺漏提示仍由 getAuthWarn 之 modeInvalid 警告圖示承擔(不變). 系統管理者在對話框內明確改動(改為 OR／AND、啟用其他項)之結果, 等於伺服端對「改動後之狀態」之解讀,
+docs/src_js_pairRowsToSnapshot.mjs.html	69	K3x1	* 兩者以列索引配對時, store 於開框期間被更新(另一位系統管理者增刪列或改 order)即錯位, 關聯寫到另一個使用者／群組(規則帳本 R-REL-PAIR-01).
+server/WWebPerm.mjs	47	K1x1	* 本套件之落實(perm-run01 起「權限後台與資料通道只限系統管理者」, 規則帳本 R-ADMIN-ONLY-01): 資料通道之連線閘(標頭 token, 所有入口: main 之 RPC／表 select／系統函數, 上傳下載各 apiType)與執行身分(請求本體 
+server/WWebPerm.mjs	50	K2x2	* hapi apis 路由: getUserByToken(只限系統管理者)／getPerm(任何通過 verifyClientUser 之有效使用者, 回本人權限樹)驗 client 使用者, getPermUserInfor／syncAndReplaceTabs 驗 app
+server/WWebPerm.mjs	52	K1x1+K2x2	* 前端元件(w-serv-hapi 1.1.8／w-serv-webdata 1.1.16／w-serv-broadcast 1.1.12 起)於輪詢本體帶 __sysToken__, 每輪經 getUserIdByToken 反查(須為系統管理者; 缺 __sysToken_
+server/WWebPerm.mjs	55	K1x1	* token 種類與等級(使用者 2026-10-24 定案, dspec/使用者身分驗證原則.md 二之一; 規則帳本 R-APP-TOKEN-01): 使用者 token(一般使用者／系統管理者)代表登入者, 等級以 perm users 表之列判定; 應用系統 token
+server/WWebPerm.mjs	57	K2x1	* 系統服務用途(不綁使用者, 代表外部應用系統本身)須同時: 不在 perm users 表、反查回 isApp='y'、isAdmin='y'、id 以 'app:' 開頭('app:<金鑰主鍵>'; sso 拒收以 app: 開頭之使用者主鍵): 可用系統管理者之後端服務(
+server/WWebPerm.mjs	58	K2x1	* 使用者用途綁定「不在 perm users 表之使用者」(如只存在於 sso 之系統管理者)不是系統服務用途(其 id 是該使用者之主鍵, 不以 'app:' 開頭), 於後台與資料通道被拒, 與其自身使用者 token 相同.
+server/WWebPerm.mjs	66	K2x2	* @param {Function} getUserByToken 輸入處理函數，函數會傳入使用者token，通過此函數處理後並回傳使用者資訊物件，並至少須提供'id'、'email'、'name'、'isAdmin'欄位，且'isAdmin'限輸入'y'或'n'。另可選提供'
+server/WWebPerm.mjs	67	K2x3	* @param {Function} verifyClientUser 輸入驗證瀏覽使用者身份之處理函數，函數會傳入使用者資訊物件(perm users 表之列)與來源字串from，通過此函數識別後回傳布林值(可為Promise)，允許使用者回傳true，反之回傳false。f
+server/WWebPerm.mjs	68	K2x1	* @param {Function} verifyAppUser 輸入驗證應用程序使用者身份之處理函數，函數會傳入使用者資訊物件(外部getUserByToken反查結果之淺層副本)與來源字串from，通過此函數識別後回傳布林值(可為Promise)，允許使用者回傳true，反
+server/WWebPerm.mjs	141	K1x1	*     //本套件於此函數通過後，另要求資料通道與後台登入限系統管理者(perm users 表之 isAdmin 為 'y')，一般使用者仍可經 /api/getPerm(from 為 'getPerm')以 token 查本人權限樹，
+server/WWebPerm.mjs	150	K1x1+K2x1	*     //本套件於此函數通過後另自行要求系統管理者等級(在users表者須為有效之系統管理者；不在表者只看getUserByToken反查之isAdmin為'y'，不要求isApp與'app:'前綴)，一般使用者即使本函數放行亦被拒(userNotAdmin)，故不必再以i
+server/WWebPerm.mjs	578	K1x1	//adminOnly 為 true 時(經 getAndVerifyAdminUser)於完整驗證通過後另要求 perm 列為有效之系統管理者(R-ADMIN-ONLY-01); 預設 false 者(/api/getPerm)一般使用者照常
+server/WWebPerm.mjs	611	K1x2	//getAndVerifyAdminUser: 權限後台與資料通道只限系統管理者(perm-run01; 使用者 2026-10-24 裁示「系統管理者才能讀寫 4 表, 一般使用者是沒法進權限後台的, 故只能用 token 查自己權限樹」; 規則帳本 R-ADMIN-ONLY
+server/WWebPerm.mjs	614	K2x1	//部署方 verifyClientUser 仍照常套用(只能再收緊), 不必再以 from 區分系統管理者與一般使用者. 唯一不經本函數之使用者入口為 /api/getPerm(一般使用者以 token 查本人權限樹), 以及應用系統路由(verifyAppUser).
+server/WWebPerm.mjs	617	K2x1	//perm-run01(R-APP-TOKEN-01, P-2)＋perm-run02②: 應用系統 token・系統服務用途(不綁使用者, 代表外部應用系統本身, 能用系統管理者之服務)——外部反查結果 isApp='y'、isAdmin='y'、**id 以 'app:' 
+server/WWebPerm.mjs	619	K2x1	//  使用者用途綁定不在表之 sso 系統管理者(id 非 'app:' 開頭)、isApp 未轉傳(視同 'n')、id 非 'app:' 開頭之虛擬應用系統, 皆不進系統服務用途, 落入 getAndVerifyClientUser(adminOnly) 而被拒(其自身使用
+server/WWebPerm.mjs	630	K2x1	//getAndVerifyAppUser: 應用系統路由(/api/getPermUserInfor、/syncAndReplaceTabs)之呼叫者驗證——套件自行要求系統管理者等級(perm-run01 P-1, R-APP-TOKEN-01; w-web呼叫者身分驗證.m
+server/WWebPerm.mjs	633	K2x2	//  不在表之 sso 系統管理者以其自身 token 呼叫亦放行(與使用者用途綁定該系統管理者一致); 在表之一般使用者、使用者用途綁一般使用者、不在表且 isAdmin 非 'y' 者皆拒(固定鍵 userNotAdmin).
+server/WWebPerm.mjs	642	K2x1	//isLevel, 系統管理者等級
+server/WWebPerm.mjs	689	K1x1	//perm-run01(R-ADMIN-ONLY-01): 資料通道只限系統管理者——完整驗證通過後另要求 perm 列 isAdmin='y' 且 isActive='y', 所有入口(main 之 RPC／表 select／系統函數, 上傳下載各 apiType)同一道閘;
+server/WWebPerm.mjs	775	K2x1	//  kpSystemAppIds 僅作縱深防禦之憑據(每個函數呼叫前 getUserIdByToken 已重新驗證 token 並更新登錄, 金鑰被撤銷後無法再抵達此處); perm 系統管理者之列被刪除後不因此退化為系統服務用途(其 id 不在登錄中; 外部 id 等於表中
+server/WWebPerm.mjs	786	K2x1	if (!ok) { //縱深防禦: 資料通道已於連線閘與執行身分要求系統管理者(R-ADMIN-ONLY-01), 此處對新鮮讀取之列再判一次(連線後角色被降級之競態)
+server/WWebPerm.mjs	952	K1x1	//getAndVerifyAdminUser, 後台登入檢查只限系統管理者(perm-run01, R-ADMIN-ONLY-01): 一般使用者即使部署方放行亦拒絕(userNotAdmin, 前端顯示「無權進入權限後台」); 一般使用者查本人權限樹走 /api/getPer
+server/WWebPerm.mjs	1152	K2x1	//getAndVerifyAppUser, 先驗身分(含系統管理者等級, R-APP-TOKEN-01)再驗 keyTable 等參數(P-5): 未通過驗證者之回應與 srLog 皆與 keyTable 無關, 不得由參數錯誤鍵之差異探測表名
+server/WWebPerm.mjs	1238	K1x1	//本函數: 驗連線標頭之 token(getAndVerifyAdminUser: 外部 getUserByToken → perm users 存在且 isActive='y' → 部署方 verifyClientUser(user, apiType) → perm 列 is
+server/WWebPerm.mjs	1298	K1x1	//perm-run01(R-ADMIN-ONLY-01): 與連線閘同為「只限系統管理者」——另要求 perm 列 isAdmin='y' 且 isActive='y'(getAndVerifyAdminUser), 否則 reject userNotAdmin, 框架即不執行
+server/WWebPerm.mjs	1325	K2x2	//本套件 getUserIdByToken 為真實反查且對空 token／非系統管理者 fail-closed, 連線閘亦先擋: 所列 [sys:getFuncList] 實際仍須有效系統管理者身分, 只是設定之表述.
+server/WWebPerm.mjs	1339	K1x1	//連線者身分之授權在 verifyConn(getAndVerifyAdminUser: 完整驗證＋限系統管理者), 此處不重做
+server/WWebPerm.mjs	1347	K1x1	//四個寫入函數皆先經 requireAdmin(函數層級角色檢查, perm-run03 範圍四): 非 perm users 表中有效之系統管理者 → userNotAdmin、零寫入
+server/adminCheck.mjs	22	K2x1	* 故以此前綴開頭之 id 不可能是一般使用者(perm-run02②; 使用者用途綁定之 sso 系統管理者其 id 是該使用者之主鍵, 不以此前綴開頭).
+server/adminCheck.mjs	36	K2x1	* 不在表者(如只存在於 sso 之系統管理者)不是系統服務用途, 於後台與資料通道被拒, 與其自身使用者 token 相同.
+server/adminCheck.mjs	51	K2x1	* 外部反查結果是否宣稱為系統管理者(僅供應用系統路由對「不在 perm users 表」之呼叫者做相容認定; perm-run02①, 原則二.8 改版預設相容)
+server/dataChannel.mjs	9	K1x1	//連線者之身分授權仍在 verifyConn(getAndVerifyAdminUser: 完整驗證＋限系統管理者), 本函數不重做.
+server/procLang.mjs	28	K1x1	//perm-run01(R-ADMIN-ONLY-01): 後台登入檢查回 userNotAdmin(登入者不是系統管理者, 即使部署方放行)時前端顯示之連線狀態文字; 同鍵另置於 src/plugins/mUI.mjs 之 kpFallback(被拒者連不上資料通道, 取不到
+server/procLang.mjs	138	K2x1	cht: `發生非預期錯誤，請洽系統管理者`,
+server/procLang.mjs	480	K1x1	//perm-run03 範圍四(寫入函數之角色檢查; dspec/使用者身分驗證原則.md 二.4): userNotAdmin 呼叫 updateTargets／updatePemis／updateGrups／updateUsers 者不是 perm users 表中有效之系
+server/procLang.mjs	481	K1x1	//perm-run01(R-ADMIN-ONLY-01): 同鍵亦為資料通道(連線閘、執行身分)與後台登入檢查拒絕非系統管理者之固定鍵, 文字涵蓋存取與變更
+server/procLang.mjs	506	K2x1	cht: `此來源之既有資料無法依 srcKey 唯一配對。資料未變更，請聯絡系統管理者處置`,
+server/tools/nameDupReport.mjs	1	K3x1	//名稱重複與使用者對應鍵之唯讀稽核工具(F-02／F-14; 規則帳本 R-NAME-UNIQ-03; ADR-034). 不屬測試, 不寫任何資料, 不提供自動刪除/改名——清理由系統管理者於後台逐一處理並確認授權.
+sgud/exp/experience.md	11	K1x1	- **改語系字串前先 grep 全部同源顯示處**: `userNotAdmin` 之 cht 訊息與 `fromTools` 離線工具之輸出字樣同為「系統管理者」, 前者出現在後台拒絕畫面、後者為操作者所見之報告; 工具輸出有 unit 斷言(`unit-fromAudit:
+sgud/exp/experience.md	14	K2x1	- **同一個『是不是系統管理者』問題有兩個相容面, 不要只做一個函數**: 升版相容面(應用系統路由, 舊 sso 之應用系統身分即 `isAdmin='y'`)要寬, 新能力面(系統服務用途, perm-run01 才新增)要嚴; 做成兩個各自單一擁有者的函數(`isExtA
+sgud/exp/experience.md	23	K2x1	## 應用系統 token 之配合、應用系統路由系統管理者等級、Bearer、路由失敗不回原文(2026-10-24 第三輪 perm-run01〔任務 20261024182735〕; 帳本 R-APP-TOKEN-01／R-BEARER-01／R-ROUTE-MSG-01; 
+sgud/exp/experience.md	24	K2x1	- **「不在 perm 表」不能用登入反查的結果判斷**: `keyCheck.findLoginUsers` 對「恰 1 筆但停用」回 `{ user:null, count:0 }`(登入視同查無, perm-run05); 若拿 `count===0` 當「不在表」, 使
+sgud/exp/experience.md	25	K2x1	- **兩種用途靠『是否在 perm 表』區分, 不靠欄位**: 使用者用途(AU)與系統服務用途(AS)在 sso 反查形狀上只差 id 與 email/name 是否為真實使用者; perm 無從直接分辨, 以『在表者一律以 perm 列為準』收斂, 代價是『綁定了不在 pe
+sgud/exp/experience.md	26	K2x1	- **只拿 userId 字串的縱深防禦(`requireAdmin`)要有『誰驗證過』的憑據**: 框架只把 `getUserIdByToken` 回的 id 交給 kpFunExt; AS 的 id 不在 perm 表, 若以『不在表』當放行會讓『連線後被刪列之系統管理者』
+sgud/exp/experience.md	27	K2x1	- **改『驗證先於參數』會連帶弄壞以『無效 token＋未知參數』觸發 log 的測試哨兵**: `markSrLog`(`api-setup.mjs`)與 `api-tokenSafety` TS-003 原靠 `/syncAndReplaceTabs?keyTable=<哨
+sgud/exp/experience.md	119	K3x1	- **外部列(run07 起)用任何系統管理者寫入都刪不掉(`saveExternalRowChanged`), 外部同步端點又拒空 rows(`isearr`, ADR-008)**: 清空整個分區只剩測試框架直接重置(`purgeExternalRows` → `woIte
+sgud/exp/experience.md	120	K3x1	- **run07 改保護後, 要回頭盤點「所有收尾退路」而不只改被點名的那一檔**: run08 為 e2e-init 加的退路(系統管理者寫入移除殘留列)正好踩在 run07 的保護上; 同型的各檔自寫 `delAll({ from })`(5 檔)雖然合規但各寫各的, 本輪
+sgud/exp/experience.md	193	K2x3	- **本套件的 `getUserIdByToken` 對空 token／非系統管理者 fail-closed + 連線閘只放系統管理者, 使 `sysFuncsPublic` 在行為上幾乎無從分辨**: 標頭有效、本體 `__sysToken__` 為空或無效者, 一般函數與輪
+sgud/exp/experience.md	202	K1x1	## 權限後台與資料通道只限系統管理者、同批重複 id、RA-037 偶發失敗根因(2026-10-24 第二輪 perm-run01〔任務 20261024105311〕; 帳本 R-ADMIN-ONLY-01／R-WRITE-ID-UNIQ-01／R-TOOL-SAMEFIL
+sgud/exp/experience.md	205	K2x1	- **更上游加閘後, 下游舊檢查變成『黑箱不可達』, 對應舊測試要遷移而不是放寬**: 連線閘改為只限系統管理者後, 一般使用者連 `requireAdmin` 都走不到(僅『連線後被降級』之競態可達)。`api-callerIdentity` A 組原斷言 `userNotA
+sgud/exp/experience.md	206	K2x2	- **角色閘放最底層共用關卡, 不逐函數加**: `getAndVerifyAdminUser` 套在 `checkToken`／`getUserIdByToken`／`/api/getUserByToken` 三處, 即涵蓋 RPC 唯讀／寫入、表 `select`、系統函數
+sgud/exp/experience.md	211	K3x1	- **e2e-init 的 LC-005 站點守護禁止檔內出現 `'updateUsers'` 字面**(防外部列夾具以系統管理者寫入收尾): 新案例要建後台列夾具時走共用層 `readTables`／`editTableRows`／`restoreTables`, 不在 e2
+sgud/exp/experience_20261022.md	185	K3x1	- **陣列形式授權資料(第 92 項①)**: 修前真瀏覽器探測(`tmp/run89/probe-revoke.mjs`): 對話框切開再切回無關列後存檔, 該使用者權限樹 `[2 個標的]` → `[]`, `cgrups` 被寫成全部 `isActive:'n'`. 解碼
+sgud/rule/rulebook.md	10	K1x1	- **2026-10-24 perm-run01(本輪)**: **R-ADMIN-ONLY-01 權限後台與資料通道只限系統管理者**(`rulebook_security.md`; `server/WWebPerm.mjs:getAndVerifyAdminUser` 於連
+sgud/rule/rulebook.md	11	K2x2	- **2026-10-24 perm-run01(第三輪, 任務 20261024182735)**: **R-APP-TOKEN-01 應用系統 token 之配合**(`rulebook_security.md`; 使用者用途以所綁使用者 perm 列判定、系統服務用途〔`
+sgud/rule/rulebook.md	12	K2x1	- **2026-10-24 perm-run02(任務 20261024182735, 修正輪單輪)**: **R-APP-TOKEN-01 補述規則 7～8**(`rulebook_security.md`): 兩套等級判準各為單一擁有者(`server/adminCheck
+sgud/rule/rulebook.md	13	K2x1	- **2026-10-25 perm-run01(任務 20261025161334, 修正輪單輪)**: **R-SYSFUNCS-01 系統函數身分關卡**(`rulebook_security.md`; `server/WWebPerm.mjs` 之 `sysFuncsP
+sgud/rule/rulebook.md	24	K1x1+K2x1	| 權杖、寫入路徑與使用端物件 | `rulebook_security.md` | 權杖不外洩(2026-09-25, ADR-023; 對應 w-web-sso ;寫入路徑與資料通道(2026-10-14, ADR-026; w-serv-or;**呼叫者身分驗證: 資料通道
+sgud/rule/rulebook_editor.md	59	K2x1+K3x2	- **根因(證據)**: 修前 `doSave` 以 `map(rows, (r, kr) => … get(users, kr, {}))` 以開框時的列索引配對存檔時新取的快照, `revRows` 以 `get(rows, \`${ku}.mode\`)` 同型; sto
+sgud/rule/rulebook_principle.md	28	K2x1	| n | **刪除**群組/權限/標的(後台與外部同步) | 同一次寫入內連帶清理所有引用(`users.cgrups`／`grups.cpemis`／`pemis.crules`),效果等同舊版「找不到即忽略」;升級時提供一次性清理既有懸空引用之工具(先稽核列出) | 刪除前
+sgud/rule/rulebook_principle.md	37	K3x1	| l | 外部列(F-23) | 後台不得改外部列之身分/結構欄 | 該列唯讀標示 | 已做(run07, ADR-037; 主控依原則定案 Q1～Q6、Q9、Q10):判別 `from` 非空字串＝外部列(`''`／缺欄／非字串＝後台列),`opt.lockExternalR
+sgud/rule/rulebook_principle.md	98	K3x3	- **規則**:編輯器存檔不改任何值時,伺服端算出之授權前後相同(或被拒存).①`VeCgrups`／`VeCpemis` 之列＝表列＋**額外列**(啟用中而名稱查無表列之引用〔含名稱 `''`〕,名稱唯讀、mode／enable 可改,系統管理者可改為停用以解除);存檔寫出
+sgud/rule/rulebook_principle.md	99	K3x2	- **方案 A(外審後採納,2026-10-22)**:未被系統管理者改動的 mode 缺／非法啟用項,存檔時**原樣還原其原始 mode**(`getRawModeMap` 記該名稱所有啟用元素皆 mode 缺／非法者;`putRowsToKp(…, rawModeMap)`
+sgud/rule/rulebook_principle.md	100	K3x4	- **已知限制(方案 A 之取捨,未處理)**:①限制項列被系統管理者改成 OR 再改回 AND,視為未改而寫回原始 mode(無法由編輯器把限制項明確轉成合法 AND;須由資料來源或先改 OR);②原為停用且 mode 缺／非法之項被系統管理者勾選啟用時,寫出對話框顯示之 m
+sgud/rule/rulebook_security.md	48	K2x1	- **測試**: `test/api-callerIdentity.test.mjs`(真後端 26 案: CI-G1／G2 本體 token 六種無效情形 × 寫入／唯讀函數不執行、CI-G3 已停用、CI-G4 isAdmin 降為 n、CI-G5 兩 token 皆有效以
+sgud/rule/rulebook_security.md	51	K1x1	## 權限後台與資料通道只限系統管理者(2026-10-24 perm-run01, R-ADMIN-ONLY-01; 使用者 2026-10-24 裁示、跨套件原則 `C:\opensrcOper\dspec\使用者身分驗證原則.md` 二.4)
+sgud/rule/rulebook_security.md	53	K1x2+K2x1	來源: 使用者 2026-10-24 裁示——「不管部署方會怎麼安排, perm 套件這邊得自己有一套做法. 數據傳輸都要通過 token 識別身份, 也都要按權限設定產製對應權限樹; **系統管理者才能讀寫 4 表, 一般使用者是沒法進權限後台的, 故只能用 token 查自己
+sgud/rule/rulebook_security.md	55	K2x3	軸: 入口(`/api/main` 之 RPC 唯讀 `getWebInfor`／`getStaEvent`／`getStaEventTable`、寫入 `updateXxx` ×4、表 `select` ×4、系統函數 `[sys:getFuncList]`／`[sys:get
+sgud/rule/rulebook_security.md	58	K2x1	1. **單一關卡**: `server/WWebPerm.mjs:getAndVerifyAdminUser(token, from)` ＝ `getAndVerifyClientUser(token, from, { adminOnly: true })`; 在既有完整驗證通
+sgud/rule/rulebook_security.md	62	K2x1	5. **不變**: `/api/getPerm`(`getAndVerifyClientUser`, 任何通過 `verifyClientUser` 之有效使用者查本人權限樹)與應用系統路由(`/api/getPermUserInfor`、`/syncAndReplaceTab
+sgud/rule/rulebook_security.md	63	K1x1	6. `userNotAdmin` 之語系文字改為涵蓋存取與變更(`Only system administrators can access or change this data`／`僅系統管理者可存取或變更此資料`); 新增 `csErrNotAdmin`.
+sgud/rule/rulebook_security.md	65	K2x1	8. **`/api/getPerm` 用驗證時取得之列算權限樹, 不以 id 重讀(外審 sol#3)**: `getGenUserAndRulesByUserId(userIdSelf, userSelf)`(第 2 參 userPre, 同 `/api/getPermUse
+sgud/rule/rulebook_security.md	66	K2x4	- **外審 sol 備查項(2026-10-24; 屬實但為既有政策或範圍外, 本輪不改, 見報告待裁示)**: ①(#1)`mappingBy` 為 `email`／`name` 時 `findLoginUsers` 只查 `isActive='y'` 之列(R-MAPKEY
+sgud/rule/rulebook_security.md	68	K2x5	- **入口 × 誰可用 × 檢查點**(README Security 同表): 資料通道 RPC／表 select／系統函數 → 系統管理者 → `verifyConn:checkToken`(`WWebPerm.mjs:590-593`, `verifyConn` 在 `:
+sgud/rule/rulebook_security.md	69	K2x3	- **測試**: `test/api-adminOnly.test.mjs`(真後端 AO-A1～A6、B1～B3、C1～C4、D1～D3、E1～E2 共 34 案〔E 為外審後補〕: 13 個資料通道入口 × 一般使用者被連線閘拒且零資料外洩〔對照系統管理者成功〕、perm 
+sgud/rule/rulebook_security.md	70	K2x1	- **行為變更**: README Upgrade Notes「Unreleased: the permission console and the data channel are for system administrators only…」: 一般使用者即使部署方放行亦
+sgud/rule/rulebook_security.md	73	K2x1	## 應用系統 token 之配合、應用系統路由系統管理者等級、連線閘 Bearer、路由失敗不回原文(2026-10-24 perm-run01 第三輪, R-APP-TOKEN-01／R-BEARER-01／R-ROUTE-MSG-01; 使用者 2026-10-24 定案之
+sgud/rule/rulebook_security.md	75	K2x2	來源: 主控任務 20261024182735 perm-run01. token 種類(使用者 2026-10-24): **使用者 token**(一般使用者／系統管理者)代表登入者; **應用系統 token**(`isApp='y'`)分**使用者用途**(以 `user
+sgud/rule/rulebook_security.md	77	K2x2	軸: 入口 24(靜態檔 1、hapi 路由 4、通訊路由 5、資料通道函數 14〔表 `select` ×4、`getWebInfor`、`update*` ×4、`getStaEvent`／`getStaEventTable`、系統函數 ×3〕; 資料通道另分標頭／本體兩個身
+sgud/rule/rulebook_security.md	80	K2x2	1. **系統服務用途之判準(單一擁有者 `server/adminCheck.mjs:isSystemAppUser`)**: 外部反查結果的 `id` 為**以 `app:` 開頭之字串**(perm-run02②更正: 原只要非空字串; 常數 `SYSTEM_APP_ID_
+sgud/rule/rulebook_security.md	83	K2x2	2. **使用者用途不特別處理**: 在 perm 表者(含 AU)一律以 perm 列判定(`getAndVerifyClientUser`), 與其使用者 token 相同; 綁系統管理者得系統管理者服務、綁一般使用者只能 `/api/getPerm`(所綁使用者之樹)、綁停
+sgud/rule/rulebook_security.md	84	K2x2	3. **P-2 系統服務用途可用系統管理者之後端服務**: `getAndVerifyAdminUser` 對系統服務用途改經 `verifySystemApp`(部署方 `verifyAppUser(user, from)`, 只收淺層副本; 身分物件 `{id,name,e
+sgud/rule/rulebook_security.md	85	K2x2	4. **P-1 應用系統路由系統管理者等級**: `getAndVerifyAppUser`: 在 perm 表(`countPermRows>0`)→ `getTokenUser`(欄位齊備、對應鍵唯一、列有效)並要求 `isAdminRow`; 不在表 → `isExtAd
+sgud/rule/rulebook_security.md	87	K2x1	6. **P-7 範例與文件**: `srv.mjs` 之 `verifyClientUser`／`verifyAppUser` 不以 `isAdmin` 判斷(`unit-appToken` AT-S7); JSDoc／README 寫明部署方否決(非角色因素)＝`userNo
+sgud/rule/rulebook_security.md	92	K2x1	- **相容性**(perm-run02①更正): ~~不在 perm 表且 `getUserByToken` 未轉傳 `isApp` 之虛擬應用系統, 在應用系統路由升版後被拒~~——改為**放行**(只看 `isAdmin==='y'`; 原則二.8 改版預設相容, 主控裁示
+sgud/rule/rulebook_security.md	97	K2x1	來源: 主控任務 20261024182735 perm-run02(新 session). 依據: `使用者身分驗證原則.md` 二.8(改版預設相容)、二之一(使用者用途＝所綁使用者自己之 token 能用者; 系統服務用途能用系統管理者之服務); sso 之系統服務用途反查
+sgud/rule/rulebook_security.md	100	K2x1	- `isSystemAppUser`(**嚴格**, 用於後台登入檢查〔`/api/getUserByToken`〕、資料通道〔連線閘＋執行身分〕、`requireAdmin`): 不在 perm users 表(`countPermRows`＝0)＋反查 `isApp==='
+sgud/rule/rulebook_security.md	103	K2x1	- **規則 8(存取表對照, 本 repo 版; `dspec/w-web存取管控表.md` 第二節由主控維護)**: 欄 = 入口; 後端系統管理者服務 = 後台登入檢查＋資料通道(含四個寫入函數); 應用系統路由 = `/api/getPermUserInfor`、`/sy
+sgud/rule/rulebook_security.md	105	K2x1	| 呼叫者(測試代號) | 後端系統管理者服務 | `/api/getPerm`(本人樹) | 應用系統路由 | 備註 |
+sgud/rule/rulebook_security.md	109	K2x2	| 在表系統管理者(A、AUA 綁系統管理者) | 通過 | 通過 | 通過 | AU＝所綁使用者 |
+sgud/rule/rulebook_security.md	111	K2x1	| 使用者用途綁不在表之 sso 系統管理者(AUX: isApp y、isAdmin y、id 非 `app:`) | 拒 `cannotGetUserFromPerm` | 拒 | **通過**(①) | ≡ 其自身使用者 token(NFV) |
+sgud/rule/rulebook_security.md	118	K2x1	- **測試**: `api-callerMatrix`(52 案; 呼叫者 6＋相容 9 × 入口 24, `lvl` 拆為 `svc`〔後端系統管理者服務〕／`app`〔應用系統路由〕; MX-R1～R8、MX-M5～M7 為本輪專屬; 計數器 950 格)、`unit-ap
+sgud/rule/rulebook_security.md	119	K2x1	- **已知限制(外審 sol 增量輪 G1／G2, 備查, 待主控裁示是否收嚴)**: 系統服務用途之近期登錄(`kpSystemAppIds`)以 id 為鍵、跨請求共用, 框架只把 `getUserIdByToken` 回傳之 id 字串交給 `requireAdmin`,
+sgud/rule/rulebook_security.md	120	K2x2	- **相容性結論**: 窄破壞性——僅『反查 `isAdmin` 非 `'y'` 之應用系統身分』或『比對到非有效系統管理者列者〔在表以列為準, 不論反查 `isAdmin`〕』於應用系統路由被拒(舊版 sso 之應用系統身分 isAdmin 恆 `'y'`, 預期不受影響);
+sgud/rule/rulebook_security.md	128	K2x4	- **規則 3(「列為公開」≠ 匿名可呼叫)**: 本套件 `getUserIdByToken` 為真實反查且對空 token／非系統管理者 fail-closed(reject, 框架據此不執行, 含列於 `sysFuncsPublic` 者), 連線閘 `verifyCon
+sgud/rule/rulebook_security.md	136	K2x1	**測試與驗證**: `api-sysFuncs`(21 案, 178 格斷言: 84 格＋標頭 12 格＋邊界 4 組〔本體 token 非字串、clientId 缺失／非字串、函數輸入封裝缺鍵／型別錯、函數名變體; 外審 sol F1〕＋clientId 綁定 2 案〔系統管
+sgud/rule/rulebook_security.md	138	K2x1	**已知限制／備查**: ①被拒之輪詢與系統函數只以框架 `error` 事件呈現(w-serv-broadcast `eeEmit('error', …)`／w-serv-webdata `evEmit`), 本套件未轉寫 srLog(函數呼叫路徑的 `getUserIdByT
+sgud/rule/rulebook_security.md	149	K3x1	- 實測(2026-10-20, HEAD `434c0d4`, 修前): ①`validateRowsBeforeWrite([{ id:'a', length:N, name:'<script>x</script>' }])` 於 `N = 0、1、2**32-1` 皆回 `
+sgud/rule/rulebook_security.md	179	K3x1	| 26 | (相關但不同型, 外審 sol#6; run02 已改) `server/procCore.mjs` `mergePickKeysOnly` 之 `get(kpIn, v, null)`(原 :40) | 資料庫 id 含 `.`／`[` 時被當路徑: 庫內 id=
+sgud/rule/rulebook_sync.md	43	K3x1	- **規則**: `server/tools/nameDupReport.mjs`(唯讀; 輸入 `{ users, grups, pemis, targets }` 匯出檔)列出 `grups`／`pemis` 同名組(各筆 `id`／`from`／`isActive`／`o
+sgud/rule/rulebook_sync_external.md	64	K3x1	- **已知限制**: ①w-aggrid-vue 貼上路徑對函式型 `editable` 恆為真(`WAggridVue.vue` 之 `kpEditable` 以真值判斷), Ctrl+V 可寫入逐列唯讀之儲存格, 前端 `getExternalEdits` 與伺服端兜底(不
+sgud/rule/rulebook_test.md	110	K3x1	### R-TEST-EXT-CLEAN-01 外部列夾具只經單一入口 `cleanExternalFixtures` 移除並回驗; 收尾不得以系統管理者寫入、reseed 或各檔自寫 delAll 代之
+sgud/rule/rulebook_test.md	112	K3x2	軸: 夾具建立方式 { 經 `/syncAndReplaceTabs`〔外部列, `from` 非空字串〕, 系統管理者寫入 RPC〔後台列, `from` 為 `''`〕, `restartBackend` 之 `seedExtra` 旁路〔後台歷史列〕 } × 收尾手段 { 
+sgud/rule/rulebook_test.md	114	K3x1	- **根因(證據)**: 全套 `af43394`〔3199 過、12 敗〕: `e2e-init` E2E-006 經 `/syncAndReplaceTabs` 灌入 `id-mk-dup`(`from=appE2eInit006`), 收尾 `restartBackend
+sgud/rule/rulebook_test.md	116	K3x1	1. **外部列(`from` 非空字串)夾具之移除只有兩條合規路徑**: ①**同步路徑**——同一 `from` 重送不含該列之批次(只在分區仍保留 ≥1 列時可用; 外部同步端點拒空 rows〔`isearr` 閘, ADR-008〕, 清空整個分區走不通); ②**測試框
+sgud/rule/rulebook_test.md	117	K3x1	2. **禁止**: ①以系統管理者寫入(`updateUsers`／`updateGrups`／`updatePemis`／`updateTargets`)移除外部列; ②倚賴 `restartBackend({ reseed:true })` 移除夾具(逐檔隔離才會真重種; 
+sgud/rule/rulebook_test.md	120	K3x2	5. 後台列夾具(`from` 為 `''`, 系統管理者寫入 RPC 或 `seedExtra` 旁路建立)之收尾不在本規則: 仍走 `restoreTables`／`restoreDbOnce`／`editTableRows`(系統管理者寫入可刪後台列; `restoreTa
+sgud/rule/rulebook_test.md	125	K3x1	| `e2e-init`(E2E-006) | `appE2eInit006` | `restartBackend(reseed)` 後 `cleanExternalFixtures({ kts:['users'], froms:[FROM_006], pristine:true
+sgud/rule/rulebook_test.md	140	K3x1	| `api-baseline`(perm-run01 新) | `appAbSync` | `purgeExternalRows`(`froms:[F_SYNC]`; 全表以 `keepIds` 保留種子列)後依「targets → pemis → grups → users」
+sgud/rule/rulebook_test.md	150	K3x1	# 3) e2e-init 不得以系統管理者寫入收尾. 期望: 0 命中
+sgud/rule/rulebook_test.md	155	K3x1	- **測試**: `api-cleanExternal`(CE-001～007, 真後端: 限定分區、不限分區＋pristine、**系統管理者寫入仍刪不掉外部列〔不放寬產品〕**、`keepIds`、pristine 回驗不放寬且訊息含 `from`、`froms` 含 `'
+sgud/rule/rulebook_test.md	246	K3x1	2. API: `test/tools/api-setup.mjs:callRpc` 對 `updateUsers／updateGrups／updatePemis` 自動附 `refs`（讀庫以系統管理者權杖經資料通道 `select`）；`opt.noDecl: true` 略
+sgud/rule/rulebook_testscope.md	30	K3x1	| `e2e-init`(12; 其中 E2E-006 於 final6 失敗, 耗時另以 run05 單跑補) | 連線狀態畫面(`LayoutState`: 連線中／已登入／拒絕登入／無法連線)、登入後頂列(`Layout` 之 `app-topbar`)、server 注入
+sgud/rule/rulebook_testscope.md	31	K3x1	| `e2e-external-rows`(26; run07 新增 15 案, run11 改寫 E2E-012 並新增 E2E-016～026; run11 已實跑) | 使用者／群組清單頁之外部列呈現(橫幅 `data-fmid="<表>-banner-ext"`、鎖頭、逐
+sgud/rule/rulebook_testscope.md	33	K3x1	| `e2e-ref-cascade`(8; run07 新增, 未實跑) | 群組頁刪除確認框(被引用／無引用)、群組頁改名預覽確認框、權限頁改名撞懸空名被拒訊息框、標的頁刪除之儲存前確認框(按否)、群組頁新增撞懸空名確認框(`confirmAddRefs*`)與無懸空引用之直
+sgud/rule/rulebook_testscope.md	80	K1x1	| `server/procLang.mjs`(語系鍵) | 只**新增**鍵且尚無 UI 引用: 不必跑 e2e(unit 站點不變式 `unit-relDialogs`／`unit-keyCheck`／`unit-getNameErrs`／`unit-getAuthWarn`
+sgud/rule/rulebook_testscope.md	100	K2x2	| `server/adminCheck.mjs:isSystemAppUser`、`server/keyCheck.mjs:countLoginRows`、`server/WWebPerm.mjs` 之 `getExtUser`／`verifySystemApp`／`getAn
+sgud/rule/rulebook_testscope.md	101	K2x1	| `server/adminCheck.mjs`（`isSystemAppUser` 加 `app:` 前綴、新增 `isExtAdminUser`）、`server/WWebPerm.mjs:getAndVerifyAppUser` 不在表分支、`srv.mjs` 新增三個測
+sgud/rule/rulebook_testscope.md	188	K2x1	- **perm-run03 補充(2026-10-24; 宣告強制必帶＋外部匯入 srcKey 差異同步＋執行身分完整驗證＋寫入函數角色檢查)**: ① 改 `server/syncCore.mjs`／`provideTabs.mjs`／`syncKeep.mjs`(同步端點)
+sgud/state/state.md	9	K1x6	- **改動(完成)**: ①`server/procLang.mjs` cht `isAdmin`「是否為系統管理者」→「是否為系統管理者」(「管理使用者」表頭); ②`src/schema/tables/users.mjs` `isAdmin.name` 同改; ③`serv
+sgud/state/state.md	12	K2x3	- **未做／備查**: ①其餘「系統管理者」(無「系統」前綴: `procLang` 之「請洽系統管理者」「請聯絡系統管理者處置」、eng `Administrator`)非本次裁定字串, 未改, 待主控／使用者裁示是否一併統一; ②`README.md`、`dist/`、`d
+sgud/state/state.md	18	K2x1	- **範圍(完成)**: ①`package.json` `w-serv-hapi` `^1.1.7`→`^1.1.8`(實裝 w-serv-hapi 1.1.8、w-serv-webdata 1.1.16、w-serv-broadcast 1.1.12; 非自有套件未動); 
+sgud/state/state.md	30	K2x1	- **②系統服務用途收緊**: `isSystemAppUser` 增 `id` 以 `app:` 開頭(`SYSTEM_APP_ID_PREFIX`; 單一擁有者仍為 `adminCheck.mjs`)。後台登入檢查、資料通道、`requireAdmin` 之系統服務用途＝不
+sgud/state/state.md	34	K2x1	- **未做／待裁示**: ①`/api/getPermUserInfor` 不檢查呼叫者 id(不在表而缺 id 之系統管理者宣稱者放行; 維持 1.1.15 行為, 外審 F2 備查); ②〔2026-10-25 perm-run01 已完成: 升 w-serv-hapi 1
+sgud/state/state.md	36	K2x1	## 近期進度(2026-10-24 第三輪 perm-run01〔任務 20261024182735〕:應用系統 token 之配合〔使用者用途／系統服務用途〕＋應用系統路由要求系統管理者等級＋連線閘須 Bearer＋`/syncAndReplaceTabs` 先驗身分＋路由失
+sgud/state/state.md	40	K2x2	- **範圍一(P-1／P-2; 使用者 2026-10-24 定案之 token 權責, dspec/w-web存取管控表.md 第二節)**: `getUserByToken` 契約增選用欄位 `isApp`('y'／'n', 未給視同 'n'). **系統服務用途**＝外部
+sgud/state/state.md	44	K2x1	- **未做／待裁示**: ①使用者用途綁定之使用者**不在 perm 表**且上游 `isAdmin='y'` 與系統服務用途無從區分(可選收緊 `isSystemAppUser` 要求 `id` 以 `app:` 開頭); ②「部署方否決者之畫面寫明理由」若要在畫面顯示須新增
+sgud/state/state.md	46	K1x1	## 近期進度(2026-10-24 第二輪 perm-run01〔任務 20261024105311〕:權限後台與資料通道只限系統管理者＋同批重複 id 四表整批拒收＋RA-037 根因; 修正輪＝單輪,未發布,待主控全套)
+sgud/state/state.md	50	K1x2	- **範圍一(使用者 2026-10-24 裁示「系統管理者才能讀寫 4 表, 一般使用者是沒法進權限後台的, 故只能用 token 查自己權限樹」; R-ADMIN-ONLY-01, ADR-039 決定 74～81)**: 系統管理者＝perm `users` 列 `isA
+sgud/state/state.md	53	K2x1	- **測試**: 新增 `api-adminOnly`(AO-*, 34 案; 修前 25 敗／7 過〔修前時尚無 AO-E 兩案,32 案〕; AO-E1／E2 為外審後補)、`unit-adminOnlySite`(10 案)、`api-batchIdDup`(9 案)、`
+sgud/state/state.md	71	K2x1	## 近期進度(2026-10-24, perm-run03:宣告強制必帶＋外部匯入改 srcKey 差異同步＋執行身分完整驗證＋寫入函數系統管理者限定;修正輪＝最末輪,未發布,待主控全套)
+sgud/state/state.md	146	K2x1	- ④未做: `requireBaseline`(強制所有寫入必帶基準, 下版再議)、(c2) 差異集 API(待多系統管理者並行成為真實需求)、UI 版 purge 按鈕(目前僅離線 `g_purgeFrom.mjs`; 該腳本依賴 `test/tools/`, npm 套件不
+spec/evidence/perm-run01-20261024/mutation-results.json	44	K2x1	"desc": "角色恆為系統管理者(let isAdmin = isAdminRow(user) 改 true)",
+spec/evidence/perm-run01-20261024/mutation-results.json	54	K2x1	"desc": "過度收緊: /api/getPerm 也要求系統管理者(一般使用者查本人權限樹被擋)",
+spec/evidence/perm-run01-20261024/mutation-results.md	13	K2x1	| M5 | 角色恆為系統管理者(`let isAdmin = true`) | 同上 | 抓到(26 敗) |
+spec/evidence/perm-run01-20261024/mutation-results.md	14	K2x1	| M6 | 過度收緊: `/api/getPerm` 也要求系統管理者 | 同上 | 抓到(3 敗) |
+spec/evidence/perm-run01-20261024/red-evidence.md	11	K2x1	- 修前即綠者(7): AO-A3(停用系統管理者)、AO-A4(P／X／B 角色)、AO-B2、AO-B3(部分)、AO-C3、AO-D1～D3——為「不變」契約之對照(`/api/getPerm`、應用路由、其餘角色之既有鍵)。
+spec/evidence/perm-run01-20261024/review/sol-prompt.md	1	K1x1	# 功能正確性審查:w-web-perm「權限後台與資料通道只限系統管理者」+「後台整表寫入同批重複 id」+「isSameFile 精度」
+spec/evidence/perm-run01-20261024/review/sol-prompt.md	17	K1x1	「數據傳輸都要通過 token 識別身份,也都要按權限設定產製對應權限樹;系統管理者才能讀寫 4 表,一般使用者是沒法進權限後台的,故只能用 token 查自己權限樹。」
+spec/evidence/perm-run01-20261024/review/sol-prompt.md	19	K1x1	定義:系統管理者＝perm 自己的 `users` 表中 `isAdmin='y'` 且 `isActive='y'` 之列(以 perm 自身的表為權威,不採外部 token 回報的 isAdmin 值);一般使用者＝`isAdmin='n'` 者。
+spec/evidence/perm-run01-20261024/review/sol-prompt.md	42	K2x3	- 角色軸(我列的):系統管理者、部署方放行之一般使用者、被升為系統管理者、停用之系統管理者、部署方拒絕者、不在 perm 表者(應用系統 token)、無效 token。
+spec/evidence/perm-run01-20261024/review/sol-report.md	5	K2x1	共 7 條發現：高 5、中 2。#1、#3–#7 涉及本輪沒有排除的既有路徑或邊界；#2 是新增「先保存角色判定」仍未保存完整身分的問題。這些結果不代表在唯一 id、沒有並發或回呼改寫時，一般 token 可以直接通過新增的三處系統管理者閘。
+spec/evidence/perm-run01-20261024/review/sol-report.md	11	K2x1	| client/app 授權分開 | 「不在 perm」不等於 app；perm 一般使用者也可能另外獲 verifyAppUser 放行，perm 系統管理者也可能被它拒絕。 | `server/WWebPerm.mjs:542–575`、`959`、`1058` |
+spec/evidence/perm-run01-20261024/review/sol-report.md	13	K2x1	| 外部聲明 × perm 現值 | 外部 n／perm y 可以是系統管理者；外部 y／perm n 仍應拒。還有缺欄、非 y/n、繼承屬性，不只七種角色。 | `WWebPerm.mjs:401–425`、`487–505`；`server/adminCheck.mjs:11
+spec/evidence/perm-run01-20261024/review/sol-report.md	16	K2x1	| 否定與例外原因 | 外部查無、欄位不全、查找歧義、停用、部署方 false/throw/reject、非系統管理者、ORM/I/O 拋錯不能統稱「無效 token」。 | `WWebPerm.mjs:401–526`、`1188–1191`；見 #5 |
+spec/evidence/perm-run01-20261024/review/sol-report.md	27	K2x1	| 有效系統管理者，但該 from 被部署方拒絕 | 不保證成功；回 userNoPermission，連線階段對外仍為 permission denied。`WWebPerm.mjs:508–517` |
+spec/evidence/perm-run01-20261024/review/sol-report.md	33	K2x1	#1 [嚴重度:高] email/name 登入先排除停用列，停用者的 token 可被解析成同鍵的另一位有效系統管理者。
+spec/evidence/perm-run01-20261024/review/sol-report.md	59	K2x3	- 失敗情境：mappingBy=name；perm 有停用系統管理者 U1（id=u1、name=Alex、email=u1@example.com、isAdmin=y、isActive=n）及另一位有效系統管理者 U2（id=u2、name=Alex、email=u2@exa
+spec/evidence/perm-run01-20261024/review/sol-report.md	93	K2x1	- 失敗情境：A 是有效系統管理者，M 是一般使用者；部署方回呼有 `u.id='M'; return true`（例如資料轉換副作用），main 標頭與本體都帶 A 的 token。預期執行者維持已驗證的 A，或身分改變後拒絕；實際角色布林值來自 A，執行 id 卻是 M，us
+spec/evidence/perm-run01-20261024/review/sol-report.md	133	K2x2	#4 [嚴重度:高] requireAdmin 在表鎖外檢查，排隊中的已降級系統管理者可用無基準舊整表把自己升回系統管理者。
+spec/evidence/perm-run01-20261024/review/sol-report.md	165	K2x2	- 失敗情境：預設整表 users 模式；系統管理者 B 帶舊全表（其中 B.isAdmin=y），省略 baseline。B 已過連線、執行身分及 requireAdmin，正等 users 鎖；先持鎖的 A 完成 B.isAdmin=n 的撤權後釋鎖。B 取得鎖時 ltdtO
+spec/evidence/perm-run01-20261024/review/sol-report.md	182	K2x1	| checkToken | getAndVerifyAdminUser(token,from)，`WWebPerm.mjs:589–594` | 所有 apiType 原樣傳 from，沒有略過系統管理者檢查的分支 |
+spec/evidence/perm-run01-20261024/review/sol-report.md	184	K2x1	| /api/getUserByToken | getAndVerifyAdminUser(token,'getUserByToken')，`833` | 登入即拒非系統管理者，資料 API 仍另驗 |
+spec/evidence/perm-run01-20261024/review/sol-report.md	187	K2x1	| /syncAndReplaceTabs | getAndVerifyAppUser(token,'syncAndReplaceTabs')，`1058`；驗表名及 payload | 刻意的服務寫入入口，不在 perm 系統管理者判準內 |
+spec/evidence/perm-run01-20261024/review/sol-report.md	189	K2x1	五條資料通道的對應為 POST /api/ulctr → upload-controller、POST /api/slc → upload-slice、POST /api/dwgfn → download-get-filename、GET /api/dwgf → download
+spec/evidence/perm-run01-20261024/review/sol-report.md	191	K2x2	成熟 RBAC 常另有逐模型／操作權限；本套件單一系統管理者可讀寫四表是明定政策，不因缺少更細的後台分權而列缺陷。app 例外也不能誤稱已由 perm 系統管理者資格保護；`srv.mjs:100–107` 範例以外部 isAdmin 判 app 使用者，顯示 app 授權確實是
+spec/evidence/perm-run01-20261024/review/sol-report.md	220	K2x1	**其餘對稱性：已檢查、未發現。** `WWebPerm.mjs:497–538`、`579–595`、`832–833`、`1120–1198` 顯示三處管理入口共用判準。上下載 apiType 均經 checkToken；執行身分的 main 與已給框架前提相符，未見「系統函
+spec/evidence/perm-run01-20261024/review/sol-result.json	4	K1x54+K2x157+K3x26	"stderr": "Reading prompt from stdin...\nOpenAI Codex v0.163.0\n--------\nworkdir: C:\\opensrc\\開源-JS-411-8-w-web-perm\\w-web-perm\\tmp\\per
+spec/evidence/perm-run01-20261024/runMutations.mjs	17	K2x1	{ id: 'M5', desc: '角色恆為系統管理者(let isAdmin = isAdminRow(user) 改 true)', file: W, from: 'let isAdmin = isAdminRow(user)', to: 'let isAdmin = tr
+spec/evidence/perm-run01-20261024/runMutations.mjs	18	K2x1	{ id: 'M6', desc: '過度收緊: /api/getPerm 也要求系統管理者(一般使用者查本人權限樹被擋)', file: W, from: "let userSelf = await getAndVerifyClientUser(token, 'getPerm'
+spec/evidence/perm-run01-20261024b/input-space.md	10	K2x2	| 呼叫者(目標) | N 無 token、U 一般使用者、A 系統管理者、AUA 使用者用途綁系統管理者、AUM 使用者用途綁一般使用者、AS 系統服務用途(dspec 之 AU 一欄依綁定者拆為 AUA／AUM) | 6 |
+spec/evidence/perm-run01-20261024b/mutation-results.json	9	K2x2	"firstFail": "MX-H4 GET /api/getPermUserInfor(查他人權限樹): 系統管理者等級(A／AUA／AS／APP)通過; 其餘拒  [P-1: 套件自行要求系統管理者等級]",
+spec/evidence/perm-run01-20261024b/mutation-results.json	19	K2x2	"firstFail": "MX-H4 GET /api/getPermUserInfor(查他人權限樹): 系統管理者等級(A／AUA／AS／APP)通過; 其餘拒  [P-1: 套件自行要求系統管理者等級]",
+spec/evidence/perm-run01-20261024b/mutation-results.json	29	K2x2	"firstFail": "MX-H4 GET /api/getPermUserInfor(查他人權限樹): 系統管理者等級(A／AUA／AS／APP)通過; 其餘拒  [P-1: 套件自行要求系統管理者等級]",
+spec/evidence/perm-run01-20261024b/mutation-results.json	39	K2x1	"firstFail": "MX-H2 GET /api/getUserByToken(後台登入檢查): 系統管理者等級(A／AUA／AS／APP)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料  [P-2: AS 放行]",
+spec/evidence/perm-run01-20261024b/mutation-results.json	49	K2x1	"firstFail": "MX-H2 GET /api/getUserByToken(後台登入檢查): 系統管理者等級(A／AUA／AS／APP)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料  [P-2: AS 放行]",
+spec/evidence/perm-run01-20261024b/mutation-results.json	70	K2x1	"firstFail": "MX-D updateUsers: 系統管理者等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2]",
+spec/evidence/perm-run01-20261024b/mutation-results.json	80	K2x1	"firstFail": "MX-D updateUsers: 系統管理者等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2]",
+spec/evidence/perm-run01-20261024b/mutation-results.json	120	K2x1	"firstFail": "MX-M3 外部 id(sso-admin-9)與 perm 主鍵(id-for-admin)不同之系統管理者: 資料通道與應用路由之稽核欄皆記 perm 內 id; 後台登入檢查回 perm 列  [外審 sol F02]",
+spec/evidence/perm-run01-20261024b/mutation-results.json	231	K2x1	"firstFail": "MX-H2 GET /api/getUserByToken(後台登入檢查): 系統管理者等級(A／AUA／AS／APP)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料  [P-2: AS 放行]",
+spec/evidence/perm-run01-20261024b/mutation-results.md	9	K2x2	| M1a | P-1 拿掉等級檢查(!isLevel 永不成立) | `server/WWebPerm.mjs` | 被抓到 | MX-H4 GET /api/getPermUserInfor(查他人權限樹): 系統管理者等級(A／AUA／AS／APP)通過; 其餘拒  [P-
+spec/evidence/perm-run01-20261024b/mutation-results.md	10	K2x2	| M1b | P-1 在表者不判 isAdminRow(isLevel 恆真) | `server/WWebPerm.mjs` | 被抓到 | MX-H4 GET /api/getPermUserInfor(查他人權限樹): 系統管理者等級(A／AUA／AS／APP)通過; 其
+spec/evidence/perm-run01-20261024b/mutation-results.md	11	K2x2	| M1c | P-1 不在表者不判 isSystemAppUser(isLevel 恆真) | `server/WWebPerm.mjs` | 被抓到 | MX-H4 GET /api/getPermUserInfor(查他人權限樹): 系統管理者等級(A／AUA／AS／APP
+spec/evidence/perm-run01-20261024b/mutation-results.md	12	K2x1	| M2a | P-2 拿掉系統服務用途放行 | `server/WWebPerm.mjs` | 被抓到 | MX-H2 GET /api/getUserByToken(後台登入檢查): 系統管理者等級(A／AUA／AS／APP)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料
+spec/evidence/perm-run01-20261024b/mutation-results.md	13	K2x1	| M2b | P-2 系統服務用途不要求「不在表」 | `server/WWebPerm.mjs` | 被抓到 | MX-H2 GET /api/getUserByToken(後台登入檢查): 系統管理者等級(A／AUA／AS／APP)通過並回該身分; 其餘一律拒、固定語系鍵、
+spec/evidence/perm-run01-20261024b/mutation-results.md	15	K2x1	| M2d | P-2 requireAdmin 不認系統服務用途登錄 | `server/WWebPerm.mjs` | 被抓到 | MX-D updateUsers: 系統管理者等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denied、於執行身
+spec/evidence/perm-run01-20261024b/mutation-results.md	16	K2x1	| M2e | P-2 getUserIdByToken 不登錄系統服務用途 id | `server/WWebPerm.mjs` | 被抓到 | MX-D updateUsers: 系統管理者等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denie
+spec/evidence/perm-run01-20261024b/mutation-results.md	20	K2x1	| M13 | F02 應用路由稽核 id 取外部 id 而非 perm 主鍵 | `server/WWebPerm.mjs` | 被抓到 | MX-M3 外部 id(sso-admin-9)與 perm 主鍵(id-for-admin)不同之系統管理者: 資料通道與應用路由之稽
+spec/evidence/perm-run01-20261024b/mutation-results.md	31	K2x1	| M9 | P-7 範例 verifyClientUser 還原以 isAdmin 否決 | `srv.mjs` | 被抓到 | MX-H2 GET /api/getUserByToken(後台登入檢查): 系統管理者等級(A／AUA／AS／APP)通過並回該身分; 其餘一律拒
+spec/evidence/perm-run01-20261024b/red-evidence.md	13	K2x1	- MX-H2 GET /api/getUserByToken(後台登入檢查): 系統管理者等級(A／AUA／AS／APP)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料  [P-2: AS 放行]
+spec/evidence/perm-run01-20261024b/red-evidence.md	14	K2x2	- MX-H4 GET /api/getPermUserInfor(查他人權限樹): 系統管理者等級(A／AUA／AS／APP)通過; 其餘拒  [P-1: 套件自行要求系統管理者等級]
+spec/evidence/perm-run01-20261024b/red-evidence.md	15	K2x1	- MX-H5 POST /syncAndReplaceTabs(整表覆寫): 系統管理者等級通過並寫入(稽核欄 userId 記呼叫者 id); 其餘拒且零寫入  [P-1; P-2 稽核欄記 app:…]
+spec/evidence/perm-run01-20261024b/red-evidence.md	16	K2x2	- MX-C /api/ulctr(upload-controller): 非系統管理者等級之回應 ≡ 無效 token 之回應(permission denied); 系統管理者等級已過閘
+spec/evidence/perm-run01-20261024b/red-evidence.md	17	K2x2	- MX-C /api/slc(upload-slice): 非系統管理者等級之回應 ≡ 無效 token 之回應(permission denied); 系統管理者等級已過閘
+spec/evidence/perm-run01-20261024b/red-evidence.md	18	K2x2	- MX-C /api/dwgfn(download-get-filename): 非系統管理者等級之回應 ≡ 無效 token 之回應(permission denied); 系統管理者等級已過閘
+spec/evidence/perm-run01-20261024b/red-evidence.md	19	K2x2	- MX-C /api/dwgf(download-get-file): 非系統管理者等級之回應 ≡ 無效 token 之回應(permission denied); 系統管理者等級已過閘
+spec/evidence/perm-run01-20261024b/red-evidence.md	20	K2x2	- MX-C /api/dw(download): 非系統管理者等級之回應 ≡ 無效 token 之回應(permission denied); 系統管理者等級已過閘
+spec/evidence/perm-run01-20261024b/red-evidence.md	21	K2x1	- MX-D getWebInfor: 系統管理者等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2]
+spec/evidence/perm-run01-20261024b/red-evidence.md	22	K2x1	- MX-D getStaEventTable: 系統管理者等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2]
+spec/evidence/perm-run01-20261024b/red-evidence.md	23	K2x1	- MX-D getStaEvent: 系統管理者等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2]
+spec/evidence/perm-run01-20261024b/red-evidence.md	24	K2x1	- MX-D users.select: 系統管理者等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2]
+spec/evidence/perm-run01-20261024b/red-evidence.md	25	K2x1	- MX-D grups.select: 系統管理者等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2]
+spec/evidence/perm-run01-20261024b/red-evidence.md	26	K2x1	- MX-D pemis.select: 系統管理者等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2]
+spec/evidence/perm-run01-20261024b/red-evidence.md	27	K2x1	- MX-D targets.select: 系統管理者等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2]
+spec/evidence/perm-run01-20261024b/red-evidence.md	28	K2x1	- MX-D [sys:getFuncList]: 系統管理者等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2]
+spec/evidence/perm-run01-20261024b/red-evidence.md	29	K2x1	- MX-D [sys:getTableTags]: 系統管理者等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2]
+spec/evidence/perm-run01-20261024b/red-evidence.md	30	K2x1	- MX-D [sys:polling]: 系統管理者等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2]
+spec/evidence/perm-run01-20261024b/red-evidence.md	31	K2x1	- MX-D updateUsers: 系統管理者等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2]
+spec/evidence/perm-run01-20261024b/red-evidence.md	32	K2x1	- MX-D updateGrups: 系統管理者等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2]
+spec/evidence/perm-run01-20261024b/red-evidence.md	33	K2x1	- MX-D updatePemis: 系統管理者等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2]
+spec/evidence/perm-run01-20261024b/red-evidence.md	34	K2x1	- MX-D updateTargets: 系統管理者等級(A／AUA／AS／APP)成功, 其餘於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2]
+spec/evidence/perm-run01-20261024b/red-evidence.md	35	K2x3	- MX-P1 AU 綁系統管理者: 該系統管理者被降為一般使用者 → AU 同步失去系統管理者服務(資料通道、後台登入、應用路由皆拒); 升回後恢復  [AU＝同綁定者, perm 列為權威]
+spec/evidence/perm-run01-20261024b/red-evidence.md	36	K2x1	- MX-P2 AU 綁停用之使用者: 不因「停用視同查無」落入系統服務用途; 該使用者啟用且為系統管理者後可用, 停用後又拒  [AU 在表者以 perm 列為準]
+spec/evidence/perm-run01-20261024b/red-evidence.md	38	K2x1	- MX-P7 標頭與本體為不同身分之組合(資料通道兩個身分來源各自完整驗證, 函數以本體身分執行): 服務身分／系統管理者交叉  [外審 sol F01]
+spec/evidence/perm-run01-20261024b/red-evidence.md	40	K2x2	- MX-P6 AS 新增資料: 新列建立者與更新者皆為 app:…, 且可被系統管理者讀回; AS 之寫入與系統管理者同一契約(同批重複 id 仍整批拒收)
+spec/evidence/perm-run01-20261024b/red-evidence.md	41	K2x1	- MX-M1 [email] 十類呼叫者 × 後台登入檢查／應用路由查他人樹／資料通道(標頭、本體): 系統管理者等級才通過, 與預設對應鍵(id)相同
+spec/evidence/perm-run01-20261024b/red-evidence.md	43	K2x1	- MX-M1 [name] 十類呼叫者 × 後台登入檢查／應用路由查他人樹／資料通道(標頭、本體): 系統管理者等級才通過, 與預設對應鍵(id)相同
+spec/evidence/perm-run01-20261024b/red-evidence.md	45	K2x1	- MX-M3 外部 id(sso-admin-9)與 perm 主鍵(id-for-admin)不同之系統管理者: 資料通道與應用路由之稽核欄皆記 perm 內 id; 後台登入檢查回 perm 列  [外審 sol F02]
+spec/evidence/perm-run01-20261024b/red-evidence.md	48	K2x1	- MX-B2 通訊路由同一規則: Basic 方案帶系統管理者 token 亦視同無 token(回應 ≡ 無效 token)
+spec/evidence/perm-run01-20261024b/red-evidence.md	49	K2x1	- MX-Q1 未通過身分驗證者(無 token、無效 token、U、AUM、NF、ASN、AUD)之回應與 srLog 皆與 keyTable 無關(有效表名／未知表名／空／未帶皆同一回應); 系統管理者等級才見 invalidKeyTable
+spec/evidence/perm-run01-20261024b/review/sol-prompt.md	14	K2x1	token 種類:使用者 token(一般使用者/系統管理者)代表登入者;應用系統 token(部署方 `getUserByToken` 回傳 `isApp='y'`)分兩種用途:
+spec/evidence/perm-run01-20261024b/review/sol-prompt.md	16	K2x1	- **系統服務用途**:不綁使用者,代表外部應用系統本身;上游反查回 `id='app:<金鑰主鍵>'`、名稱為金鑰名稱、`isApp='y'`、`isAdmin='y'`(email 可為空);能用系統管理者之服務。
+spec/evidence/perm-run01-20261024b/review/sol-prompt.md	17	K2x1	perm 自身 users 表中 `isActive='y'` 且 `isAdmin='y'` 之列為系統管理者(權威)。需求:
+spec/evidence/perm-run01-20261024b/review/sol-prompt.md	18	K2x1	1. **P-1** `/api/getPermUserInfor`、`/syncAndReplaceTabs` 由套件自行要求呼叫者為系統管理者等級:呼叫者在 users 表者以該列為準(`isAdmin='y'` 且啟用);不在表者須反查結果 `isApp='y'` 且 `i
+spec/evidence/perm-run01-20261024b/review/sol-prompt.md	19	K2x1	2. **P-2** 系統服務用途可用系統管理者之後端服務:後台登入檢查、資料通道各入口(含四表 `select`、四個 `update*` 之 `requireAdmin`)對系統服務用途(不在 users 表、反查 `isApp='y'` 且 `isAdmin='y'`)放行
+spec/evidence/perm-run01-20261024b/review/sol-prompt.md	22	K2x1	5. **P-7** 範例 `srv.mjs` 之 `verifyClientUser` 不以 `isAdmin` 判斷,非系統管理者一律看到「無權進入權限後台」;部署方否決者(非角色因素)維持 `userNoPermission`。
+spec/evidence/perm-run01-20261024b/review/sol-prompt.md	24	K2x1	不得改變:1.1.15 之行為(後台與資料通道只限 users 表之系統管理者、同批重複 id 拒收、`/api/getPerm` 供一般使用者查本人樹)、`srcKey` 匯入、多人同時編輯之寫入契約。
+spec/evidence/perm-run01-20261024b/review/sol-prompt.md	27	K2x2	**①先審「輸入空間表」之完整性**:本輪之矩陣=呼叫者(無 token、一般使用者、系統管理者、使用者用途綁系統管理者、使用者用途綁一般使用者、系統服務用途;相容:isApp 未轉傳、AS 形狀但 isAdmin n、使用者用途綁停用之使用者、虛擬應用系統)× 入口(靜態檔、4
+spec/evidence/perm-run01-20261024b/review/sol-prompt.md	29	K2x2	**③審實作與規定之符合**:逐項核對 P-1/P-2/P-3/P-5/P-7/路由失敗訊息。重點自問:(a)「在 users 表」之判定(`countLoginRows`,不論 isActive)與登入反查(`findLoginUsers`)之差異是否留下缺口(例如停用之系統管
+spec/evidence/perm-run01-20261024b/review/sol-report.md	21	K2x1	| Keycloak 為 client 提供服務帳號，權限取服務帳號角色與 client scope mappings 的交集。[官方說明](https://www.keycloak.org/docs/latest/server_admin/index.html#_service
+spec/evidence/perm-run01-20261024b/review/sol-report.md	26	K2x1	| F03 | 「在 users 表」於共同驗證和 `requireAdmin` 採不同定義，造成同一身分部分入口放行、部分拒絕。 | `server/WWebPerm.mjs:458`、`:588`、`:607`、`:740`、`:741` | `mappingBy='emai
+spec/evidence/perm-run01-20261024b/review/sol-report.md	32	K2x2	| F04 | 無可用對應鍵被當成「已確認不在表」，使失效的 AU 輸入升為 AS。 | `server/keyCheck.mjs:345`；`server/WWebPerm.mjs:458`、`:588`、`:607` | `mappingBy='email'`；users 存
+spec/evidence/perm-run01-20261024b/review/sol-report.md	34	K2x1	| F06 | 永久的 AS id 登錄會把後來的使用者身分誤當成服務憑據。 | `server/WWebPerm.mjs:466`、`:741`、`:1275` | ① AS id `x` 曾執行 RPC，登錄於集合；② 後來 users 建立 id `x` 的系統管理者，使用
+spec/evidence/perm-run01-20261024b/review/sol-report.md	42	K2x1	| P-1、P-2 基本路徑 | 正常且穩定的輸入已要求 perm 系統管理者或 AS，部署方驗證仍套用；例外為 F02～F06。 |
+spec/evidence/perm-run01-20261024b/review/sol-report.md	60	K2x1	| `MX-H2` | 後台系統管理者界線、P-2、固定拒絕鍵、拒絕時無資料；成功身分只驗 id、isAdmin。 |
+spec/evidence/perm-run01-20261024b/review/sol-report.md	66	K2x1	| `MX-P3`、`MX-P4` | 部署方否決及 P-7 固定鍵；角色都為系統管理者，守不到兩種拒絕原因同時成立的次序。 |
+spec/evidence/perm-run01-20261024b/review/sol-report.md	80	K2x1	改寫的 `api-adminOnly`、`api-callerIdentity`、`api-verifyConn-auth`、`api-tokenSafety` 確有守住一般使用者拒絕、獨立本體驗證、稽核身分及上游秘密不外洩。`CI-G7` 另補普通系統管理者的 email 對應
+spec/evidence/perm-run01-20261024b/review/sol-report.md	84	K2x2	| F09 | 沒有同時觸發「部署方否決＋非系統管理者」，拒絕鍵次序可以退化而不被攔截。 | `test/unit-appToken.test.mjs:169`；`test/unit-adminOnlySite.test.mjs:128`；`test/api-callerMatr
+spec/evidence/perm-run01-20261024b/review/sol-report.md	91	K2x1	| F01 | 刪除 `server/WWebPerm.mjs:424` 的 `cannotGetUserName` reject。 | 有效系統管理者 id／email、缺 name 的外部結果由拒絕變登入成功；現有固定 token 都有 name。 | `MX-H2`、`AT
+spec/evidence/perm-run01-20261024b/run-evidence.mjs	120	K2x2	{ id: 'M9', desc: 'P-7 範例 verifyClientUser 還原以 isAdmin 否決', file: 'srv.mjs', pairs: [["    //只放行有效之瀏覽使用者, 不以 isAdmin 判斷(P-7): 非系統管理者由本套件統一拒絕
+spec/evidence/perm-run01-20261025/green-final.summary.txt	8	K2x1	✔ MX-B2 通訊路由同一規則: Basic 方案帶系統管理者 token 亦視同無 token(回應 ≡ 無效 token)
+spec/evidence/perm-run01-20261025/green-final.summary.txt	13	K2x1	✔ MX-R2 ①在表者以 perm 列為準(不看反查之 isAdmin): 同一外部身分 sso-admin-77(反查 isAdmin y)不在表時放行; 建為一般使用者列 → userNotAdmin; 改為有效系統管理者 → 放行; 停用 → cannotGetUserF
+spec/evidence/perm-run01-20261025/green-final.summary.txt	14	K2x1	✔ MX-R3 ②系統服務用途須 id 以 app: 開頭: 同為不在表、isApp y、isAdmin y, 僅 id 前綴不同 → AS(app:key-sys)可用後端系統管理者服務、AUX(sso-admin-77)與 APP(id-for-application)不可;
+spec/evidence/perm-run01-20261025/green-final.summary.txt	15	K2x2	✔ MX-R4 ②「二者一致」: 使用者用途綁不在表之 sso 系統管理者(AUX)的後端結果 ≡ 該系統管理者自身使用者 token(NFV)——後台登入、資料通道標頭／本體的拒絕鍵逐一相同; 兩者應用系統路由皆放行  [原則二之一: 使用者用途＝同綁定者]
+spec/evidence/perm-run01-20261025/green-final.summary.txt	18	K2x2	✔ MX-R8 [外審 sol 增量輪 G5] ①的權限面: 不在表之 sso 系統管理者(NFV 自身 token／AUX 綁定 token)可經 /syncAndReplaceTabs 匯入自己的 users 列(srcKey ≡ 外部 id、isAdmin y)——之後同一
+spec/evidence/perm-run01-20261025/green-final.summary.txt	19	K2x1	✔ MX-R7 [外審 sol F1] 外部列系統管理者(經匯入建立, srcKey ≡ 外部 id sso-ext-5, 內部 id 為系統配發): 後台登入、資料通道、兩條應用系統路由皆通過, 稽核欄一律記 perm 內部 id(≠ srcKey)
+spec/evidence/perm-run01-20261025/input-space.md	10	K1x1+K2x2	| 呼叫者(7) | N 無 token、U 一般使用者(perm 列 isAdmin n、部署方放行)、A 系統管理者、AUA 使用者用途綁系統管理者、AUM 使用者用途綁一般使用者、AS 系統服務用途、BAD 未知 token | 同 `api-callerMatrix` 之
+spec/evidence/perm-run01-20261025/input-space.md	11	K2x1	| 協定(4) | new(標頭與本體同為呼叫者 token)、body(標頭系統管理者、本體為呼叫者)、old(本體缺 `__sysToken__` 鍵＝已發布之舊前端建置檔之輪詢形狀)、empty(本體 `__sysToken__` 為 '') | 框架 `haskey(in
+spec/evidence/perm-run01-20261025/input-space.md	14	K2x1	| 登入狀態(前端) | 無 token 進站、無效 token、一般使用者、有效系統管理者、舊建置檔 | `src/App.vue` loginSuccess／loginError、`useWaitToken` |
+spec/evidence/perm-run01-20261025/input-space.md	18	K2x2	應然: 只有(A／AUA／AS)×(new／body)放行; 其餘一律拒——標頭非系統管理者等級於連線閘(`permission denied`); 標頭有效而本體缺鍵: 函數回 `invalid token`(框架封裝鍵先於身分關卡)、輪詢回 `[sys:polling] pe
+spec/evidence/perm-run01-20261025/input-space.md	32	K2x1	| B1 | 標頭 4 形式 × 3 函數(本體有效系統管理者) | 12 格皆連線閘 `permission denied` | 同左 | 已測(api-sysFuncs) |
+spec/evidence/perm-run01-20261025/input-space.md	34	K2x1	| B3 | 被拒之舊協定輪詢不綁定空身分 | 之後新協定系統管理者首次輪詢放行 | 同左 | 已測 |
+spec/evidence/perm-run01-20261025/input-space.md	35	K2x1	| B4 | 真前端元件(`WServHapiClient`, `useWaitToken:true`), getToken 先 '' 後系統管理者 token | 等待期間後端零 verifyConn 紀錄; token 出現後開機、輪詢兩輪以上無 error 事件 | 同左 
+spec/evidence/perm-run01-20261025/input-space.md	37	K2x1	| B6 | `api-callerMatrix` `[sys:polling]` × 15 呼叫者 × 標頭／本體兩個身分來源 | 30 格(原只測標頭 15 格) | 系統管理者服務等級放行, 其餘拒、零寫入 | 已測(格數 950→965) |
+spec/evidence/perm-run01-20261025/input-space.md	41	K2x1	| B10 | 本體 `__sysToken__` 非字串(null、123、true、{}、[]、['sys']、['nope-invalid']) × 3 函數(標頭有效系統管理者) | 21 格皆拒(函數 `cannotFindUserFromToken`、輪詢 `[sys
+spec/evidence/perm-run01-20261025/input-space.md	45	K2x1	| B14 | clientId 過長(如一百萬字元) | 框架只檢查非空字串(`WServBroadcastServer.mjs:213`), 有效系統管理者才可建立在線狀態; 未測 | 框架資源邊界 | 備查(範圍外, 框架) |
+spec/evidence/perm-run01-20261025/red-api-sysFuncs-default-final.summary.txt	9	K2x1	[sys:polling] × 協定 old: 系統管理者服務等級(A／AUA／AS)只在 new／body 放行(內容正確), 其餘一律拒(固定鍵)、不回資料:
+spec/evidence/perm-run01-20261025/red-api-sysFuncs-default-final.summary.txt	28	K2x1	被拒者零副作用: 舊協定輪詢被拒後, 該 clientId 不綁定空身分(之後以新協定系統管理者身分首次輪詢仍可綁定):
+spec/evidence/perm-run01-20261025/red-api-sysFuncs-default.summary.txt	9	K2x1	[sys:polling] × 協定 old: 系統管理者服務等級(A／AUA／AS)只在 new／body 放行, 其餘一律拒、不回資料:
+spec/evidence/perm-run01-20261025/red-api-sysFuncs-default.summary.txt	28	K2x1	被拒者零副作用: 舊協定輪詢被拒後, 該 clientId 不留在線身分(之後以新協定系統管理者身分首次輪詢仍可綁定):
+spec/evidence/perm-run01-20261025/review/round2-prompt.md	16	K2x3	這是權限管理後端 `server/WWebPerm.mjs`(建於 w-serv-hapi → w-serv-webdata → w-serv-broadcast 之上)與其 Vue 前端。框架選項 `sysFuncsPublic` 決定哪些系統函數(`[sys:getFuncL
+spec/evidence/perm-run01-20261025/review/round2-prompt.md	20	K2x1	- F2 clientId 綁定案原本第二次請求缺 token 先被空身分檢查擋下 → 改測兩個「有效但 userId 不同」的呼叫者(系統管理者 id-for-admin、系統服務用途 app:key-sys)重用同一 clientId,以及同 userId 之 AUA tok
+spec/evidence/perm-run01-20261025/review/round2-sol-report.md	8	K2x1	情境：驗證「invalid clientId／invalid input 先於身分反查」的案例，本體皆使用有效系統管理者 token。→ 實際：即使實作錯將身分反查提前，反查成功後仍回相同錯誤，這些斷言會繼續通過；目前沒有守住宣稱的檢查次序。
+spec/evidence/perm-run01-20261025/review/sol-prompt.md	20	K2x3	3. 本套件的 `getUserIdByToken`(`server/WWebPerm.mjs`)為真實反查且對空 token/非系統管理者 fail-closed(reject), 連線閘 `verifyConn` 亦只放行系統管理者。因此在本套件, 「列為公開」的 `[sys
+spec/evidence/perm-run01-20261025/review/sol-prompt.md	23	K1x1	不得改變: 1.1.16 既有存取規則與行為(後台與資料通道限系統管理者、`/api/getPerm`、應用系統路由等級、系統服務用途之認定)。
+spec/evidence/perm-run01-20261025/review/sol-prompt.md	29	K1x1+K2x2	**(一) 挑戰輸入空間表的完整性**: 本輪的表為 呼叫者(無 token、一般使用者、系統管理者、使用者用途之應用系統綁系統管理者/綁一般使用者、系統服務用途、未知 token) × 協定(new: 標頭與本體同 token; body: 標頭系統管理者、本體為呼叫者; ol
+spec/evidence/perm-run01-20261025/review/sol-report.md	10	K2x1	| 缺的軸／格（標頭均為有效系統管理者，除非另註） | 程式碼所示的實際處理／輸出 | 應補的預期 |
+spec/evidence/perm-run01-20261025/review/sol-report.md	14	K2x1	| 過長 clientId，例如一百萬個 `x` | `WServBroadcastServer.mjs:213` 只檢查非空字串，沒有長度上限；有效系統管理者可建立該識別的在線狀態及佇列 | 定義長度契約並測邊界；目前測試完全避開此資源邊界 |
+spec/evidence/perm-run01-20261025/review/sol-report.md	32	K2x1	此外，`:213` 的「零副作用」只由之後能綁定系統管理者推論，沒有檢查在線名單、佇列、廣播是否被取走或在線期限是否刷新。應直接觀察這些狀態；資料庫零寫入也不能代替廣播狀態斷言。
+spec/evidence/perm-run01-20261025/scripts/probe-browser.mjs	3	K2x1	//  S0 無 token 進站(127.0.0.1, 非 localhost 不自動給 sys) / S1 帶已發 token(?token=sys) 進站, 登入後各頁籤與推播 / S2 一般使用者(部署方放行之非系統管理者)進站「無權進入」/ S3 無效 token 進站
+spec/evidence/perm-run01-20261025/scripts/probe-browser.mjs	162	K2x1	//S1 帶已發 token 進站(sys: 系統管理者), 登入後各頁籤與推播
+spec/evidence/perm-run01-20261025/scripts/probe-browser.mjs	184	K2x1	//推播: 另一個用戶(API, 系統管理者)改 grups 第 1 列 description → 瀏覽器 store 於輪詢內收到
+spec/evidence/perm-run01-20261025/scripts/probe-browser.mjs	211	K2x1	//S2 一般使用者(部署方放行之非系統管理者): 「無權進入」
+spec/evidence/perm-run02-20261024/final-runs/e2e-init-final.summary.txt	9	K2x1	E2E-008-veto-by-deployer [eng]: 系統管理者之 perm 列因非角色因素被部署方 verifyClientUser 否決 → 後端 userNoPermission、轉址至 urlRedirect（非「無權進入權限後台」）:
+spec/evidence/perm-run02-20261024/input-space.md	12	K2x2	| R1d | 給定在表之系統管理者(含使用者用途綁系統管理者) → 放行, 稽核欄記 perm 列主鍵 | MX-H4、MX-H5(A、AUA)、MX-M3 |
+spec/evidence/perm-run02-20261024/input-space.md	14	K2x1	| R1f | 給定使用者用途綁不在表之 sso 系統管理者 → 放行(與其自身使用者 token 一致) | MX-H4、MX-H5、MX-R1(AUX)、MX-R4 |
+spec/evidence/perm-run02-20261024/input-space.md	15	K2x1	| R1g | 給定同一外部身分: 不在表放行 → 建成在表一般使用者(反查 `isAdmin` y 不採信)拒 → 在表有效系統管理者放行 → 停用拒(`cannotGetUserFromPerm`) → 刪列後放行 | MX-R2 |
+spec/evidence/perm-run02-20261024/input-space.md	16	K2x1	| R1h | 給定 `isAdmin` 為 `'y'` 以外之各值(`'Y'`、`' y'`、`true`、`1`、缺欄、繼承屬性、陣列…) → 不算系統管理者宣稱 | AT-003a～c |
+spec/evidence/perm-run02-20261024/input-space.md	19	K2x2	| R2c | 給定使用者用途綁不在表之 sso 系統管理者(AUX)與該系統管理者自身使用者 token(NFV) → 後台登入檢查回應逐字相同、資料通道標頭／本體拒絕鍵相同 | MX-R4 |
+spec/evidence/perm-run02-20261024/input-space.md	23	K2x1	| R2g | 給定嚴格系統服務形狀而 perm 有主鍵同為其 id 之停用列 → 在表, 以列為準(不落入系統服務用途); 啟用且系統管理者 → 以列通過; 降為一般使用者 → `userNotAdmin`(反查 `isAdmin` y 不採信) | MX-R5(帶 email
+spec/evidence/perm-run02-20261024/input-space.md	24	K2x1	| R2h | 給定 `isApp` 明確 `'n'` 或 `'Y'`、`isAdmin` y、不在表 → 後端系統管理者服務拒、應用系統路由放行 | 呼叫者軸 AFN／AFO 全入口 |
+spec/evidence/perm-run02-20261024/input-space.md	26	K2x1	| R2j | 給定外部列系統管理者(srcKey 對應, 內部 id 系統配發) → 各入口通過, 稽核欄記 perm 內部 id | MX-R7 |
+spec/evidence/perm-run02-20261024/input-space.md	27	K2x1	| R2k | 給定不在表之 sso 系統管理者(NFV／AUX)經 `/syncAndReplaceTabs?keyTable=users` 匯入自己的 users 列 → 之後同一 token 以該列通過後台與資料通道, 稽核欄由外部 id 轉 perm 內部 id(①的權限
+spec/evidence/perm-run02-20261024/input-space.md	29	K2x2	| R3 | 給定系統服務用途 id 近期已登錄、perm 其後建立主鍵同為該 id 之系統管理者列、一般 sso 系統管理者經該列通過驗證、列於 `requireAdmin` 讀取前被刪 → 寫入函數 `userNotAdmin`、零寫入(外審 sol F3) | MX-M6(
+spec/evidence/perm-run02-20261024/input-space.md	55	K2x1	| NFV(sso 系統管理者自身 token; 新增軸) | 應用系統路由 | 拒 → 放行 | ① |
+spec/evidence/perm-run02-20261024/input-space.md	57	K2x1	| AUX(使用者用途綁不在表 sso 系統管理者; 新增軸) | 後台登入檢查、資料通道 | 放行 → 拒 | ② |
+spec/evidence/perm-run02-20261024/mutation-results.json	44	K2x1	"desc": "①isExtAdminUser 恆真(任何物件皆為系統管理者)",
+spec/evidence/perm-run02-20261024/mutation-results.json	59	K2x3	"firstFail": "MX-P1 AU 綁系統管理者: 該系統管理者被降為一般使用者 → AU 同步失去系統管理者服務(資料通道、後台登入、應用路由皆拒); 升回後恢復  [AU＝同綁定者, perm 列為權威]",
+spec/evidence/perm-run02-20261024/mutation-results.json	69	K2x1	"firstFail": "MX-H2 GET /api/getUserByToken(後台登入檢查): 後端系統管理者服務等級(A／AUA／AS)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料(含 id 非 app: 開頭之 APP／AUX)  [P-2: AS 放行; p
+spec/evidence/perm-run02-20261024/mutation-results.json	79	K2x1	"firstFail": "AT-001b 輸入空間 id × isApp × isAdmin: 僅 (以 'app:' 開頭之字串, y, y) 為 true  [perm-run02②: 使用者用途綁不在表之 sso 系統管理者〔id 非 app: 開頭〕不是系統服務用途]"
+spec/evidence/perm-run02-20261024/mutation-results.json	89	K2x1	"firstFail": "AT-001b 輸入空間 id × isApp × isAdmin: 僅 (以 'app:' 開頭之字串, y, y) 為 true  [perm-run02②: 使用者用途綁不在表之 sso 系統管理者〔id 非 app: 開頭〕不是系統服務用途]"
+spec/evidence/perm-run02-20261024/mutation-results.json	99	K2x1	"firstFail": "AT-001b 輸入空間 id × isApp × isAdmin: 僅 (以 'app:' 開頭之字串, y, y) 為 true  [perm-run02②: 使用者用途綁不在表之 sso 系統管理者〔id 非 app: 開頭〕不是系統服務用途]"
+spec/evidence/perm-run02-20261024/mutation-results.json	109	K2x1	"firstFail": "AT-001b 輸入空間 id × isApp × isAdmin: 僅 (以 'app:' 開頭之字串, y, y) 為 true  [perm-run02②: 使用者用途綁不在表之 sso 系統管理者〔id 非 app: 開頭〕不是系統服務用途]"
+spec/evidence/perm-run02-20261024/mutation-results.json	119	K2x1	"firstFail": "MX-H2 GET /api/getUserByToken(後台登入檢查): 後端系統管理者服務等級(A／AUA／AS)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料(含 id 非 app: 開頭之 APP／AUX)  [P-2: AS 放行; p
+spec/evidence/perm-run02-20261024/mutation-results.json	129	K2x1	"firstFail": "MX-H2 GET /api/getUserByToken(後台登入檢查): 後端系統管理者服務等級(A／AUA／AS)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料(含 id 非 app: 開頭之 APP／AUX)  [P-2: AS 放行; p
+spec/evidence/perm-run02-20261024/mutation-results.json	149	K2x2	"firstFail": "MX-M6 [外審 sol F3] 近期系統服務用途登錄不得被「經 perm 列通過驗證、其後該列於 requireAdmin 讀取前被刪」之請求沿用: AS(app:key-ghost)先登錄 → perm 建立主鍵同為 app:key-ghost 
+spec/evidence/perm-run02-20261024/mutation-results.json	159	K2x2	"firstFail": "MX-M6 [外審 sol F3] 近期系統服務用途登錄不得被「經 perm 列通過驗證、其後該列於 requireAdmin 讀取前被刪」之請求沿用: AS(app:key-ghost)先登錄 → perm 建立主鍵同為 app:key-ghost 
+spec/evidence/perm-run02-20261024/mutation-results.json	169	K2x2	"firstFail": "MX-M6 [外審 sol F3] 近期系統服務用途登錄不得被「經 perm 列通過驗證、其後該列於 requireAdmin 讀取前被刪」之請求沿用: AS(app:key-ghost)先登錄 → perm 建立主鍵同為 app:key-ghost 
+spec/evidence/perm-run02-20261024/mutation-results.json	179	K2x2	"firstFail": "MX-M6 [外審 sol F3] 近期系統服務用途登錄不得被「經 perm 列通過驗證、其後該列於 requireAdmin 讀取前被刪」之請求沿用: AS(app:key-ghost)先登錄 → perm 建立主鍵同為 app:key-ghost 
+spec/evidence/perm-run02-20261024/mutation-results.json	189	K2x2	"firstFail": "MX-M6 [外審 sol F3] 近期系統服務用途登錄不得被「經 perm 列通過驗證、其後該列於 requireAdmin 讀取前被刪」之請求沿用: AS(app:key-ghost)先登錄 → perm 建立主鍵同為 app:key-ghost 
+spec/evidence/perm-run02-20261024/mutation-results.json	209	K2x1	"firstFail": "MX-P4 系統管理者之 perm 列因非角色因素被 verifyClientUser 否決(TOKEN_DENY): userNoPermission  [P-7: 部署方否決者之固定鍵]",
+spec/evidence/perm-run02-20261024/mutation-results.md	24	K2x1	| MA6 | ①在表者改採反查之 `isAdmin`(不以 perm 列為準) | MX-P1(AU 綁系統管理者降級後仍放行) |
+spec/evidence/perm-run02-20261024/old-code-results.json	11	K2x1	"MX-H2 GET /api/getUserByToken(後台登入檢查): 後端系統管理者服務等級(A／AUA／AS)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料(含 id 非 app: 開頭之 APP／AUX)  [P-2: AS 放行; perm-run02②: A
+spec/evidence/perm-run02-20261024/old-code-results.json	14	K2x1	"MX-C /api/ulctr(upload-controller): 非後端系統管理者服務等級之回應 ≡ 無效 token 之回應(permission denied); A／AUA／AS 已過閘; id 非 app: 開頭之 APP／AUX 與相容軸皆被擋",
+spec/evidence/perm-run02-20261024/old-code-results.json	15	K2x1	"MX-C /api/slc(upload-slice): 非後端系統管理者服務等級之回應 ≡ 無效 token 之回應(permission denied); A／AUA／AS 已過閘; id 非 app: 開頭之 APP／AUX 與相容軸皆被擋",
+spec/evidence/perm-run02-20261024/old-code-results.json	16	K2x1	"MX-C /api/dwgfn(download-get-filename): 非後端系統管理者服務等級之回應 ≡ 無效 token 之回應(permission denied); A／AUA／AS 已過閘; id 非 app: 開頭之 APP／AUX 與相容軸皆被擋",
+spec/evidence/perm-run02-20261024/old-code-results.json	17	K2x1	"MX-C /api/dwgf(download-get-file): 非後端系統管理者服務等級之回應 ≡ 無效 token 之回應(permission denied); A／AUA／AS 已過閘; id 非 app: 開頭之 APP／AUX 與相容軸皆被擋",
+spec/evidence/perm-run02-20261024/old-code-results.json	18	K2x1	"MX-C /api/dw(download): 非後端系統管理者服務等級之回應 ≡ 無效 token 之回應(permission denied); A／AUA／AS 已過閘; id 非 app: 開頭之 APP／AUX 與相容軸皆被擋",
+spec/evidence/perm-run02-20261024/old-code-results.json	19	K2x1	"MX-D getWebInfor: 後端系統管理者服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]",
+spec/evidence/perm-run02-20261024/old-code-results.json	20	K2x1	"MX-D getStaEventTable: 後端系統管理者服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]",
+spec/evidence/perm-run02-20261024/old-code-results.json	21	K2x1	"MX-D getStaEvent: 後端系統管理者服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]",
+spec/evidence/perm-run02-20261024/old-code-results.json	22	K2x1	"MX-D users.select: 後端系統管理者服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]",
+spec/evidence/perm-run02-20261024/old-code-results.json	23	K2x1	"MX-D grups.select: 後端系統管理者服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]",
+spec/evidence/perm-run02-20261024/old-code-results.json	24	K2x1	"MX-D pemis.select: 後端系統管理者服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]",
+spec/evidence/perm-run02-20261024/old-code-results.json	25	K2x1	"MX-D targets.select: 後端系統管理者服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]",
+spec/evidence/perm-run02-20261024/old-code-results.json	26	K2x1	"MX-D [sys:getFuncList]: 後端系統管理者服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]",
+spec/evidence/perm-run02-20261024/old-code-results.json	27	K2x1	"MX-D [sys:getTableTags]: 後端系統管理者服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]",
+spec/evidence/perm-run02-20261024/old-code-results.json	28	K2x1	"MX-D [sys:polling]: 後端系統管理者服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]",
+spec/evidence/perm-run02-20261024/old-code-results.json	29	K2x1	"MX-D updateUsers: 後端系統管理者服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]",
+spec/evidence/perm-run02-20261024/old-code-results.json	30	K2x1	"MX-D updateGrups: 後端系統管理者服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]",
+spec/evidence/perm-run02-20261024/old-code-results.json	31	K2x1	"MX-D updatePemis: 後端系統管理者服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]",
+spec/evidence/perm-run02-20261024/old-code-results.json	32	K2x1	"MX-D updateTargets: 後端系統管理者服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]",
+spec/evidence/perm-run02-20261024/old-code-results.json	33	K2x1	"MX-P7 標頭與本體為不同身分之組合(資料通道兩個身分來源各自完整驗證, 函數以本體身分執行): 服務身分／系統管理者交叉  [外審 sol F01]",
+spec/evidence/perm-run02-20261024/old-code-results.json	36	K2x2	"MX-M6 [外審 sol F3] 近期系統服務用途登錄不得被「經 perm 列通過驗證、其後該列於 requireAdmin 讀取前被刪」之請求沿用: AS(app:key-ghost)先登錄 → perm 建立主鍵同為 app:key-ghost 之系統管理者列(email
+spec/evidence/perm-run02-20261024/old-code-results.json	39	K2x1	"MX-R2 ①在表者以 perm 列為準(不看反查之 isAdmin): 同一外部身分 sso-admin-77(反查 isAdmin y)不在表時放行; 建為一般使用者列 → userNotAdmin; 改為有效系統管理者 → 放行; 停用 → cannotGetUserFr
+spec/evidence/perm-run02-20261024/old-code-results.json	40	K2x1	"MX-R3 ②系統服務用途須 id 以 app: 開頭: 同為不在表、isApp y、isAdmin y, 僅 id 前綴不同 → AS(app:key-sys)可用後端系統管理者服務、AUX(sso-admin-77)與 APP(id-for-application)不可; 
+spec/evidence/perm-run02-20261024/old-code-results.json	41	K2x2	"MX-R4 ②「二者一致」: 使用者用途綁不在表之 sso 系統管理者(AUX)的後端結果 ≡ 該系統管理者自身使用者 token(NFV)——後台登入、資料通道標頭／本體的拒絕鍵逐一相同; 兩者應用系統路由皆放行  [原則二之一: 使用者用途＝同綁定者]",
+spec/evidence/perm-run02-20261024/old-code-results.json	42	K2x2	"MX-R8 [外審 sol 增量輪 G5] ①的權限面: 不在表之 sso 系統管理者(NFV 自身 token／AUX 綁定 token)可經 /syncAndReplaceTabs 匯入自己的 users 列(srcKey ≡ 外部 id、isAdmin y)——之後同一 
+spec/evidence/perm-run02-20261024/red-api-callerMatrix.summary.txt	10	K2x1	MX-H2 GET /api/getUserByToken(後台登入檢查): 後端系統管理者服務等級(A／AUA／AS)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料(含 id 非 app: 開頭之 APP／AUX)  [P-2: AS 放行; perm-run02②: AS
+spec/evidence/perm-run02-20261024/red-api-callerMatrix.summary.txt	57	K2x2	MX-R4 ②「二者一致」: 使用者用途綁不在表之 sso 系統管理者(AUX)的後端結果 ≡ 該系統管理者自身使用者 token(NFV)——後台登入、資料通道標頭／本體的拒絕鍵逐一相同; 兩者應用系統路由皆放行  [原則二之一: 使用者用途＝同綁定者]:
+spec/evidence/perm-run02-20261024/review/round1-prompt.md	23	K2x1	**② 系統服務用途之認定收緊**: 用於後台登入檢查、資料通道(連線閘與執行身分)與 `requireAdmin` 的「系統服務用途」須同時: 不在表、反查 `isApp==='y'`、`isAdmin==='y'`、**`id` 以 `app:` 開頭**。使用者用途綁定「不
+spec/evidence/perm-run02-20261024/review/round1-prompt.md	25	K2x1	不得改變: perm-run01 其餘行為(Bearer 檢查、先驗身分再驗參數、稽核欄記 perm 列主鍵、路由失敗只回語系鍵)、1.1.15 行為(後台與資料通道只限系統管理者等)。
+spec/evidence/perm-run02-20261024/review/round1-prompt.md	32	K2x2	**(二) 對稱性**: 同一個外部身分是否在不同入口被判成不同類(例如共同驗證階段與 `requireAdmin` 對「在表」的定義是否一致)? 使用者用途綁「不在表的 sso 系統管理者」與該系統管理者的自身使用者 token 在各入口的結果是否一致(應用系統路由兩者都放行;
+spec/evidence/perm-run02-20261024/review/round1-sol-report.md	7	K2x1	- **明確 `isApp='n'`／其他值 × 不在表系統管理者**：例如上述外部物件改為 `isApp:'Z'`、perm 無匹配列、部署方放行。現行兩條應用系統路由放行，後台與資料通道拒絕。API 矩陣只有 `'y'` 與未給；單元測試雖涵蓋其他值，沒有驗證其入口組合。
+spec/evidence/perm-run02-20261024/review/round1-sol-report.md	22	K2x1	2. 60 秒內建立有效系統管理者列 `{id:'app:k',email:'u@x',…}`。本套件沒有禁止這種 perm 主鍵；MX-M2 本身也建立 `app:` 主鍵列。
+spec/evidence/perm-run02-20261024/review/round1-sol-report.md	26	K2x1	第 3 步沒有清除先前的系統服務登錄；第 4 步查無列後，`requireAdmin` 直接採用先前請求留下的近期登錄而放行。此 token 的外部 id 沒有前綴，也沒有 `isApp='y'`，卻在函數層被當成系統服務。TTL 僅限制發生時間，不能保證憑據屬於本次請求。`se
+spec/evidence/perm-run02-20261024/review/round1-sol-report.md	45	K2x1	F5 | 中 | test/api-callerMatrix.test.mjs:12、319、329；README.md:111 | `[sys:polling]` 使用有效系統管理者標頭、NFV／AUX 本體 token → 此格未送出、未斷言，vs 文件宣稱每個函數均驗證本體
+spec/evidence/perm-run02-20261024/review/round1-sol-report.md	56	K2x1	- JSDoc 範例仍將應用路由等級概括成「有效 perm 系統管理者，或系統服務用途 token」，漏掉相容分支。
+spec/evidence/perm-run02-20261024/review/round2-prompt.md	16	K2x1	- F1(測試缺格): 補了 MX-R5(嚴格系統服務形狀而 perm 有主鍵同為其 id 之停用列)、MX-R6(不在表且 isAdmin n 而被 verifyAppUser 否決 → 拒絕鍵次序)、MX-R7(外部列系統管理者 srcKey 登入, 稽核欄記 perm 內部
+spec/evidence/perm-run02-20261024/review/round2-prompt.md	17	K2x1	- F2(`/api/getPermUserInfor` 不檢查呼叫者 id, 缺 id 之不在表系統管理者宣稱者放行): **不改行為**(1.1.15 行為; `getUserByToken` 契約本就要求 id; 主控裁示『不在表只看 isAdmin』), 只更正文件過廣之
+spec/evidence/perm-run02-20261024/review/round2-sol-report.md	6	K2x1	G1 | 高 | server/WWebPerm.mjs:778 | `mappingBy=email`，請求 B 經 `app:key-ghost` 系統管理者列驗證，該列隨後被刪；B 執行 `clearSystemAppId` 後、`requireAdmin` 判定前，合法系
+spec/evidence/perm-run02-20261024/review/round2-sol-report.md	8	K2x3	G2 | 中 | server/WWebPerm.mjs:1315 | B 已取得同 id 的有效系統管理者列，停在非同步 `verifyClientUser`；刪列後，合法系統服務請求 A 驗證、登錄，並開始 `requireAdmin` 查詢；B 此時完成驗證並清除登錄，A 
+spec/evidence/perm-run02-20261024/review/round2-sol-report.md	14	K2x1	G5 | 低 | test/api-callerMatrix.test.mjs:721 | 不在表的 NFV／AUX 可用 `/syncAndReplaceTabs?keyTable=users` 匯入 `srcKey='sso-admin-77'`、`isAdmin='y'`、
+spec/evidence/perm-run02-20261024/review/round2-sol-report.md	16	K2x1	G6 | 低 | sgud/rule/rulebook_security.md:119 | 外部反查 `isAdmin='y'`，但命中停用列或有效的一般使用者列 → 實際分別拒絕 `cannotGetUserFromPerm`／`userNotAdmin`；新增「相容性結論」仍
+spec/evidence/perm-run02-20261024/run-evidence.mjs	111	K2x1	{ id: 'MA5', desc: '①isExtAdminUser 恆真(任何物件皆為系統管理者)', file: 'server/adminCheck.mjs', pairs: [["return Object.prototype.hasOwnProperty.call(u
+spec/evidence/perm-run03/review/sol-1.md	41	K2x1	- **建議**：先建立有效的 `id-for-verify-throw` 使用者，再用有效系統管理者標頭與該本體 token，斷言拒收、零寫入及回應／log 不洩漏秘密。
+spec/evidence/perm-run04/red-evidence.md	10	K2x1	| `test/api-mapKeyId.test.mjs`(新,真後端) | 10 案中 7 敗(MI-001、002、005、006、007、009、010);3 過(MI-003、004、008: 遷移前舊列、後台列、email／name 模式——不應被改變的行為,守護不被
+spec/evidence/perm-run04/review/BRIEF-r1.md	12	K2x1	- **後台列**(`from` 為空字串):由系統管理者在後台建立,`id` 是列的主鍵,也是該使用者在外部系統的使用者代號。
+spec/evidence/perm-run04/review/sol-1.md	3	K2x2	#1 [嚴重度:高] 確定：表漏掉「跨來源同鍵、僅一列有效」，D3 可能登入成另一來源的系統管理者 — 位置 server/keyCheck.mjs:315、server/WWebPerm.mjs:452、sgud/rule/rulebook_sync.md:108 — 失敗情境
+spec/evidence/perm-run05/review/BRIEF-r1.md	12	K2x1	- **後台列**(`from` 為空字串):由系統管理者在後台建立,`id` 是列的主鍵,也是該使用者在外部系統的使用者代號。
+spec/evidence/perm-run05/review/sol-1.md	5	K2x1	#2 [嚴重度:高] 確定：解析後再以內部 id 重讀，可能取得重建後另一人的權限 — 位置 server/WWebPerm.mjs:671、server/WWebPerm.mjs:684、server/WWebPerm.mjs:962 — 失敗情境：原列 A={id:'S',f
+spec/流程_使用者群組關聯.md	5	K2x1	系統管理者（瀏覽器使用者，經 w-ui-loginout 登入取得有效 token、`connState='csLogin'`）於後台後可由兩個入口進入同一份 `users.cgrups`（JSON5 格式 `{群組名:{mode:'OR'|'AND',isActive:'y'|
+spec/流程_使用者群組關聯.md	10	K2x1	兩入口寫入端點同為 `updateUsers`，經 hapi `verifyConn` 刪 Bearer 取 token → `checkToken(token, apiType)` → `getAndVerifyClientUser` 守門（`server/WWebPerm.m
+spec/流程_使用者群組關聯.md	15	K2x1	- title: 系統管理者自使用者列 cgrups 按鈕開啟群組關聯對話框
+spec/流程_使用者群組關聯.md	16	K2x1	- description: 系統管理者在使用者清單頁開啟編輯模式後，點某列「管控使用權限群組」欄的按鈕，畫面開啟「編輯使用權限群組」對話框，逐列列出全部權限群組，每列有群組名稱、「合併權限群組模式」控制項與「是否使用」勾選框，模式控制項顯示 OR 或 AND 且點開可選；該使用
+spec/流程_使用者群組關聯.md	27	K2x1	- title: 系統管理者於 VeCgrups 勾選群組並切 OR/AND 後儲存回填
+spec/流程_使用者群組關聯.md	28	K2x1	- description: 系統管理者在「編輯使用權限群組」對話框勾選某個權限群組的「是否使用」後，該列的模式控制項由淡色轉為可點，點開後可選 OR 或 AND；選 AND 並點對話框的儲存鈕，設定即回填到使用者清單該列的「管控使用權限群組」欄，欄內摘要文字由「使用 1 項權限
+spec/流程_使用者群組關聯.md	39	K2x1	- title: 系統管理者於 VeCgrups 點 Close 取消不回填
+spec/流程_使用者群組關聯.md	40	K2x1	- description: 系統管理者在「編輯使用權限群組」對話框勾選了某個群組之後改變心意，點右上角的關閉鈕而非儲存鈕，所有變更即被放棄：使用者清單該列的「管控使用權限群組」欄仍維持原本的摘要文字，清單也不會進入待儲存狀態。適合誤改後想整批放棄時使用。
+spec/流程_使用者群組關聯.md	51	K2x1	- title: 系統管理者自群組列 belongUsers 按鈕開啟成員對話框
+spec/流程_使用者群組關聯.md	52	K2x1	- description: 系統管理者在權限群組清單頁開啟編輯模式後，點某列「管控所屬使用者」欄的按鈕，畫面開啟「編輯所屬使用者」對話框，頂部顯示目前的群組名稱，表格逐列列出全部使用者，欄位為使用者名稱、「是否使用」勾選框、「所屬權限群組名稱」；最後一欄以標籤列出該使用者已屬的
+spec/流程_使用者群組關聯.md	63	K2x1	- title: 系統管理者於 VeGrupBlngUsers 勾選使用者並切 OR/AND 後儲存成功
+spec/流程_使用者群組關聯.md	64	K2x1	- description: 系統管理者在「編輯所屬使用者」對話框勾選某位尚未歸屬的使用者，該使用者的「所屬權限群組名稱」欄立刻多出一顆代表本群組的深色標籤並排在最前面，標籤左段可點開選 OR 或 AND；該列此時有兩顆標籤，欄寬足以全部顯示，因此不會出現「+」數量按鈕。選 AN
+spec/流程_使用者群組關聯.md	77	K2x1	- title: 系統管理者於 VeGrupBlngUsers 點 Close 取消不寫入
+spec/流程_使用者群組關聯.md	78	K2x1	- description: 系統管理者在「編輯所屬使用者」對話框勾選了某位使用者，該列的所屬群組標籤已多出一顆代表本群組者，之後改變心意而點右上角的關閉鈕而非儲存鈕，變更不會寫入資料庫：群組清單該列的「管控所屬使用者」欄仍維持原本內容。適合誤勾後想放棄時使用。
+spec/流程_使用者群組關聯.md	90	K2x1	- description: 系統管理者未開啟編輯模式即點使用者列「管控使用權限群組」欄的按鈕時，開啟的是「展示使用權限群組」對話框：內容與編輯時相同，但沒有功能列與儲存鈕，每列的模式控制項呈淡色且點不開，勾選框也不能改，只能檢視該使用者目前擁有哪些權限群組。適合查看而不想誤改設
+spec/流程_使用者群組關聯.md	102	K2x1	- description: 系統管理者未開啟編輯模式即點群組列「管控所屬使用者」欄的按鈕時，開啟的是「展示所屬使用者」對話框：表格照常列出各使用者與其所屬群組標籤，但沒有功能列與儲存鈕，標籤左段只顯示合併模式而點不開，勾選框也不能改；欄寬放不下全部標籤時同樣會出現「+」數量按鈕
+spec/流程_使用者群組關聯.md	114	K2x1	- description: 系統管理者在權限群組清單頁開啟編輯模式，並從某個群組開啟「編輯所屬使用者」對話框後，若瀏覽器視窗較窄，「所屬權限群組名稱」欄會跟著變窄。勾選某位使用者的「是否使用」使該列有兩顆標籤時，若欄寬放不下，該列只顯示代表本群組的深色標籤，後面接一顆顯示「+1
+spec/流程_使用者群組關聯.md	116	K2x1	- 測試資料：base seed users 與 grups；開啟標的為群組清單頁 row 0（權限群組M1）；勾選標的為對話框 row 1（mary，原屬 權限群組M2）。登入身分為系統管理者 token `sys`。
+spec/流程_使用者群組關聯.md	127	K2x1	- description: 系統允許不同的使用者取相同名稱，以電子郵件區分。系統管理者在權限群組清單頁開啟編輯模式，從某個群組開啟「編輯所屬使用者」對話框時，同名的使用者會各佔一列；勾選其中一位的「是否使用」，只有被勾選的那一列會多出代表本群組的深色標籤，另一位同名者維持原狀。
+spec/流程_使用者群組關聯.md	129	K2x1	- 測試資料：base seed users 與 grups；前置以寫入 API 新增一位與 mary 同名之使用者（id `id-for-mary-dup`、email `mary.dup@example.com`、其餘欄位同 mary，排序在最後），此為案例前置、非使用者操作
+spec/流程_使用者群組關聯.md	140	K2x1	- description: 系統管理者在使用者清單頁看到某位使用者的「管控使用權限群組」欄按鈕左側出現警告圖示，滑鼠停留會提示該使用者引用了在權限群組清單中找不到的群組，並說明這個引用仍以它設定的模式參與計算，以 AND 引用時使用者的授權為空，請還原或移除。點該欄按鈕開啟「編
+spec/流程_使用者群組關聯.md	142	K2x1	- 測試資料：base seed users / grups / pemis；案例前置（非使用者操作）：經外部同步端點（`/syncAndReplaceTabs`，`from` 為本案專屬分區）為 `users` 推入一位使用者 `dang-u`（id `id-dang-u`、e
+spec/流程_使用者群組關聯.md	154	K2x2	- description: 使用者的群組關聯中某個群組沒有填合併模式，例如外部應用以只有名稱與是否使用的格式寫入時，伺服端把它當成限制：同一處另有填對模式的群組時，它與 AND 一樣要求也授權才算數，但它不會單獨成為授權的來源。系統管理者在使用者清單頁看到該使用者「管控使用權限
+spec/流程_使用者群組關聯.md	156	K2x1	- 測試資料：base seed；案例前置：經外部同步端點推入使用者 `mode-u`（id `id-mode-u`、email `mode-u@example.com`），其 `cgrups` 為 `{"權限群組M1":{"mode":"OR","isActive":"y"},
+spec/流程_使用者群組關聯.md	159	K3x1	1. 語意：清單 mode-u 列該欄按鈕左側有警告圖示，`title` 為 `warnRefModeInvalid` 代入 `權限群組M2`（eng：`The merge mode is missing or invalid: 權限群組M2. It is treated as 
+spec/流程_使用者群組關聯.md	164	K3x2	- 備註：本案證明「存檔後授權不變」：缺 mode 之啟用項若在編輯器顯示為停用（修改前之行為），存檔即丟掉這個 AND 限制；若補成 OR 則多給。物件形式縮寫 `{"權限群組M2":"y"}`（值為字串、無 mode）同樣為限制項、編輯器解碼為 `{ isActive: 'y
+spec/流程_使用者群組關聯.md	168	K2x2	- description: 外部應用寫入的群組關聯裡，若某個啟用中的項目沒有名稱，編輯器無法把它原樣寫回。系統管理者開啟「編輯使用權限群組」對話框，內容區最上方會出現一行提示，帶警告圖示，說明有項目沒有可用的名稱、編輯器無法保留、於資料來源修正前將拒絕儲存，並指出是第幾個項目。
+spec/流程_使用者群組關聯.md	170	K2x1	- 測試資料：base seed；案例前置：經外部同步端點推入使用者 `noname-u`（id `id-noname-u`、email `noname-u@example.com`），其 `cgrups` 為陣列形式 `[{"name":"權限群組M1","mode":"OR"
+spec/流程_使用者群組關聯.md	181	K2x1	- description: 權限群組清單中有兩個以上同名的群組，通常是外部應用在限制同名之前同步進來的歷史資料，而使用者的群組關聯又引用該名稱時，「編輯使用權限群組」對話框會把同名的群組各列出一列，各列名稱左側都有警告圖示，提示對到多筆同名的權限群組，僅採用它們共同擁有的授權。
+spec/流程_使用者群組關聯.md	183	K2x1	- 測試資料：**需特殊資料前置**——同名群組無法經任何現行寫入入口造出（外部同步與後台整表寫入皆拒同名，ADR-034），須於後端啟動前以種子子行程追加，或停止後端後直寫資料庫再重啟：`grups` 追加兩列同名 `dup-g`（id `id-dup-g1`，`cpemis`
+spec/流程_使用者群組關聯.md	191	K3x1	- 備註：同名列之內容無共同管理對象僅為使授權差異可見之選擇，不是必要條件。拒存之判準在 `src/js/editorRefRows.mjs:getDupRowsInconsistent`（同名各列之 `mode` 或 `enable` 不全相同），寫出時同名只寫一次（`putR
+spec/流程_使用者群組關聯.md	195	K2x2	- description: 系統管理者在權限群組清單頁開啟編輯模式後，開啟某個群組的「編輯所屬使用者」對話框時，若某位使用者的群組關聯引用了群組清單中找不到的群組，該使用者列「所屬權限群組名稱」欄的最左側會出現警告圖示，提示內容與使用者清單頁相同。系統管理者在對話框裡勾選這位使
+spec/流程_使用者群組關聯.md	197	K2x1	- 測試資料：同 E2E-011 之 dang-u（`cgrups` 含啟用中的 `權限群組MX` AND 引用，MX 不存在）。開啟標的為群組清單頁之 權限群組M2 列；勾選標的為對話框中的 dang-u 列。登入身分為系統管理者 token `sys`。
+spec/流程_使用者群組關聯.md	209	K2x3	- description: 使用者的群組關聯中，所有啟用的群組都沒有填合併模式時，系統把它們只當成限制，沒有任何一個填對模式的群組可以當授權的來源，因此這位使用者目前沒有任何授權。系統管理者在使用者清單頁看到該欄按鈕左側有警告圖示，提示合併模式缺漏或不合法、系統視為 AND 且
+spec/流程_使用者群組關聯.md	211	K2x1	- 測試資料：base seed；案例前置（非使用者操作）：經外部同步端點推入使用者 `allbad-u`（id `id-allbad-u`、email `allbad-u@example.com`），其 `cgrups` 為 `{"權限群組M1":{"isActive":"y"
+spec/流程_使用者群組關聯.md	219	K3x5	- 備註：裁決（2026-10-21，主控）：mode 缺或非法之啟用項為限制項（只當 AND 交集項、不單獨成為基底）。**原「`getKpLossy` 第三格有損」已放寬（2026-10-22 run06，使用者裁示，ADR-035 Update）**：`getKpLossy
+spec/流程_使用者群組關聯.md	230	K2x1	001  系統管理者點使用者列 cgrups 欄按鈕, 觸發 showVeCgrupsById(id)  [LayoutContentUsers.vue:showVeCgrupsById]
+spec/流程_使用者群組關聯.md	246	K2x1	015          系統管理者點某群組之模式控制項(ModeSelectChip, 僅該列已勾選時可點)並選 OR/AND, 觸發 showVeCgrupsToggleItemModeByName(name, mode)  [VeCgrups.vue:showVeCgrup
+spec/流程_使用者群組關聯.md	248	K2x1	017          系統管理者點某群組 enable checkbox, 觸發 showVeCgrupsToggleItemEnableByName(name)  [VeCgrups.vue:showVeCgrupsToggleItemEnableByName]
+spec/流程_使用者群組關聯.md	250	K2x1	019          系統管理者點對話框 Save, 觸發 clickSave  [VeCgrups.vue:clickSave]
+spec/流程_使用者群組關聯.md	269	K2x1	037          系統管理者若改點 Close, 觸發 clickClose  [VeCgrups.vue:clickClose]
+spec/流程_使用者群組關聯.md	282	K2x1	001  系統管理者點群組列 belongUsers 欄按鈕, 觸發 showVeGrupBlngUsersById(id)  [LayoutContentGrups.vue:showVeGrupBlngUsersById]
+spec/流程_使用者群組關聯.md	295	K2x1	013          系統管理者點某使用者之本群組標籤左段(RelationChips → RelationChip → ModeSelectChip)並選 OR/AND, 觸發 showVeGrupBlngUsersToggleItemModeByName(name, mo
+spec/流程_使用者群組關聯.md	297	K2x1	015          系統管理者點某使用者 enable checkbox, 觸發 showVeGrupBlngUsersToggleItemEnableByName(name, id)  [VeGrupBlngUsers.vue:showVeGrupBlngUsersTog
+spec/流程_使用者群組關聯.md	299	K2x1	016a             系統管理者點對話框工具列之「全選／全取消／反選」(checkAllYes／checkAllNo／checkAllInv; 僅可編輯時渲染), 觸發 showVeGrupBlngUsersToggleItemsEnableAllYes／AllNo／
+spec/流程_使用者群組關聯.md	302	K2x1	017          系統管理者點對話框 Save, 觸發 clickSave  [VeGrupBlngUsers.vue:clickSave]
+spec/流程_使用者群組關聯.md	341	K2x1	053          系統管理者若改點 Close, 觸發 clickClose  [VeGrupBlngUsers.vue:clickClose]
+spec/流程_使用者群組關聯.md	415	K2x1	- **權限**：兩入口寫入皆經 `updateUsers` → `verifyConn` → `checkToken` → `getAndVerifyClientUser` 守門（token 須有效、其使用者須在 perm `users` 表且 `isActive='y'`、並
+spec/流程_使用者群組關聯.md	429	K3x1	- **遇衝突或歧義一律收嚴並於引用處提示（ADR-035，2026-10-21 run05，使用者原則「收嚴＋增加提示」）**：伺服端對引用查無（懸空）者以其模式參與、內容全 `n`（AND 使授權為空），對同名多筆取交集，對模式缺或非法者為限制項（只當 AND 的交集項、不單
+spec/流程_使用者群組關聯.md	435	K3x2	- **設計事實（記錄備查；業主裁定之事實更正；資料軸）** 2026-10-22（run06；使用者裁示，規則帳本 `R-EDIT-KEEP-01` ③，ADR-035 Update 2026-10-22）：`getKpLossy` 第三格「該層啟用項皆 mode 缺漏或不合法
+spec/流程_使用者群組關聯.md	441	K2x1	- **設計事實（記錄備查）** 2026-10-21：入口 B 存檔以對話框之列整表寫回 users（`updateUsers` 為整表 diff）：開框期間他人**新增**之使用者不在列內，存檔時被整表 diff 刪除；寫回順序依對話框序，他人之 `order` 重排被覆蓋。
+spec/流程_使用者群組關聯.md	444	K3x1	- **已修復（附修復紀錄）** 2026-10-20（ADR-030，規則帳本 R-AUTH-DECODE-01）：外部應用直接寫入之「陣列形式」授權資料（如 `cgrups` 為 `[{"name":"G1","mode":"OR","isActive":"y"}]`，伺服端
+spec/流程_外部列保護與過期快照.md	5	K2x1	系統管理者（瀏覽器使用者，經 w-ui-loginout 登入取得有效 token、`connState='csLogin'`）進入後台後，於 `LayoutContent.vue` 左側導覽點「管理使用者」（`mmUsers`）進入使用者清單頁（`LayoutContentUs
+spec/流程_外部列保護與過期快照.md	9	K3x1	外部同步方式與夾具標籤慣例（2026-10-23 perm-run03 起）：`/syncAndReplaceTabs` 改依來源鍵 `srcKey` 做**差異同步**（`server/syncCore.mjs:syncAndReplaceTabs`；規則帳本 `sgud/ru
+spec/流程_外部列保護與過期快照.md	19	K2x1	- description: 系統管理者在左側選單點「管理使用者」進入使用者清單頁。當系統已開啟外部同步，且清單中有由外部來源同步進來的使用者時，清單上方會多出一條灰底橫幅，說明有幾筆資料由外部來源同步、其身分欄位在此唯讀且不可刪除、僅能修改授權指派設定；這些外部使用者的名稱儲存
+spec/流程_外部列保護與過期快照.md	21	K2x1	- 測試資料：base seed 四位使用者（peter、mary、john、admin，`from` 皆為空）；案例前置（非使用者操作）：經外部同步端點（`/syncAndReplaceTabs`，app token）為 `users` 推入外部使用者 `ext-u1`（src
+spec/流程_外部列保護與過期快照.md	36	K2x1	- description: 在使用者清單頁，外部使用者的名稱、電子郵件、說明三個儲存格雙擊後不會出現編輯框，是否為系統管理者與是否有效兩個核選方塊也呈灰色不能點，因為這些身分欄位由外部來源擁有。相對地，後台自行建立的使用者，例如種子資料中的 peter，雙擊名稱即可進入編輯，核
+spec/流程_外部列保護與過期快照.md	38	K2x1	- 測試資料：同 E2E-001（base seed 四位使用者加外部使用者 ext-u1、ext-u2）。登入身分為系統管理者 token `sys`。
+spec/流程_外部列保護與過期快照.md	39	K2x1	- 操作：登入後台 → 點「管理使用者」頁籤 → 依序雙擊 ext-u1 之名稱、電子郵件、說明儲存格與 ext-u2 之名稱儲存格 → 雙擊 peter 之名稱儲存格（對照組；看到編輯框後按 Esc 取消）→ 觀察各列「是否為系統管理者」「是否有效」核選方塊 → 觀察 ext-
+spec/流程_外部列保護與過期快照.md	52	K2x1	- description: 使用者清單預設不顯示「來源」欄。系統管理者點工具列的「顯示欄位」鈕，在彈出的清單中勾選「來源」，表格就會多出一欄：外部使用者顯示其來源名稱，後台自行建立的使用者此欄為空白。這一欄對所有使用者都不能編輯，雙擊儲存格不會出現編輯框，因為來源名稱由外部來源
+spec/流程_外部列保護與過期快照.md	54	K2x1	- 測試資料：同 E2E-001。登入身分為系統管理者 token `sys`。
+spec/流程_外部列保護與過期快照.md	66	K2x1	- description: 系統管理者在使用者清單頁同時勾選一位外部使用者與一位後台自行建立的使用者，點工具列的「刪除勾選使用者」，畫面會先跳出提示「所選資料中有 1 筆由外部來源同步，無法在此刪除，已略過。」，點「確認」後只有後台使用者從清單移除，外部使用者仍在清單中，並出現
+spec/流程_外部列保護與過期快照.md	68	K2x1+K3x1	- 測試資料：base seed 四位使用者；案例前置（非使用者操作）：以系統管理者寫入 RPC（`updateUsers`）新增後台使用者 `bk-u1`（id `id-xr-bk1`，`from` 為空）；再經外部同步端點推入外部使用者 ext-u1、ext-u2（同 E2E
+spec/流程_外部列保護與過期快照.md	84	K2x1	- description: 系統管理者在使用者清單頁只勾選外部使用者，點「刪除勾選使用者」，畫面跳出提示「所選資料中有 2 筆由外部來源同步，無法在此刪除，已略過。」，點「確認」後沒有任何使用者被刪除，也不會出現其他確認框或儲存鈕，清單維持原狀。外部使用者必須在外部來源端移除。
+spec/流程_外部列保護與過期快照.md	86	K2x1	- 測試資料：同 E2E-001（外部使用者 ext-u1、ext-u2）。登入身分為系統管理者 token `sys`。
+spec/流程_外部列保護與過期快照.md	98	K2x1	- description: 系統管理者在使用者清單頁勾選一位外部使用者，點「複製使用者」，新列出現在清單最上方，名稱帶「複製」後綴，沒有鎖頭，因為複製出來的是後台新增的使用者，來源為空白；原外部使用者仍有鎖頭。複製列的電子郵件與來源使用者相同，須先把電子郵件改成唯一值，再點「儲
+spec/流程_外部列保護與過期快照.md	100	K2x1	- 測試資料：同 E2E-001（外部使用者 ext-u1、ext-u2）。登入身分為系統管理者 token `sys`。
+spec/流程_外部列保護與過期快照.md	115	K2x1	- description: 系統管理者在左側選單點「管理權限群組」進入群組清單頁。清單中若有由外部來源同步進來的群組，清單上方會出現灰底橫幅，說明有幾筆資料由外部來源同步、其身分欄位唯讀且不可刪除；外部群組的名稱儲存格左側各帶一個鎖頭，停留時提示來源名稱。外部群組的名稱與說明雙
+spec/流程_外部列保護與過期快照.md	117	K2x1	- 測試資料：base seed 四個群組（權限群組M1～M4，`from` 皆為空）；案例前置（非使用者操作）：經外部同步端點為 `grups` 推入外部群組 `ext-g1`（srcKey `id-xr-g1`，`cpemis` 含 權限P1）與 `ext-g2`（srcKe
+spec/流程_外部列保護與過期快照.md	133	K2x1	- description: 外部群組的名稱與說明不能在後台改，但它擁有哪些權限屬於授權指派，仍可在後台調整。系統管理者在群組清單頁點外部群組「管控使用權限」欄的按鈕，開啟「編輯使用權限」對話框，勾選一項原本沒有的權限後點對話框的儲存鈕，對話框關閉、清單頁出現儲存鈕，再點「儲存變
+spec/流程_外部列保護與過期快照.md	135	K2x1	- 測試資料：同 E2E-007 之外部群組（ext-g1 之 `cpemis` 含 權限P1）；另經外部同步端點推入外部使用者 `ext-u3`（srcKey `id-xr-u3`，`from` 為 `appExtU`，`cgrups` 引用 ext-g1）以其授權樹觀察端到端
+spec/流程_外部列保護與過期快照.md	149	K2x1	- description: 系統管理者在群組清單頁勾選外部群組，點「刪除勾選權限群組」，畫面跳出提示「所選資料中有 1 筆由外部來源同步，無法在此刪除，已略過。」，點「確認」後該群組仍在清單中，不會出現確認框，也不會出現儲存鈕。外部群組必須在外部來源端移除。便於避免誤以為已刪除
+spec/流程_外部列保護與過期快照.md	151	K2x1	- 測試資料：同 E2E-007。登入身分為系統管理者 token `sys`。
+spec/流程_外部列保護與過期快照.md	163	K2x2	- description: 外部來源每次同步會以各筆資料的來源鍵識別各群組；如果同一個來源在同一批資料中，讓某個名稱改由不同的來源鍵承載，系統會視為疑似來源鍵重編：舊項目被移除、其引用被連帶清理，可能抹掉系統管理者在後台做的授權指派。系統管理者重新載入頁面進入群組清單頁，清單上
+spec/流程_外部列保護與過期快照.md	165	K2x1	- 測試資料：base seed 四個群組；案例前置（非使用者操作）：經外部同步端點為 `grups` 推入外部群組 `wg-renum`（srcKey `id-xr-wa`），`from` 為 `appExtWarn`；操作中再以同一來源推入同名 `wg-renum` 但 sr
+spec/流程_外部列保護與過期快照.md	183	K2x3	- description: 系統管理者在群組清單頁點某群組「管控所屬使用者」欄的按鈕，開啟「編輯所屬使用者」對話框，勾選了其中一位使用者但尚未儲存。在對話框開著的期間，如果有人改動了這位使用者的資料，約 2 秒後對話框內、工具列下方會出現橘色提示「資料已被他人或外部同步更新，本
+spec/流程_外部列保護與過期快照.md	185	K2x3+K3x1	- 測試資料：base seed 四位使用者與四個群組。案例中系統管理者先於對話框勾選 mary（原不屬 權限群組M1，形成未存草稿），再以系統管理者寫入 RPC（`updateUsers`）把 mary 之說明改為「他人於對話框開啟後改過之說明」，模擬他人於對話框開啟、系統管理
+spec/流程_外部列保護與過期快照.md	198	K2x2	- 備註：〔2026-10-23 perm-run02 改寫；原載「開框後不編輯，待他人改了 mary 之列，再勾選 mary 存檔被拒」不成立：perm-run01 起對話框開著而無未存修改時收到推播，會以新資料重建並更新基準（`VeGrupBlngUsers.vue:sync
+spec/流程_外部列保護與過期快照.md	202	K2x4	- description: 系統管理者在群組清單頁開啟「編輯所屬使用者」對話框，勾選了 john 但尚未儲存。在對話框開著的期間，有人在後台新增了一位使用者，外部來源也同步進來一位新的使用者，約 2 秒後對話框內出現橘色的「資料已被他人或外部同步更新」提示，系統管理者的勾選仍保
+spec/流程_外部列保護與過期快照.md	204	K2x2+K3x1	- 測試資料：base seed 四位使用者；案例中系統管理者先於對話框勾選 john（原不屬 權限群組M1，形成未存草稿），再於其後以系統管理者寫入 RPC 新增後台使用者 `late-b`（id `id-xr-lb`），並經外部同步端點推入外部使用者 `late-x`（src
+spec/流程_外部列保護與過期快照.md	218	K2x3	- description: 系統管理者開啟「編輯所屬使用者」對話框，勾選了一位外部使用者但尚未儲存。在對話框開著的期間，外部來源同步更新了這位外部使用者的資料，約 2 秒後對話框內出現橘色的「資料已被他人或外部同步更新」提示，系統管理者的勾選仍保留。系統管理者按儲存鈕，系統會拒
+spec/流程_外部列保護與過期快照.md	220	K2x2	- 測試資料：同 E2E-001（外部使用者 ext-u1 之 `cgrups` 引用 權限群組M2、ext-u2）。案例中系統管理者先於對話框勾選 ext-u1（形成未存草稿），再經外部同步端點以同一來源 `appExtU` 重推兩位外部使用者，ext-u1 之說明改為「外部來
+spec/流程_外部列保護與過期快照.md	234	K2x2	- description: 系統管理者可在後端設定中關閉外部列保護，關閉後回到舊行為：使用者清單頁不再出現外部列橫幅，外部使用者的名稱儲存格沒有鎖頭，雙擊可以編輯並改名，是否為系統管理者與是否有效的核選方塊也可以點。系統管理者改名後點「儲存變更」，成功時出現「儲存使用者數據成功
+spec/流程_外部列保護與過期快照.md	236	K2x1	- 測試資料：同 E2E-001（外部使用者 ext-u1、ext-u2）；後端以臨時設定重啟為 `lockExternalRows: 'n'`（資料庫保留；前端 `webInfor.lockExternalRows` 為 `'n'`）。登入身分為系統管理者 token `sys
+spec/流程_外部列保護與過期快照.md	249	K2x1	- description: 系統管理者在群組清單頁點「新增權限群組」，把新列的名稱改成與某個外部群組相同，新列的名稱儲存格會出現橘色文字與警告圖示，滑鼠停留會提示「外部來源「來源名稱」已使用此名稱「名稱」。」，表示這個名稱已被外部來源占用。此時點「儲存變更」會被擋下，出現「名稱
+spec/流程_外部列保護與過期快照.md	251	K2x1	- 測試資料：同 E2E-007（外部群組 ext-g1、ext-g2）。登入身分為系統管理者 token `sys`。
+spec/流程_外部列保護與過期快照.md	263	K2x2	- description: 系統管理者在使用者清單頁雙擊某位使用者的「說明」欄輸入新內容，還沒按儲存時，有人在後台改了同一位使用者的 email。約兩秒後清單上方會出現橘色橫幅，寫著「資料已被他人或外部同步更新。您尚未儲存的編輯仍保留於此，但現在儲存將被拒絕。請按「重新載入」取
+spec/流程_外部列保護與過期快照.md	265	K2x2+K3x1	- 測試資料：base seed 四位使用者；案例中以系統管理者寫入 RPC 把 mary 之 email 改為 `mary-by-other@example.com`（同一列，模擬他人），說明欄輸入「A系統管理者未儲存之說明」。登入身分為系統管理者 token `sys`。
+spec/流程_外部列保護與過期快照.md	266	K2x1	- 操作：登入後台 → 點「管理使用者」頁籤 → 雙擊 mary 之說明儲存格輸入新說明（Enter，不儲存）→（他人改了 mary 之 email）→ 等橫幅出現 → 點「儲存變更」→ 訊息框點「確認」→ 點橫幅「重新載入」→ 雙擊 mary 之說明儲存格輸入「A系統管理者重新
+spec/流程_外部列保護與過期快照.md	279	K2x4	- description: 系統管理者在群組清單頁雙擊某群組的「說明」欄輸入新內容，還沒按儲存時，外部來源同步改了另一個外部群組的說明（與系統管理者編輯的那一列無關）。清單上方同樣出現「資料已被更新」橫幅，系統管理者的草稿保留；按儲存會被拒絕，跳出「儲存權限群組數據失敗」接「未
+spec/流程_外部列保護與過期快照.md	281	K2x3	- 測試資料：同 E2E-007（外部群組 ext-g1、ext-g2）；案例中經外部同步端點以同一來源 `appExtG` 重推兩位外部群組，ext-g2 之說明改為「外部來源改過之說明(別列)」（依 `srcKey` 差異同步：ext-g2 為修改、`id` 不變，ext-g
+spec/流程_外部列保護與過期快照.md	293	K2x3	- description: 系統管理者在權限清單頁雙擊某權限的「說明」欄輸入新內容，還沒按儲存時，有人新增了一個權限（表內多了一列）。清單上方出現「資料已被更新」橫幅，系統管理者的草稿保留，清單仍是系統管理者開啟頁面時的內容（不含他人新增的權限）；按儲存會被拒絕，跳出「儲存權限
+spec/流程_外部列保護與過期快照.md	295	K2x3+K3x1	- 測試資料：base seed 四個權限；案例中以系統管理者寫入 RPC 新增權限 `xr-late-pemi`（id `id-xr-p9`）；系統管理者編輯 權限P1 之說明為「A系統管理者未儲存之權限說明」。登入身分為系統管理者 token `sys`。
+spec/流程_外部列保護與過期快照.md	307	K2x3	- description: 系統管理者在標的清單頁雙擊首列標的的「說明」欄輸入新內容，還沒按儲存時，有人刪除了另一個標的（表內少了一列）。清單上方出現「資料已被更新」橫幅，系統管理者的草稿保留，清單仍含被他人刪除的標的（保留載入時的版本）；按儲存會被拒絕，跳出「儲存標的數據失敗
+spec/流程_外部列保護與過期快照.md	309	K2x3+K3x2	- 測試資料：base seed 22 個標的外加案例夾具標的 `zz-xr/t1`（說明「xr暫存標的」，系統管理者寫入 RPC 於開瀏覽器前建立，共 23 筆）；案例中以系統管理者寫入 RPC 刪除 `zz-xr/t1`。系統管理者編輯首列 `專案A/頁A/區塊A` 之說明為
+spec/流程_外部列保護與過期快照.md	321	K2x2	- description: 系統管理者在群組清單頁開啟「編輯所屬使用者」對話框並勾選一位使用者（尚未儲存），這時有人改了另一位使用者的資料。約兩秒後對話框內、工具列下方會出現橘色提示，寫著「資料已被他人或外部同步更新，本視窗內的資料已過期，儲存將被拒絕。請關閉本視窗後重新開啟，
+spec/流程_外部列保護與過期快照.md	323	K2x1+K3x1	- 測試資料：base seed 四位使用者與四個群組；案例中以系統管理者寫入 RPC 把 mary 之說明改為「他人於對話框編輯中改過之說明」。登入身分為系統管理者 token `sys`。
+spec/流程_外部列保護與過期快照.md	331	K2x2	- 備註：有未存編輯時對話框不隨推播重建（草稿與基準維持開框時之版本，`show()` 綁定）；提示由 `VeGrupBlngUsers.vue` 之 watch `users` 閂鎖——僅於「收到推播當下有未存編輯（`isModified`）且表已異於開框基準」時顯示，每次 `
+spec/流程_外部列保護與過期快照.md	335	K2x1	- description: 系統管理者在權限清單頁開啟「編輯所屬權限群組」對話框並勾選一個群組（尚未儲存），這時有人改了另一個群組的資料。對話框內出現橘色的「資料已被更新」提示，按儲存鈕會被拒絕，跳出「儲存權限群組數據失敗」接「未儲存：載入此頁面後資料已被他人或外部同步更新。資
+spec/流程_外部列保護與過期快照.md	337	K2x1+K3x1	- 測試資料：base seed 四個權限與四個群組；案例中以系統管理者寫入 RPC 把 權限群組M3 之說明改為「他人於對話框編輯中改過之群組說明」。登入身分為系統管理者 token `sys`。
+spec/流程_外部列保護與過期快照.md	349	K2x3	- description: 系統管理者在使用者清單頁雙擊某位使用者的「說明」欄輸入新內容，還沒按儲存時，外部來源又同步了這批外部使用者。第一種情形是內容完全沒變的重送，系統判定沒有任何差異，不寫入資料，畫面也不會更新；第二種情形是來源端只把排序數字整批重編而先後順序不變，系統會
+spec/流程_外部列保護與過期快照.md	351	K2x3	- 測試資料：同 E2E-001（外部使用者 ext-u1、ext-u2）；案例中經外部同步端點以同一來源 `appExtU` 先原樣重送兩位外部使用者（內容與夾具逐欄相同；依 `srcKey` 差異同步，伺服端結果 `{ nAdd: 0, nUpdate: 0, nDel: 0
+spec/流程_外部列保護與過期快照.md	366	K2x1	- description: 系統管理者在使用者清單頁沒有做任何編輯時，有人改了某位使用者的 email。約兩秒後清單自動更新，該位使用者的 email 欄顯示為最新內容，沒有出現「資料已被更新」橫幅，也沒有儲存鈕（因為沒有未存的編輯）。便於確認只有「有未存編輯」時才會保留草稿並
+spec/流程_外部列保護與過期快照.md	368	K2x1+K3x1	- 測試資料：base seed 四位使用者；案例中以系統管理者寫入 RPC 把 mary 之 email 改為 `mary-by-other-23@example.com`。登入身分為系統管理者 token `sys`。
+spec/流程_外部列保護與過期快照.md	379	K2x1	- description: 系統管理者在使用者清單頁沒有編輯時，於頂列語系下拉切換為另一種語系，清單的欄位表頭文字（例如「名稱」欄）立刻改為該語系的文字，沒有出現「資料已被更新」橫幅，也沒有儲存鈕。便於確認清單頁為了保留未存編輯而調整的更新機制，沒有影響語系切換等其他畫面更新。
+spec/流程_外部列保護與過期快照.md	381	K2x1	- 測試資料：base seed 四位使用者。登入身分為系統管理者 token `sys`。
+spec/流程_外部列保護與過期快照.md	392	K2x2	- description: 系統管理者在使用者清單頁編輯了某位使用者的說明（尚未儲存），這時有人改了同一位使用者的 email，清單上方出現「資料已被更新」橫幅。系統管理者點擊橫幅上的「重新載入」後，清單回到最新資料、橫幅與儲存鈕消失；此時於頂列切換語系，清單的欄位表頭文字（例
+spec/流程_外部列保護與過期快照.md	394	K2x1+K3x1	- 測試資料：base seed 四位使用者；案例中以系統管理者寫入 RPC 把 mary 之 email 改為 `mary-by-other-25@example.com`。登入身分為系統管理者 token `sys`。
+spec/流程_外部列保護與過期快照.md	405	K2x2	- description: 系統管理者在使用者清單頁沒有未存編輯時，開啟某位使用者的「所屬群組」編輯視窗並勾選了一個群組（尚未按儲存）。這時有人改了另一位使用者的說明，清單隨之更新。系統管理者按編輯視窗的儲存後，視窗關閉並提示「未儲存：載入此頁面後資料已被他人或外部同步更新」，
+spec/流程_外部列保護與過期快照.md	407	K2x1+K3x1	- 測試資料：base seed 四位使用者（mary、john 等）；案例中以系統管理者寫入 RPC 把 john 之說明改為「他人於編輯器開啟中改過john之說明(026)」。登入身分為系統管理者 token `sys`。
+spec/流程_外部列保護與過期快照.md	418	K2x1	- description: 系統管理者在使用者清單頁雙擊 mary 的「說明」欄輸入新內容，點擊「儲存變更」，出現「儲存使用者數據成功」，點擊「確認」關閉訊息。不久後系統把這次儲存後的最新資料送回清單，有時會分兩筆先後送達。清單以最新資料重新顯示，mary 的說明維持剛儲存的內
+spec/流程_外部列保護與過期快照.md	420	K2x2	- 測試資料：base seed 四位使用者；mary 之說明輸入「A系統管理者自己儲存之說明(027)」。登入身分為系統管理者 token `sys`。
+spec/流程_外部列保護與過期快照.md	433	K2x1	- description: 系統管理者在使用者清單頁雙擊 mary 的「說明」欄輸入新內容，點擊「儲存變更」。伺服器已寫入，但回應稍慢，這段期間清單先收到這次儲存所帶來的資料更新。清單上方不會出現「資料已被更新」橫幅；回應抵達後出現「儲存使用者數據成功」，點擊「確認」後儲存鈕消
+spec/流程_外部列保護與過期快照.md	435	K2x2	- 測試資料：base seed 四位使用者；mary 之說明輸入「A系統管理者自己儲存之說明(028)」。登入身分為系統管理者 token `sys`。
+spec/流程_外部列保護與過期快照.md	448	K2x1	- description: 系統管理者在群組清單頁點擊 M1 的「所屬使用者」按鈕開啟編輯視窗，勾選 john 後點擊視窗的儲存。伺服器已寫入，但回應稍慢，這段期間視窗先收到這次儲存所帶來的資料更新。視窗內不會出現「資料已被更新」提示；回應抵達後出現「儲存使用者數據成功」，點擊
+spec/流程_外部列保護與過期快照.md	450	K2x1	- 測試資料：base seed；M1 之對話框列為 row0=peter、row1=mary、row2=john、row3=admin，勾選 john。登入身分為系統管理者 token `sys`。
+spec/流程_外部列保護與過期快照.md	463	K2x1	- description: 系統管理者在權限清單頁點擊 P1 的「所屬群組」按鈕開啟編輯視窗，勾選 M2 後點擊視窗的儲存。伺服器已寫入，但回應稍慢，這段期間視窗先收到這次儲存所帶來的資料更新。視窗內不會出現「資料已被更新」提示；回應抵達後出現「儲存權限群組數據成功」，點擊「確
+spec/流程_外部列保護與過期快照.md	465	K2x1	- 測試資料：base seed；P1 之對話框列依群組順序 row0=M1、row1=M2、row2=M3、row3=M4，勾選 M2。登入身分為系統管理者 token `sys`。
+spec/流程_外部列保護與過期快照.md	488	K3x1	| B-U1 | bk-u1 | users／`id-xr-bk1` | 空 | 說明「後台列」 | 系統管理者寫入 RPC | 供刪除混合案例之後台列（E2E-004） |
+spec/流程_外部列保護與過期快照.md	489	K3x1	| L-B | late-b | users／`id-xr-lb` | 空 | 說明「開框後他人新增之後台列」 | 系統管理者寫入 RPC | E2E-012 |
+spec/流程_外部列保護與過期快照.md	491	K3x1	| S-M | mary | users／`id-for-mary` | 空 | base seed；案例中他人改其說明或 email | 系統管理者寫入 RPC | E2E-011、016、020、022、023 之被他人改動／編輯之列 |
+spec/流程_外部列保護與過期快照.md	492	K3x1	| L-P | xr-late-pemi | pemis／`id-xr-p9` | 空 | 說明「他人新增之權限」 | 系統管理者寫入 RPC | E2E-018 之他人新增之列 |
+spec/流程_外部列保護與過期快照.md	493	K3x1	| L-T | zz-xr/t1 | targets／`zz-xr/t1` | 空 | 說明「xr暫存標的」 | 系統管理者寫入 RPC（夾具於開瀏覽器前建立，案例中被刪除） | E2E-019 之他人刪除之列 |
+spec/流程_外部列保護與過期快照.md	494	K3x1	| S-G3 | 權限群組M3 | grups／`id-for-權限群組M3` | 空 | base seed；案例中他人改其說明 | 系統管理者寫入 RPC | E2E-021 之被他人改動之列 |
+spec/流程_外部列保護與過期快照.md	496	K2x2	登入帳號：系統管理者 token `sys`（`id-for-admin`，經 `getUserByToken` 解出，通過 `verifyClientUser`）；同步端點用 app token `{token-for-application}`。單一帳號，無帳號矩陣需求（本檔
+spec/流程_外部列保護與過期快照.md	506	K2x1	| 清單上方 | 外部列橫幅（`data-fmid="<表>-banner-ext"`） | `externalRowsNotice`（標的頁為 `externalRowsNoticeTarget`） | 鎖頭（灰） | `LayoutContent{Users,Grups,Pe
+spec/流程_外部列保護與過期快照.md	511	K2x1	| 清單上方 | 資料已被更新橫幅（`data-fmid="<表>-banner-stale"`）與「重新載入」鈕（`data-fmid="<表>-banner-stale-reload"`） | `staleDraftNotice`、`staleDraftReload` | 警
+spec/流程_外部列保護與過期快照.md	540	K2x1	- **權限**：本檔案例皆為系統管理者（token `sys`）之畫面軸行為；寫入經 `verifyConn` → `checkToken` → `getAndVerifyClientUser` 守門（同 `流程_後台群組清單.md`）。同步端點經 app token（`ver
+spec/流程_外部列保護與過期快照.md	555	K2x1	- **已修復（附修復紀錄）** 2026-10-22：清單頁有未存編輯時他人或外部同步改了同一表，約 2 秒輪詢之推播使 `changeParams` 同時重建 `items` 與 `baseline`，系統管理者草稿被靜默丟棄，再存回「儲存成功」（verify01 情境 5，
+spec/流程_外部列保護與過期快照.md	560	K2x2	- **設計事實（記錄備查）** 2026-10-22：外部來源同步之列若不帶 `id`，ORM 每次補隨機主鍵，同步後列集合（id）改變即視為表內容改變（等同列被刪除並新增），系統管理者開著的舊畫面存檔會被拒；外部端須保持 `id` 穩定才不會每次同步使系統管理者之草稿過期（同
+spec/流程_外部列保護與過期快照.md	561	K2x1	- **設計事實（記錄備查）** 2026-10-22：系統管理者自己儲存成功後至推播抵達前之窗口內再編輯再存，基準仍為舊版，表級比對會因自己剛寫入之列而回 `saveStale`（成功訊息框為停留 modal，實務上推播已於人按確認前抵達；原僅涉及本次寫入列，run11 起涵蓋
+spec/流程_外部應用同步權限資料.md	9	K2x3	伺服器端點僅以 query `token` 經 `getAndVerifyAppUser`（`server/WWebPerm.mjs:getAndVerifyAppUser`）守門，且**先驗身分再驗參數**（2026-10-24 perm-run01 本輪 P-5：身分驗證通過
+spec/流程_外部應用同步權限資料.md	354	K3x1	- 測試資料：base seed 四表；案例前置：以來源 `appRC` 推送群組 `rcX1`、`rcX2`、`rcX3`（`srcKey` 各為 `sk-rc-x1`～`sk-rc-x3`；內部 `id` 由系統配發，`cpemis` 各為 權限P1、權限P2、權限P3 之 
+spec/流程_外部應用同步權限資料.md	359	K3x1	- 清理：每案後以系統管理者寫入 RPC 將四表還原為 base seed（`appRC` 之列一併移除），回驗四表筆數。
+spec/流程_外部應用同步權限資料.md	367	K3x1	- 測試資料：同 E2E-027 之前置，另以系統管理者寫入 RPC 加對照使用者 `rcXctl`（只 OR 引用 rcX1）。
+spec/流程_外部應用同步權限資料.md	380	K3x1	- 測試資料：base seed 四表；案例前置：以來源 `appRC-n` 推送群組 `rcN1`（`srcKey` `sk-rc-n1`，`cpemis`：權限P1 OR）、`rcN2`（`srcKey` `sk-rc-n2`，`cpemis`：權限P2 OR）；以系統管理者
+spec/流程_外部應用同步權限資料.md	407	K3x1	- 測試資料：同 E2E-027 之前置，另以系統管理者寫入 RPC 建立後台使用者 `rcSecretS1Name`（id `id-rc-secret-s1`，啟用引用不存在之 `rcGhostS`）與 `rcSecretS2Name`（id `id-rc-secret-s2`
+spec/流程_外部應用同步權限資料.md	419	K3x1	- 測試資料：base seed 四表；案例前置：以來源 `appRC` 推送權限 `rcPx1`（`srcKey` `id-rc-px1`，規則啟用 `專案A/頁A/區塊A`、`專案A/頁C`）與 `rcPx2`（`srcKey` `id-rc-px2`，規則啟用 `專案B/頁
+spec/流程_外部應用同步權限資料.md	432	K3x1	- 測試資料：base seed 四表；案例前置：以來源 `appRC` 推送標的 `專案RC/頁1/區塊A`、`專案RC/頁1/區塊B`、`專案RC/頁1/區塊C`（`srcKey` 即路徑，`id` 等於 `srcKey`）；以系統管理者寫入 RPC 建立後台權限 `rc-p
+spec/流程_外部應用同步權限資料.md	508	K3x1	- description: 若庫內同一來源已有兩列的 `srcKey` 相同（資料異常），或同一個 `srcKey` 同時被兩個庫內列主張（一列已有此 `srcKey`、另一列無 `srcKey` 而其 `id` 恰等於此值），伺服器無法唯一配對，於寫入任何資料之前拒絕整批推送
+spec/流程_外部應用同步權限資料.md	520	K3x1	- description: 外部應用推送使用者、權限群組或權限時，授權指派欄（使用者的 `cgrups`、權限群組的 `cpemis`、權限的 `crules`）屬「外部可選」：批次該列有帶這個鍵，就以外部給的值為準（含空字串）；沒有帶這個鍵，就保留庫內同一列（依 `srcKe
+spec/流程_外部應用同步權限資料.md	522	K3x1	- 測試資料：base seed；獨立來源；先推送 users、grups、pemis 各一列（帶 `srcKey`），再以系統管理者寫入 RPC 為這些外部列指派授權（指派欄後台可寫）。
+spec/流程_外部應用同步權限資料.md	530	K3x1	- 清理：以系統管理者寫入 RPC 還原四表並刪除外部列夾具，回驗筆數。
+spec/流程_外部應用同步權限資料.md	535	K2x1	- description: 權限系統未設定對應鍵或對應鍵為 id，也就是以主鍵方式對應外部系統的使用者時，外部同步進來的使用者是用「來源鍵」登入的，後台建立的使用者則用自己的 id 登入。不同外部系統給使用者的代號常會重複而並非同一個人，所以推送的每一位使用者，其來源鍵都不能與
+spec/流程_外部應用同步權限資料.md	537	K3x1	- 測試資料：base seed；各情境分別預置：後台使用者（以系統管理者寫入 RPC 新增，id `id-for-admin2`、啟用）；他來源停用的外部使用者（來源 `appMi-11a`，來源鍵 `id-for-admin2`）；遷移前舊外部列（來源 `appMi-13a`
+spec/流程_外部應用同步權限資料.md	546	K3x1	- 清理：刪除 `from` 為 `appMi-5`、`appMi-11a`、`appMi-11b`、`appMi-13a`、`appMi-13b` 之列，以系統管理者寫入 RPC 還原 users 表，回驗筆數。
+spec/流程_外部應用同步權限資料.md	554	K2x1+K3x1	- 操作：（a）app token 以來源 `appMi-1` 推送來源鍵為 `id-for-admin2` 之啟用中系統管理者，以該 token 登入、查詢權限、呼叫資料通道；（b）以測試框架直寫資料庫預置內部 id 為 `id-for-admin2`、來源鍵為別值之外部列，以
+spec/流程_外部應用同步權限資料.md	556	K2x1	1. 語意（a）：登入、`getPerm`、資料通道皆成功；登入回傳之 `id` 為內部 id（不等於 `id-for-admin2`）；以該系統管理者呼叫寫入函數成功且稽核欄位記內部 id。
+spec/流程_外部應用同步權限資料.md	559	K3x1	4. 語意（d）：後台使用者以 id 登入成功；預設系統管理者 `sys` 不受影響。
+spec/流程_外部應用同步權限資料.md	564	K3x1	- 清理：`cleanExternalFixtures` 移除 `appMi-*` 之列並以系統管理者寫入 RPC 還原 users／grups 表；對應鍵為 email／name 之輪次還原 `./settings.json`。
+spec/流程_外部應用同步權限資料.md	705	K2x1	- **權限**：`/syncAndReplaceTabs` 守門完全由端點 handler 內 `getAndVerifyAppUser`（query `token` → `getUserByToken` → 系統管理者等級〔2026-10-24 perm-run01 本輪 P
+spec/流程_外部應用同步權限資料.md	741	K2x2	- **設計事實（記錄備查；事實更正，使用者 2026-10-24 定案之 token 權責）** 2026-10-24（perm-run01 本輪，P-1／P-2／P-5，R-APP-TOKEN-01，`spec/設計要點與取捨.md` ADR-040）：應用系統路由（本端點與
+spec/流程_外部應用同步權限資料.md	749	K2x2	- **已修復（附修復紀錄；原待裁示，主控 2026-10-24 裁示採 O1）** 2026-10-23：users 之登入對應 `mappingBy='id'` 本輪未改（以下為 perm-run03 原文，留痕；結案紀錄在本條末）。跨套件規格第 9 節末載「`mapping
+spec/流程_多人同時編輯.md	5	K2x2	系統管理者（瀏覽器使用者，經 w-ui-loginout 登入取得有效 token、`connState='csLogin'`）進入後台後，於 `LayoutContent.vue` 左側導覽點「管理使用者」（`mmUsers`）、「管理權限群組」（`mmGrups`）、「管理權
+spec/流程_多人同時編輯.md	7	K2x1+K3x1	名詞：**他人**＝另一位系統管理者（e2e 以系統管理者寫入 RPC 模擬）或外部來源（e2e 以外部同步端點 `/syncAndReplaceTabs` 模擬）；**推播**＝伺服端表異動後客戶端重抓整表並以新陣列取代 store 該表（約 2 秒輪詢，見 `src/js/d
+spec/流程_多人同時編輯.md	11	K2x2	案例檔為 `test/e2e-concurrent-edit.test.mjs`：38 案（E2E-001～038）× eng／cht ＝ 76 個 `it`，全為語意案例，無標準圖、無 `--baseline` 模式。〔2026-10-23 perm-run02: 原 24 案
+spec/流程_多人同時編輯.md	17	K2x2	- description: 系統管理者從左側選單點選「管理使用者」進入使用者清單頁，雙擊某位使用者的「說明」欄輸入新內容，點擊「儲存變更」，出現「儲存使用者數據成功」，點擊「確認」關閉訊息；說明此時已寫入資料庫，清單顯示剛儲存的內容，儲存鈕消失，清單上方沒有「資料已被他人或外部
+spec/流程_多人同時編輯.md	19	K2x1	- 測試資料：base seed（B-U2 mary，`id-for-mary`）；第一次說明 `CE-a1-users`，第二次說明 `CE-a2-users`。登入身分為系統管理者 token `sys`。
+spec/流程_多人同時編輯.md	28	K3x1	- 清理：案例結束以 `createIsolation().restore()` 還原——先以 `purgeExternalRows` 刪外部列夾具（本案無），再經系統管理者寫入 RPC 把 users、grups、pemis 整表寫回案前快照；回驗三表筆數等於快照且無外部列殘留
+spec/流程_多人同時編輯.md	33	K2x2	- description: 系統管理者從左側選單點選「管理權限群組」進入群組清單頁，雙擊「權限群組M1」的「說明」欄輸入新內容，點擊「儲存變更」，出現「儲存權限群組數據成功」，點擊「確認」關閉訊息；說明此時已寫入資料庫，清單顯示剛儲存的內容，儲存鈕消失，清單上方沒有「資料已被他
+spec/流程_多人同時編輯.md	35	K2x1	- 測試資料：base seed（B-G1 權限群組M1，`id-for-權限群組M1`）；第一次說明 `CE-a1-grups`，第二次說明 `CE-a2-grups`。登入身分為系統管理者 token `sys`。
+spec/流程_多人同時編輯.md	49	K2x2	- description: 系統管理者從左側選單點選「管理權限」進入權限清單頁，雙擊「權限P1」的「說明」欄輸入新內容，點擊「儲存變更」，出現「儲存權限數據成功」，點擊「確認」關閉訊息；說明此時已寫入資料庫，清單顯示剛儲存的內容，儲存鈕消失，清單上方沒有「資料已被他人或外部同步
+spec/流程_多人同時編輯.md	51	K2x1	- 測試資料：base seed（B-P1 權限P1，`id-for-權限P1`）；第一次說明 `CE-a1-pemis`，第二次說明 `CE-a2-pemis`。登入身分為系統管理者 token `sys`。
+spec/流程_多人同時編輯.md	65	K2x2	- description: 系統管理者從左側選單點選「管理對象」進入對象清單頁，雙擊首列對象「專案A/頁A/區塊A」的「說明」欄輸入新內容，點擊「儲存變更」，出現「儲存對象數據成功」，點擊「確認」關閉訊息；說明此時已寫入資料庫，清單顯示剛儲存的內容，儲存鈕消失，清單上方沒有「資
+spec/流程_多人同時編輯.md	67	K2x1	- 測試資料：base seed（B-T 22 筆，首列 `專案A/頁A/區塊A`，其 id 欄即路徑）；第一次說明 `CE-a1-targets`，第二次說明 `CE-a2-targets`。登入身分為系統管理者 token `sys`。
+spec/流程_多人同時編輯.md	76	K3x1	- 清理：共用之 `createIsolation().restore()` 只還原 users、grups、pemis（`test/tools/api-setup.mjs` 之 `TABLE_FN`），本檔另於檔首擷取 targets 之 base seed 22 列、每案後經
+spec/流程_多人同時編輯.md	81	K2x2	- description: 系統管理者從左側選單點選「管理權限群組」進入群組清單頁，點擊「權限群組M1」列「管控所屬使用者」欄的按鈕開啟「編輯所屬使用者」對話框，勾選「john」那一列「是否使用」欄的核選方塊，點擊對話框的儲存鈕，出現「儲存使用者數據成功」，點擊「確認」後對話框
+spec/流程_多人同時編輯.md	83	K2x1	- 測試資料：base seed；群組清單第 0 列 權限群組M1；對話框列次 row0＝peter（已屬 M1）、row1＝mary、row2＝john、row3＝admin；先勾 john（row2），後勾 mary（row1）。登入身分為系統管理者 token `sys`。
+spec/流程_多人同時編輯.md	97	K2x2	- description: 系統管理者從左側選單點選「管理權限」進入權限清單頁，點擊「權限P1」列「管控所屬權限群組」欄的按鈕開啟「編輯所屬權限群組」對話框，勾選「權限群組M2」那一列「是否使用」欄的核選方塊，點擊對話框的儲存鈕，出現「儲存權限群組數據成功」，點擊「確認」後對話
+spec/流程_多人同時編輯.md	99	K2x1	- 測試資料：base seed；權限清單第 0 列 權限P1；對話框列次依群組 order：row0＝M1（已含 P1）、row1＝M2、row2＝M3、row3＝M4；先勾 M2（row1），後勾 M3（row2）。登入身分為系統管理者 token `sys`。
+spec/流程_多人同時編輯.md	113	K2x5	- description: 系統管理者從左側選單點選「管理權限群組」進入群組清單頁，點擊「權限群組M1」列「管控所屬使用者」欄的按鈕開啟「編輯所屬使用者」對話框，先不勾選任何項目。這時有人把「john」加入了這個群組，約 2 秒後對話框內 john 那一列自動變成已勾選，對話框
+spec/流程_多人同時編輯.md	115	K2x1+K3x1	- 測試資料：base seed；群組清單第 0 列 權限群組M1；對話框列次 row1＝mary、row2＝john（john 原不屬 M1）。他人之變更：經系統管理者寫入 RPC（`updateUsers`）把 john 之 `cgrups` 加入 權限群組M1（OR、啟用）
+spec/流程_多人同時編輯.md	129	K2x5	- description: 系統管理者從左側選單點選「管理權限」進入權限清單頁，點擊「權限P1」列「管控所屬權限群組」欄的按鈕開啟「編輯所屬權限群組」對話框，先不勾選任何項目。這時有人讓「權限群組M2」含了這個權限，約 2 秒後對話框內權限群組M2 那一列自動變成已勾選，對話框
+spec/流程_多人同時編輯.md	131	K2x1+K3x1	- 測試資料：base seed；權限清單第 0 列 權限P1；對話框列次 row1＝M2（原不含 P1）、row2＝M3。他人之變更：經系統管理者寫入 RPC（`updateGrups`）把 M2 之 `cpemis` 加入 權限P1（OR、啟用），保留 M2 原有項。登入身分
+spec/流程_多人同時編輯.md	145	K2x4	- description: 系統管理者從左側選單點選「管理使用者」進入使用者清單頁，雙擊某位使用者的「說明」欄開始輸入新內容，還沒按「Enter 鍵」確認時，有人改了另一位使用者的說明。約 2 秒後清單上方出現橘色橫幅「資料已被他人或外部同步更新。您尚未儲存的編輯仍保留於此，但
+spec/流程_多人同時編輯.md	147	K2x1	- 測試資料：base seed；編輯列 mary，輸入文字 `CE-c-typed-users`；他人改動列 john（`id-for-john`），其說明被改為 `CE-c-other-users`。登入身分為系統管理者 token `sys`。
+spec/流程_多人同時編輯.md	148	K3x1	- 操作：登入後台 → 點「管理使用者」頁籤，等 store 載入 4 筆 → 雙擊 mary 之說明儲存格，清空後輸入 `CE-c-typed-users`，**不按 Enter**（編輯器維持開啟）→（他人經系統管理者寫入 RPC 把 john 之說明改為 `CE-c-oth
+spec/流程_多人同時編輯.md	161	K2x4	- description: 系統管理者從左側選單點選「管理權限群組」進入群組清單頁，雙擊「權限群組M1」的「說明」欄開始輸入新內容，還沒按「Enter 鍵」確認時，有人改了「權限群組M2」的說明。約 2 秒後清單上方出現橘色橫幅「資料已被他人或外部同步更新。您尚未儲存的編輯仍保
+spec/流程_多人同時編輯.md	163	K2x1	- 測試資料：base seed；編輯列 權限群組M1，輸入文字 `CE-c-typed-grups`；他人改動列 權限群組M2（`id-for-權限群組M2`），其說明被改為 `CE-c-other-grups`。登入身分為系統管理者 token `sys`。
+spec/流程_多人同時編輯.md	164	K3x1	- 操作：登入後台 → 點「管理權限群組」頁籤，等 store 載入 4 筆 → 雙擊 權限群組M1 之說明儲存格，清空後輸入 `CE-c-typed-grups`，不按 Enter →（他人經系統管理者寫入 RPC 把 權限群組M2 之說明改為 `CE-c-other-grup
+spec/流程_多人同時編輯.md	177	K2x4	- description: 系統管理者從左側選單點選「管理權限」進入權限清單頁，雙擊「權限P1」的「說明」欄開始輸入新內容，還沒按「Enter 鍵」確認時，有人改了「權限P2」的說明。約 2 秒後清單上方出現橘色橫幅「資料已被他人或外部同步更新。您尚未儲存的編輯仍保留於此，但現
+spec/流程_多人同時編輯.md	179	K2x1	- 測試資料：base seed；編輯列 權限P1，輸入文字 `CE-c-typed-pemis`；他人改動列 權限P2（`id-for-權限P2`），其說明被改為 `CE-c-other-pemis`。登入身分為系統管理者 token `sys`。
+spec/流程_多人同時編輯.md	180	K3x1	- 操作：登入後台 → 點「管理權限」頁籤，等 store 載入 4 筆 → 雙擊 權限P1 之說明儲存格，清空後輸入 `CE-c-typed-pemis`，不按 Enter →（他人經系統管理者寫入 RPC 把 權限P2 之說明改為 `CE-c-other-pemis`）→ 等
+spec/流程_多人同時編輯.md	193	K2x4	- description: 系統管理者從左側選單點選「管理對象」進入對象清單頁，雙擊首列對象「專案A/頁A/區塊A」的「說明」欄開始輸入新內容，還沒按「Enter 鍵」確認時，有人改了對象「專案A/頁C」的說明。約 2 秒後清單上方出現橘色橫幅「資料已被他人或外部同步更新。您尚
+spec/流程_多人同時編輯.md	195	K2x1	- 測試資料：base seed；編輯列 `專案A/頁A/區塊A`，輸入文字 `CE-c-typed-targets`；他人改動列 `專案A/頁C`，其說明被改為 `CE-c-other-targets`。登入身分為系統管理者 token `sys`。
+spec/流程_多人同時編輯.md	196	K3x1	- 操作：登入後台 → 點「管理對象」頁籤，等 store 載入 22 筆 → 雙擊 `專案A/頁A/區塊A` 之說明儲存格，清空後輸入 `CE-c-typed-targets`，不按 Enter →（他人經系統管理者寫入 RPC 把 `專案A/頁C` 之說明改為 `CE-c-o
+spec/流程_多人同時編輯.md	209	K2x2	- description: 系統管理者從左側選單點選「管理使用者」進入使用者清單頁，雙擊某位使用者的「說明」欄開始輸入新內容但還沒按「Enter 鍵」，有人改了另一位使用者的說明，清單上方出現橘色橫幅「資料已被他人或外部同步更新。您尚未儲存的編輯仍保留於此，但現在儲存將被拒絕。
+spec/流程_多人同時編輯.md	211	K2x1	- 測試資料：base seed；編輯列 mary，輸入文字 `CE-c-escape-typed`；他人改動列 john，其說明被改為 `CE-c-escape-other`。登入身分為系統管理者 token `sys`。
+spec/流程_多人同時編輯.md	212	K3x1	- 操作：登入後台 → 點「管理使用者」頁籤，等 store 載入 4 筆 → 雙擊 mary 之說明儲存格，清空後輸入 `CE-c-escape-typed`，不按 Enter →（他人經系統管理者寫入 RPC 把 john 之說明改為 `CE-c-escape-other`）
+spec/流程_多人同時編輯.md	225	K2x2	- description: 系統管理者從左側選單點選「管理權限群組」進入群組清單頁，點擊「權限群組M1」列「管控所屬使用者」欄的按鈕開啟「編輯所屬使用者」對話框，勾選「john」但尚未儲存。這時有人把「權限群組M1」刪除，並另外建立 1 個同名的群組。對話框內隨即出現橘色提示「
+spec/流程_多人同時編輯.md	227	K2x1+K3x1	- 測試資料：base seed；群組清單第 0 列 權限群組M1；對話框列次 row2＝john，勾選之。他人之變更：經系統管理者寫入 RPC（`updateGrups`）整表寫入，刪除 權限群組M1（`id-for-權限群組M1`）並新增同名群組 R-G1（`id-ce-m1
+spec/流程_多人同時編輯.md	241	K2x2	- description: 系統管理者從左側選單點選「管理權限」進入權限清單頁，點擊「權限P1」列「管控所屬權限群組」欄的按鈕開啟「編輯所屬權限群組」對話框，勾選「權限群組M2」但尚未儲存。這時有人把「權限P1」刪除，並另外建立 1 個同名的權限。對話框內隨即出現橘色提示「資料
+spec/流程_多人同時編輯.md	243	K2x1+K3x1	- 測試資料：base seed；權限清單第 0 列 權限P1；對話框列次 row1＝M2，勾選之。他人之變更：經系統管理者寫入 RPC（`updatePemis`）整表寫入，刪除 權限P1（`id-for-權限P1`）並新增同名權限 R-P1（`id-ce-p1-new`，or
+spec/流程_多人同時編輯.md	257	K2x3	- description: 系統管理者從左側選單點選「管理權限群組」進入群組清單頁，點擊「權限群組M1」列「管控所屬使用者」欄的按鈕開啟「編輯所屬使用者」對話框，先不勾選任何項目。這時有人把「權限群組M1」刪除，並另外建立 1 個同名的群組。即使系統管理者還沒有編輯，對話框內也
+spec/流程_多人同時編輯.md	259	K2x1+K3x1	- 測試資料：base seed；群組清單第 0 列 權限群組M1；對話框列次 row2＝john。他人之變更：經系統管理者寫入 RPC（`updateGrups`）整表寫入，刪除 權限群組M1 並新增同名群組 R-G2（`id-ce-m1-new2`，order 99、說明「同
+spec/流程_多人同時編輯.md	272	K2x4	- description: 系統管理者從左側選單點選「管理使用者」進入使用者清單頁，雙擊某位使用者的「說明」欄輸入新內容並按「Enter 鍵」確認，還沒儲存時，有人調整了使用者的排列順序，把前 2 位使用者對調，各列的內容完全沒有改。約 2 秒後清單上方出現橘色橫幅「資料已被他
+spec/流程_多人同時編輯.md	274	K2x1+K3x1	- 測試資料：base seed；編輯列 mary，說明輸入 `CE-e-draft-users`；他人之變更：經系統管理者寫入 RPC（`updateUsers`）把依 order 排序之前 2 列（peter、mary）對調後整表寫入（內容不變，order 依陣列位置重給）。
+spec/流程_多人同時編輯.md	283	K3x1	- 備註：名次入基準——`src/js/rowDigest.mjs:compareBaseline` 經核心 `w-serv-orm/src/baseline.mjs:compareBaseline` 得 `reordered=true`，伺服端 reason 為 `rowReo
+spec/流程_多人同時編輯.md	287	K2x4	- description: 系統管理者從左側選單點選「管理權限群組」進入群組清單頁，雙擊「權限群組M1」的「說明」欄輸入新內容並按「Enter 鍵」確認，還沒儲存時，有人調整了群組的排列順序，把前 2 個群組對調，各列的內容完全沒有改。約 2 秒後清單上方出現橘色橫幅「資料已被
+spec/流程_多人同時編輯.md	289	K2x1+K3x1	- 測試資料：base seed；編輯列 權限群組M1，說明輸入 `CE-e-draft-grups`；他人之變更：經系統管理者寫入 RPC（`updateGrups`）把依 order 排序之前 2 列（M1、M2）對調後整表寫入。登入身分為系統管理者 token `sys`。
+spec/流程_多人同時編輯.md	302	K2x4	- description: 系統管理者從左側選單點選「管理使用者」進入使用者清單頁，清單中除了後台自建的使用者，還有外部來源同步進來的外部使用者。系統管理者雙擊某位使用者的「說明」欄輸入新內容並按「Enter 鍵」確認，還沒儲存時，外部來源重新同步了這些外部使用者：內容完全沒變
+spec/流程_多人同時編輯.md	304	K2x1	- 測試資料：base seed 加外部使用者 X-1 ce-x1（`srcKey` 為 `id-ce-x1`，說明「ce外部一」，order 100）、X-2 ce-x2（`srcKey` 為 `id-ce-x2`，說明「ce外部二」，order 101），`from` 皆為 
+spec/流程_多人同時編輯.md	317	K2x2	- description: 系統管理者從左側選單點選「管理使用者」進入使用者清單頁，雙擊某位使用者的「說明」欄輸入新內容並按「Enter 鍵」確認。如果這個頁面是在系統升級之前載入、升級後沒有重新整理過，點擊「儲存變更」時系統無法辨識此頁面所帶的資料版本，會拒絕存檔，跳出「儲存
+spec/流程_多人同時編輯.md	319	K2x1	- 測試資料：base seed；編輯列 mary，說明輸入 `CE-legacy-draft`。登入身分為系統管理者 token `sys`。
+spec/流程_多人同時編輯.md	332	K2x1	- description: 系統管理者從左側選單點選「管理使用者」進入使用者清單頁，沒有其他人同時作業時，雙擊某位使用者的「說明」欄輸入新內容並按「Enter 鍵」確認，點擊「儲存變更」，出現「儲存使用者數據成功」，點擊「確認」關閉訊息，說明已寫入資料庫。此時系統核對的資料版本
+spec/流程_多人同時編輯.md	334	K2x1	- 測試資料：base seed；編輯列 mary，說明輸入 `CE-v10-users`。登入身分為系統管理者 token `sys`。
+spec/流程_多人同時編輯.md	349	K2x1	- description: 系統管理者從左側選單點選「管理權限群組」進入群組清單頁，沒有其他人同時作業時，雙擊「權限群組M1」的「說明」欄輸入新內容並按「Enter 鍵」確認，點擊「儲存變更」，出現「儲存權限群組數據成功」，點擊「確認」關閉訊息，說明已寫入資料庫。此時系統核對的
+spec/流程_多人同時編輯.md	351	K2x1	- 測試資料：base seed；編輯列 權限群組M1，說明輸入 `CE-v10-grups`。登入身分為系統管理者 token `sys`。
+spec/流程_多人同時編輯.md	366	K2x1	- description: 系統管理者從左側選單點選「管理權限」進入權限清單頁，沒有其他人同時作業時，雙擊「權限P1」的「說明」欄輸入新內容並按「Enter 鍵」確認，點擊「儲存變更」，出現「儲存權限數據成功」，點擊「確認」關閉訊息，說明已寫入資料庫。此時系統核對的資料版本與畫
+spec/流程_多人同時編輯.md	368	K2x1	- 測試資料：base seed；編輯列 權限P1，說明輸入 `CE-v10-pemis`。登入身分為系統管理者 token `sys`。
+spec/流程_多人同時編輯.md	383	K2x1	- description: 系統管理者從左側選單點選「管理對象」進入對象清單頁，沒有其他人同時作業時，雙擊首列對象「專案A/頁A/區塊A」的「說明」欄輸入新內容並按「Enter 鍵」確認，點擊「儲存變更」，出現「儲存對象數據成功」，點擊「確認」關閉訊息，說明已寫入資料庫。此時系
+spec/流程_多人同時編輯.md	385	K2x1	- 測試資料：base seed；編輯列 `專案A/頁A/區塊A`，說明輸入 `CE-v10-targets`。登入身分為系統管理者 token `sys`。
+spec/流程_多人同時編輯.md	400	K2x3	- description: 系統管理者從左側選單點選「管理權限群組」進入群組清單頁，點擊「權限群組M1」列「管控所屬使用者」欄的按鈕開啟「編輯所屬使用者」對話框，勾選「john」但尚未儲存。這時有人把「權限群組M1」刪除，並另外建立 1 個同名的群組，但這項變動還沒有傳到系統管
+spec/流程_多人同時編輯.md	402	K2x1+K3x1	- 測試資料：base seed；群組清單第 0 列 權限群組M1；對話框列次 row2＝john，勾選之。他人之變更：經系統管理者寫入 RPC（`updateGrups`）整表寫入，刪除 權限群組M1（`id-for-權限群組M1`）並新增同名群組 R-G3（`id-ce-m1
+spec/流程_多人同時編輯.md	417	K2x3	- description: 系統管理者從左側選單點選「管理權限」進入權限清單頁，點擊「權限P1」列「管控所屬權限群組」欄的按鈕開啟「編輯所屬權限群組」對話框，勾選「權限群組M2」但尚未儲存。這時有人把「權限P1」刪除，並另外建立 1 個同名的權限，但這項變動還沒有傳到系統管理者
+spec/流程_多人同時編輯.md	419	K2x1+K3x1	- 測試資料：base seed；權限清單第 0 列 權限P1；對話框列次 row1＝M2，勾選之。他人之變更：經系統管理者寫入 RPC（`updatePemis`）整表寫入，刪除 權限P1（`id-for-權限P1`）並新增同名權限 R-P2（`id-ce-p1-new2`，o
+spec/流程_多人同時編輯.md	434	K2x3	- description: 系統管理者從左側選單點選「管理使用者」進入使用者清單頁，點擊「mary」列「管控使用權限群組」欄的按鈕開啟「編輯使用權限群組」對話框，勾選尚無人使用的「權限群組M9」，點擊對話框的儲存鈕，對話框關閉，清單上方出現儲存鈕。這時有人把「權限群組M9」刪除
+spec/流程_多人同時編輯.md	436	K2x1+K3x2	- 測試資料：base seed 加案前追加之群組 F-G（權限群組M9，`id-ce-m9`，無任何使用者引用，`cpemis` 為 `{}`，`from` 為空；於開瀏覽器前經系統管理者寫入 RPC `updateGrups` 追加於群組表末位）；編輯列 mary（`id-f
+spec/流程_多人同時編輯.md	451	K2x3	- description: 系統管理者從左側選單點選「管理權限群組」進入群組清單頁，點擊「權限群組M1」列「管控使用權限」欄的按鈕開啟「編輯使用權限」對話框，勾選尚無人使用的「權限P9」，點擊對話框的儲存鈕，對話框關閉，清單上方出現儲存鈕。這時有人把「權限P9」刪除，並另外建立
+spec/流程_多人同時編輯.md	453	K2x1+K3x2	- 測試資料：base seed 加案前追加之權限 F-P（權限P9，`id-ce-p9`，無任何群組引用，`crules` 為 `{}`，`from` 為空；於開瀏覽器前經系統管理者寫入 RPC `updatePemis` 追加於權限表末位）；編輯列 權限群組M1（`id-fo
+spec/流程_多人同時編輯.md	468	K2x3	- description: 系統管理者從左側選單點選「管理權限」進入權限清單頁，點擊「權限P1」列「管控對象」欄的按鈕開啟「編輯使用對象」對話框，勾選尚無人使用的對象「專案A/頁A/區塊A/執行按鈕」，點擊對話框的儲存鈕，對話框關閉，清單上方出現儲存鈕。這時有人把這個對象刪除，
+spec/流程_多人同時編輯.md	470	K2x1+K3x1	- 測試資料：base seed；編輯列 權限P1（`id-for-權限P1`）；編輯器列次（依對象 order）row1＝`專案A/頁A/區塊A/執行按鈕`（B-T3；base seed 四個權限之 `crules` 皆未引用它），勾選之。他人之變更：經系統管理者寫入 RPC（
+spec/流程_多人同時編輯.md	485	K2x4	- description: 系統管理者從左側選單點選「管理使用者」進入使用者清單頁，點擊「mary」列「管控使用權限群組」欄的按鈕開啟「編輯使用權限群組」對話框，勾選尚無人使用的「權限群組M9」，點擊對話框的儲存鈕，對話框關閉，清單上方出現儲存鈕。這時有人把「權限群組M9」刪除
+spec/流程_多人同時編輯.md	487	K2x1	- 測試資料：同 E2E-027（案前追加之群組 F-G 權限群組M9；他人之變更同為刪除 M9 並新增 R-G4）。登入身分為系統管理者 token `sys`。
+spec/流程_多人同時編輯.md	501	K2x4	- description: 系統管理者從左側選單點選「管理權限群組」進入群組清單頁，點擊「權限群組M1」列「管控使用權限」欄的按鈕開啟「編輯使用權限」對話框，勾選尚無人使用的「權限P9」，點擊對話框的儲存鈕，對話框關閉，清單上方出現儲存鈕。這時有人把「權限P9」刪除，並另外建立
+spec/流程_多人同時編輯.md	503	K2x1	- 測試資料：同 E2E-028（案前追加之權限 F-P 權限P9；他人之變更同為刪除 P9 並新增 R-P3）。登入身分為系統管理者 token `sys`。
+spec/流程_多人同時編輯.md	517	K2x4	- description: 系統管理者從左側選單點選「管理權限」進入權限清單頁，點擊「權限P1」列「管控對象」欄的按鈕開啟「編輯使用對象」對話框，勾選尚無人使用的對象「專案A/頁A/區塊A/執行按鈕」，點擊對話框的儲存鈕，對話框關閉，清單上方出現儲存鈕。這時有人把這個對象刪除，
+spec/流程_多人同時編輯.md	519	K2x1	- 測試資料：同 E2E-029（他人之變更同為刪除該對象，不重建）。登入身分為系統管理者 token `sys`。
+spec/流程_多人同時編輯.md	533	K2x1	- description: 系統管理者從左側選單點選「管理使用者」進入使用者清單頁，點擊「mary」列「管控使用權限群組」欄的按鈕開啟「編輯使用權限群組」對話框，勾選「權限群組M1」，點擊對話框的儲存鈕，對話框關閉，清單上方出現儲存鈕。點擊「儲存變更」，出現「儲存使用者數據成功
+spec/流程_多人同時編輯.md	535	K2x1	- 測試資料：base seed；編輯列 mary（`id-for-mary`，原僅屬 權限群組M2）；編輯器列次 row0＝權限群組M1，勾選之。登入身分為系統管理者 token `sys`。
+spec/流程_多人同時編輯.md	549	K2x1	- description: 系統管理者從左側選單點選「管理權限群組」進入群組清單頁，點擊「權限群組M1」列「管控使用權限」欄的按鈕開啟「編輯使用權限」對話框，勾選「權限P3」，點擊對話框的儲存鈕，對話框關閉，清單上方出現儲存鈕。點擊「儲存變更」，出現「儲存權限群組數據成功」，點
+spec/流程_多人同時編輯.md	551	K2x1	- 測試資料：base seed；編輯列 權限群組M1（`id-for-權限群組M1`，原含 P1、P2）；編輯器列次 row2＝權限P3，勾選之。登入身分為系統管理者 token `sys`。
+spec/流程_多人同時編輯.md	565	K2x1	- description: 系統管理者從左側選單點選「管理權限」進入權限清單頁，點擊「權限P1」列「管控對象」欄的按鈕開啟「編輯使用對象」對話框，勾選對象「專案A/頁A/區塊A/執行按鈕」，點擊對話框的儲存鈕，對話框關閉，清單上方出現儲存鈕。點擊「儲存變更」，出現「儲存權限數據
+spec/流程_多人同時編輯.md	567	K2x1	- 測試資料：base seed；編輯列 權限P1（`id-for-權限P1`，原 `crules` 啟用 `專案A/頁A/區塊A`）；編輯器列次 row1＝`專案A/頁A/區塊A/執行按鈕`（B-T3），勾選之。登入身分為系統管理者 token `sys`。
+spec/流程_多人同時編輯.md	581	K2x3	- description: 系統管理者從左側選單點選「管理權限」進入權限清單頁，點擊「權限P1」列「管控對象」欄的按鈕開啟「編輯使用對象」對話框，勾選尚無人使用的對象「專案A/頁A/區塊A/執行按鈕」，點擊對話框的儲存鈕，對話框關閉，清單上方出現儲存鈕。這時有人把這個對象刪除，
+spec/流程_多人同時編輯.md	583	K2x1+K3x1	- 測試資料：同 E2E-029（編輯列 權限P1；編輯器列次 row1＝`專案A/頁A/區塊A/執行按鈕`）。他人之變更為兩次獨立寫入：先經系統管理者寫入 RPC（`updateTargets`）整表寫入刪除該對象，再整表寫入以同 id 新增回該對象（order 99、說明「同
+spec/流程_多人同時編輯.md	597	K2x2	- description: 系統管理者從左側選單點選「管理使用者」進入使用者清單頁，點擊「mary」列「管控使用權限群組」欄的按鈕，勾選尚無人使用的「權限群組M9」，點擊對話框的儲存鈕，清單上方出現儲存鈕。這時有人把「權限群組M9」刪除，並以相同的名稱重新建立（成為另一個群組）
+spec/流程_多人同時編輯.md	599	K2x1	- 測試資料：同 E2E-027（案前追加之群組 F-G 權限群組M9；他人之變更為刪除 M9 並新增 R-G4）。編輯列為 mary（`id-for-mary`）與 john（`id-for-john`），編輯器列次皆 row4＝權限群組M9。登入身分為系統管理者 token 
+spec/流程_多人同時編輯.md	611	K2x1	- description: 系統管理者從左側選單點選「管理使用者」進入使用者清單頁，點擊「mary」列「管控使用權限群組」欄的按鈕開啟「編輯使用權限群組」對話框，「權限群組M2」原為已勾選，取消勾選後點擊對話框的儲存鈕，對話框關閉，清單上方出現儲存鈕。點擊「儲存變更」，出現「儲
+spec/流程_多人同時編輯.md	613	K2x1	- 測試資料：base seed；編輯列 mary（`id-for-mary`，原僅屬 權限群組M2〔OR、啟用〕）；編輯器列次 row1＝權限群組M2（編輯器列依群組 order，M1 為 row0），開窗時已勾選，取消勾選之。登入身分為系統管理者 token `sys`。本案
+spec/流程_多人同時編輯.md	640	K3x1	| R-G1 | 權限群組M1（同名重建） | grups／`id-ce-m1-new` | 空 | order 99、說明「同名重建之群組」、`cpemis` 為 `{}` | 系統管理者寫入 RPC（案中取代 M1） | E2E-014 |
+spec/流程_多人同時編輯.md	641	K3x1	| R-G2 | 權限群組M1（同名重建） | grups／`id-ce-m1-new2` | 空 | 同 R-G1 | 系統管理者寫入 RPC（案中取代 M1） | E2E-016 |
+spec/流程_多人同時編輯.md	642	K3x1	| R-P1 | 權限P1（同名重建） | pemis／`id-ce-p1-new` | 空 | order 99、說明「同名重建之權限」、`crules` 為 `{}` | 系統管理者寫入 RPC（案中取代 P1） | E2E-015 |
+spec/流程_多人同時編輯.md	643	K3x1	| R-G3 | 權限群組M1（同名重建） | grups／`id-ce-m1-new3` | 空 | 同 R-G1 | 系統管理者寫入 RPC（案中取代 M1） | E2E-025 |
+spec/流程_多人同時編輯.md	644	K3x1	| R-P2 | 權限P1（同名重建） | pemis／`id-ce-p1-new2` | 空 | 同 R-P1 | 系統管理者寫入 RPC（案中取代 P1） | E2E-026 |
+spec/流程_多人同時編輯.md	645	K3x1	| F-G | 權限群組M9 | grups／`id-ce-m9` | 空 | 無任何使用者引用、說明「案前追加之群組」、`cpemis` 為 `{}`；追加於群組表末位 | 案前經系統管理者寫入 RPC `updateGrups` 追加（開瀏覽器前） | E2E-027、030
+spec/流程_多人同時編輯.md	646	K3x1	| R-G4 | 權限群組M9（同名重建） | grups／`id-ce-m9-new` | 空 | order 99、說明「同名重建之群組」、`cpemis` 為 `{}` | 系統管理者寫入 RPC（案中取代 M9） | E2E-027、030 |
+spec/流程_多人同時編輯.md	647	K3x1	| F-P | 權限P9 | pemis／`id-ce-p9` | 空 | 無任何群組引用、說明「案前追加之權限」、`crules` 為 `{}`；追加於權限表末位 | 案前經系統管理者寫入 RPC `updatePemis` 追加（開瀏覽器前） | E2E-028、031 |
+spec/流程_多人同時編輯.md	648	K3x1	| R-P3 | 權限P9（同名重建） | pemis／`id-ce-p9-new` | 空 | order 99、說明「同名重建之權限」、`crules` 為 `{}` | 系統管理者寫入 RPC（案中取代 P9） | E2E-028、031 |
+spec/流程_多人同時編輯.md	650	K3x1	| R-T | `專案A/頁A/區塊A/執行按鈕`（同路徑重建） | targets／同 id | 空 | order 99、說明「同路徑重建之對象」 | 系統管理者寫入 RPC（案中先刪除、再整表寫入新增回） | E2E-036 |
+spec/流程_多人同時編輯.md	656	K3x1	| E2E-007 | john 之 `cgrups` 加入 權限群組M1（OR、啟用），保留原有項 | 系統管理者寫入 RPC `updateUsers` |
+spec/流程_多人同時編輯.md	657	K3x1	| E2E-008 | 權限群組M2 之 `cpemis` 加入 權限P1（OR、啟用），保留原有項 | 系統管理者寫入 RPC `updateGrups` |
+spec/流程_多人同時編輯.md	658	K3x1	| E2E-009 | john 之說明改為 `CE-c-other-users` | 系統管理者寫入 RPC `updateUsers` |
+spec/流程_多人同時編輯.md	659	K3x1	| E2E-010 | 權限群組M2 之說明改為 `CE-c-other-grups` | 系統管理者寫入 RPC `updateGrups` |
+spec/流程_多人同時編輯.md	660	K3x1	| E2E-011 | 權限P2 之說明改為 `CE-c-other-pemis` | 系統管理者寫入 RPC `updatePemis` |
+spec/流程_多人同時編輯.md	661	K3x1	| E2E-012 | `專案A/頁C` 之說明改為 `CE-c-other-targets` | 系統管理者寫入 RPC `updateTargets` |
+spec/流程_多人同時編輯.md	662	K3x1	| E2E-013 | john 之說明改為 `CE-c-escape-other` | 系統管理者寫入 RPC `updateUsers` |
+spec/流程_多人同時編輯.md	663	K3x1	| E2E-014 | 刪除 權限群組M1、新增 R-G1 | 系統管理者寫入 RPC `updateGrups`（整表） |
+spec/流程_多人同時編輯.md	664	K3x1	| E2E-015 | 刪除 權限P1、新增 R-P1 | 系統管理者寫入 RPC `updatePemis`（整表） |
+spec/流程_多人同時編輯.md	665	K3x1	| E2E-016 | 刪除 權限群組M1、新增 R-G2 | 系統管理者寫入 RPC `updateGrups`（整表） |
+spec/流程_多人同時編輯.md	666	K3x1	| E2E-017 | users 依 order 排序之前 2 列對調 | 系統管理者寫入 RPC `updateUsers`（整表，order 依陣列位置重給） |
+spec/流程_多人同時編輯.md	667	K3x1	| E2E-018 | grups 依 order 排序之前 2 列對調 | 系統管理者寫入 RPC `updateGrups`（整表） |
+spec/流程_多人同時編輯.md	669	K3x1	| E2E-025 | 刪除 權限群組M1、新增 R-G3（推播被攔住，前端看不到） | 系統管理者寫入 RPC `updateGrups`（整表） |
+spec/流程_多人同時編輯.md	670	K3x1	| E2E-026 | 刪除 權限P1、新增 R-P2（推播被攔住） | 系統管理者寫入 RPC `updatePemis`（整表） |
+spec/流程_多人同時編輯.md	671	K3x1	| E2E-027 | 刪除 F-G（權限群組M9）、新增 R-G4（推播被攔住） | 系統管理者寫入 RPC `updateGrups`（整表） |
+spec/流程_多人同時編輯.md	672	K3x1	| E2E-028 | 刪除 F-P（權限P9）、新增 R-P3（推播被攔住） | 系統管理者寫入 RPC `updatePemis`（整表） |
+spec/流程_多人同時編輯.md	673	K3x1	| E2E-029 | 刪除 B-T3（不重建；推播被攔住） | 系統管理者寫入 RPC `updateTargets`（整表） |
+spec/流程_多人同時編輯.md	674	K3x1	| E2E-030 | 同 E2E-027（推播不攔，抵達 store） | 系統管理者寫入 RPC `updateGrups`（整表） |
+spec/流程_多人同時編輯.md	675	K3x1	| E2E-031 | 同 E2E-028（推播不攔） | 系統管理者寫入 RPC `updatePemis`（整表） |
+spec/流程_多人同時編輯.md	676	K3x1	| E2E-032 | 同 E2E-029（推播不攔） | 系統管理者寫入 RPC `updateTargets`（整表） |
+spec/流程_多人同時編輯.md	677	K3x1	| E2E-036 | 先刪除 B-T3，再整表寫入新增 R-T（同 id；推播被攔住） | 系統管理者寫入 RPC `updateTargets`（兩次整表寫入） |
+spec/流程_多人同時編輯.md	679	K2x2	登入帳號：系統管理者 token `sys`（`id-for-admin`，經 `getUserByToken` 解出，通過 `verifyClientUser`；`test/tools/api-setup.mjs` 之 `TOKEN_ADMIN`）；同步端點用 app toke
+spec/流程_多人同時編輯.md	689	K2x1	| 清單上方 | 資料已被更新橫幅（`data-fmid="<表>-banner-stale"`，表為 users／grups／pemis／targets） | `staleDraftNotice` | 警告圖示 | `LayoutContent{Users,Grups,Pemi
+spec/流程_多人同時編輯.md	727	K1x1+K2x3	| 寫入函數呼叫者不是有效系統管理者（perm-run03） | eng `Only system administrators can access or change this data`／cht `僅系統管理者可存取或變更此資料`〔2026-10-24 perm-run01
+spec/流程_多人同時編輯.md	728	K2x1	| 執行身分（請求本體 token）驗證失敗（perm-run03） | `cannotFindUserFromToken`：eng `Cannot identify the user from token`／cht `無法由 token 識別使用者`；`cannotGetUse
+spec/流程_多人同時編輯.md	732	K2x3+K3x1	- **權限**：本檔案例皆為系統管理者（token `sys`）之畫面軸行為；單一帳號，無負向權限案例。寫入經 `verifyConn` 守門，執行身分（`getUserIdByToken`）另經完整驗證，且四個寫入函數另經 `requireAdmin`（見下「呼叫者身分驗證與
+spec/流程_多人同時編輯.md	744	K2x1	- **呼叫者身分驗證與寫入函數角色檢查**（perm-run03；API 層、無 UI 案例；使用者 2026-10-23 裁示採 C2 之②「套件自行強制」〔依 `server/WWebPerm.mjs:requireAdmin` 註解〕；跨套件規則 `C:\opensrcO
+spec/流程_多人同時編輯.md	745	K3x2	- **手段說明（setup，非使用者動作）**：「他人」＝系統管理者寫入 RPC（`editTableRows`：讀現況整表 → 改 → 整表寫入，依陣列位置重給 order）或外部同步端點（`syncRows`：app token、依 `srcKey` 差異同步；夾具列之 `
+spec/流程_多人同時編輯.md	752	K3x2	- **清理與隔離**：每案 `afterCase` 呼叫 `createIsolation().restore()`——`purgeExternalRows` 刪外部列夾具後，經系統管理者寫入 RPC 把 users、grups、pemis 整表寫回案前快照，並回驗三表筆數與無
+spec/流程_多人同時編輯.md	762	K2x1	- **設計事實（記錄備查）** 2026-10-23：名次入基準使「他人只重排」亦令持舊畫面存檔被拒（E2E-017、018），而僅 `order` 數值重編號（名次不變）不算變更（E2E-019）——`w-serv-orm/src/baseline.mjs:compareBa
+spec/流程_多人同時編輯.md	770	K2x2	- **設計事實（記錄備查；未設 e2e）** 2026-10-23（perm-run03 範圍三、四）：資料通道執行身分完整驗證與寫入函數角色檢查屬 API 層行為，本檔 e2e 帳號恆為系統管理者，不設案例，細節見〈規則摘要〉「呼叫者身分驗證與寫入函數角色檢查」條。決定理由與
+spec/流程_引用連帶確認框.md	5	K2x1	系統管理者（瀏覽器使用者，經 w-ui-loginout 登入取得有效 token、`connState='csLogin'`）進入後台後，於 `LayoutContent.vue` 左側導覽點「管理權限群組」（`mmGrups`）、「管理權限」（`mmPemis`）、「管理對象
+spec/流程_引用連帶確認框.md	15	K2x1	- description: 系統管理者在群組清單頁的編輯模式下，勾選一個正被使用者引用的群組，點「刪除勾選權限群組」，畫面先跳出確認框，說明將自幾位使用者移除對所選群組的引用，若其中有使用者以 AND 引用，還會說明這些使用者的限制解除後授權可能變多。點「取消」，群組仍在清單中
+spec/流程_引用連帶確認框.md	17	K2x1+K3x1	- 測試資料：base seed 四表；案例前置（非使用者操作）：以系統管理者寫入 RPC 新增後台群組 `rc-del-g`（id `id-rc-delg`，`cpemis` 為 權限P3 之 OR）與後台使用者 `rc-del-uo`（id `id-rc-uo`，`cgrup
+spec/流程_引用連帶確認框.md	30	K3x1	- 清理：案例結束以 `restoreTables` 還原（先 `purgeExternalRows` 直接刪外部使用者夾具，再經系統管理者寫入 RPC 整表寫回快照，移除後台夾具），回驗三表筆數皆為 4 且無外部列殘留。
+spec/流程_引用連帶確認框.md	35	K2x1	- description: 系統管理者在群組清單頁勾選一個沒有任何使用者引用的群組，點「刪除勾選權限群組」，不會跳出確認框，該列直接從清單移除並出現儲存鈕；此時資料庫尚未變動，再點「儲存變更」才真正刪除，成功時出現「儲存權限群組數據成功」，其他使用者與權限的資料都不受影響。便於
+spec/流程_引用連帶確認框.md	37	K2x1+K3x1	- 測試資料：base seed 四表；案例前置（非使用者操作）：以系統管理者寫入 RPC 新增後台群組 `rc-lone`（id `id-rc-lone`，`cpemis` 為 權限P4 之 OR），無任何使用者引用。登入身分為系統管理者 token `sys`。
+spec/流程_引用連帶確認框.md	49	K2x1	- description: 系統管理者在群組清單頁雙擊某個正被使用者引用的群組名稱，改成新名稱後點「儲存變更」，畫面先跳出確認框，說明儲存後將一併更新幾位使用者對這個群組的引用，並列出舊名稱與新名稱；其中若有來源是外部應用的使用者，確認框會加註這些使用者的引用下次外部同步時可能
+spec/流程_引用連帶確認框.md	51	K2x1+K3x1	- 測試資料：base seed 四表；案例前置（非使用者操作）：以系統管理者寫入 RPC 新增後台群組 `rc-ren-g`（id `id-rc-reng`，`cpemis` 為 權限P3 與 權限P1 之 OR）與後台使用者 `rc-ren-u`（id `id-rc-ru`，
+spec/流程_引用連帶確認框.md	69	K2x1	- description: 系統管理者在權限清單頁把某個權限改名，新名稱與一個正被群組啟用引用、卻在權限清單中找不到的名稱相同，也就是引用中的懸空名稱，系統為避免改名後的權限被這些引用接管，會整次拒絕儲存。畫面不會跳出確認框，而是直接出現失敗訊息，內容為「儲存權限數據失敗」接拒
+spec/流程_引用連帶確認框.md	71	K2x1	- 測試資料：base seed 四表；案例前置（非使用者操作）：經外部同步端點推入外部群組 `rc-dang-g`（id `id-rc-dg`，`from` 為 `appRefCascade`，`cpemis` 為 權限P1 之 OR 加不存在之 `rc-ghost-p` 之 
+spec/流程_引用連帶確認框.md	86	K2x1	- description: 系統管理者在標的清單頁勾選一個正被權限規則引用的管控對象，點「刪除勾選對象」，該列直接從清單移除並出現儲存鈕；點「儲存變更」時畫面先跳出確認框，說明將自幾個權限的規則移除對該管控對象的設定，並列出受影響的對象名稱。點「取消」則不送出，清單仍保持已刪除
+spec/流程_引用連帶確認框.md	88	K2x1	- 測試資料：base seed 四表與 22 筆標的；被刪標的取 `專案A/頁A/區塊A`（base seed 中僅 權限P1 之規則含它；案例以庫內規則集計得引用之權限數，不寫死）。登入身分為系統管理者 token `sys`。
+spec/流程_引用連帶確認框.md	103	K2x1	- description: 系統管理者在群組清單頁新增一個群組，名稱與一個正被使用者啟用引用、卻在群組清單中找不到的名稱相同，也就是引用中的懸空名稱。點「儲存變更」時畫面先跳出確認框，說明新增後將有幾位使用者取得或受此群組限制，其中以 AND 引用的使用者數也會一併列出，因為新
+spec/流程_引用連帶確認框.md	105	K2x1	- 測試資料：base seed 四表；案例前置（非使用者操作）：經外部同步端點推入兩位外部使用者（`from` 為 `appRefCascade`）：`rc-dg-u1`（id `id-rc-dg1`，`cgrups` 為不存在之 `rc-ghost-g` 之 OR）與 `rc
+spec/流程_引用連帶確認框.md	122	K2x1	- description: 系統管理者在群組清單頁新增一個群組，名稱沒有被任何使用者的授權設定引用時，點「儲存變更」不會跳出確認框，直接寫入並出現「儲存權限群組數據成功」，資料庫新增該群組。便於一般新增群組時不被多餘的確認打斷。
+spec/流程_引用連帶確認框.md	124	K2x1	- 測試資料：base seed 四表（無懸空引用）。登入身分為系統管理者 token `sys`。
+spec/流程_引用連帶確認框.md	136	K2x1	- description: 當系統設定關閉「改名連帶更新」時，系統管理者在群組清單頁修改被引用的群組名稱後點「儲存變更」，不會跳出改名確認框，直接寫入並出現原本的訊息「儲存權限群組數據成功」，不附連帶更新的筆數。引用這個群組的使用者其「管控使用權限群組」不會被改寫，仍指向舊名稱
+spec/流程_引用連帶確認框.md	138	K2x1	- 測試資料：同 E2E-003 之夾具（`rc-ren-g`、`rc-ren-u`、`rc-ren-ext`）；後端以臨時設定重啟為 `cascadeRename: false`（資料庫保留；前端 `webInfor.cascadeRename` 為 `false`）。登入身分
+spec/流程_引用連帶確認框.md	154	K3x1	| R-DG | rc-del-g | grups／`id-rc-delg` | 空 | `cpemis` 為 權限P3 之 OR | 系統管理者寫入 RPC | 被兩位使用者引用（含 AND）之刪除標的（E2E-001） |
+spec/流程_引用連帶確認框.md	155	K3x1	| R-DUO | rc-del-uo | users／`id-rc-uo` | 空 | `cgrups`：M1 之 OR、`rc-del-g` 之 OR | 系統管理者寫入 RPC | OR 引用者；授權 M1 ∪ P3 |
+spec/流程_引用連帶確認框.md	157	K3x1	| R-LONE | rc-lone | grups／`id-rc-lone` | 空 | `cpemis` 為 權限P4 之 OR；無人引用 | 系統管理者寫入 RPC | 直刪路徑（E2E-002） |
+spec/流程_引用連帶確認框.md	158	K3x1	| R-RG | rc-ren-g | grups／`id-rc-reng` | 空 | `cpemis`：權限P3、權限P1 之 OR | 系統管理者寫入 RPC | 被改名之群組（E2E-003、008） |
+spec/流程_引用連帶確認框.md	159	K3x1	| R-RU | rc-ren-u | users／`id-rc-ru` | 空 | `cgrups`：`rc-ren-g` 之 OR | 系統管理者寫入 RPC | 後台引用者；授權 P1 ∪ P3 |
+spec/流程_引用連帶確認框.md	166	K2x2	登入帳號：系統管理者 token `sys`（`id-for-admin`）；同步端點用 app token `{token-for-application}`。單一帳號，皆為系統管理者之畫面軸行為，無帳號矩陣需求。
+spec/流程_引用連帶確認框.md	200	K2x1	- **權限**：本檔案例皆為系統管理者（token `sys`）之畫面軸行為，寫入經 `verifyConn` → `checkToken` → `getAndVerifyClientUser` 守門（同 `流程_後台群組清單.md`）。
+spec/流程_後台使用者清單.md	5	K2x1	系統管理者（瀏覽器使用者，經 w-ui-loginout 登入取得有效 token、`connState='csLogin'`）進入後台後，於 `LayoutContent.vue` 左側導覽點「使用者」（`mmUsers`）進入使用者清單頁（`LayoutContentUser
+spec/流程_後台使用者清單.md	7	K2x1	寫入端點 `updateUsers` 經 hapi `verifyConn` → `checkToken(token, apiType)` → `getAndVerifyClientUser` 守門（`server/WWebPerm.mjs`：`verifyConn`、`p.ch
+spec/流程_後台使用者清單.md	12	K2x1	- title: 系統管理者進入使用者清單頁顯示初始清單
+spec/流程_後台使用者清單.md	13	K2x1	- description: 驗證系統管理者以有效 token 登入後台、於左側點「使用者」頁籤後，`LayoutContentUsers` 以 ag-grid 渲染 `users` 表初始清單（顯示 name / email / cgrups / isAdmin / isAct
+spec/流程_後台使用者清單.md	25	K2x1	- title: 系統管理者關閉編輯模式隱藏工具列按鈕
+spec/流程_後台使用者清單.md	26	K2x1	- description: 驗證系統管理者自預設編輯態點編輯模式開關（`modeEdit`）將其關閉後，工具列「新增使用者」/「複製」/「刪除」/「儲存」按鈕隱藏、各列 `isAdmin` / `isActive` checkbox 轉為 disabled、name / ema
+spec/流程_後台使用者清單.md	37	K2x1	- 修改留痕（2026-09-28）：原載 title「系統管理者開啟編輯模式顯示工具列按鈕」、description「點編輯模式開關後，工具列顯示新增使用者按鈕…屬編輯態入口案例」不成立——頁面預設即編輯模式，本案實際為關閉編輯模式（程式、語意斷言、標準圖檔名 `edit-mo
+spec/流程_後台使用者清單.md	42	K2x1	- title: 系統管理者新增使用者列並儲存成功
+spec/流程_後台使用者清單.md	43	K2x1	- description: 驗證系統管理者開啟編輯模式、點「新增使用者」插入一空白列、以鍵盤填入唯一 name 與合法且唯一 email 後點 Save，前端通過 name / email 驗證、後端 `updateUsers` 經 email 去重後 insert，`user
+spec/流程_後台使用者清單.md	54	K2x1	- title: 系統管理者複製使用者列並儲存成功
+spec/流程_後台使用者清單.md	55	K2x1	- description: 驗證系統管理者勾選一既有列後點「複製使用者」，前端產生新 id、name 自動加上「複製」後綴（`userCopyNameNew`）、稽核欄位填佔位符，點 Save 後端 insert 成功。驗證複製出的列為獨立 id（非覆蓋原列），且 name 允
+spec/流程_後台使用者清單.md	66	K2x1	- title: 系統管理者勾選刪除使用者列並儲存成功
+spec/流程_後台使用者清單.md	67	K2x1	- description: 驗證系統管理者勾選一列後點「刪除勾選使用者」，前端自 `opt.rows` 移除該列，點 Save 後端 `ltdtDiffByKey`（依 id）判定該列已移除並 `del`，DB `users` 表對應列消失。屬刪除路徑成功案例。本 case 採
+spec/流程_後台使用者清單.md	78	K2x1	- title: 系統管理者切換 isAdmin / isActive 並儲存
+spec/流程_後台使用者清單.md	79	K2x1	- description: 驗證系統管理者於編輯模式點某列 `isAdmin` 或 `isActive` checkbox 切換值（y↔n），`isModified` 轉真、點 Save 後端 `save` 該列，DB 對應欄位更新。屬就地切換 + 批次儲存案例。本 case 
+spec/流程_後台使用者清單.md	91	K2x1	- description: 驗證系統管理者新增一列但 name 留空時，該列 name 欄顯示橘色文字 + 警告 icon（tooltip 為 `userNameEmpty`），點 Save 時 `isError` 彙整為 `errInNames` 並以 `$dg.showCh
+spec/流程_後台使用者清單.md	103	K2x1	- description: 驗證系統管理者新增一列 email 填入非法格式時，email 欄顯示警告 icon（tooltip 為 `userEmailError`），點 Save 時 `isError` 彙整為 `errInEmails` 並以 `$dg.showCheck
+spec/流程_後台使用者清單.md	115	K2x1	- description: 驗證系統管理者新增一列 email 與既有列重複時，email 欄顯示警告 icon（tooltip 為 `userEmailDuplicate`），點 Save 被前端 `errInEmails` 擋下；即使繞過前端，後端 `updateTabIt
+spec/流程_後台使用者清單.md	139	K2x1	- description: 驗證系統管理者點某列 `cgrups` 欄的按鈕後，開啟群組關聯編輯對話框（`VeCgrups`）。本案僅驗「按鈕能開啟對話框」此一本流程可觀察事實；對話框內勾選群組、OR/AND、回填 `cgrups` 字串之編輯細節屬使用者群組關聯流程，不在本案
+spec/流程_後台使用者清單.md	151	K2x1	- description: 使用者身分由外部單一登入系統同步的部署，會將本系統設定為「僅可調整使用者所屬群組」。此時系統管理者進入「使用者」頁即為編輯模式，但工具列只有編輯模式開關與顯示欄位挑選，沒有「新增使用者」按鈕；名稱、電子郵件、說明、來源等儲存格不能就地編輯，「系統管理
+spec/流程_後台使用者清單.md	164	K2x1	- description: 系統管理者在使用者清單頁看到，某位使用者的「管控使用權限群組」欄按鈕左側出現警告圖示，代表這位使用者引用的群組有問題：引用的群組在權限群組清單中找不到、合併模式缺漏或不合法、同一名稱同時以 OR 與 AND 設定，或有項目沒有名稱。滑鼠停留會說明哪個
+spec/流程_後台使用者清單.md	166	K2x1	- 測試資料：base seed users / grups；案例前置（非使用者操作）：經外部同步端點（`/syncAndReplaceTabs`，`from` 為本案專屬分區）為 `users` 推入四位使用者（email 各為 `<id>@example.com`）：`dan
+spec/流程_後台使用者清單.md	177	K2x2	- description: 使用者清單中有兩位以上使用者名稱相同，或電子郵件相同，通常是在限制重複之前同步進來的歷史資料。系統管理者進入使用者清單頁，這些使用者的名稱與電子郵件儲存格會顯示橘色文字與警告圖示，滑鼠停留會提示此名稱或 Email 由幾位使用者共用，這是既有的重複而
+spec/流程_後台使用者清單.md	179	K2x1	- 測試資料：base seed users；案例前置（非使用者操作）：後端用預設對應鍵（`mappingBy='id'`，`/syncAndReplaceTabs` 於此設定下允許重複的名稱與 Email）經外部同步端點推入兩位使用者：`dup-a`（id `id-dup-a`
+spec/流程_後台使用者清單.md	190	K2x2	- description: 外部應用同步進來的使用者可能沒有填電子郵件。系統管理者進入使用者清單頁，這些使用者的 Email 儲存格會顯示橘色警告圖示，滑鼠停留會提示此使用者尚未給予 Email，這是既有資料而非本次編輯造成，不影響儲存；若以 Email 作為登入對應鍵，此使用
+spec/流程_後台使用者清單.md	192	K2x1	- 測試資料：base seed users；案例前置（非使用者操作）：後端用預設對應鍵（`mappingBy='id'`）經外部同步端點推入使用者 `noemail-u`（id `id-noemail-u`、name `noemail-u`、email 為空字串、`isActi
+spec/流程_後台使用者清單.md	203	K2x1	- description: 部署把登入對應鍵設為「名稱」時，兩位啟用中的使用者不能同名，否則登入時無法確定是哪一位。此時系統管理者在使用者清單頁把一位已停用、名稱與某位啟用中使用者相同的使用者改為啟用並點儲存，會被後端擋下，畫面顯示「儲存使用者數據失敗」並附上「儲存資料的欄位值
+spec/流程_後台使用者清單.md	205	K2x1+K3x1	- 測試資料：**需特殊後端設定前置**——案例前置（非使用者操作）：先以預設對應鍵經系統管理者寫入 RPC 新增停用之後台列使用者 `john-off`（id `id-john-off`、name `john`、email `john-off@example.com`、`isA
+spec/流程_後台使用者清單.md	219	K2x1	001  系統管理者點 Save 按鈕, 觸發 saveUsers  [LayoutContentUsers.vue:saveUsers]
+spec/流程_後台使用者清單.md	319	K2x1	- **權限**：所有 `updateUsers` 寫入經 `verifyConn` → `checkToken` → `getAndVerifyClientUser` 守門（token 須有效、其使用者須在 perm `users` 表且 `isActive='y'`、並通過部
+spec/流程_後台使用者清單.md	334	K3x1	- **設計事實（記錄備查；新行為，尚無對應 E2E 案例）** 2026-10-22 run07（F-23／F-26，ADR-037，規則帳本 R-EXT-OWN-01、R-BASELINE-01；層級：產品程式碼之前端與寫入路徑）：本頁自本日起：①**外部列**（`from`
+spec/流程_後台使用者清單.md	350	K3x1	- **設計事實（記錄備查）** 2026-10-21（F-14，ADR-034；層級：產品程式碼之後台寫入路徑）：本清單之後端去重只檢查 `email`（`ckKey('email')`，不論 `mappingBy`）、**不檢查 `name`**（users 之 name 允
+spec/流程_後台導覽版面.md	5	K2x1	系統管理者登入後台後，畫面由左側導覽區與右側內容區組成（`LayoutContent.vue`）。導覽區列出五個頁籤（`mmStaInfor` / `mmTargets` / `mmPemis` / `mmGrups` / `mmUsers`），預設停在「統計資訊」（`menuK
+spec/流程_後台導覽版面.md	17	K2x1	- description: 系統管理者在後台任一頁點擊導覽區右上角的「隱藏選單」圓鈕後，左側導覽區收合、內容區向左延展，內容區左上角出現「顯示選單」圓鈕，而頁面標題向右讓位，不與該圓鈕重疊。以預設的「統計資訊」頁為例：收合前標題緊接導覽區右側，收合後標題左緣位於圓鈕右側，兩者之
+spec/流程_後台導覽版面.md	19	K3x1	- 測試資料：後端以統計虛擬數據模式啟動（統計頁圖表確定性）；登入身分 `sys`（`test/tools/e2e-setup.mjs` 之 `appUrl` 帶 `?token=sys`，經 `srv.mjs` 之 `getUserByToken` 解為系統管理者 `id-fo
+spec/流程_後台導覽版面.md	32	K2x1	- description: 系統管理者在導覽區已收合的狀態下，點擊內容區左上角的「顯示選單」圓鈕，左側導覽區隨即展開並列出五個頁籤，「顯示選單」圓鈕消失、導覽區右上角重新出現「隱藏選單」圓鈕，頁面標題回到緊接導覽區右側的位置。適合在收合後需要切換頁籤時使用；此操作只影響版面，不
+spec/流程_後台導覽版面.md	87	K3x2	- 原載 E2E-001 測試資料「登入身分 `sys`（系統管理者，見 `spec/設計要點與取捨.md` 帳號矩陣）」不成立：`spec/設計要點與取捨.md` 與全 repo 皆無「帳號矩陣」章節或文件（Grep 0 命中）；已改寫為 `test/tools/e2e-set
+spec/流程_後台標的清單.md	5	K2x1	系統管理者（瀏覽器使用者，經 w-ui-loginout 登入取得有效 token、連線守門通過）進入後台後，於左側導覽點「管理對象」（`mmTargets`）進入標的清單頁（`LayoutContentTargets.vue`）。此頁以 ag-grid（`WAggridVue`
+spec/流程_後台標的清單.md	7	K2x1	寫入端點 `updateTargets` 經 hapi `verifyConn` → `checkToken(token, apiType)` → `getAndVerifyClientUser` 守門（`server/WWebPerm.mjs`：`verifyConn`、`p.
+spec/流程_後台標的清單.md	12	K2x1	- title: 系統管理者進入標的清單頁顯示初始清單
+spec/流程_後台標的清單.md	13	K2x1	- description: 驗證系統管理者以有效 token 登入後台、於左側點「管理對象」頁籤後，`LayoutContentTargets` 以 ag-grid 渲染 `targets` 表初始清單（預設顯示 id / description 欄），呈現預設編輯模式檢視態（
+spec/流程_後台標的清單.md	25	K2x1	- title: 系統管理者關閉編輯模式隱藏工具列按鈕
+spec/流程_後台標的清單.md	26	K2x1	- description: 驗證系統管理者自預設編輯態點編輯模式開關（`modeEdit`）將其關閉後，工具列「新增對象」/「複製對象」/「刪除勾選對象」/「儲存」按鈕隱藏、id / description / from 欄轉為唯讀（不可就地編輯）、id 欄勾選與拖曳控制收起，
+spec/流程_後台標的清單.md	42	K2x1	- title: 系統管理者新增標的列並儲存成功
+spec/流程_後台標的清單.md	43	K2x1	- description: 驗證系統管理者開啟編輯模式、點「新增對象」插入一列（id 自動帶唯一「新對象」名、稽核欄位填佔位符）、以鍵盤改填唯一路徑式 id 與 description 後點 Save，後端 `updateTargets` 經 `id` 去重後 insert，`
+spec/流程_後台標的清單.md	54	K2x1	- title: 系統管理者複製標的列並儲存成功
+spec/流程_後台標的清單.md	55	K2x1	- description: 驗證系統管理者勾選一既有列後點「複製對象」，前端產生新 id（沿用來源 id 加上「複製」後綴並避重）、稽核欄位填佔位符，點 Save 後端 insert 成功。驗證複製出的列為獨立 id（非覆蓋原列）。本 case 採多階段截圖，逐段觀察：勾選來源
+spec/流程_後台標的清單.md	66	K2x1	- title: 系統管理者勾選刪除標的列並儲存成功
+spec/流程_後台標的清單.md	67	K2x1	- description: 系統管理者在標的清單頁的編輯模式下，勾選一個標的列後點工具列的「刪除勾選對象」，該列先自清單移除，此時資料庫尚未變動；再點工具列的儲存鈕時，若所選標的正被某些權限的規則引用，畫面會先跳出確認框，說明將自幾個權限的規則移除對該管控對象的設定，並列出被刪
+spec/流程_後台標的清單.md	69	K2x1	- 測試資料：base seed targets / pemis / grups / users；本案直接以 base seed 第一列（`專案A/頁A/區塊A`）為刪除標的，依賴每 case 前還原至 base seed（不另建特化列）。base seed 中只有權限 權限P1
+spec/流程_後台標的清單.md	81	K2x1	- title: 系統管理者就地編輯標的 id 與 description 並儲存
+spec/流程_後台標的清單.md	82	K2x1	- description: 驗證系統管理者於編輯模式雙擊某既有列的 id 欄改寫路徑式名稱、或改寫 description 欄，`isModified` 轉真、點 Save 後端依 `id` diff 判定為 del（舊 id）+ insert（新 id）或 save（同 id
+spec/流程_後台標的清單.md	94	K2x1	- description: 驗證系統管理者新增一列但 id 留空（清空自動帶入的名稱）時，該列 id 欄顯示橘色文字 + 警告 icon（tooltip 為 `targetIdEmpty`）；點 Save 時前端 `isError`（`errItemsById` 偵測空 id）
+spec/流程_後台標的清單.md	106	K2x1	- description: 驗證系統管理者新增一列 id 與既有列重複時，重複列 id 欄顯示警告 icon（tooltip 為 `targetIdDuplicate`）；點 Save 時前端 `isError`（`errItemsById` 偵測重複 id）於存檔前即攔截、不
+spec/流程_後台標的清單.md	161	K2x1	- description: 系統管理者在標的清單頁的編輯模式下，刪除某個標的、或把某個標的的路徑改成別的路徑後點儲存。因為標的的路徑就是它的名稱，改路徑對系統而言等同刪除舊路徑再新增新路徑，新路徑不會繼承舊路徑在權限規則中的設定。若有權限的規則正引用這些被刪除或被改路徑的標的，
+spec/流程_後台標的清單.md	163	K2x1+K3x1	- 測試資料：base seed 四表；案例前置（非使用者操作，以系統管理者寫入 RPC 依序建立）：標的 `專案R/頁A/區塊D`（將被刪除）、`專案R/頁A/區塊K`（將被改路徑），置於清單最上方（清單為虛擬捲動，只渲染可見列）；權限 `ref-p1`（`crules` 啟用
+spec/流程_後台標的清單.md	176	K2x1	- description: 系統管理者在標的清單頁的編輯模式下，刪除一個沒有任何權限規則引用的標的，並把另一個同樣沒有被引用的標的改成新路徑後點儲存，畫面不會跳出確認框，直接寫入並出現訊息「儲存對象數據成功」。這兩個標的的變更都已寫入，所有權限、群組與使用者的資料完全不變，授權
+spec/流程_後台標的清單.md	178	K2x1	- 測試資料：base seed 四表，不另建夾具；取 base seed 中無任何權限規則引用之兩個標的：`專案A/頁A/區塊A/執行按鈕`（將被刪除）、`專案A/頁A/區塊A/分析按鈕`（將被改路徑為 `專案A/頁A/區塊A/分析按鈕改`）；前提於案例內以全部權限之 `cru
+spec/流程_後台標的清單.md	193	K2x1	001  系統管理者點 Save 按鈕, 觸發 saveTargets  [LayoutContentTargets.vue:saveTargets]
+spec/流程_後台標的清單.md	298	K2x1	- **權限**：所有 `updateTargets` 寫入經 `verifyConn` → `checkToken` → `getAndVerifyClientUser` 守門（token 須有效、其使用者須在 perm `users` 表且 `isActive='y'`、並通
+spec/流程_後台權限清單.md	5	K2x1	系統管理者（瀏覽器使用者，經登入取得有效 token、連線通過 `verifyConn` 守門）進入後台後，於左側導覽進入權限清單頁（`LayoutContentPemis.vue`）。此頁以 ag-grid（`WAggridVue`）列出 `pemis`（權限設定）表，欄序為 
+spec/流程_後台權限清單.md	7	K2x1	寫入端點 `updatePemis` 經 hapi `verifyConn` → `checkToken(token, apiType)` → `getAndVerifyClientUser` 守門（`server/WWebPerm.mjs`：`verifyConn`、`p.ch
+spec/流程_後台權限清單.md	12	K2x1	- title: 系統管理者進入權限清單頁顯示初始清單
+spec/流程_後台權限清單.md	13	K2x1	- description: 系統管理者登入後台後，在左側選單點「管理權限」即進入權限清單頁，表格逐列列出目前所有權限，欄位由左至右為 名稱、說明、管控對象、管控所屬權限群組，本權限自己管控的欄位在左、由上層帶過來的在右。「管控對象」欄與「管控所屬權限群組」欄各是一顆顯示數量摘要
+spec/流程_後台權限清單.md	25	K2x1	- title: 系統管理者關閉編輯模式隱藏工具列按鈕
+spec/流程_後台權限清單.md	26	K2x1	- description: 驗證系統管理者點編輯模式開關（`modeEdit`）將其由預設 ON 切為 OFF 後，工具列隱藏新增 / 複製 / 刪除 / 儲存按鈕、name 欄取消勾選與拖曳，轉為唯讀檢視態。屬編輯態切換出口案例，與 E2E-001 預設編輯態互為對照。
+spec/流程_後台權限清單.md	42	K2x1	- title: 系統管理者新增權限列並儲存成功
+spec/流程_後台權限清單.md	43	K2x1	- description: 驗證系統管理者開啟編輯模式、點「新增權限」插入一空白列、以鍵盤填入唯一 name 後點 Save，前端通過 name 驗證、後端 `updatePemis` 經名稱檢查（空值與唯一）後 insert，`userId` / `timeCreate` 由
+spec/流程_後台權限清單.md	54	K2x1	- title: 系統管理者複製權限列並儲存成功
+spec/流程_後台權限清單.md	55	K2x1	- description: 驗證系統管理者勾選一既有列後點「複製權限」，前端產生新 id、name 自動加上「複製」後綴（`pemiCopyNameNew`）、稽核欄位填佔位符，點 Save 後端 insert 成功。驗證複製出的列為獨立 id（非覆蓋原列），且其 name 因
+spec/流程_後台權限清單.md	66	K2x1	- title: 系統管理者勾選刪除權限列並儲存成功
+spec/流程_後台權限清單.md	67	K2x1	- description: 系統管理者在權限清單頁的編輯模式下，勾選一個權限列後點工具列的「刪除勾選權限」。若所選權限正被群組引用，例如種子資料的第一個權限「權限P1」被群組「權限群組M1」引用，畫面會先跳出確認框，說明將自幾個群組移除對所選權限的引用，點「確定」才把該列自清單
+spec/流程_後台權限清單.md	69	K2x1	- 測試資料：base seed pemis / grups / users；以首列（權限 P1）為刪除標的，由每 case 前的 DB 還原機制復原。base seed 中只有群組 權限群組M1 之 `cpemis` 引用 權限P1，且為 OR 引用（M1 之 `cpemis`
+spec/流程_後台權限清單.md	82	K2x1	- description: 驗證系統管理者新增一列但 name 留空時，該列 name 欄顯示橘色文字 + 警告 icon（tooltip 為 `pemiNameEmpty`），點 Save 時 `isError` 彙整為 `errInNames` 並以 `showCheckY
+spec/流程_後台權限清單.md	94	K2x1	- description: 驗證系統管理者新增一列 name 與既有列重複時，name 欄顯示警告 icon（tooltip 為 `pemiNameDuplicate`），點 Save 被前端 `errInNames` 結果 modal 擋下；即使繞過前端，後端 `update
+spec/流程_後台權限清單.md	106	K2x1	- description: 驗證系統管理者點某列 `crules` 欄的按鈕後，開啟管控規則編輯對話框（`VeCrules`）。本案僅驗「按鈕能開啟對話框」此一本流程可觀察事實；對話框內針對各管控對象設定 y/n、確認後回填 `crules` 字串之編輯細節屬該對話框內部，不在
+spec/流程_後台權限清單.md	118	K2x1	- description: 驗證系統管理者點某列 `belongGrups` 欄的按鈕後，開啟所屬權限群組對話框（`VePemiBlngGrups`；頁面為編輯模式時標題為「編輯所屬權限群組」，唯讀時為「展示所屬權限群組」）。本案僅驗「按鈕能開啟對話框」此一本流程可觀察事實；對
+spec/流程_後台權限清單.md	142	K2x2	- description: 權限清單中有兩個以上同名的權限，通常是外部應用在限制同名之前同步進來的歷史資料。系統管理者進入權限清單頁，這些同名權限每一列的名稱都會顯示橘色文字與警告圖示，滑鼠停留會提示此名稱由幾筆資料共用，這是既有的重複而非本次編輯造成，以名稱引用它的授權僅採用
+spec/流程_後台權限清單.md	144	K2x1	- 測試資料：**需特殊資料前置**——歷史同名權限無法經任何現行寫入入口造出（外部同步與後台整表寫入皆拒同名，ADR-034），須於後端啟動前以種子子行程追加，或停止後端後直寫資料庫再重啟：`pemis` 追加兩列同名 `dup-pm`（id `id-dup-pm1`，`cru
+spec/流程_後台權限清單.md	155	K2x1	- description: 同樣在權限清單已有兩個同名權限的情形下，系統管理者點「新增權限」並把新列的名稱填成這個重複的名稱時，三列的名稱儲存格都會顯示重複的警告圖示，點儲存會被擋下，出現「名稱出現錯誤待修復」的訊息，資料不變。也就是說，既有的重複不會擋住儲存，但不能再造出新的
+spec/流程_後台權限清單.md	157	K2x1	- 測試資料：同 E2E-011（`pemis` 追加兩列同名 `dup-pm`）。登入身分為系統管理者 token `sys`。
+spec/流程_後台權限清單.md	168	K2x1	- description: 系統管理者在權限清單頁看到，某個權限的「管控對象」欄按鈕左側出現警告圖示，代表這個權限的規則裡有同一個管控對象被列了兩次以上，而且有勾選與不勾選並存。滑鼠停留會說明是哪些管控對象，以及系統視為沒勾選。沒有這種衝突的權限，該欄與原本完全相同，沒有圖示。
+spec/流程_後台權限清單.md	170	K2x1	- 測試資料：base seed pemis；案例前置（非使用者操作）：經外部同步端點（`/syncAndReplaceTabs`，`from` 為本案專屬分區）為 `pemis` 推入兩個權限：`dup-p`（`crules` 為陣列形式 `[{"name":"專案A/頁A/區
+spec/流程_後台權限清單.md	181	K2x1	- description: 系統管理者在權限清單頁的編輯模式下，勾選一個正被群組引用的權限，點「刪除勾選權限」時，畫面先跳出確認框，說明將自幾個群組移除對所選權限的引用。其中以 AND 引用的群組，移除引用後其限制解除，授權可能變多，確認框會一併說明有幾個這樣的群組，並詢問是否
+spec/流程_後台權限清單.md	183	K2x1	- 測試資料：base seed pemis / grups / users。刪除標的為 權限P3 列：base seed 中引用它者為群組 權限群組M2（OR 引用）、權限群組M3（AND 引用）、權限群組M4（OR 引用），使用者 mary 屬 M2、john 屬 M3。登入
+spec/流程_後台權限清單.md	197	K2x1	- description: 系統管理者在權限清單頁就地修改某個權限的名稱後點儲存，若有群組正引用這個權限，畫面會先跳出確認框，說明儲存後將一併更新幾個群組對已改名權限的引用，並列出每個改名的舊名稱與新名稱；若其中有群組的來源是外部應用，確認框會加註這些群組的引用下次外部同步時可
+spec/流程_後台權限清單.md	199	K2x1+K3x1	- 測試資料：base seed 四表；案例前置（非使用者操作）：以系統管理者寫入 RPC 於 `pemis` 新增 `ren-p`（`crules` 啟用 `專案A/頁A/區塊A`、`專案B/頁A/區塊B`）；於 `grups` 新增 `ren-g1`（物件形式，OR 引用 r
+spec/流程_後台權限清單.md	205	K3x1	4. 名單截斷變體（e2e-array-form AF-042）：以系統管理者寫入 RPC 新增 6 個權限 `tr-p1`～`tr-p6`（皆啟用 `專案A/頁A/區塊A`）與引用全部之群組 `tr-g`；一次改名為 `tr-q1`～`tr-q6` 後點 Save，確認框為 `
+spec/流程_後台權限清單.md	216	K2x1	001  系統管理者點 Save 按鈕, 觸發 savePemis  [LayoutContentPemis.vue:savePemis]
+spec/流程_後台權限清單.md	281	K2x1	001  系統管理者勾選權限列後點「刪除勾選權限」, 觸發 deleteItemsCheck  [LayoutContentPemis.vue:deleteItemsCheck]
+spec/流程_後台權限清單.md	349	K2x1	- **權限**：所有 `updatePemis` 寫入經 `verifyConn` → `checkToken` → `getAndVerifyClientUser` 守門（token 須有效、其使用者須在 perm `users` 表且 `isActive='y'`、並通過部
+spec/流程_後台權限清單.md	366	K2x1	- **已修復（附修復紀錄）** 2026-10-21 發現（ADR-035 之 c 收嚴時記為「改名先於 F-07 仍是風險」）、2026-10-22 run06 修復（本專案，ADR-036、規則帳本 R-REF-CASCADE-01；層級：產品程式碼之寫入路徑與前端）：刪除
+spec/流程_後台群組清單.md	5	K2x1	系統管理者（瀏覽器使用者，經 w-ui-loginout 登入取得有效 token、`connState='csLogin'`）進入後台後，於 `LayoutContent.vue` 左側導覽點「權限群組」（`mmGrups`）進入群組清單頁（`LayoutContentGrup
+spec/流程_後台群組清單.md	7	K2x1	寫入端點 `updateGrups` 經 hapi `verifyConn` → `checkToken(token, apiType)` → `getAndVerifyClientUser` 守門（`server/WWebPerm.mjs`：`verifyConn`、`p.ch
+spec/流程_後台群組清單.md	12	K2x1	- title: 系統管理者進入群組清單頁顯示初始清單
+spec/流程_後台群組清單.md	13	K2x1	- description: 系統管理者登入後台後，在左側選單點「管理權限群組」即進入權限群組清單頁，表格逐列列出目前所有權限群組，欄位由左至右為 名稱、說明、管控使用權限、管控所屬使用者，本群組自己管控的欄位在左、由上層帶過來的在右。「管控使用權限」欄與「管控所屬使用者」欄各是
+spec/流程_後台群組清單.md	25	K2x1	- title: 系統管理者關閉編輯模式隱藏工具列按鈕
+spec/流程_後台群組清單.md	26	K2x1	- description: 驗證系統管理者點編輯模式開關（`modeEdit`）將其由預設 ON 切為 OFF 後，工具列隱藏新增 / 複製 / 刪除 / 儲存按鈕、name 欄取消勾選與拖曳，轉為唯讀檢視態。屬編輯態切換出口案例，與 E2E-001 預設編輯態互為對照。
+spec/流程_後台群組清單.md	36	K2x1	- 修改留痕（2026-09-28）：原載 title「系統管理者開啟編輯模式顯示工具列按鈕」、description「點編輯模式開關後，工具列顯示新增權限群組按鈕…屬編輯態入口案例」不成立——頁面預設即編輯模式，本案實際為關閉編輯模式（程式、語意斷言與標準圖皆然），比照權限清單
+spec/流程_後台群組清單.md	42	K2x1	- title: 系統管理者新增群組列並儲存成功
+spec/流程_後台群組清單.md	43	K2x1	- description: 驗證系統管理者開啟編輯模式、點「新增權限群組」插入一空白列、以鍵盤填入唯一 name 後點 Save，前端通過 name 驗證、後端 `updateGrups` 經名稱檢查（`ckKey('name')` 空值與 `findTouchedDup` 唯
+spec/流程_後台群組清單.md	54	K2x1	- title: 系統管理者複製群組列並儲存成功
+spec/流程_後台群組清單.md	55	K2x1	- description: 驗證系統管理者勾選一既有列後點「複製權限群組」，前端產生新 id、name 自動加上「複製」後綴（`grupCopyNameNew`）、稽核欄位填佔位符，點 Save 後端 insert 成功。驗證複製出的列為獨立 id（非覆蓋原列），且 name 
+spec/流程_後台群組清單.md	66	K2x1	- title: 系統管理者勾選刪除群組列並儲存成功
+spec/流程_後台群組清單.md	67	K2x1	- description: 系統管理者在群組清單頁的編輯模式下，勾選一個群組列後點工具列的「刪除勾選權限群組」。若所選群組正被使用者引用，例如種子資料的第一個群組「權限群組M1」被使用者 peter 引用，畫面會先跳出確認框，說明將自幾位使用者移除對所選群組的引用，點「確定」才
+spec/流程_後台群組清單.md	69	K2x1	- 測試資料：base seed grups / users；本案直接刪除清單首列（base seed 其一，權限群組M1），由每 case 前的 DB 還原機制復原，故不破壞後續 case 之 base seed。base seed 中只有使用者 peter（`id-for-p
+spec/流程_後台群組清單.md	82	K2x1	- description: 驗證系統管理者新增一列但 name 留空時，該列 name 欄顯示橘色文字 + 警告 icon（tooltip 為 `grupNameEmpty`），點 Save 時 `isError` 彙整為 `errInNames` 並以 `$dg.showCh
+spec/流程_後台群組清單.md	94	K2x1	- description: 驗證系統管理者新增一列 name 與既有列重複時，name 欄顯示警告 icon（tooltip 為 `grupNameDuplicate`），點 Save 被前端 `errInNames` 持久 modal 擋下；即使繞過前端，後端 `update
+spec/流程_後台群組清單.md	106	K2x1	- description: 驗證系統管理者點某列 `belongUsers` 欄的按鈕後，開啟群組成員編輯對話框（`VeGrupBlngUsers`）。本案僅驗「按鈕能開啟對話框」此一本流程可觀察事實；對話框內檢視 / 調整群組成員之編輯細節屬群組成員流程，不在本案展開。本 c
+spec/流程_後台群組清單.md	118	K2x1	- description: 驗證系統管理者點某列 `cpemis` 欄的按鈕後，開啟群組所擁有權限編輯對話框（`VeCpemis`）。本案僅驗「按鈕能開啟對話框」此一本流程可觀察事實；對話框內勾選權限、OR/AND、回填 `cpemis` 字串之編輯細節屬群組權限關聯流程，不在
+spec/流程_後台群組清單.md	142	K2x2	- description: 權限群組清單中有兩個以上同名的群組，通常是外部應用在限制同名之前同步進來的歷史資料。系統管理者進入群組清單頁，這些同名群組每一列的名稱都會顯示橘色文字與警告圖示，滑鼠停留會提示此名稱由幾筆資料共用，這是既有的重複而非本次編輯造成，以名稱引用它的授權僅
+spec/流程_後台群組清單.md	144	K2x1	- 測試資料：**需特殊資料前置**——歷史同名群組無法經任何現行寫入入口造出（外部同步與後台整表寫入皆拒同名，ADR-034），須於後端啟動前以種子子行程追加，或停止後端後直寫資料庫再重啟：`grups` 追加兩列同名 `dup-g`（id `id-dup-g1`，`cpemi
+spec/流程_後台群組清單.md	155	K2x1	- description: 同樣在群組清單已有兩個同名群組的情形下，系統管理者點「新增權限群組」並把新列的名稱填成這個重複的名稱時，三列的名稱儲存格都會顯示重複的警告圖示，點儲存會被擋下，出現「名稱出現錯誤待修復」的訊息，資料不變。也就是說，既有的重複不會擋住儲存，但不能再造出
+spec/流程_後台群組清單.md	157	K2x1	- 測試資料：同 E2E-011（`grups` 追加兩列同名 `dup-g`）。登入身分為系統管理者 token `sys`。
+spec/流程_後台群組清單.md	168	K2x1	- description: 系統管理者在群組清單頁看到，某個群組的「管控使用權限」欄按鈕左側出現警告圖示，代表這個群組引用的權限有問題：引用的權限在權限清單中找不到、合併模式缺漏或不合法，或同一名稱同時以 OR 與 AND 設定。滑鼠停留會說明哪個名稱出了什麼問題，以及系統怎麼
+spec/流程_後台群組清單.md	170	K2x1	- 測試資料：base seed grups / pemis；案例前置（非使用者操作）：經外部同步端點（`/syncAndReplaceTabs`，`from` 為本案專屬分區）為 `grups` 推入三個群組：`dang-g`（`cpemis` 為 `{"權限P1":{"mod
+spec/流程_後台群組清單.md	181	K2x1	- description: 系統管理者在群組清單頁的編輯模式下，勾選一個正被使用者引用的群組，點「刪除勾選權限群組」時，畫面先跳出確認框，說明將自幾位使用者移除對所選群組的引用。其中以 AND 引用的使用者，移除引用後其限制解除，授權可能變多，確認框會一併說明有幾位這樣的使用者
+spec/流程_後台群組清單.md	183	K2x1	- 測試資料：base seed grups / users；案例前置（非使用者操作）：經外部同步端點為 `users` 推入使用者 `and-u`（id `id-and-u`、email `and-u@example.com`、`isActive='y'`、`from` 為本案
+spec/流程_後台群組清單.md	197	K2x1	- description: 系統管理者在群組清單頁就地修改某個群組的名稱後點儲存，若有使用者正引用這個群組，畫面會先跳出確認框，說明儲存後將一併更新幾位使用者對已改名群組的引用，並列出每個改名的舊名稱與新名稱；若其中有使用者的來源是外部應用，確認框會加註這些使用者的引用下次外部
+spec/流程_後台群組清單.md	199	K2x1+K3x1	- 測試資料：base seed 四表；案例前置（非使用者操作）：以系統管理者寫入 RPC 於 `grups` 新增 `ren-g`（`cpemis`：權限P3 OR、權限P1 OR）與無人引用之 `ren-lone`（`cpemis`：權限P4 OR）；於 `users` 新增
+spec/流程_後台群組清單.md	212	K2x1	- description: 系統管理者在群組清單頁把某個群組改名後點儲存，若新名稱與一個正被使用者啟用引用、卻在群組清單中找不到的名稱相同，也就是引用中的懸空名稱，系統為避免改名後的群組被這些引用接管，會整次拒絕儲存。此時畫面不會跳出確認框，而是直接出現失敗訊息，內容為「儲存權
+spec/流程_後台群組清單.md	214	K2x1+K3x1	- 測試資料：base seed 四表；案例前置（非使用者操作）：以系統管理者寫入 RPC 於 `grups` 新增 `rej-g`（`cpemis`：權限P1 OR）；於 `users` 新增 `rej-u`（`cgrups`：啟用引用不存在之 `Ghost`〔懸空名稱〕與 O
+spec/流程_後台群組清單.md	225	K2x1	- description: 當系統設定關閉「改名連帶更新」時，系統管理者在群組清單頁修改群組名稱後點儲存，畫面不會跳出改名確認框，直接寫入並出現原本的訊息「儲存權限群組數據成功」，不附連帶更新的筆數。引用這個群組的使用者其「管控使用權限群組」不會被改寫，仍指向舊名稱，因此這些引
+spec/流程_後台群組清單.md	227	K2x1	- 測試資料：同 E2E-015 之夾具（`ren-g`、`ren-lone`、`ren-u`、`ren-ua`、`ren-ext`）；後端以臨時設定重啟為 `cascadeRename: false`（資料庫保留；前端 `webInfor.cascadeRename` 為 `f
+spec/流程_後台群組清單.md	243	K2x1	001  系統管理者點 Save 按鈕, 觸發 saveGrups  [LayoutContentGrups.vue:saveGrups]
+spec/流程_後台群組清單.md	308	K2x1	001  系統管理者勾選群組列後點「刪除勾選權限群組」, 觸發 deleteItemsCheck  [LayoutContentGrups.vue:deleteItemsCheck]
+spec/流程_後台群組清單.md	373	K2x1	- **權限**：所有 `updateGrups` 寫入經 `verifyConn` → `checkToken` → `getAndVerifyClientUser` 守門（token 須有效、其使用者須在 perm `users` 表且 `isActive='y'`、並通過部
+spec/流程_後台群組清單.md	390	K2x1	- **已修復（附修復紀錄）** 2026-10-21 發現（ADR-035 之 c 收嚴時記為「改名先於 F-07 仍是風險」）、2026-10-22 run06 修復（本專案，ADR-036、規則帳本 R-REF-CASCADE-01；層級：產品程式碼之寫入路徑與前端）：刪除
+spec/流程_應用啟動與登入.md	77	K3x1	- description: 後台的對應鍵設定為 email 或 name，也就是以電子郵件或名稱對應外部系統的使用者時，若權限系統中有兩位以上啟用中的使用者符合登入者的同一個值，系統無法確定登入的是哪一位，會拒絕登入：畫面停在「拒絕登入」，並依設定轉址至指定網址，開發環境會延遲
+spec/流程_應用啟動與登入.md	92	K2x1	- 測試資料：base seed；以系統管理者令牌 `sys` 經資料通道 `updateUsers` 於 `users` 加入一位使用者（id `id-for-member`、name `member`、email `member@example.com`、`isAdmin='
+spec/流程_應用啟動與登入.md	97	K2x1	- 變體（2026-10-24，perm-run01 本輪 P-7）：另以 base seed 之一般使用者 peter（令牌 `{token-for-peter}`，`isAdmin='n'`、啟用，不需加入任何列）重複上列語意驗證（測試名 `E2E-007-not-admin
+spec/流程_應用啟動與登入.md	106	K2x2	- 測試資料：base seed；以系統管理者令牌 `sys` 經共用層於 `users` 加入一位系統管理者（id `id-for-deny`、name `deny`、email `deny@example.com`、`isAdmin='y'`、`isActive='y'`、`
+spec/流程_應用啟動與登入.md	157	K1x1	036a                     data.msg 為 'userNotAdmin'(登入者不是系統管理者, 即使部署方放行; 後端 getAndVerifyAdminUser 拒絕): 直接返回——停在「無權進入權限後台」畫面, 不轉址(perm-run01) 
+spec/流程_應用啟動與登入.md	232	K1x2	- **登入分流**：`login()` 成功 → `loginSuccess` 設 `csLogin` + 寫 `userToken` / `userSelf`；失敗 → `loginError` 設 `csErrLogin` + 清 `userToken`，並重導 `urlR
+spec/流程_應用啟動與登入.md	233	K2x4	- **資料通道啟動時機與系統函數（perm-run01 2026-10-25，R-SYSFUNCS-01）**：前端於登入成功（`userToken` 有值）後才啟動資料通道（`main.js` 之 `useWaitToken: true`），輪詢本體每輪帶 `__sysTok
+spec/流程_應用啟動與登入.md	240	K2x3	- **設計事實（記錄備查）** 2026-10-24（perm-run01 本輪，P-7，R-APP-TOKEN-01）：部署方 `verifyClientUser` 先否決非系統管理者時，畫面走一般登入失敗並轉址、看不到「無權進入」（`dspec/w-web存取管控表.md`
+spec/流程_應用啟動與登入.md	241	K1x3+K2x1	- **設計事實（記錄備查）** 2026-10-24（perm-run01，R-ADMIN-ONLY-01；使用者 2026-10-24 裁示「系統管理者才能讀寫 4 表，一般使用者是沒法進權限後台的，故只能用 token 查自己權限樹」）：後台登入檢查（`/api/getUs
+spec/流程_應用啟動與登入.md	242	K2x1	- **設計事實（記錄備查）** 2026-10-24（perm-run02②，R-APP-TOKEN-01；主控裁示收緊系統服務用途之認定）：後台登入檢查（及資料通道、`requireAdmin`）接受「不在 perm users 表之應用系統身分」須同時：反查 `isApp=
+spec/流程_查詢使用者權限.md	89	K3x1	- description: 權限系統的對應鍵設定為 email 或 name，也就是以電子郵件或名稱對應外部系統的使用者時，若權限系統中有兩位以上啟用中的使用者符合同一個值（對應鍵為預設的 id 時，不論啟用與否，只要有兩位以上使用者符合同一個代號，也同樣拒絕，見《流程_外部應
+spec/流程_查詢使用者權限.md	215	K1x1+K2x1	- **權限**：`/api/getPerm` 守門點為 handler `core()` 內以 `req.query.token` 經 `getAndVerifyClientUser`（`getUserByToken` 反查 + perm `users` 表正規化 + `ver
+spec/流程_查詢指定使用者權限.md	7	K2x3	後端以 `query.token` 解出發起者 `tokenSelf`，經 `getAndVerifyAppUser` 驗證其為合法 app 使用者（`server/WWebPerm.mjs:apis(/api/getPermUserInfor).core`）；驗證通過後以 `q
+spec/流程_查詢指定使用者權限.md	100	K3x1	- description: 權限系統以預設的主鍵方式對應外部系統的使用者時，若傳入的使用者代號同時符合兩位以上使用者（例如後台使用者的 id 與外部使用者的來源鍵相同，或兩個來源的來源鍵相同；不論其中幾位啟用中），系統無法確定要查的是哪一位，伺服器一律拒絕、不會任取其中一位：回
+spec/流程_查詢指定使用者權限.md	224	K2x1	| 發起者使用者 | 部署方 `getUserByToken(tokenSelf)`（`WWebPerm.mjs:getExtUser`；一次請求只呼叫一次） | 須為系統管理者等級（2026-10-24 perm-run01 本輪 P-1）：在 perm `users` 表者以
+spec/流程_查詢指定使用者權限.md	229	K2x3	- **權限**：發起者身分以 `query.token`（即 `tokenSelf`）經 handler 內 `getAndVerifyAppUser` 把關（`WWebPerm.mjs:apis(/api/getPermUserInfor).core`），驗證鏈為 `getU
+spec/流程_權限規則合併計算.md	237	K3x1	- description: 群組表或權限表中有兩筆以上同名的資料，通常是外部應用在限制同名之前同步進來的歷史資料，而使用者或群組又以這個名稱引用它時，系統無法確定指的是哪一筆，因此只採用這幾筆共同授權的管理對象，也就是取交集，而不是任選其中一筆。結果與這幾筆在表中的排列先後無關
+spec/流程_權限規則合併計算.md	423	K3x1	- **設計事實（記錄備查；主控依原則自行決定，與帳本字面不同之一格，待主控／使用者確認；資料軸）** 2026-10-21（run05 撰寫本 spec 時發現、同日主控裁決並已實作；層級：部署專案之授權判斷，`src/plugins/mShare.mjs:mergeRules
+spec/流程_權限規則合併計算.md	429	K2x1	- **設計事實（記錄備查；spec 原載更正）** 2026-10-21：本 spec 11 個案例（E2E-001～011）之 description 原含「單元層級。」「驗證…」等寫給測試撰寫者之句型與過長括號夾註，已改寫為以使用者（系統管理者）可讀之語言敘述（語意不變，資
+spec/流程_權限規則關聯.md	5	K2x1	系統管理者於權限清單頁（`LayoutContentPemis.vue`）開啟編輯模式（`modeEdit` 開關，`isEditable=true`）後，每一列的 `crules` 欄渲染為一個按鈕（顯示「使用共 N 項對象」或「無使用任何對象」摘要文字）。點該按鈕觸發 `$d
+spec/流程_權限規則關聯.md	16	K2x1	- title: 系統管理者點 crules 欄按鈕開啟權限規則關聯對話框
+spec/流程_權限規則關聯.md	17	K2x1	- description: 系統管理者在權限清單頁開啟編輯模式後，點某列「管控對象」欄的按鈕，按鈕文字為「使用共 N 項對象」或「無使用任何對象」，畫面開啟「編輯使用對象」對話框，逐列列出全部管控對象，每列有「對象名稱」與「是否使用」勾選框；該權限已授權的管控對象，其勾選框呈勾
+spec/流程_權限規則關聯.md	29	K2x1	- title: 系統管理者勾選某 target 為啟用（y）
+spec/流程_權限規則關聯.md	30	K2x1	- description: 系統管理者在「編輯使用對象」對話框中，點某個尚未使用（未勾選）的管控對象之「是否使用」勾選框，該列隨即呈勾選狀態，且對話框出現儲存鈕。此時只是對話框內的暫時變更，尚未回填到清單。便於把一個管控對象加入某個權限的涵蓋範圍。
+spec/流程_權限規則關聯.md	41	K2x1	- title: 系統管理者將原為啟用的 target 切回停用（n）
+spec/流程_權限規則關聯.md	42	K2x1	- description: 系統管理者在「編輯使用對象」對話框中，點某個已使用（已勾選）的管控對象之「是否使用」勾選框，該列由勾選變為未勾選，且對話框出現儲存鈕。方向與勾選相反，同樣只是對話框內的暫時變更。便於把一個管控對象從某個權限的涵蓋範圍移除。
+spec/流程_權限規則關聯.md	53	K2x1	- title: 系統管理者儲存對話框回填 crules 字串至權限列
+spec/流程_權限規則關聯.md	54	K2x1	- description: 系統管理者在「編輯使用對象」對話框勾選一個原本未使用的管控對象後，點對話框的儲存鈕，設定即回填到權限清單該列的「管控對象」欄，欄內按鈕文字中的項數隨之增加，清單頁並出現儲存鈕；此時尚未寫入資料庫，須再點清單頁工具列的儲存鈕才會真正存檔，完成後顯示「儲
+spec/流程_權限規則關聯.md	67	K2x1	- title: 系統管理者取消對話框不變更 crules
+spec/流程_權限規則關聯.md	68	K2x1	- description: 系統管理者在「編輯使用對象」對話框切換若干管控對象的勾選後，改點右上角的關閉鈕而非儲存鈕，所有變更即被放棄：權限清單該列「管控對象」欄的按鈕文字維持原樣，清單也不會進入待儲存狀態。適合誤改後想整批放棄時使用。
+spec/流程_權限規則關聯.md	80	K2x1	- description: 系統管理者未開啟編輯模式即點權限清單某列「管控對象」欄的按鈕時，開啟的是「展示使用對象」對話框：內容與編輯時相同，但沒有功能列與儲存鈕，每列的勾選框也不能改，只能檢視該權限目前涵蓋哪些管控對象。此欄按鈕不受編輯模式影響，隨時可點開檢視。與其他關聯對話
+spec/流程_權限規則關聯.md	93	K2x2	- description: 外部應用以陣列形式寫入權限的規則時，同一個管控對象可能被列了兩次，一列勾選、一列不勾選，系統取不勾選。系統管理者在權限清單頁看到該權限列「管控對象」欄按鈕左側出現警告圖示，滑鼠停留會提示哪個管控對象重複列出且有勾與沒勾並存，系統視為沒勾選。點該欄按鈕
+spec/流程_權限規則關聯.md	95	K2x1	- 測試資料：base seed pemis / targets；案例前置（非使用者操作）：經外部同步端點（`/syncAndReplaceTabs`，`from` 為本案專屬分區）推入權限 `dup-p`（id `id-dup-p`），其 `crules` 為陣列形式 `[{"
+spec/流程_權限規則關聯.md	112	K2x1	001  系統管理者點權限列 crules 欄按鈕, 觸發 showVeCrulesById(id)  [LayoutContentPemis.vue:showVeCrulesById]
+spec/流程_權限規則關聯.md	127	K2x1	015      系統管理者於對話框操作 (任一變更皆設 isModified=true, 不即時序列化):
+spec/流程_權限規則關聯.md	133	K2x1	021      系統管理者點對話框儲存, 觸發 clickSave  [VeCrules.vue:clickSave]
+spec/流程_權限規則關聯.md	155	K2x1	041      系統管理者點對話框關閉 (取消), 觸發 clickClose  [VeCrules.vue:clickClose]
+spec/流程_權限規則關聯.md	224	K3x1	- **已修復（附修復紀錄）** 2026-10-20（ADR-030，規則帳本 R-AUTH-DECODE-01）：外部應用直接寫入之「陣列形式」授權資料（如 `crules` 為 `[{"name":"專案A/頁A/區塊A","isActive":"y"}]`，伺服端 `ge
+spec/流程_統計資訊事件展示.md	5	K2x1	系統管理者於後台左側導覽點「統計資訊」（`mmStaInfor`，第一頁籤）進入統計頁。頁面以兩個區塊呈現後端 `srLog` 所記事件（event）之發生情形：
+spec/流程_群組權限關聯.md	5	K2x1	系統管理者（瀏覽器使用者，經 w-ui-loginout 登入取得有效 token、後端 `verifyConn` 守門）進入後台後，可由兩個入口進入「群組與權限的關聯」編輯。兩入口操作的是同一份資料 `grups.cpemis`（一個 JSON5 字串，結構為 `{ 權限名: 
+spec/流程_群組權限關聯.md	15	K2x1	- **VeCpemis（群組頁入口）**：對話框 Save 不直接打 API，而是把編輯後的 `cpemis` 字串 resolve 回群組頁；群組頁於 `showVeCpemisById.then` 寫回該列 `opt.rows[kr].cpemis` 並設 `isModif
+spec/流程_群組權限關聯.md	18	K2x1	寫入端點 `updateGrups` 經 hapi `verifyConn` 刪 Bearer 取 token → `checkToken(token, apiType)` → `getAndVerifyClientUser` 守門（`server/WWebPerm.mjs:ve
+spec/流程_群組權限關聯.md	23	K2x1	- title: 系統管理者從群組頁點 cpemis 按鈕開啟群組權限關聯對話框
+spec/流程_群組權限關聯.md	24	K2x1	- description: 系統管理者在權限群組清單頁開啟編輯模式後，點某列「管控使用權限」欄的按鈕，畫面開啟「編輯使用權限」對話框，逐列列出全部權限，每列有權限名稱、「合併權限模式」控制項與「是否使用」勾選框，模式控制項顯示 OR 或 AND 且點開可選；該群組既有的權限設定
+spec/流程_群組權限關聯.md	35	K2x1	- title: 系統管理者於群組頁對話框勾選權限並選 OR/AND 後存檔成功
+spec/流程_群組權限關聯.md	36	K2x1	- description: 系統管理者在「編輯使用權限」對話框勾選某個權限的「是否使用」後，該列的模式控制項由淡色轉為可點，點開後可選 OR 或 AND；選 AND 並點對話框的儲存鈕，設定即回填到權限群組清單該列的「管控使用權限」欄，欄內摘要由「使用 2 項權限」改為「使用 
+spec/流程_群組權限關聯.md	49	K2x1	- title: 系統管理者從權限頁點 belongGrups 按鈕開啟權限隸屬群組對話框
+spec/流程_群組權限關聯.md	50	K2x1	- description: 系統管理者在權限清單頁開啟編輯模式後，點某列「管控所屬權限群組」欄的按鈕，畫面開啟「編輯所屬權限群組」對話框，頂部顯示目前的權限名稱，表格逐列列出全部權限群組，欄位為群組名稱、「是否使用」勾選框、「所屬權限名稱」；最後一欄以標籤列出該群組已使用的每個
+spec/流程_群組權限關聯.md	61	K2x1	- title: 系統管理者於權限頁對話框勾選群組並選 OR/AND 後存檔成功
+spec/流程_群組權限關聯.md	62	K2x1	- description: 系統管理者在「編輯所屬權限群組」對話框勾選某個尚未使用本權限的群組，該群組的「所屬權限名稱」欄立刻多出一顆代表本權限的深色標籤並排在最前面，標籤左段可點開選 OR 或 AND；該列此時有兩顆標籤，欄寬足以全部顯示，因此不會出現「+」數量按鈕。選 AN
+spec/流程_群組權限關聯.md	74	K2x1	- description: 系統管理者未開啟編輯模式即點群組列「管控使用權限」欄的按鈕時，開啟的是「展示使用權限」對話框：內容與編輯時相同，但沒有功能列與儲存鈕，每列的模式控制項呈淡色且點不開，勾選框也不能改，只能檢視該群組目前使用哪些權限。適合查看而不想誤改設定時使用。
+spec/流程_群組權限關聯.md	86	K2x1	- description: 系統管理者未開啟編輯模式即點權限列「管控所屬權限群組」欄的按鈕時，開啟的是「展示所屬權限群組」對話框：表格照常列出各群組與其所屬權限標籤，但沒有功能列與儲存鈕，標籤左段只顯示合併模式而點不開，勾選框也不能改。若瀏覽器視窗較窄而欄寬放不下全部標籤，該列
+spec/流程_群組權限關聯.md	99	K2x1	- description: 系統管理者在權限清單頁開啟編輯模式，並從某個權限開啟「編輯所屬權限群組」對話框後，若瀏覽器視窗較窄，「所屬權限名稱」欄會跟著變窄。已使用本權限的群組其該列有兩顆標籤時，若欄寬放不下，該列只顯示代表本權限的深色標籤，後面接一顆顯示「+1」的按鈕，表示還
+spec/流程_群組權限關聯.md	101	K2x1	- 測試資料：base seed grups / pemis；開啟標的為權限清單頁 row 0（權限P1）；觀察與操作標的為對話框 row 0（權限群組M1，已使用 權限P1，另有 權限P2，共兩顆）。登入身分為系統管理者 token `sys`。
+spec/流程_群組權限關聯.md	112	K2x1	- description: 系統管理者在權限群組清單頁看到某個群組的「管控使用權限」欄按鈕左側出現警告圖示，滑鼠停留會提示該群組引用了在權限清單中找不到的權限，並說明這個引用仍以它設定的模式參與計算，以 AND 引用時該群組的授權為空，請還原或移除。點該欄按鈕開啟「編輯使用權限
+spec/流程_群組權限關聯.md	114	K2x1	- 測試資料：base seed grups / pemis / users；案例前置（非使用者操作）：經外部同步端點（`/syncAndReplaceTabs`，`from` 為本案專屬分區）為 `grups` 推入群組 `dang-g`（id `id-dang-g`），其 `
+spec/流程_群組權限關聯.md	126	K2x2	- description: 系統管理者在權限清單頁開啟編輯模式後，開啟某個權限的「編輯所屬權限群組」對話框時，若某個群組的權限關聯引用了權限清單中找不到的權限，該群組列「所屬權限名稱」欄的最左側會出現警告圖示，提示內容與群組清單頁相同。系統管理者在對話框裡勾選這個群組使用本權限
+spec/流程_群組權限關聯.md	128	K2x1	- 測試資料：同 E2E-008 之 dang-g 與 dang-gu（`dang-g` 之 `cpemis` 含啟用中的 `權限PX` AND 引用，PX 不存在）。開啟標的為權限清單頁之 權限P2 列；勾選標的為對話框中的 dang-g 列。登入身分為系統管理者 token 
+spec/流程_群組權限關聯.md	140	K2x3	- description: 權限群組的權限關聯中，所有啟用的權限都沒有填合併模式時，系統把它們只當成限制，沒有任何一個填對模式的權限可以當授權的來源，因此屬於這個群組的使用者目前沒有任何授權。系統管理者在權限群組清單頁看到該群組「管控使用權限」欄按鈕左側有警告圖示，提示合併模式
+spec/流程_群組權限關聯.md	142	K2x1	- 測試資料：base seed grups / pemis / users；案例前置（非使用者操作）：經外部同步端點（`/syncAndReplaceTabs`，`from` 為本案專屬分區）為 `grups` 推入群組 `allbad-g`（id `id-allbad-g`）
+spec/流程_群組權限關聯.md	150	K3x2	- 備註：與 `流程_使用者群組關聯.md` E2E-016 為對稱路徑（群組層對權限層）。2026-10-21 主控裁決（限制項，與帳本字面不同之一格，取較嚴，待主控／使用者確認）：mode 缺或非法之啟用項於 `mergeRules` 只作 AND 交集項、不單獨成為基底；該
+spec/流程_群組權限關聯.md	159	K2x1	001  系統管理者點 cpemis 欄按鈕, 觸發 showVeCpemisById(id)  [LayoutContentGrups.vue:showVeCpemisById]
+spec/流程_群組權限關聯.md	171	K2x1	011      系統管理者勾選權限 checkbox, 觸發 showVeCpemisToggleItemEnableByName  [VeCpemis.vue:showVeCpemisToggleItemEnableByName]
+spec/流程_群組權限關聯.md	173	K2x1	013      系統管理者點該列之模式控制項(ModeSelectChip, 僅該列已勾選時可點)並選 OR/AND, 觸發 showVeCpemisToggleItemModeByName  [VeCpemis.vue:showVeCpemisToggleItemModeBy
+spec/流程_群組權限關聯.md	175	K2x1	015      系統管理者點對話框 Save, 觸發 clickSave  [VeCpemis.vue:clickSave]
+spec/流程_群組權限關聯.md	196	K2x1	035  系統管理者點群組頁工具列存檔按鈕, 觸發 saveGrups  [LayoutContentGrups.vue:saveGrups]
+spec/流程_群組權限關聯.md	238	K2x1	001  系統管理者點 belongGrups 欄按鈕, 觸發 showVePemiBlngGrupsById(id)  [LayoutContentPemis.vue:showVePemiBlngGrupsById]
+spec/流程_群組權限關聯.md	247	K2x1	009      系統管理者勾選群組 checkbox, 觸發 showVePemiBlngGrupsToggleItemEnableByName  [VePemiBlngGrups.vue:showVePemiBlngGrupsToggleItemEnableByName]
+spec/流程_群組權限關聯.md	249	K2x1	011      系統管理者點該群組之本權限標籤左段(RelationChips → RelationChip → ModeSelectChip)並選 OR/AND, 觸發 showVePemiBlngGrupsToggleItemModeByName  [VePemiBlngG
+spec/流程_群組權限關聯.md	251	K2x1	012a         系統管理者點對話框工具列之「全選／全取消／反選」(僅可編輯時渲染), 觸發 showVePemiBlngGrupsToggleItemsEnableAllYes／AllNo／AllInv  [VePemiBlngGrups.vue:showVePemiB
+spec/流程_群組權限關聯.md	253	K2x1	013      系統管理者點對話框 Save, 觸發 clickSave  [VePemiBlngGrups.vue:clickSave]
+spec/流程_群組權限關聯.md	353	K2x1	- **權限**：兩入口存檔皆經 `verifyConn → checkToken → getAndVerifyClientUser` 守門（token 須有效、其使用者須在 perm `users` 表且 `isActive='y'`、並通過部署方 `verifyClientU
+spec/流程_群組權限關聯.md	362	K3x1	- **授權不變與合併規則（`R-AUTH-MERGE-00`，ADR-033，2026-10-21）**：伺服端合併結果與 `cpemis` 之鍵序、陣列元素序無關（先對全部 OR 項聯集、再與全部 AND 項交集，未列之管理對象視同 `n`），故兩入口存檔皆不保留原鍵序、也不
+spec/流程_群組權限關聯.md	363	K3x1	- **遇衝突或歧義一律收嚴並於引用處提示（ADR-035，2026-10-21 run05，使用者原則「收嚴＋增加提示」）**：伺服端對引用查無（懸空）者以其模式參與、內容全 `n`（AND 使該群組授權為空），對同名多筆取交集，對模式缺或非法者視為「限制項」——只當 AND 
+spec/流程_群組權限關聯.md	369	K3x2	- **設計事實（記錄備查；業主裁定之事實更正；資料軸）** 2026-10-22（run06；使用者裁示，規則帳本 `R-EDIT-KEEP-01` ③，ADR-035 Update 2026-10-22；與 `流程_使用者群組關聯.md`〈已知落差〉同日同名條目為同一事實）：
+spec/流程_群組權限關聯.md	375	K2x1	- **設計事實（記錄備查）** 2026-10-21：權限頁入口存檔以對話框之列整表寫回 grups（`updateGrups` 為整表 diff）：開框期間他人**新增**之群組不在列內，存檔時被整表 diff 刪除；寫回順序依對話框序，他人之 `order` 重排被覆蓋。屬
+spec/流程_群組權限關聯.md	378	K3x1	- **已修復（附修復紀錄）** 2026-10-20（ADR-030，規則帳本 R-AUTH-DECODE-01）：外部應用直接寫入之「陣列形式」授權資料（如 `cpemis` 為 `[{"name":"P1","mode":"OR","isActive":"y"}]`，伺服端
+spec/設計要點與取捨.md	85	K2x1	- 系統管理者刪除某 target 後, 引用該 target 的 `pemis.crules` 字串仍可能殘留對它的 `'y'`/`'n'` 引用 (crules 與 targets 為各自獨立維護的兩張表, 刪 target 不會回頭清掃所有 crules).
+spec/設計要點與取捨.md	115	K2x1	- 不解決會踩到: 停用旗標失去意義、系統管理者以為停用了卻仍生效.
+spec/設計要點與取捨.md	163	K2x1	- ⚠️ 靜默忽略無使用者可見回饋: 系統管理者若把群組名打錯, 該群組默默不生效而無錯誤提示 — 須靠後端 `console.log` 或 e2e 守護察覺.
+spec/設計要點與取捨.md	457	K2x1	3. 後果 (部分更新) 為推測性, 且本工具為單一系統管理者驅動之後台, 觸發面窄.
+spec/設計要點與取捨.md	476	K2x1	- **Decision 理由 3「本工具為單一系統管理者驅動之後台, 觸發面窄」之前提已失效**: 外部同步本身即第二位寫入者, 後台持舊快照之整表存檔可使已被同步撤銷之列復活、使外部已撤銷之授權還原(ADR-037 Context S1／S2／S4). ADR-037 以草稿
+spec/設計要點與取捨.md	511	K2x1	- 內建寫入通道之存取邊界 = **「token 可由 `getUserByToken` 解析出結構合法 user」**。**整合者負責**確保 `getUserByToken` 只對「應具寫入權」之主體回傳有效 user(例如僅對系統管理者 token 解析成功, 或在 `ge
+spec/設計要點與取捨.md	516	K2x2	- ⚠️ 不對稱為已知契約: 若整合者同時(a)以 `getUserByToken` 解析非系統管理者 token(供讀取 API 經 `verifyClientUser` 過濾)且(b)未在 `getUserByToken` 層限制寫入主體, 則該非系統管理者 token 可經
+spec/設計要點與取捨.md	524	K3x1	- **觸發**: 整合者 rddmanager_2_perm 提出建議書(其 §2)要求「於 verifyConn 呼叫 verifyClientUser, **或新增 verifyWriteUser 鉤子**, 讓部署層授權政策涵蓋資料通道; 閱讀類維持現狀即可」。該部署已將
+spec/設計要點與取捨.md	529	K2x1	- **裁示後須連帶處理**: `api-verifyConn-auth` 案例改為「傳鉤子/未傳鉤子」兩組; 四份流程 spec 之權限段(後台使用者/群組/權限/標的清單)現載「是否限定系統管理者由部署方的 verifyClientUser 決定」, 與本 ADR 之 foo
+spec/設計要點與取捨.md	780	K3x1	- 部署方回報(2026-09-24)觸發 sso / perm / api / task 四 repo 之權杖外洩修正, 方案與後果分析見 w-web-sso ADR-068(同日新增; 外洩之 app token 等同 sso 全權系統管理者). 本專案為消費端: 部署方常把
+spec/設計要點與取捨.md	1149	K3x1	2. **無法無損表示者 fail-closed**(R-AUTH-LOSSY-01): `src/js/getKpLossy.mjs` 判定陣列形式之 `cgrups`／`cpemis` 是否含①同名有效 OR＋AND ②有效 AND 名稱 ≥ 2 且其**相對順序**於伺服端
+spec/設計要點與取捨.md	1160	K3x1	- ⚠️ **待裁示(外審第三輪 minimax#1／#2, 2026-10-20 讀碼並以 `getUserRules` 重現屬實, 本輪未改)**: 「存檔授權不變」只涵蓋**未變更**之存檔; 系統管理者**啟用**一個原為停用、且鍵序排在既有有效 AND 項之前的 AND
+spec/設計要點與取捨.md	1270	K3x1	5. **既有重複資料之處置與工具**(R-NAME-UNIQ-03): 提供**唯讀稽核工具** `server/tools/nameDupReport.mjs`(輸入 `{ users, grups, pemis, targets }` 匯出檔; 列出 `grups`／`pe
+spec/設計要點與取捨.md	1278	K3x1	- ⚠️ **已知限制／範圍外觀察(本輪未改, 請主責裁示)**: ①**前端仍擋歷史重複存檔**: `LayoutContentGrups`／`LayoutContentPemis` 之 `errItemsByName` 標出重複並使 `isError` 擋存(`src/com
+spec/設計要點與取捨.md	1314	K3x1	- run04(ADR-033／034)把「結果與順序無關」「同名不得新增」做完, 但授權資料仍有五處**靜默放寬**或**靜默擇一**, 系統管理者無從察覺: ①引用之群組／權限**查無**(懸空)時該項被略過(`arrFinder` 找不到即忽略, ADR-005)——AND
+spec/設計要點與取捨.md	1322	K3x1	3. **c 引用之群組／權限查無(懸空)**: 該項**仍以其 `mode` 參與合併、內容為空集合(全 `n`)**——OR 項貢獻為空(但該層因此「有 OR 項」, 起點為 OR 聯集而非第一個 AND 項), AND 項使交集為空(`mShare.mjs:getUserR
+spec/設計要點與取捨.md	1334	K3x1	- **e**——「視為 `OR`」(多給, 增權: mode 缺漏的項目成為聯集的來源, 授予原本不授權的內容) vs「不計入」(舊, 放寬 AND 限制: mode 缺漏的 AND 意圖消失, 其限制隨之消失, 授權變多) vs「直接視為 `AND`」(該層另有 mode 合
+spec/設計要點與取捨.md	1336	K3x1	- **提示**——警告圖示＋tooltip(採) vs 僅記 log: log 系統管理者看不到、也不在發生問題的位置; 圖示在該儲存格左側、不改版面、無衝突時零差異, 且與既有名稱欄警告(`grupNameDuplicate` 等)同一視覺語彙.
+spec/設計要點與取捨.md	1337	K3x1	- **g**——前端全擋(舊) vs 同伺服端判準(採) vs 完全不擋: 全擋使已有重複之庫無法在後台修復(與 ADR-034 決定 2 之意旨矛盾); 完全不擋則本次造成之新同名可通過前端檢查(伺服端仍會拒, 但系統管理者要等送出才知道).
+spec/設計要點與取捨.md	1344	K3x1	- ✅ **〔2026-10-22 外審後已處理〕以下「編輯當下停用所有合法項」之限制已修**: 未被系統管理者改動的 mode 缺／非法啟用項, 存檔時原樣還原其原始 mode(`editorRefRows.mjs` `getRawModeMap`／`putRowsToKp`／
+spec/設計要點與取捨.md	1345	K3x3	- ⚠️ ~~**編輯當下停用所有合法項之限制(讀碼並以真函數實算, 未另設 e2e 案例; 屬系統管理者明確編輯結果)**~~(已修, 留痕): `getKpLossy` 只判開啟對話框時的原字串. 該層同時有 mode 合法之項(如 `G1` OR)與 mode 缺漏之項(如
+spec/設計要點與取捨.md	1346	K3x1	- ✅ 系統管理者於**發生問題的位置**看到提示: 清單頁 `cgrups`／`cpemis`／`crules` 欄按鈕左側、五個編輯對話框的列、群組／權限／使用者名稱欄(歷史同名); 不再靠 log 發現. 刪除被 AND 引用之群組／權限前, 先得知將被收回授權之使用者／群
+spec/設計要點與取捨.md	1351	K3x1	- ⚠️ 同名多列之編輯器行為: 只做「顯示、不一致則拒存」, 不提供對話框內合併或刪除同名列(同 ADR-034 決定 5: 由系統管理者於後台清單改名或刪除其一, 以 `nameDupReport` 列出引用者).
+spec/設計要點與取捨.md	1362	K3x2	- **Context**: 第三格拒存之理由是編輯器解碼為 AND、存檔照列寫出會使該項成為唯一 AND 基底而多給. 方案 A(外審後採納, 2026-10-22; 規則帳本 `R-EDIT-KEEP-01`)使未被系統管理者改動之限制項存檔時原樣寫回其原始 mode(`ge
+spec/設計要點與取捨.md	1363	K3x1	- **Decision**: 使用者裁示放寬——`getKpLossy` 移除第三格, 兩個直接編輯器與兩個反向關聯對話框皆可存(單一缺 mode 之項、舊縮寫 `{"G1":"y"}`、陣列與物件形式皆然); `authLossyBlocked` 文字(eng／cht)去掉「
+spec/設計要點與取捨.md	1364	K3x3	- **Consequences**: ✅ 以真 `getUserRules` 窮舉＋隨機(固定種子)證明存檔不多給(`unit-editorRows` RT-LOSSY3-001～009、EX-LOSSY3-001～008; 物件與陣列形式、單一／多個啟用項、混停用項／懸空／名
+spec/設計要點與取捨.md	1369	K2x1	**Status**: Accepted (2026-10-22). 使用者裁示(2026-10-21, 帳本 `R-PRINCIPLE-00` 原則 6 與適用表 n): 刪除即表示要移除其效果, **不採「被引用則禁止刪除」**(可能牽涉大量帳號, 系統管理者須人工逐一處理)
+spec/設計要點與取捨.md	1372	K3x1	- 引用以名稱字串查找(`users.cgrups`→`grups.name`、`grups.cpemis`→`pemis.name`、`pemis.crules`→`targets.id`), 寫入側對名稱透明: 改名或刪除不動引用, 引用成為懸空(ADR-035 c: 收嚴為
+spec/設計要點與取捨.md	1390	K2x1	- **刪除被引用者**——禁止刪除(A2, 使用者否決: 系統管理者須人工逐一處理大量帳號) vs 保留懸空(舊, 讀取端權宜; 引用被同名新資料接管) vs 連帶清理(採).
+spec/設計要點與取捨.md	1424	K2x1	- 外部同步(`/syncAndReplaceTabs`)以 `from` 為界全量取代(ADR-008), 後台(`updateXxx`)為整表批次 diff 且「快照＝真相」(ADR-009); 兩者寫同一批表, ADR-013 之「單一系統管理者驅動」前提因外部同步成為第二
+spec/設計要點與取捨.md	1432	K2x1	| S5 | 兩位系統管理者同時存檔 | 最後寫入者勝, 他人修改靜默消失 |
+spec/設計要點與取捨.md	1433	K3x1	| S6 | 後台改了外部列(如 `isActive`) | 被下次同步覆蓋, 系統管理者以為已停用之帳號又可登入 |
+spec/設計要點與取捨.md	1445	K3x1	3. **鎖定層級 Lv1**(`getLockFields`、`checkExternalWrite`): 外部列之**身分／結構欄**(schema 全部欄位扣除 `id`、`from`、`order`、指派欄、伺服器管理欄)後台不得改, 外部列不得刪除、不得改 `from`
+spec/設計要點與取捨.md	1453	K3x1	11. **外部同步保留後台指派(事實題; 指派欄屬後台, Lv1)**: users 列缺 `cgrups` 鍵時保留庫內同一 `from` 對應列之值(`syncKeep.keepAssignOnMissing`: 先依 `id`; 無 `id` 者於 `mappingBy`
+spec/設計要點與取捨.md	1465	K3x1	- **違規處置**——整次拒收(採) vs 靜默忽略該列(系統管理者誤以為已存, 否).
+spec/設計要點與取捨.md	1466	K2x1	- **過期快照**——基準於草稿建立時綁定＋逐列內容指紋(採) vs 存檔當下取 store 基準(外審 B.1: 只證明 store 新, 否) vs 表級指紋(誤拒面大, 否) vs 差異集 API(c2: 新 RPC、6 站點重寫, 工大風險高, 待多系統管理者並行成為真
+spec/設計要點與取捨.md	1469	K3x1	- **外部同步缺鍵**——users 之 `cgrups` 保留(採, 事實題) vs 一律以外部為準(抹掉後台指派); `grups.cpemis`／`pemis.crules` 缺鍵是否保留——**〔run08 定案〕比照 users 保留**(見決定 11; 備選「一律以
+spec/設計要點與取捨.md	1474	K3x1	- ⚠️ **C-3 政策: 後台系統管理者無法停用或刪除外部使用者**: `isActive`／`isAdmin`／`name`／`email` 等屬身分欄, 外部列鎖定(Lv1); 外部使用者之緊急停用須走來源端(下次同步生效)或離線 `g_purgeFrom.mjs`; 未
+spec/設計要點與取捨.md	1481	K2x1	- **背景**: 獨立實操確認發現清單頁於自然時序下(A 編輯未存 → 他人或外部同步改同一表 → 約 2 秒輪詢之推播)`changeParams` 同時重建 `items` 與 `baseline`, A 之草稿被靜默丟棄, 再存回「儲存成功」(ADR-037 Conseq
+spec/設計要點與取捨.md	1497	K2x1	- **Consequences(run11)**: ⚠️ **行為變更(README Upgrade Notes)**: 他人改「別列」或增刪列亦使存檔被拒(原僅本次寫入之列); 對話框開框後他人新增之列不再「原樣帶回成功」而是被拒、重新開啟後可存(E2E-012 改寫); 外
+spec/設計要點與取捨.md	1518	K3x1	- **決定 42——判準單一擁有者 `src/js/refIdentity.mjs`(前後端共用之純函數)**: 反向 `subject = { id, name, saved }`(判準即 `draftSync.checkSubject`); 正向 `refs = [{ na
+spec/設計要點與取捨.md	1527	K3x1	- **b. 以「載入當時」而非「選取當時」之快照記 id**: 會誤擋「載入後他人新建、我才指派」之合法操作(載入當時 store 無該實體 → 宣告 `[]` → 存檔時已出現 → 不符); 且系統管理者的授權意圖是「選取當時所見的那一個」。
+spec/設計要點與取捨.md	1558	K2x1	- 範圍四(函數層級角色): 寫入 RPC 無函數級系統管理者檢查, 授權全靠部署方 `verifyClientUser` 把關(規格 C2).
+spec/設計要點與取捨.md	1567	K2x1	55. **users 登入對應 `mappingBy='id'` 未實作(待裁示, 本輪不改)**〔2026-10-24 perm-run04 更新: 已採 O1 實作, 見下方 ADR-038 Update 決定 58～64; 以下為 perm-run03 原文, 留痕〕: 
+spec/設計要點與取捨.md	1572	K2x1	- ⚠️ **行為變更(README Upgrade Notes; README 已有相關說明, Grep 計 `srcKey`／`userNotAdmin`／`saveIdentityRequired` 共 18 處提及, 本文件撰寫時未逐條核對)**: ①外部端須改送 `sr
+spec/設計要點與取捨.md	1590	K2x1	58. **採 O1**(主控裁示). 不採 O3: `id` 模式維持只對內部 id, 預設部署者升版後新匯入之使用者將靜默無法登入; 不採 O2: 後台建立之系統管理者須改設定、破壞後台列登入; 不採 O4: 現況即缺口. O1 的代價是撞值須在三個入口收嚴(決定 61), 
+spec/設計要點與取捨.md	1630	K1x1	## ADR-039: perm-run01(2026-10-24 輪)—— 權限後台與資料通道只限系統管理者(套件自行強制)、後台整表寫入同批重複 id 四表整批拒收、`isSameFile` 精度 (2026-10-24, 使用者 2026-10-24 裁示; 主控任務 20
+spec/設計要點與取捨.md	1632	K1x1	**Status**: Accepted (2026-10-24; 使用者裁示 2026-10-24「不管部署方會怎麼安排, perm 套件這邊得自己有一套做法. 數據傳輸都要通過 token 識別身份, 也都要按權限設定產製對應權限樹; 系統管理者才能讀寫 4 表, 一般使用者
+spec/設計要點與取捨.md	1634	K2x1	**Context**: 1.1.14 已限寫入為系統管理者(`requireAdmin`, perm-run03), `/api/getPerm` 只回本人權限樹; 缺口: 資料通道之讀取(連線閘 `checkToken`、執行身分 `getUserIdByToken`、表 `
+spec/設計要點與取捨.md	1637	K1x1	74. **系統管理者之定義與權威**: perm `users` 列 `isActive='y'` 且 `isAdmin='y'`(自有屬性、嚴格相等); perm 以自身表為權威, 不採 token 宣稱值(同 `getTokenUser` 既有政策). 判準單一擁有者 `s
+spec/設計要點與取捨.md	1638	K2x1	75. **單一關卡 `getAndVerifyAdminUser`＝`getAndVerifyClientUser(…, { adminOnly:true })`**: 角色於交給部署方 `verifyClientUser` **之前**判定(檢查之值即使用之值: 部署方函數即
+spec/設計要點與取捨.md	1642	K2x2	79. **`requireAdmin` 保留為縱深防禦**: 連線閘與執行身分已要求系統管理者後, 非系統管理者黑箱測不到 `requireAdmin`(僅「連線後角色被降級」之競態可達), 以 `unit-adminOnlySite` AOS-S6 站點守護＋變異驗證涵蓋; 
+spec/設計要點與取捨.md	1648	K2x3	85. **外審備查項(不改, 待裁示或另案)**: #1 `email`／`name` 登入對應只計有效列(R-MAPKEY-02 既有政策, 停用系統管理者與另一位有效系統管理者同 email／name 時其 token 解析為後者); #4 `requireAdmin` 在
+spec/設計要點與取捨.md	1658	K2x1	## ADR-040: perm-run01(2026-10-24 第三輪)—— 應用系統 token 之配合(使用者用途／系統服務用途)、應用系統路由要求系統管理者等級、連線閘須 Bearer、`/syncAndReplaceTabs` 先驗身分、路由失敗不回原文 (2026-
+spec/設計要點與取捨.md	1662	K2x4	**Context**: 1.1.15 使後台與資料通道只限 perm users 表之系統管理者, 但: ①應用系統路由(`/api/getPermUserInfor`、`/syncAndReplaceTabs`)只看部署方 `verifyAppUser`, 套件不要求系統管理
+spec/設計要點與取捨.md	1666	K2x2	88. **系統服務用途之判準(單一擁有者)**: `server/adminCheck.mjs:isSystemAppUser`(非空字串 `id`、`isApp==='y'`、`isAdmin==='y'`, 自有屬性、嚴格相等)**且**在 perm users 表中對不到
+spec/設計要點與取捨.md	1667	K2x1	89. **放行範圍與經由哪個部署方函數**: 系統服務用途可用系統管理者之服務——後台登入檢查、資料通道各入口(連線閘＋執行身分, 含四表 `select`、四個 `update*`、`getWebInfor`／`getStaEvent*`、系統函數、上傳下載)、`/api/g
+spec/設計要點與取捨.md	1668	K2x1	90. **稽核欄記其 id**: `getUserIdByToken` 回其外部 id(`app:…`), 框架據以寫 `userId`／`userIdUpdate`(`MX-D` updateXxx 驗證)。`requireAdmin` 縱深防禦(只拿 userId 字串):
+spec/設計要點與取捨.md	1669	K2x1	91. **P-1 應用系統路由要求系統管理者等級**: `getAndVerifyAppUser` 改為: 外部反查 → 在 perm 表者(`countPermRows>0`)經 `getTokenUser`(欄位齊備、對應鍵唯一、列有效)並要求 `isAdminRow`; 
+spec/設計要點與取捨.md	1671	K2x1	93. **P-5 先驗身分再驗參數**: `/syncAndReplaceTabs` 順序改為 token 非空 → `getAndVerifyAppUser`(含系統管理者等級)→ `user.id` → `keyTable` 缺/白名單 → `parsePayload`; 
+spec/設計要點與取捨.md	1672	K2x3	94. **P-7 部署方範例與 JSDoc 對齊**: `srv.mjs` 之 `verifyClientUser`／`verifyAppUser` 範例**不以 `isAdmin` 判斷**(只留測試鉤子), 非系統管理者一律由套件以 `userNotAdmin` 拒絕並使畫
+spec/設計要點與取捨.md	1675	K2x1	96. **外審 sol(gpt-6.1-sol, read-only, 36 分, 提出 F01～F10; 全數對照原始碼核對: 屬實 10〔F03／F04 部分屬實〕, 採納修正 8〔F02、F03、F05、F06、F08 改碼; F01、F09、F10 補測試〕, 部分採納
+spec/設計要點與取捨.md	1680	K2x3	- ⚠️ 〔**perm-run02②已結案**: 主控裁示 `isSystemAppUser` 要求 `id` 以 `app:` 開頭, 見下方 ADR-040 Update(perm-run02) 決定 98、99; 原文留痕如下〕已知限制/待確認 ③(**待主控裁示**):
+spec/設計要點與取捨.md	1689	K2x1	**Status**: Accepted (2026-10-24; 主控任務 20261024182735 perm-run02, 修正輪單輪; 依據 `C:\opensrcOper\dspec\使用者身分驗證原則.md` 二.8〔改版預設相容〕與二之一〔使用者用途＝所綁使用者自
+spec/設計要點與取捨.md	1691	K2x2	**Context**: perm-run01 對『不在 perm users 表』之應用系統路由呼叫者一律要求 `isSystemAppUser`(`isApp` y＋`isAdmin` y＋非空 id), 使未轉傳 `isApp` 之既有部署升版後中斷; 又因 `isSyst
+spec/設計要點與取捨.md	1696	K2x1	99. **兩套判準分流的理由**: 應用系統路由是升版相容面(舊版 sso 之應用系統身分即 `isAdmin='y'`, 部署方可能未轉傳 `isApp`), 故寬; 後台登入檢查與資料通道本就拒絕一切不在表者(已發布之 1.1.15), 系統服務用途是 perm-run01
+spec/設計要點與取捨.md	1697	K2x2	100. **相容性結論**: perm-run01 之『破壞性變更』(未轉傳 `isApp` 者被拒)取消; 窄破壞性僅剩『反查 `isAdmin` 非 `'y'` 之應用系統身分(及比對到非有效系統管理者列者)於應用系統路由被拒』。相對 perm-run01 檢查點(`dad
+spec/設計要點與取捨.md	1698	K2x1	101. **perm-run01 待裁示 ① 結案**: 『使用者用途綁不在表之 sso 系統管理者與系統服務用途無從區分』由 98 解決; 待裁示 ②(P-7 後半)主控已接受『只寫入文件』。
+spec/設計要點與取捨.md	1699	K2x2	102. **外審 sol 第一輪(gpt-6.1-sol max, read-only, 19 分; F1～F7)**: F1(測試缺格, 屬實, 中)採納——補 MX-R5～R7、MX-M5、呼叫者軸 AFN(`isApp` 明確 `'n'`)／AFO(`isApp` 為 `
+spec/設計要點與取捨.md	1700	K2x2	103. **增量外審(sol 第二輪, 7 分; 針對採納後之 delta; G1～G6)**: G1(B 清除登錄後、合法系統服務請求 A 重新登錄, B 的 `requireAdmin` 沿用 A 的登錄)與 G2(B 於 A 登錄後才完成驗證並清除, A 誤拒)——屬實但
+spec/設計要點與取捨.md	1705	K2x1	- ⚠️ 已知不修: `[sys:polling]` 本體 `__sysToken__` 之身分檢查屬框架(排程第 128 項); F2 之『不在表而缺 id 之系統管理者宣稱者可呼叫 `/api/getPermUserInfor`』維持 1.1.15 行為(備查, 若要收嚴屬契
+spec/設計要點與取捨.md	1715	K2x1	**Context**: w-serv-hapi 1.1.8(連帶 w-serv-webdata 1.1.16、w-serv-broadcast 1.1.12)新增 `sysFuncsPublic`: 列出之系統函數(`[sys:getFuncList]`、`[sys:getTa
+spec/設計要點與取捨.md	1721	K2x3	108. **「列為公開」在本套件不等於匿名可呼叫**: 連線閘只放系統管理者, `getUserIdByToken` 對空 token／非系統管理者 reject(框架不執行, 含列於 `sysFuncsPublic` 者)。故 `[sys:getFuncList]` 之公開是
+spec/設計要點與取捨.md	1725	K2x1	112. **外審 sol 第一輪(gpt-6.1-sol max, 唯讀快照副本, 20 分鐘; F1～F11 全部逐條核對原始碼)**: 採納——F1(中, 測試缺格)補邊界格 4 組: 本體 token 非字串〔`cstr` 轉為空字串或數字字串, 一律拒〕、輪詢 `cli
+src/App.vue	86	K1x1	//登入者不是系統管理者(後端 userNotAdmin; 即使部署方放行亦拒絕, R-ADMIN-ONLY-01): 顯示「無權進入權限後台」並停留, 不轉址(轉走則使用者看不到原因); 一般使用者查本人權限樹走 /api/getPerm
+src/js/cvKpToObj.mjs	13	K3x1	* 編輯對話框若依名稱為鍵查值會查不到陣列元素 → 顯示停用 → 系統管理者存檔即撤銷有效授權. 本函數與伺服端共用 cvKpToArr 之解碼(單一擁有者),
+src/js/draftSync.mjs	3	K2x1	//背景: 清單頁以 computed(changeParams)監看 store, 資料推播(伺服器約 2 秒輪詢, 他人或外部同步改了表)使 store 變新時, 修改前一律重建 items 與基準, 使系統管理者尚未儲存之編輯被靜默丟棄,
+src/js/editorRefRows.mjs	32	K3x1	* 取得「mode 缺或非法之啟用引用」(伺服端之限制項)之原始 mode, 供存檔時原樣寫回(R-PRINCIPLE-00 e; 未被系統管理者改動之項寫回其原始 mode)
+src/js/editorRefRows.mjs	35	K3x1	* 編輯器(cvKpToObj)把此類項顯示為「AND、啟用」; 存檔若寫出合法 AND, 限制項即變成可當基底之 AND——例: { G1: 缺 mode, G2: AND } 系統管理者停用唯一合法項 G2 後存檔,
+src/js/editorRefRows.mjs	37	K3x1	* 系統管理者改過 mode 或停用者照其選擇寫出.
+src/js/editorRefRows.mjs	175	K3x1	* 否則限制項變為可當基底之 AND 而多給(見 getRawModeMap); 系統管理者改過 mode 或停用者照列寫出. 不給＝一律照列寫出.
+src/js/getKpLossy.mjs	17	K3x1	* (R-PRINCIPLE-00 e, 該層無任何 mode 合法之啟用項時結果全 n), 編輯器雖顯示為「AND、啟用」, 但存檔時對未被系統管理者改動者原樣寫回其原始 mode(editorRefRows 之
+src/js/getKpLossy.mjs	18	K3x1	* getRawModeMap／putRowsToKp／putRefEntry, 方案 A; R-EDIT-KEEP-01), 故未改動時存檔前後授權相等、不會成為唯一 AND 基底而多給; 放寬前此格拒存只會使系統管理者無法存任何變更.
+src/js/getKpLossy.mjs	19	K3x1	* 該項之 mode 缺漏提示仍由 getAuthWarn 之 modeInvalid 警告圖示承擔(不變). 系統管理者在對話框內明確改動(改為 OR／AND、啟用其他項)之結果, 等於伺服端對「改動後之狀態」之解讀,
+src/js/pairRowsToSnapshot.mjs	22	K3x1	* 兩者以列索引配對時, store 於開框期間被更新(另一位系統管理者增刪列或改 order)即錯位, 關聯寫到另一個使用者／群組(規則帳本 R-REL-PAIR-01).
+src/plugins/mUI.mjs	43	K1x1	//perm-run01(R-ADMIN-ONLY-01): 登入者不是系統管理者(後端 userNotAdmin, 即使部署方放行); 被拒者連不上資料通道、取不到後端字典, 故文字須在此備妥(同鍵亦在 server/procLang.mjs)
+srv.mjs	59	K1x1	if (token === '{token-for-admin2}') { //測試用(perm-run03 範圍三): 第二位系統管理者, 供「標頭 token 與本體 __sysToken__ 為不同使用者」「本體 token 之使用者被停用」等 getUserIdByTok
+srv.mjs	67	K2x1	if (token === '{token-for-member}') { //測試用(perm-run03 範圍四): 在 perm users 表內(測試自行建立)、有效、isAdmin='n' 但**通過** verifyClientUser(見下方)之瀏覽使用者, 供「通
+srv.mjs	75	K2x1	if (token === '{token-for-mutate}') { //測試用(perm-run01 外審 sol#2): perm 列為系統管理者, 但 verifyClientUser 會改寫其收到之 user 物件(id、isAdmin), 模擬行為不良之部署方回呼
+srv.mjs	112	K2x1	if (token === '{token-for-sso-admin}') { //不在 perm users 表之 sso 系統管理者, 以其**自身使用者 token**(perm-run02): 未轉傳 isApp; 與下一個權杖為同一人(id 同)
+srv.mjs	136	K2x1	if (token === '{token-for-ghost-user}') { //一般 sso 系統管理者(perm-run02 外審 sol F3): email 對應 perm 列(主鍵恰為 'app:key-ghost'; 僅 mappingBy='email' 之測
+srv.mjs	139	K2x1	if (token === '{token-for-app-bind-sso}') { //使用者用途(AU)綁定「不在 perm users 表之 sso 系統管理者」(perm-run02): 反查回該使用者實際資料(id 非 'app:' 開頭)＋isApp='y', is
+srv.mjs	142	K2x1	if (token === '{token-for-app-bind-admin}') { //使用者用途(AU)綁定系統管理者(base seed admin): 反查回該使用者實際資料＋isApp='y'
+srv.mjs	151	K2x1	if (token === '{token-for-alt-admin}') { //外部 id 與 perm 主鍵不同之系統管理者(外審 sol F02): 以 email 對應 perm 列 id-for-admin(僅 mappingBy 為 email 之測試設定有效);
+srv.mjs	157	K2x1	if (token === '{token-for-deny}') { //perm 列為系統管理者(列由測試自建), 但 verifyClientUser 因非角色因素(模擬來源網段)否決
+srv.mjs	178	K2x1	if (process.env.NODE_ENV !== 'production' && user.id === 'id-for-member') { //測試用: 見 getUserByToken 之 '{token-for-member}'(部署方放行非系統管理者, 套件仍須
+srv.mjs	195	K2x2	//只放行有效之瀏覽使用者, 不以 isAdmin 判斷(P-7): 非系統管理者由本套件統一拒絕並使畫面顯示「無權進入權限後台」(userNotAdmin); 若在此先否決非系統管理者, 使用者只會看到「拒絕登入」並被轉址; 部署方可依 from 與自家政策(來源網段、系統別)
+srv.mjs	206	K2x1	if (process.env.NODE_ENV !== 'production' && (user.id === 'app:key-deny' || user.id === 'id-for-deny')) { //測試用: 見 '{token-for-app-deny}'、'{
+srv.mjs	214	K1x1+K2x1	//套件已自行要求系統管理者等級(users 表中有效之系統管理者, 或系統服務用途之應用系統 token; P-1), 不必再以 isAdmin 判斷; 部署方可依 from 與自家政策再收緊
+test/api-adminOnly.test.mjs	1	K1x2	//權限後台與資料通道只限系統管理者(perm-run01; 使用者 2026-10-24 裁示「系統管理者才能讀寫 4 表, 一般使用者是沒法進權限後台的, 故只能用 token 查自己權限樹」; 真後端)。
+test/api-adminOnly.test.mjs	4	K1x1	//定義: 系統管理者＝perm users 表中 isAdmin='y' 且 isActive='y' 之列(perm 以自身表為權威, 不採 token 宣稱值); 一般使用者＝isAdmin='n' 者。
+test/api-adminOnly.test.mjs	5	K2x2	//角色軸: A 系統管理者(sys)、M 一般使用者(TOKEN_MEMBER: perm 列 isAdmin n 且啟用, srv.mjs 之 verifyClientUser 放行 → 「部署方放行」)、M+ 一般使用者被升為系統管理者(perm 為權威)、
+test/api-adminOnly.test.mjs	6	K2x1	//        D 停用之系統管理者(TOKEN_ADMIN2, isAdmin y 但 isActive n)、P 部署方放行之一般使用者(TOKEN_PETER; perm-run01 本輪 P-7 起 srv.mjs 之 verifyClientUser 不再以 isA
+test/api-adminOnly.test.mjs	10	K2x1	//[A] 連線閘: 一般使用者(部署方放行)經任何入口皆被拒(傳輸層 permission denied)、回應不含資料、記 srLog verifyConn-error msg userNotAdmin(不含 token); 系統管理者照常。
+test/api-adminOnly.test.mjs	11	K2x1	//[B] 執行身分: 標頭 token 為系統管理者、本體 __sysToken__ 為一般使用者 → reject userNotAdmin、函數不執行(零寫入、零資料)、記 srLog getUserIdByToken-error。
+test/api-adminOnly.test.mjs	12	K2x1	//[C] /api/getUserByToken: 一般使用者(部署方放行) → {state:'error', msg:'userNotAdmin'}; 系統管理者照常; 部署方拒絕者仍為 userNoPermission(不改既有鍵)。
+test/api-adminOnly.test.mjs	60	K2x1	//回應不得含之個資與資料特徵(base seed 之使用者 email／名稱; 系統管理者視角之資料)
+test/api-adminOnly.test.mjs	64	K1x1	describe('api-adminOnly (權限後台與資料通道只限系統管理者, perm-run01, 真後端)', function() {
+test/api-adminOnly.test.mjs	81	K2x1	//addUsers: 以系統管理者在 base seed 的 users 之上追加夾具使用者
+test/api-adminOnly.test.mjs	119	K2x1	//入口表: 名稱、函數、參數(函數回傳參數陣列)、系統管理者對照是否應成功
+test/api-adminOnly.test.mjs	137	K2x1	it(`AO-A1 ${e.name}: 一般使用者被連線閘拒絕(permission denied)、回應無資料、零寫入; 系統管理者同一輸入照常  [使用者裁示: 一般使用者沒法進權限後台]`, async function() {
+test/api-adminOnly.test.mjs	149	K2x1	//對照: 系統管理者同一輸入成功(差別只在角色)
+test/api-adminOnly.test.mjs	151	K2x1	A.equal(ok.ok, true, `系統管理者照常 ${e.fn}: ${JSON.stringify(ok).slice(0, 200)}`)
+test/api-adminOnly.test.mjs	162	K2x1	A.ok((await rowsOf('grups')).some((g) => g.id === 'id-ao-a2'), '升為系統管理者後之寫入生效')
+test/api-adminOnly.test.mjs	163	K2x1	//系統管理者(sys)把 member 降為一般使用者 → 立即被拒(每次請求新鮮讀 perm 列, 不快取)
+test/api-adminOnly.test.mjs	172	K2x1	it('AO-A3 停用之系統管理者(perm 列 isAdmin y、isActive n)被拒(permission denied), 與角色檢查無關的既有關卡不退讓', async function() {
+test/api-adminOnly.test.mjs	202	K2x2	//上傳下載入口: 各路由先經同一連線閘(apiType 為 upload-controller／upload-slice／download-get-filename／download-get-file／download); 一般使用者之回應須與無效 token 之回應完全相同(
+test/api-adminOnly.test.mjs	217	K2x1	it(`AO-A6 ${rt.name}: 一般使用者之回應 ≡ 無效 token 之回應(permission denied), ≢ 系統管理者之回應(已過閘)  [所有入口名皆經同一連線閘]`, async function() {
+test/api-adminOnly.test.mjs	225	K2x1	A.ok(!ra.body.includes('permission denied'), `系統管理者已過閘(回應為參數類錯誤, 非 permission denied): ${ra.body.slice(0, 120)}`)
+test/api-adminOnly.test.mjs	232	K2x1	describe('B 執行身分(getUserIdByToken): 標頭 token 為系統管理者、本體 token 為一般使用者', function() {
+test/api-adminOnly.test.mjs	250	K2x1	it('AO-B2 本體 token 之使用者被升為系統管理者(perm 列 isAdmin y) → 以其身分執行(對照: 差別只在 perm 角色)', async function() {
+test/api-adminOnly.test.mjs	273	K1x1	describe('C 後台登入檢查(/api/getUserByToken): 非系統管理者一律拒絕', function() {
+test/api-adminOnly.test.mjs	275	K2x1	it('AO-C1 一般使用者(部署方放行)登入檢查 → state error、msg userNotAdmin(固定錯誤鍵); 不回使用者資料; 系統管理者照常', async function() {
+test/api-adminOnly.test.mjs	289	K2x1	it('AO-C2 perm 為權威: member 之 perm 列升為系統管理者 → 登入檢查通過; 降回一般使用者 → 拒', async function() {
+test/api-adminOnly.test.mjs	301	K2x1	it('AO-C3 其餘角色之既有錯誤鍵不變: 部署方拒絕者 userNoPermission、不在 perm 者 cannotGetUserFromPerm、無效 token cannotFindUserFromToken、停用之系統管理者 cannotGetUserFromP
+test/api-adminOnly.test.mjs	375	K2x2	it('AO-D2 /api/getPerm 只回「token 所屬」之本人權限樹: 系統管理者 token 得系統管理者之樹(與 member 不同)', async function() {
+test/api-batchIdDup.test.mjs	4	K2x1	//單元層(含數字／字串同值 id、srLog 不含資料值)見 unit-procCore-writeValidate WV-DUPID-*; 本檔驗證端到端: 回前端之 key、資料表零變更、系統管理者對照組成功。
+test/api-callerIdentity.test.mjs	8	K2x1	//[A] requireAdmin: updateTargets／updatePemis／updateGrups／updateUsers 僅 perm users 表中有效且 isAdmin='y' 之使用者可呼叫; 通過部署方 verifyClientUser 之非系統管理者
+test/api-callerIdentity.test.mjs	9	K2x1	//    零寫入; perm 為權威(token 宣稱 isAdmin 'n'、perm 列 'y' 者可呼叫); 系統管理者照常。
+test/api-callerIdentity.test.mjs	10	K1x1+K2x1	//    〔perm-run01 更新(R-ADMIN-ONLY-01)〕資料通道的連線閘與執行身分已改為只限系統管理者(getAndVerifyAdminUser), 非系統管理者於連線閘即被拒(permission denied; 整個入口矩陣見 api-adminOnly
+test/api-callerIdentity.test.mjs	35	K2x1	//newGrup: 追加一個群組之整表(以系統管理者視角讀現況再加一列; id 由呼叫端給)
+test/api-callerIdentity.test.mjs	69	K2x1	//addUsers: 以系統管理者在 base seed 的 users 之上追加夾具使用者
+test/api-callerIdentity.test.mjs	103	K2x1	//perm-run01 本輪(R-APP-TOKEN-01): 原用 TOKEN_APP(isApp 未轉傳)代表「不在 perm 表」; TOKEN_APP 現轉傳 isApp='y' 屬系統服務用途(可用系統管理者之服務, 見 api-callerMatrix), 故改用 
+test/api-callerIdentity.test.mjs	106	K1x1	{ title: 'perm 內有效使用者(一般使用者, isAdmin n)通過部署方但非系統管理者', token: TOKEN_PETER, key: 'userNotAdmin' },
+test/api-callerIdentity.test.mjs	107	K2x1	{ title: 'perm 內有效之系統管理者但被部署方 verifyClientUser 因非角色因素否決(TOKEN_DENY)', token: TOKEN_DENY, key: 'userNoPermission', pre: async () => addUsers(
+test/api-callerIdentity.test.mjs	150	K1x1+K2x1	it('CI-G4 perm 內 isAdmin 已被降為 n 之系統管理者(admin2 列 isAdmin n)之本體 token → 非系統管理者被拒(userNotAdmin)、零寫入  [perm 以自身 users 表為權威; P-7: 部署方範例不再以 isAdmi
+test/api-callerIdentity.test.mjs	200	K2x1	describe('A 非系統管理者之寫入(perm-run01 起於連線閘拒; requireAdmin 為縱深防禦)', function() {
+test/api-callerIdentity.test.mjs	207	K2x1	it('CI-A0 前提: member 通過部署方 verifyClientUser(經 /api/getPerm 取得本人權限樹; 自 perm-run01 起資料通道與後台登入另限系統管理者, 見 api-adminOnly)', async function() {
+test/api-callerIdentity.test.mjs	216	K2x2	it(`CI-A1 ${FN[kt]}: 通過部署方之非系統管理者(perm 列 isAdmin n)被拒、零寫入; 系統管理者照常  [C2、使用者身分驗證原則 二.4; perm-run01 起於連線閘即拒(permission denied), 原為 requireAdmi
+test/api-callerIdentity.test.mjs	222	K2x1	A.equal(r.ok, false, `非系統管理者不得寫入, 實得 ${JSON.stringify(r).slice(0, 200)}`)
+test/api-callerIdentity.test.mjs	226	K2x1	A.equal(ok.ok, true, `系統管理者照常: ${JSON.stringify(ok).slice(0, 200)}`)
+test/api-callerIdentity.test.mjs	227	K2x1	A.equal((await rowsOf(kt))[0].description, 'edited-by-member', '系統管理者之寫入生效(對照: 同一輸入, 差別只在角色)')
+test/api-callerIdentity.test.mjs	261	K2x1	it('CI-A5 唯讀函數亦限系統管理者(perm-run01, R-ADMIN-ONLY-01; 原為「唯讀函數不受角色檢查約束」): member 呼叫 getWebInfor 於連線閘被拒', async function() {
+test/api-callerMatrix.test.mjs	4	K2x1	//定義: 系統管理者之判準為 perm 自身 users 表(isAdmin='y' 且 isActive='y'); 使用者用途之應用系統 token(AU)以所綁使用者之 perm 列判定(同其使用者 token); 系統服務用途(AS)須同時: 不在 perm users
+test/api-callerMatrix.test.mjs	5	K2x1	//      部署方 getUserByToken 轉傳 isApp='y'、isAdmin='y'、且反查 id 以 'app:' 開頭('app:<金鑰主鍵>'; sso 拒收以 app: 開頭之使用者主鍵), 可用系統管理者之後端服務, 稽核欄記其 id; 不可用 /ap
+test/api-callerMatrix.test.mjs	8	K2x2	//呼叫者軸: N 無 token、U 一般使用者、A 系統管理者、AUA 使用者用途綁系統管理者、AUM 使用者用途綁一般使用者、AS 系統服務用途;
+test/api-callerMatrix.test.mjs	9	K2x1	//          相容軸: NF isApp 未轉傳(AS 形狀, app: 前綴)、NFV 不在表之 sso 系統管理者自身使用者 token(未轉傳 isApp)、NFN 不在表且 isAdmin n 未轉傳 isApp、ASN AS 形狀但 isAdmin n、AUD
+test/api-callerMatrix.test.mjs	10	K2x1	//          APP 虛擬應用系統(TOKEN_APP; isApp y、isAdmin y 但 id 非 app: 開頭)、AUX 使用者用途綁不在表之 sso 系統管理者(isApp y、isAdmin y、id 非 app: 開頭)。
+test/api-callerMatrix.test.mjs	41	K2x1	//呼叫者: svc＝是否為「後端系統管理者服務」等級(後台登入檢查、資料通道各入口、requireAdmin; 系統服務用途須 isApp y＋isAdmin y＋id 以 app: 開頭＋不在表); app＝是否通過應用系統路由之等級(在表以 perm 列, 不在表只看 is
+test/api-callerMatrix.test.mjs	46	K2x1	{ k: 'A', label: '系統管理者', token: TOKEN_ADMIN, svc: true, app: true, own: 'id-for-admin', aud: 'id-for-admin' },
+test/api-callerMatrix.test.mjs	47	K2x1	{ k: 'AUA', label: '使用者用途綁系統管理者', token: TOKEN_AU_ADMIN, svc: true, app: true, own: 'id-for-admin', aud: 'id-for-admin' },
+test/api-callerMatrix.test.mjs	53	K2x1	{ k: 'NFV', label: '不在表之 sso 系統管理者自身使用者 token(未轉傳 isApp)', token: TOKEN_SSO_ADMIN, svc: false, app: true, own: null, aud: 'sso-admin-77' },
+test/api-callerMatrix.test.mjs	58	K2x1	{ k: 'AUX', label: '使用者用途綁不在表之 sso 系統管理者(isApp y、id 非 app: 開頭)', token: TOKEN_AU_SSO, svc: false, app: true, own: null, aud: 'sso-admin-77' 
+test/api-callerMatrix.test.mjs	64	K2x1	//回應不得含之資料特徵(系統管理者視角之 base seed 資料)
+test/api-callerMatrix.test.mjs	170	K2x1	it('MX-H2 GET /api/getUserByToken(後台登入檢查): 後端系統管理者服務等級(A／AUA／AS)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料(含 id 非 app: 開頭之 APP／AUX)  [P-2: AS 放行; perm-run02②
+test/api-callerMatrix.test.mjs	187	K2x1	//固定鍵(各拒絕原因): 無 token tokenNoPermission、一般使用者與 AU 綁一般使用者 userNotAdmin、isApp 未轉傳者與 AS 形狀非系統管理者、AU 綁停用者不在有效 perm 列 → cannotGetUserFromPerm／can
+test/api-callerMatrix.test.mjs	194	K2x1	//perm-run02②: 不在表、isApp y、isAdmin y 但 id 非 app: 開頭(APP／AUX)與不在表 sso 系統管理者自身使用者 token(NFV)、不在表一般使用者(NFN)皆非系統服務用途 → 同為「perm 查無此使用者」
+test/api-callerMatrix.test.mjs	272	K2x1	describe('C 通訊路由(ulctr／slc／dwgfn／dwgf／dw × 15 呼叫者): 同一連線閘, 後端系統管理者服務等級過閘, 其餘 permission denied', function() {
+test/api-callerMatrix.test.mjs	287	K2x1	it(`MX-C ${rt.name}: 非後端系統管理者服務等級之回應 ≡ 無效 token 之回應(permission denied); A／AUA／AS 已過閘; id 非 app: 開頭之 APP／AUX 與相容軸皆被擋`, async function() {
+test/api-callerMatrix.test.mjs	320	K2x2	//  本套件 sysFuncsPublic 只公開 [sys:getFuncList](perm-run01 2026-10-25, R-SYSFUNCS-01), 故兩個身分來源皆測(標頭來源之本體為有效系統管理者; 本體來源之標頭為有效系統管理者)。
+test/api-callerMatrix.test.mjs	336	K2x1	it(`MX-D ${e.name}: 後端系統管理者服務等級(A／AUA／AS)成功, 其餘(含 id 非 app: 開頭之 APP／AUX)於連線閘 permission denied、於執行身分回固定語系鍵; 零寫入  [P-2; perm-run02②]`, async 
+test/api-callerMatrix.test.mjs	377	K2x3	it('MX-P1 AU 綁系統管理者: 該系統管理者被降為一般使用者 → AU 同步失去系統管理者服務(資料通道、後台登入、應用路由皆拒); 升回後恢復  [AU＝同綁定者, perm 列為權威]', async function() {
+test/api-callerMatrix.test.mjs	383	K2x2	//peter 升為系統管理者 → AUM(綁 peter)得系統管理者服務
+test/api-callerMatrix.test.mjs	385	K2x1	A.equal((await callRpc('getWebInfor', [], TOKEN_AU_MEMBER)).ok, true, 'AUM 綁定者升為系統管理者後應可用資料通道')
+test/api-callerMatrix.test.mjs	396	K2x1	it('MX-P2 AU 綁停用之使用者: 不因「停用視同查無」落入系統服務用途; 該使用者啟用且為系統管理者後可用, 停用後又拒  [AU 在表者以 perm 列為準]', async function() {
+test/api-callerMatrix.test.mjs	433	K2x1	it('MX-P4 系統管理者之 perm 列因非角色因素被 verifyClientUser 否決(TOKEN_DENY): userNoPermission  [P-7: 部署方否決者之固定鍵]', async function() {
+test/api-callerMatrix.test.mjs	439	K2x1	//拒絕鍵次序(1.1.15 行為不變): 同時『部署方否決』與『非系統管理者』→ 部署方否決先(userNoPermission), 不是 userNotAdmin  [外審 sol F09]
+test/api-callerMatrix.test.mjs	443	K2x1	A.equal((await getJson(`/api/getUserByToken?token=${q(TOKEN_DENY)}`)).msg, 'userNoPermission', '雙原因(否決＋非系統管理者): 部署方否決先')
+test/api-callerMatrix.test.mjs	449	K2x1	it('MX-P7 標頭與本體為不同身分之組合(資料通道兩個身分來源各自完整驗證, 函數以本體身分執行): 服務身分／系統管理者交叉  [外審 sol F01]', async function() {
+test/api-callerMatrix.test.mjs	463	K2x1	//標頭 AUA＋本體 AS → 以 AS 執行; 標頭 AS＋本體 AUA → 以 AUA(所綁系統管理者)執行
+test/api-callerMatrix.test.mjs	470	K2x1	//任一邊為非系統管理者等級 → 拒、零寫入: 標頭 U／AUM／NF 於連線閘; 本體 U／AUM／NF 於執行身分
+test/api-callerMatrix.test.mjs	475	K2x1	A.equal(g.msg, 'permission denied', '標頭為非系統管理者等級: 連線閘')
+test/api-callerMatrix.test.mjs	478	K2x1	A.ok(KEYS.has(b.msg), `本體為非系統管理者等級: 執行身分拒絕鍵 ${b.msg}`)
+test/api-callerMatrix.test.mjs	504	K2x2	it('MX-P6 AS 新增資料: 新列建立者與更新者皆為 app:…, 且可被系統管理者讀回; AS 之寫入與系統管理者同一契約(同批重複 id 仍整批拒收)', async function() {
+test/api-callerMatrix.test.mjs	565	K2x1	it(`MX-M5 [${mb}] 主鍵同為服務身分 id 之**停用系統管理者**列(外審 sol F1: 嚴格系統服務形狀×停用列): 在表以列為準, 各入口一致被拒(不得因停用而落入系統服務用途), 零寫入`, async function() {
+test/api-callerMatrix.test.mjs	591	K2x1	it('MX-M3 外部 id(sso-admin-9)與 perm 主鍵(id-for-admin)不同之系統管理者: 資料通道與應用路由之稽核欄皆記 perm 內 id; 後台登入檢查回 perm 列  [外審 sol F02]', async function() {
+test/api-callerMatrix.test.mjs	607	K2x2	it('MX-M6 [外審 sol F3] 近期系統服務用途登錄不得被「經 perm 列通過驗證、其後該列於 requireAdmin 讀取前被刪」之請求沿用: AS(app:key-ghost)先登錄 → perm 建立主鍵同為 app:key-ghost 之系統管理者列(em
+test/api-callerMatrix.test.mjs	611	K2x1	A.equal((await callRpc('updateUsers', [users], TOKEN_ADMIN)).ok, true, '前置: 建立主鍵同為服務 id 之系統管理者列')
+test/api-callerMatrix.test.mjs	663	K2x1	//getWebInfor 之 input 與 callRpc 同(本體 __sysToken__ 為 sys, 即系統管理者), 只改 Authorization 標頭
+test/api-callerMatrix.test.mjs	681	K2x1	it('MX-B2 通訊路由同一規則: Basic 方案帶系統管理者 token 亦視同無 token(回應 ≡ 無效 token)', async function() {
+test/api-callerMatrix.test.mjs	725	K2x1	//通過應用系統路由等級者(系統管理者、AS、相容放行之 NF／NFV／APP／AUX): 才走到 keyTable 檢查
+test/api-callerMatrix.test.mjs	769	K2x1	it('MX-R2 ①在表者以 perm 列為準(不看反查之 isAdmin): 同一外部身分 sso-admin-77(反查 isAdmin y)不在表時放行; 建為一般使用者列 → userNotAdmin; 改為有效系統管理者 → 放行; 停用 → cannotGetUse
+test/api-callerMatrix.test.mjs	793	K2x1	await okBoth(tk, '在表有效系統管理者')
+test/api-callerMatrix.test.mjs	806	K2x1	it('MX-R3 ②系統服務用途須 id 以 app: 開頭: 同為不在表、isApp y、isAdmin y, 僅 id 前綴不同 → AS(app:key-sys)可用後端系統管理者服務、AUX(sso-admin-77)與 APP(id-for-application)不
+test/api-callerMatrix.test.mjs	829	K2x2	it('MX-R4 ②「二者一致」: 使用者用途綁不在表之 sso 系統管理者(AUX)的後端結果 ≡ 該系統管理者自身使用者 token(NFV)——後台登入、資料通道標頭／本體的拒絕鍵逐一相同; 兩者應用系統路由皆放行  [原則二之一: 使用者用途＝同綁定者]', async
+test/api-callerMatrix.test.mjs	849	K2x1	//人造帶 email 之嚴格形狀(TOKEN_AS_EMAIL: app:key-email、isApp y、isAdmin y), perm 有主鍵同為其 id 之停用系統管理者列
+test/api-callerMatrix.test.mjs	863	K2x1	//啟用且為系統管理者: 以列通過(回 perm 列, 不經 verifyAppUser 之系統服務用途); 降為一般使用者: 依列拒
+test/api-callerMatrix.test.mjs	867	K2x1	A.equal((await callRpc('getWebInfor', [], TOKEN_AS_EMAIL)).ok, true, '啟用且為系統管理者後以列通過')
+test/api-callerMatrix.test.mjs	885	K2x2	it('MX-R8 [外審 sol 增量輪 G5] ①的權限面: 不在表之 sso 系統管理者(NFV 自身 token／AUX 綁定 token)可經 /syncAndReplaceTabs 匯入自己的 users 列(srcKey ≡ 外部 id、isAdmin y)——之後
+test/api-callerMatrix.test.mjs	907	K2x1	it('MX-R7 [外審 sol F1] 外部列系統管理者(經匯入建立, srcKey ≡ 外部 id sso-ext-5, 內部 id 為系統配發): 後台登入、資料通道、兩條應用系統路由皆通過, 稽核欄一律記 perm 內部 id(≠ srcKey)', async fun
+test/api-cleanExternal.test.mjs	3	K3x1	//背景(2026-10-22 全套): e2e-init E2E-006 以外部同步灌入 id-mk-dup(from=appE2eInit006), 收尾退而以系統管理者寫入移除 → 後台不得刪外部列(Lv1 saveExternalRowChanged), 夾具殘留,
+test/api-cleanExternal.test.mjs	9	K3x1	//  CE-003 不放寬產品: 系統管理者寫入無法移除外部列(回 saveExternalRowChanged、列仍在), 唯有本入口移除
+test/api-cleanExternal.test.mjs	87	K3x1	it('CE-003 不放寬產品: 系統管理者寫入無法移除外部列(回 saveExternalRowChanged、列仍在); 唯有本入口移除', async function() {
+test/api-cleanExternal.test.mjs	91	K3x1	A.equal(res.ok, false, `系統管理者寫入應拒絕, 實得 ${JSON.stringify(res).slice(0, 200)}`)
+test/api-externalRows.test.mjs	257	K3x1	//restoreBase: 移除外部列夾具(purgeExternalRows, 測試框架之重置)後以系統管理者寫入 RPC 把四表還原為 base seed(後台列)
+test/api-externalRows.test.mjs	466	K3x1	//(c2) 過期: 持舊基準 B1, 另一路徑(系統管理者二)以正確基準改了同一列之指派欄後, 再以 B1 存檔 → saveStale
+test/api-mapKeyId.test.mjs	10	K3x1	//  M4 後台列(from 空)仍以 id 登入(不變); 預設系統管理者 'sys' 不受影響;
+test/api-mapKeyId.test.mjs	16	K2x1	//  M10 以 srcKey 登入之外部系統管理者呼叫寫入函數: 執行身分為其 perm 內部 id(稽核欄位記內部 id, 非 srcKey)。
+test/api-mapKeyId.test.mjs	55	K2x1	//addBackend: 以系統管理者在現況之上追加後台列(回 callRpc 結果, 不丟錯)
+test/api-mapKeyId.test.mjs	145	K3x1	it('MI-004 後台列仍以 id 登入(不變); 預設系統管理者 sys 不受影響  [M4]', async function() {
+test/api-mapKeyId.test.mjs	211	K3x1	A.equal(rs.state, 'success', `mappingBy=${mode} 後台系統管理者 sys 仍以 ${mode} 登入`)
+test/api-mapKeyId.test.mjs	237	K2x1	it('MI-010 以 srcKey 登入之外部系統管理者呼叫寫入函數: 通過 requireAdmin, 稽核欄位記其 perm 內部 id(不是 srcKey)  [M10]', async function() {
+test/api-mapKeyId.test.mjs	244	K2x1	A.equal(rc.ok, true, `外部系統管理者(srcKey 登入)可寫入, 實得: ${JSON.stringify(rc).slice(0, 200)}`)
+test/api-refCascade.test.mjs	22	K3x1	//設定切換以 restartBackend(genTempSettings({ cascadeRename:false })); 收尾還原 './settings.json' 並 reseed, 以系統管理者寫入 RPC 還原四表為 base seed(同 api-mapKey
+test/api-refCascade.test.mjs	275	K3x1	//restoreAll: 以系統管理者寫入 RPC 把四表還原為 base seed. 次序「被引用者先、引用端後」(targets → pemis → grups → users):
+test/api-sysFuncs.test.mjs	5	K2x1	// 本套件設定: `sysFuncsPublic: ['[sys:getFuncList]']`(server/WWebPerm.mjs); `getUserIdByToken` 為真實反查(與 task 同型)且對空 token / 非系統管理者 fail-closed——
+test/api-sysFuncs.test.mjs	6	K2x1	//   故「公開 getFuncList」在本套件只是設定之表述, 實際仍須有效系統管理者身分(連線閘 verifyConn 先擋; 本體 token 再經 getUserIdByToken)。登入前不連線: src/main.js 之 `useWaitToken: true`
+test/api-sysFuncs.test.mjs	9	K1x1+K2x1	// 呼叫者軸(7): N 無 token、U 一般使用者(perm 列 isAdmin n, 部署方放行)、A 系統管理者、AUA 使用者用途之應用系統綁系統管理者、AUM 使用者用途綁一般使用者、AS 系統服務用途、BAD 未知 token。
+test/api-sysFuncs.test.mjs	10	K2x1	//   「通過」＝系統管理者服務等級(A／AUA／AS; 與 api-callerMatrix 之 svc 同); 其餘於連線閘(標頭)或執行身分(本體)被拒。
+test/api-sysFuncs.test.mjs	13	K2x1	//   body  本體來源: 標頭為有效系統管理者, 本體 `__sysToken__` 為呼叫者 token(兩個身分來源各自完整驗證, 框架不比對);
+test/api-sysFuncs.test.mjs	43	K2x1	//ok: 是否為系統管理者服務等級(通過連線閘與執行身分); 其餘皆拒
+test/api-sysFuncs.test.mjs	47	K1x1	{ k: 'A', label: '系統管理者', token: TOKEN_ADMIN, ok: true },
+test/api-sysFuncs.test.mjs	48	K2x1	{ k: 'AUA', label: '使用者用途之應用系統(綁系統管理者)', token: TOKEN_AU_ADMIN, ok: true },
+test/api-sysFuncs.test.mjs	126	K2x1	//標頭為呼叫者 token 且非系統管理者等級(含無 token、未知 token): 連線閘
+test/api-sysFuncs.test.mjs	130	K2x2	//標頭有效(A／AUA／AS 之 old／empty; 或 body 協定之標頭為系統管理者而本體為非系統管理者／空): 框架或執行身分拒
+test/api-sysFuncs.test.mjs	137	K2x1	//函數: 執行身分(getUserIdByToken)拒絕之固定語系鍵——一般使用者(在表、非系統管理者)本體 → userNotAdmin; 空／未知／無 token → cannotFindUserFromToken
+test/api-sysFuncs.test.mjs	157	K2x1	//夾具: id-for-member(perm 列 isAdmin n; srv.mjs 之 verifyClientUser 放行 → 通過部署方但非系統管理者)
+test/api-sysFuncs.test.mjs	175	K2x1	it(`${func} × 協定 ${proto}: 系統管理者服務等級(A／AUA／AS)只在 new／body 放行(內容正確), 其餘一律拒(固定鍵)、不回資料`, async function() {
+test/api-sysFuncs.test.mjs	210	K2x1	it('標頭缺失／Basic 方案／空 Bearer／雙空白: 三個系統函數(本體帶有效系統管理者 token)一律於連線閘被拒', async function() {
+test/api-sysFuncs.test.mjs	226	K2x1	//邊界(外審 sol F1): 標頭為有效系統管理者; 以下輸入皆不得放行
+test/api-sysFuncs.test.mjs	305	K2x1	it('輪詢之 clientId 與身分綁定: 系統管理者(userId id-for-admin)綁定後, 系統服務用途(app:key-sys)重用同一 clientId 被拒但其函數呼叫照常放行; 同 userId 之 AUA token 續輪詢放行; 舊協定重用亦被拒',
+test/api-sysFuncs.test.mjs	315	K2x1	//反向: 先由 AS 綁定, 系統管理者重用被拒
+test/api-sysFuncs.test.mjs	324	K2x1	it('被拒者零副作用: 舊協定輪詢被拒後, 該 clientId 不綁定空身分(之後以新協定系統管理者身分首次輪詢仍可綁定)', async function() {
+test/api-sysFuncs.test.mjs	388	K2x1	it('登入前(getToken 回空字串)不連線: 等待期間後端零連線閘紀錄; 取得系統管理者 token 後才開機、四表同步完成, 其後輪詢至少兩輪且無 error 事件', async function() {
+test/api-sysFuncs.test.mjs	420	K2x1	it('一般使用者 token(通過部署方、非系統管理者)交給前端元件: 不開機、不取得資料——error 事件皆為連線閘之 permission denied', async function() {
+test/api-tokenSafety.test.mjs	7	K3x1	//  client 通道(api/getUserByToken、api/getPerm、資料通道)會反查 perm users 表(mappingBy), 故 before 以系統管理者寫入 RPC(updateUsers, editTableRows)於 perm users
+test/api-tokenSafety.test.mjs	8	K3x1	//  id-for-verify-throw(from ''; isActive='y')使驗證走到 verifyClientUser; after 以系統管理者寫入 RPC 移除該列。
+test/api-tokenSafety.test.mjs	71	K3x1	//建立 id-for-verify-throw(後台列, isActive='y'), 使 client 通道之驗證走到 verifyClientUser(editTableRows 經系統管理者寫入 RPC, 失敗即拋錯)
+test/api-tokenSafety.test.mjs	162	K2x1	//應用系統路由先驗身分再驗 keyTable(perm-run01 P-5): 哨兵請求須帶系統管理者等級之 token(TOKEN_APP＝系統服務用途)才會走到 keyTable 檢查並記 srLog
+test/api-updateUsers-forGrups.test.mjs	8	K1x1	//  寫入函數另須呼叫者為 perm users 內有效之系統管理者(requireAdmin; TOKEN_ADMIN 即是), 本檔各案之契約與斷言不變。
+test/api-verifyConn-auth.test.mjs	16	K2x1	//perm-run01 本輪(R-APP-TOKEN-01、P-7): 原以 TOKEN_APP 代表「外部有效但不在 perm users 表」; TOKEN_APP 現轉傳 isApp='y' 屬系統服務用途(可用系統管理者之服務, 見 api-callerMatrix),
+test/api-verifyConn-auth.test.mjs	83	K1x1	//spec: 在表、有效、通過部署方、但非系統管理者(perm-run01 P-7: 範例 verifyClientUser 不再以 isAdmin 否決, 由套件於連線閘以 userNotAdmin 拒絕) → 拒
+test/api-verifyConn-auth.test.mjs	87	K3x1	assert.strict.ok(peter && peter.isActive === 'y' && peter.isAdmin === 'n', 'base seed peter 應為有效非系統管理者')
+test/api-verifyConn-auth.test.mjs	157	K1x1	const ID_ADMIN2 = 'id-for-admin2' //srv.mjs '{token-for-admin2}' 之使用者 id（測試用第二位系統管理者; 其 perm users 列由本檔案例自建並於收尾移除）
+test/api-verifyConn-auth.test.mjs	164	K1x1	{ label: '本體 token 為在表、啟用、通過部署方但非系統管理者(peter)', sysToken: TOKEN_PETER, key: 'userNotAdmin' },
+test/api-verifyConn-auth.test.mjs	179	K2x1	it('AUTH-BODY-002-body-token-other-admin-identity-and-disabled：本體 token 為另一位有效系統管理者(admin2)→ 以該使用者之 perm id 執行(新增列建立者為 id-for-admin2); 將其停用後
+test/api-verifyConn-auth.test.mjs	185	K3x1	//建立 admin2(後台列, 啟用, isAdmin='y'), 由 admin 經系統管理者寫入 RPC
+test/api-verifyConn-auth.test.mjs	191	K2x1	assert.strict.ok(r1.ok, `(1) 本體 token 為有效系統管理者應可執行, 實得 ${JSON.stringify(r1)}`)
+test/api-verifyConn-auth.test.mjs	207	K3x1	//收尾(失敗時亦還原): 移除本案新增之群組列與 admin2 列(皆為後台列, 經 admin 之系統管理者寫入 RPC)
+test/e2e-array-form.test.mjs	5	K3x1	//依名稱為鍵查值, 查不到陣列元素 → 顯示停用 → 系統管理者存檔即撤銷有效授權.
+test/e2e-array-form.test.mjs	26	K3x1	//  資料前置以系統管理者寫入 RPC(含 from 非空之外部來源列), 案後 restoreTables 還原並回驗筆數(R-E2E-ISO-01).
+test/e2e-array-form.test.mjs	38	K3x1	//  後台列夾具(editTable／seedExtra 旁路寫庫)之 id 不變, 仍以 id 比對。本檔無「以外部同步建立之使用者登入」之案例(全程以預設系統管理者登入), 故不受 users.mappingBy='id' 待裁示之影響。
+test/e2e-array-form.test.mjs	166	K3x1	//  ①後台列——另一位系統管理者之整表寫入(updateXxx 依陣列位置重給後台列之 order);
+test/e2e-array-form.test.mjs	177	K3x1	assert.ok(resp.ok, `另一端(另一位系統管理者)重排後台列 ${fn} 應成功, 實得 ${JSON.stringify(resp)}`)
+test/e2e-array-form.test.mjs	2083	K3x1	//(2026-10-22 全套實測 after-hook 失敗): 仍有殘留則以 restoreTables(base 快照, 系統管理者寫入 RPC)還原
+test/e2e-array-form.test.mjs	2315	K3x1	// 資料前置一律以系統管理者寫入 RPC(資料通道 updateUsers／updateGrups／updatePemis; 非使用者操作, 含 from 非空之外部來源列)推入本段專屬之 id-ren-*／id-del-*／id-rej-*／id-tr-* 列;
+test/e2e-array-form.test.mjs	2328	K3x1	//整列夾具(供系統管理者寫入 RPC; order 由伺服器依陣列位置重給; from 非空者為外部來源)
+test/e2e-array-form.test.mjs	2335	K3x1	//以系統管理者寫入 RPC 在某表現況之上追加(或改)列: fn(現況列複本) → 新整表(回傳 undefined 視為就地修改); 失敗即拋錯
+test/e2e-array-form.test.mjs	2344	K3x1	//  其餘(被改名／被刪除之主體與其他引用端)一律為後台列(from ''), 以系統管理者寫入 RPC 新增——改名／刪除之主體須後台可改可刪; 外部來源引用端之 cgrups／cpemis 為指派欄, 由伺服端引用連帶改寫(不受守門限制).
+test/e2e-concurrent-edit.test.mjs	33	K3x1	//手段說明（setup，非使用者動作）：「他人」＝經系統管理者寫入 RPC（editTableRows）或外部同步端點；「推播尚未抵達」＝攔住網路推播（holdNetPushes：store.commit 攔下 tableName+data 之 payload，
+test/e2e-concurrent-edit.test.mjs	616	K3x1	//  mkFixture: 開瀏覽器前追加 fx（pemis 頁之 fx 為 base seed 既有對象, 不須追加）; other: 他人取代／刪除 fx（經系統管理者寫入 RPC）
+test/e2e-concurrent-edit.test.mjs	984	K3x1	//  故於本檔加 targets 之擷取／還原（經系統管理者寫入 RPC 整表寫回, 與 restoreTables 同法; 還原後逐列回驗）。
+test/e2e-external-rows.test.mjs	24	K3x1	//  後台列夾具由系統管理者寫入 RPC(editTableRows)先於外部列建立。收尾 restoreTables(purgeExternalRows 直刪外部列夾具 → 整表寫回快照)並回驗筆數與無外部列殘留(R-E2E-ISO-01)。
+test/e2e-external-rows.test.mjs	576	K3x1	//他人改了 mary 之列(說明): 經系統管理者寫入 RPC; 前端 store 隨廣播更新, 對話框有草稿故保留草稿與開框時之基準
+test/e2e-external-rows.test.mjs	739	K2x1	//6 步 user path: ①部署方已設 lockExternalRows 為 n, 系統管理者登入點「使用者」 ②看不到橫幅與鎖頭 ③外部列 isAdmin／isActive 核選方塊可點 ④雙擊外部列 name 可編輯並改名 ⑤按儲存 ⑥看到成功訊息, 庫內改名、來源不
+test/e2e-external-rows.test.mjs	805	K2x1	const DRAFT = 'A系統管理者未儲存之說明'
+test/e2e-external-rows.test.mjs	809	K3x1	//他人改了 mary 之 email(同一列; 經系統管理者寫入 RPC); 前端 store 隨推播更新
+test/e2e-external-rows.test.mjs	840	K2x1	const AFTER = 'A系統管理者重新載入後之說明'
+test/e2e-external-rows.test.mjs	850	K2x1	assert.equal(mary.description, 'A系統管理者重新載入後之說明', '重新載入後之編輯已存')
+test/e2e-external-rows.test.mjs	862	K2x1	const DRAFT = 'A系統管理者未儲存之群組說明'
+test/e2e-external-rows.test.mjs	882	K2x1	assert.notEqual(rowOf(gs, 'id-for-權限群組M1').description, 'A系統管理者未儲存之群組說明', 'M1 之說明未被被拒之儲存寫入')
+test/e2e-external-rows.test.mjs	894	K2x1	const DRAFT = 'A系統管理者未儲存之權限說明'
+test/e2e-external-rows.test.mjs	914	K2x1	assert.notEqual(rowOf(ps, 'id-for-權限P1').description, 'A系統管理者未儲存之權限說明', 'P1 之說明未被被拒之儲存寫入')
+test/e2e-external-rows.test.mjs	927	K2x1	const DRAFT = 'A系統管理者未儲存之標的說明'
+test/e2e-external-rows.test.mjs	946	K2x1	assert.notEqual(rowOf(ts, T.A).description, 'A系統管理者未儲存之標的說明', '首列之說明未被被拒之儲存寫入')
+test/e2e-external-rows.test.mjs	1034	K2x1	const DRAFT = 'A系統管理者未儲存之說明'
+test/e2e-external-rows.test.mjs	1052	K2x1	assert.equal(rowOf(us, 'id-for-mary').description, 'A系統管理者未儲存之說明', 'mary 之編輯已存')
+test/e2e-external-rows.test.mjs	1111	K2x1	await typeIntoCell(page, k, 'description', 'A系統管理者未儲存之說明(025)')
+test/e2e-external-rows.test.mjs	1193	K2x1	const DRAFT = 'A系統管理者自己儲存之說明(027)'
+test/e2e-external-rows.test.mjs	1212	K2x1	assert.equal(rowOf(await selectAllRows('users'), 'id-for-mary').description, 'A系統管理者自己儲存之說明(027)', 'mary 之編輯已存')
+test/e2e-external-rows.test.mjs	1224	K2x1	const DRAFT = 'A系統管理者自己儲存之說明(028)'
+test/e2e-external-rows.test.mjs	1247	K2x1	assert.equal(rowOf(await selectAllRows('users'), 'id-for-mary').description, 'A系統管理者自己儲存之說明(028)', 'mary 之編輯已存')
+test/e2e-init.test.mjs	406	K3x1	//id-mk-dup 為外部列(from=FROM_006): 後台整表寫入不得刪(Lv1 saveExternalRowChanged, 2026-10-22 全套實測以系統管理者寫入移除而失敗)、
+test/e2e-init.test.mjs	416	K2x1	//  資料前置（非使用者操作）: 系統管理者(sys)經資料通道把 member(TOKEN_MEMBER: srv.mjs 之 verifyClientUser 放行、perm 列 isAdmin='n' 且啟用)加入 users。
+test/e2e-init.test.mjs	431	K3x1	snap = await readTables() //擷取收尾用快照(與 restoreTables 對稱; 不使用 callRpc('updateUsers')——LC-005 禁 e2e-init 以系統管理者寫入收尾外部列夾具, 本案夾具為後台列, 走共用層)
+test/e2e-init.test.mjs	495	K2x1	//  對照 E2E-007: 角色因素（非系統管理者）由本套件拒絕並停在「無權進入權限後台」, 非角色因素由部署方否決並走拒絕登入＋轉址。語意斷言, 不產標準圖（拒絕登入畫面見 E2E-004）。
+test/e2e-init.test.mjs	496	K2x1	//  資料前置（非使用者操作）: 系統管理者經共用層把 deny（isAdmin y、啟用）加入 users。
+test/e2e-init.test.mjs	498	K2x1	it(`E2E-008-veto-by-deployer [${lang}]: 系統管理者之 perm 列因非角色因素被部署方 verifyClientUser 否決 → 後端 userNoPermission、轉址至 urlRedirect（非「無權進入權限後台」）`, asy
+test/e2e-ref-cascade.test.mjs	23	K3x1	//夾具(後台列由系統管理者寫入 RPC(editTableRows)先建, 外部列經真 /syncAndReplaceTabs 後建): 群組 rc-del-g／rc-lone／rc-ren-g; 使用者 rc-del-uo(後台)、rc-del-ua(外部)、rc-ren-u
+test/e2e-ref-cascade.test.mjs	393	K2x1	//6 步 user path: ①部署方已設 cascadeRename 為 false, 系統管理者登入點「權限群組」②雙擊 rc-ren-g 名稱儲存格改名(Enter) ③按儲存 ④沒有確認框, 直接看到成功訊息 ⑤按確認, 點「使用者」⑥看到兩位引用者之「權限群組」欄出
+test/e2e-targets.test.mjs	481	K3x1	// 資料前置以系統管理者寫入 RPC(editTableRows; 夾具標的置於清單最上方——清單頁為虛擬捲動, 只渲染可見列), 每案後還原四表並回驗筆數(R-E2E-ISO-01);
+test/e2e-users.test.mjs	328	K2x1	//6 步 user path：①部署方已設 for:grups，系統管理者登入後點「使用者」 ②看到工具列只有編輯開關與欄位挑選（無新增鈕）、
+test/tools/api-setup.mjs	42	K2x1	export const TOKEN_ADMIN2 = '{token-for-admin2}'       // → id-for-admin2（perm-run03 範圍三：第二位系統管理者；其 perm users 列由測試自建／停用，過 verifyClientUser 
+test/tools/api-setup.mjs	43	K2x1	export const TOKEN_MEMBER = '{token-for-member}'       // → id-for-member（perm-run03 範圍四：perm users 列〔測試自建〕isAdmin='n'，但 srv.mjs 之 verifyCli
+test/tools/api-setup.mjs	44	K2x1	export const TOKEN_MUTATE = '{token-for-mutate}'       // → id-for-mutate（perm-run01 外審 sol#2：perm 列〔測試自建〕為系統管理者, 但 srv.mjs 之 verifyClientUs
+test/tools/api-setup.mjs	51	K2x1	export const TOKEN_SSO_ADMIN = '{token-for-sso-admin}'        // → perm-run02: 不在 perm users 表之 sso 系統管理者以自身使用者 token（id 'sso-admin-77'、未轉傳 
+test/tools/api-setup.mjs	52	K2x1	export const TOKEN_AU_SSO = '{token-for-app-bind-sso}'        // → perm-run02: 使用者用途綁「不在 perm users 表之 sso 系統管理者」（同上 id＋isApp y; id 非 'app:'
+test/tools/api-setup.mjs	60	K2x1	export const TOKEN_GHOST_USER = '{token-for-ghost-user}'      // → perm-run02 外審 F3: 一般 sso 系統管理者（email ghost@example.com）, 經 perm 列（主鍵 'app
+test/tools/api-setup.mjs	61	K2x1	export const TOKEN_AU_ADMIN = '{token-for-app-bind-admin}'    // → 使用者用途綁系統管理者（base seed admin 之實際資料 + isApp y）
+test/tools/api-setup.mjs	64	K2x1	export const TOKEN_DENY = '{token-for-deny}'                  // → perm 列〔測試自建〕為系統管理者, 但 srv.mjs 之 verifyClientUser 因非角色因素否決
+test/tools/api-setup.mjs	172	K3x1	//(經系統管理者寫入 RPC, 與 api-updateTabs 之 restoreBaseSeed 同法; sync 端點拒絕空 rows 故不能用它清)
+test/tools/api-setup.mjs	209	K3x1	//    (2026-10-22 全套: e2e-init E2E-006 收尾退而以系統管理者寫入移除 id-mk-dup → saveExternalRowChanged, 夾具殘留, 其後 4 個檔 12 案失敗。)
+test/tools/api-setup.mjs	210	K3x1	//  不放寬產品: 本函式只動測試資料庫, 產品之 Lv1 守門不變(對照: api-cleanExternal CE-003 驗系統管理者寫入仍刪不掉外部列)。
+test/tools/api-setup.mjs	285	K3x1	//  editTableRows: 以系統管理者寫入 RPC 在某表現況之上追加(或改)列: fn(依 order 排序之現況列複本) → 新整表(回傳 undefined 視為就地修改); 失敗即拋錯。
+test/tools/api-setup.mjs	322	K2x1	//應用系統路由先驗身分再驗參數(perm-run01 P-5): 哨兵須帶有效之系統管理者等級 token 才會走到 keyTable 檢查並記 srLog(event api/syncAndReplaceTabs-error、keyTable 為哨兵)
+test/tools/e2eExt.mjs	8	K3x1	//  ①後台列(from 為 '')以 api-setup 之 editTableRows 經系統管理者寫入 RPC 建立; ②外部列以 syncRows 經真同步端點建立(以 from 為界全量取代該分區);
+test/tools/e2eExt.mjs	149	K3x1	//  (restoreTables: 先以 purgeExternalRows 直接刪外部列夾具, 再經系統管理者寫入 RPC 整表寫回快照; 見 api-setup.mjs)
+test/unit-adminOnlySite.test.mjs	1	K1x1	//權限後台與資料通道只限系統管理者之判準與站點不變式(perm-run01; 規則帳本 R-ADMIN-ONLY-01; 使用者 2026-10-24 裁示)
+test/unit-adminOnlySite.test.mjs	38	K1x1	describe('unit-adminOnlySite (權限後台與資料通道只限系統管理者之判準與站點, perm-run01)', function() {
+test/unit-adminOnlySite.test.mjs	41	K1x1	it('AOS-001a 有效之系統管理者 → true', function() {
+test/unit-appToken.test.mjs	50	K2x1	it("AT-001b 輸入空間 id × isApp × isAdmin: 僅 (以 'app:' 開頭之字串, y, y) 為 true  [perm-run02②: 使用者用途綁不在表之 sso 系統管理者〔id 非 app: 開頭〕不是系統服務用途]", function
+test/unit-cvKpToObj.test.mjs	21	K3x1	//  不判有損且方案 A 存檔授權相等(照列寫出為合法 AND 之舊寫法 saveLike 仍保留為對照, 證明放寬仰賴方案 A); 往返之完整證明(直接編輯器／反向關聯對話框, 含系統管理者改動)見 unit-editorRows RT-LOSSY3-*.
+test/unit-cvKpToObj.test.mjs	610	K3x1	//keepLim(方案 A, run05 外審後採納, R-EDIT-KEEP-01; run06 第三格放寬之依據): 「未被系統管理者改動」之限制項(該名稱所有啟用元素皆 mode 缺／非法, 列仍為啟用 AND)原樣寫回其原始 mode(缺則不寫 mode 鍵);
+test/unit-e2e-lifecycle.test.mjs	173	K3x1	//LC-004～005: 外部列夾具之收尾(規則帳本 R-TEST-EXT-CLEAN-01; run09)——2026-10-22 全套: e2e-init E2E-006 以系統管理者寫入移除外部列 id-mk-dup → saveExternalRowChanged, 夾
+test/unit-e2e-lifecycle.test.mjs	222	K3x1	assert.strict.equal(RE_CLEANS_EXT.test('await callRpc(\'updateUsers\', [rowsBase], TOKEN_ADMIN)'), false, '系統管理者寫入不是外部列收尾')
+test/unit-e2e-lifecycle.test.mjs	232	K3x1	it('LC-005 站點不變式: e2e-init E2E-006 之 finally 以 cleanExternalFixtures 移除本案外部分區(froms: [FROM_006])並回驗 pristine, 不以系統管理者寫入 updateUsers 移除', fun
+test/unit-e2e-lifecycle.test.mjs	235	K3x1	assert.strict.ok(!/['"`]updateUsers['"`]/.test(code), 'e2e-init 不得以系統管理者寫入(updateUsers)做收尾: 外部列後台不得刪(Lv1 saveExternalRowChanged)')
+test/unit-editorRows.test.mjs	11	K3x1	//  ④第三格放寬之證明(RT-LOSSY3-*、EX-LOSSY3-*; run06, ADR-035 Update 2026-10-22): 原 getKpLossy 第三格(該層啟用項皆 mode 缺／非法 → 拒存)改為可存; 依據為方案 A(未被系統管理者改動之限制項
+test/unit-editorRows.test.mjs	13	K3x1	//  名稱 ''／同名重複、含歷史同名表), 或「原層有合法項而系統管理者於同一次編輯停用之而使該層只剩限制項」者, 經直接編輯器與反向關聯對話框存檔後之授權: 未改動 → 等於存檔前; 有改動 → 等於同一編輯套用於
+test/unit-editorRows.test.mjs	172	K3x1	//未被編輯之元素(含 mode 缺／非法之限制項)逐字保留——此即「凡未被系統管理者改動之項目不得放寬」之判準(限制項不被升格為可當基底之合法 AND). 以陣列形式寫出
+test/unit-editorRows.test.mjs	461	K3x1	it('ER-006-putRowsToKp(含 rawModeMap): 限制項之列仍為「AND、啟用」(開啟時之狀態)者寫回原始 mode(缺則不寫 mode 鍵); 系統管理者改為 OR 或停用者照列寫出; 不在 map 者照列; 未給 map 為現行行為', functi
+test/unit-editorRows.test.mjs	475	K3x1	it('RV-002-putRefEntry(含 rawModeMap): 複製其餘項時啟用中之限制項寫回原始 mode(停用者原樣); 本項照目標寫出(系統管理者改過則不還原); 本項為限制項而目標同顯示狀態(AND、啟用)→ 未變更', function() {
+test/unit-editorRows.test.mjs	490	K3x1	assert.deepStrictEqual(o2.G1, { mode: 'OR', isActive: 'y' }, '系統管理者改為 OR: 照選擇寫出')
+test/unit-editorRows.test.mjs	517	K3x1	//系統管理者把 G1 改為 OR: 照選擇寫出 OR(明確操作)
+test/unit-editorRows.test.mjs	565	K3x1	//系統管理者把懸空列改為停用以解除 → 得 G1 之授權(使用者明確操作)
+test/unit-editorRows.test.mjs	715	K3x1	//若以真合法 AND 解讀, 會成為唯一基底而多給, 並非系統管理者之改動); 其餘照舊為同一編輯套用於原資料之 oracle
+test/unit-editorRows.test.mjs	837	K3x1	//放寬前 getKpLossy 對此格判有損而整格拒存(系統管理者無法存任何變更); 放寬後存檔須不多給. 判準(對 getUserRules 之真授權):
+test/unit-editorRows.test.mjs	1021	K3x1	//空化: 原層有合法項, 系統管理者之編輯使該層啟用項皆為限制項
+test/unit-editorRows.test.mjs	1121	K3x1	it('RT-LOSSY3-005-群組層「原層有合法項, 系統管理者編輯後只剩限制項」窮舉(物件形式 3 名稱 × 13 值, 原字串為合法項與限制項並存; 全 3^k 終態含停用全部合法項): 存檔不多給, 授權＝同一編輯套用於原資料', function() {
+test/unit-editorRows.test.mjs	1134	K3x1	it('RT-LOSSY3-006-權限層「原層有合法項, 系統管理者編輯後只剩限制項」窮舉: 同 RT-LOSSY3-005', function() {
+test/unit-editorRows.test.mjs	1156	K3x1	it('RT-LOSSY3-008-陣列形式「原層有合法項, 系統管理者編輯後只剩限制項」窮舉(含同名重複: 同名限制項與合法項並存): 2 名稱 × {啟用限制項 4 種, 啟用 OR／AND, 停用 OR} 長度 ≤ 3 之全部「合法項與限制項並存」序列(表 A, 群組層與權
+test/unit-editorRows.test.mjs	1225	K3x1	editorToggle(st, 'G2', 'y', 'OR') //系統管理者勾選 G2 又取消: 終態同開啟時, 視為未改動(列狀態為終態之函數, 不記操作歷程)
+test/unit-editorRows.test.mjs	1236	K3x1	it('EX-LOSSY3-002-直接編輯器: 兩個限制項 { G1 缺 mode, G2 \'or\' }, 系統管理者停用 G1 → 只剩限制項 G2, 授權全 n(不是 G2 之 T2,T3); G2 之 mode 原樣(\'or\')', function() {
+test/unit-editorRows.test.mjs	1248	K3x1	it('EX-LOSSY3-003-直接編輯器: 限制項 { G1 } 之層, 系統管理者勾選 G2(OR 或 AND) → 授權＝G2 與 G1(限制項, 交集)之 T2, 等於同一編輯套用於原資料; G1 仍為缺 mode 之限制項', function() {
+test/unit-editorRows.test.mjs	1261	K3x1	it('EX-LOSSY3-004-直接編輯器: 系統管理者把限制項 G1 改為 OR → 照選擇寫出 OR(明確操作: 授予 T1,T2); 改成 OR 再改回 AND 視為未改, 仍寫回原始 mode(已知限制①: 無法由編輯器把限制項明確轉成合法 AND)', functi
+test/unit-editorRows.test.mjs	1274	K3x1	it('EX-LOSSY3-005-權限層(直接編輯器 VeCpemis, cpemis): 原層有合法項 P2(AND)與限制項 P1(\'or\'), 系統管理者停用 P2 → 只剩限制項 P1, 授權全 n; 照列寫出則 P1 成為唯一 AND 基底而多給 T1,T2', 
+test/unit-fromAudit.test.mjs	1476	K2x1	it('FA-080 users 清除: 報告含系統管理者警示與 id(不含姓名／email); 被清除列缺主鍵者規劃被拒(purgeRowNoId); 超過上限之列從略並註明', async function() {
+test/unit-pairRowsToSnapshot.test.mjs	4	K3x1	//store 於開框期間被更新(另一位系統管理者增刪或改 order)時, 關聯寫到另一個使用者／群組. 修後以列身分(id; 群組另驗 name)配對, 找不到者回報為 missing, 由元件整次拒存.
+test/unit-procCore-external.test.mjs	1651	K2x1	//(先於 pickClientOpt、lockSave、表鎖與任何讀庫——非系統管理者零寫入、零讀庫); requireAdmin 本體以 perm users 表之 isAdmin==='y' 為準, 不符 reject 固定鍵 userNotAdmin(行為面見 api 層
+test/unit-roleName.test.mjs	9	K3x1	//  RN-003  procLang cht.userNotAdmin(後台拒絕非系統管理者之訊息)為「僅系統管理者可存取或變更此資料」; eng 不動
+test/unit-syncKeepEntity.test.mjs	7	K3x1	//        每次同步清空等於靜默丟棄系統管理者之指派(原則 3). users 之行為不變(unit-syncKeep).
+建議w-web-perm修正.md	1	K1x1	# 建議w-web-perm修正:「管理使用者」之欄位名「是否為系統管理者」改為「是否為系統管理者」
+建議w-web-perm修正.md	7	K1x1	- 緣由:使用者裁定全系統(報告、操作手冊、spec、畫面文字)之角色名稱統一為「系統管理者」;盤查畫面文字時發現本套件「管理使用者」之欄位名仍為「是否為系統管理者」,與 w-web-sso 同一欄位之「是否為系統管理者」(w-web-sso `server/procLang.m
+建議w-web-perm修正.md	11	K1x1	## 1.〔低〕欄位名「是否為系統管理者」與單一登入系統同一欄位之「是否為系統管理者」不一致
+建議w-web-perm修正.md	13	K1x2	**現況**:`server/procLang.mjs:656` 之 `cht: 是否為系統管理者`(1.1.11 為 `:311`),為「管理使用者」表格之欄位標題;`src/schema/tables/users.mjs:49` 之 `name: '是否為系統管理者'`。w-
+建議w-web-perm修正.md	21	K1x1	2. 於套件 repo 執行 `git grep -n "是否為系統管理者" -- src server`,結果為 0。

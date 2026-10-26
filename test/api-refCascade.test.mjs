@@ -19,7 +19,7 @@
 //  被寫入表(grups／pemis／targets) × 事件(改名／刪除／刪後同名新增／互換／鏈式／歷史同名) × 入口(後台整表寫入／外部同步同 from) × 引用端形狀(物件／陣列／停用項) × 引用端來源(from ''／appRC 外部; run07 起基準種子已無外部 teamA 列) × cascadeRename(預設／false) × 拒絕(三鍵) × 操作者(admin／application) × 並行(五寫入者).
 //
 //真後端; DB 斷言一律 getWoItems() 唯讀 select, 寫入一律走後端 RPC／同步 API(例外: 歷史同名列無任何現行寫入入口可造〔ADR-034〕, 以 restartBackend 之 seedExtra 於後端停止期間旁路寫庫, 同 e2e-array-form).
-//設定切換以 restartBackend(genTempSettings({ cascadeRename:false })); 收尾還原 './settings.json' 並 reseed, 以管理者寫入 RPC 還原四表為 base seed(同 api-mapKey 之做法).
+//設定切換以 restartBackend(genTempSettings({ cascadeRename:false })); 收尾還原 './settings.json' 並 reseed, 以系統管理者寫入 RPC 還原四表為 base seed(同 api-mapKey 之做法).
 //測試 token: 'sys'(id-for-admin, 後台 RPC 操作者)、'{token-for-application}'(id-for-application, 外部同步操作者與 getPermUserInfor 之 app 身分).
 //跑法: node C:/opensrcOper/tools/quiet-run.mjs --name tapi --lock --timeout 1800 -- npx mocha test/api-refCascade.test.mjs --timeout 300000
 
@@ -272,7 +272,7 @@ describe('api-refCascade (引用連帶: 改名級聯＋刪除連帶清理, 真�
         backendMode = mode
     }
 
-    //restoreAll: 以管理者寫入 RPC 把四表還原為 base seed. 次序「被引用者先、引用端後」(targets → pemis → grups → users):
+    //restoreAll: 以系統管理者寫入 RPC 把四表還原為 base seed. 次序「被引用者先、引用端後」(targets → pemis → grups → users):
     //  被引用表之改名會連帶改寫引用端(此時引用端仍指向舊名, 隨即被改回), 引用端最後一併還原; 反序則引用端先指向 base 名稱(尚無實體)而使 grups／pemis 改回原名被 renameCascadeNameInUse 拒絕
     //  run07(F-23): 後台整表寫入不得刪除外部列(from 非空, 本檔以同步灌入之 appRC* 夾具與 seedExtra 之 appRC-d 列), 故先以 purgeExternalRows(測試框架之重置, 不經 RPC)移除外部列再以 RPC 還原後台列;
     //  直接刪除不經引用連帶, 之後由「被引用者先、引用端後」之 RPC 還原把後台引用端改回 base seed

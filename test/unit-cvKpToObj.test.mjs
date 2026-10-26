@@ -18,7 +18,7 @@
 //  run02 之排序保護(keepKeyOrder／getKeyOrderLost／getKpWriteLost 與 getKpLossy 之 AND 相對順序判定)已隨規則 4 刪除, 本檔對應案例(KO／GL／WL／KL-003)隨之移除;
 //  保留者唯「同名同時有效 OR 與 AND」一格(物件形式一個名稱只有一個 mode, 無法無損表示), 由 getKpLossy 判定, 編輯器拒存(R-AUTH-LOSSY-01); 加上「啟用而名稱非字串」(run05 f)一格.
 //  〔run06〕原第三格「該層啟用項皆 mode 缺／非法 → 拒存」(ADR-035 決定 e)已放寬(使用者裁示, ADR-035 Update 2026-10-22): 方案 A(未改動之限制項原樣寫回原始 mode)使存檔前後授權相等, KL-007／PR-* 改為
-//  不判有損且方案 A 存檔授權相等(照列寫出為合法 AND 之舊寫法 saveLike 仍保留為對照, 證明放寬仰賴方案 A); 往返之完整證明(直接編輯器／反向關聯對話框, 含管理者改動)見 unit-editorRows RT-LOSSY3-*.
+//  不判有損且方案 A 存檔授權相等(照列寫出為合法 AND 之舊寫法 saveLike 仍保留為對照, 證明放寬仰賴方案 A); 往返之完整證明(直接編輯器／反向關聯對話框, 含系統管理者改動)見 unit-editorRows RT-LOSSY3-*.
 //跑法: npx mocha test/unit-cvKpToObj.test.mjs --timeout 180000
 import assert from 'assert'
 import fs from 'fs'
@@ -607,7 +607,7 @@ describe('unit-cvKpToObj (授權資料共用解碼, R-AUTH-DECODE-01)', function
     //  (被引用表之全部列, 狀態取 refState) ∪ (啟用而名稱不在表中之引用〔懸空, 含名稱 ""〕, 各一列原樣保留其有效 mode; R-PRINCIPLE-00 c／f: 丟棄即改變授權)
     //  → 寫出 { 名稱: { mode, isActive } }(JSON.stringify; 物件鍵序 = 列序. 不保序: 規則 4, 結果與鍵序無關).
     //名稱非字串之啟用元素物件形式無法表示, 由 getKpLossy 判定(拒存), 此處不寫出
-    //keepLim(方案 A, run05 外審後採納, R-EDIT-KEEP-01; run06 第三格放寬之依據): 「未被管理者改動」之限制項(該名稱所有啟用元素皆 mode 缺／非法, 列仍為啟用 AND)原樣寫回其原始 mode(缺則不寫 mode 鍵);
+    //keepLim(方案 A, run05 外審後採納, R-EDIT-KEEP-01; run06 第三格放寬之依據): 「未被系統管理者改動」之限制項(該名稱所有啟用元素皆 mode 缺／非法, 列仍為啟用 AND)原樣寫回其原始 mode(缺則不寫 mode 鍵);
     //  不給(預設)＝照列寫出, 為方案 A 之前之寫法(限制項被寫成合法 AND, 該層無合法項時成為唯一基底而多給). 本檔獨立寫出(不經 editorRefRows)以交叉驗證; 往返之完整證明見 unit-editorRows RT-LOSSY3-*
     let saveLike = (raw, names, keepLim = false) => {
         let kp = cvKpToObj(JSON5.parse(raw), HM)

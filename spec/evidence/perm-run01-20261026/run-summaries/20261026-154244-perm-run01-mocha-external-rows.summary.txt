@@ -1,0 +1,18 @@
+[quiet-run] exit=0 time=13m16s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261026-154244-perm-run01-mocha-external-rows.log (14 行, 1 KB)
+[quiet-run] cmd: npx mocha --no-parallel test/e2e-external-rows.test.mjs --timeout 180000 --reporter dot
+[quiet-run] lock: 取得並已釋放(等待 0s)
+== 統計 ==
+  60 passing (13m)
+== 最後 11 行(非空,不含上列失敗段落) ==
+npm notice run w-web-perm@1.1.17 npx
+npm notice run mocha --no-parallel test/e2e-external-rows.test.mjs --timeout 180000 --reporter dot
+[e2e-setup] starting backend (port 11006)...
+[e2e-setup] backend ready
+[e2e-setup] starting frontend (port 8090), webpack 首編較久...
+[e2e-setup] frontend ready
+  .....[box-scroll] 目標比其可視區大且已部分入鏡，捲入會改變版面(假畫面)；框整個檢視區宜傳 itemsUnionBox(loc, { scroll: null }) 或 scrollTall:false
+..............................[box-scroll] 目標比其可視區大且已部分入鏡，捲入會改變版面(假畫面)；框整個檢視區宜傳 itemsUnionBox(loc, { scroll: null }) 或 scrollTall:false
+.....................
+  ....
+  60 passing (13m)
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)

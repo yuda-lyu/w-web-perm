@@ -325,7 +325,7 @@ const CASES = [
     },
     {
         //E2E-012：settings.modeEditUsers='for:grups'（使用者身分由外部單一登入系統同步之部署）→ 進頁即編輯模式但僅能調整群組指派。
-        //6 步 user path：①部署方已設 for:grups，管理員登入後點「使用者」 ②看到工具列只有編輯開關與欄位挑選（無新增鈕）、
+        //6 步 user path：①部署方已設 for:grups，系統管理者登入後點「使用者」 ②看到工具列只有編輯開關與欄位挑選（無新增鈕）、
         //  身分儲存格不可編、isAdmin/isActive 勾選 disabled ③點 peter 列「權限群組」按鈕開對話框（可編） ④勾選 權限群組M2 是否使用 →
         //  點對話框儲存 → 回填、peter 列顯示 2 群組、工具列出現儲存鈕 ⑤點儲存 → 看到「儲存成功」 ⑥DB peter.cgrups 含 M2、name/email 不變。
         //settings 由 runCase 依 c.settings 於 openPage 內（resetDb 之後、開 case page 之前）restartBackend 注入，

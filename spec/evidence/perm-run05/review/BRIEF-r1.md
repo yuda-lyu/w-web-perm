@@ -9,7 +9,7 @@
 ## 一、被審的功能
 
 權限系統(w-web-perm)的 `users` 表有兩種列:
-- **後台列**(`from` 為空字串):由管理員在後台建立,`id` 是列的主鍵,也是該使用者在外部系統的使用者代號。
+- **後台列**(`from` 為空字串):由系統管理者在後台建立,`id` 是列的主鍵,也是該使用者在外部系統的使用者代號。
 - **外部列**(`from` 非空):由外部應用透過 `POST /syncAndReplaceTabs` 匯入。每列帶外部自訂的來源鍵 `srcKey`(只在同一個 `from` 內唯一);`id` 是本系統配發的內部主鍵,外部不得提供。遷移前舊外部列沒有 `srcKey`。
 
 登入時,外部系統(`getUserByToken`)回報該 token 的使用者 `id`;權限系統依部署設定 `mappingBy`(`'id'`〔預設〕｜`'email'`｜`'name'`)到 `users` 表找對應的列。`mappingBy='id'` 時的「登入識別值」(`loginIdOf`):後台列=`id`;外部列=`srcKey`;遷移前舊外部列(無 `srcKey`)暫=`id`。

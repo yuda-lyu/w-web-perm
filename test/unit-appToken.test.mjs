@@ -47,7 +47,7 @@ describe('unit-appToken (應用系統 token 之判準與站點不變式, perm-ru
             A.equal(isSystemAppUser({ id: 'app:k1', name: 'n', email: 'e@x.com', isAdmin: 'y', isApp: 'y', extra: 1 }), true)
         })
 
-        it("AT-001b 輸入空間 id × isApp × isAdmin: 僅 (以 'app:' 開頭之字串, y, y) 為 true  [perm-run02②: 使用者用途綁不在表之 sso 管理員〔id 非 app: 開頭〕不是系統服務用途]", function() {
+        it("AT-001b 輸入空間 id × isApp × isAdmin: 僅 (以 'app:' 開頭之字串, y, y) 為 true  [perm-run02②: 使用者用途綁不在表之 sso 系統管理者〔id 非 app: 開頭〕不是系統服務用途]", function() {
             let ids = ['app:k', 'app:', 'x', '', ' ', 'sso-admin-77', 'App:k', 'APP:k', ' app:k', 'xapp:k', 'app', 'app-k', 'app：k', 'app.k', 0, 1, null, undefined, true, {}, [], ['a']]
             let vals = ['y', 'n', 'Y', ' y', 'y ', 'yes', '', true, false, 1, 0, null, undefined]
             let nTrue = 0

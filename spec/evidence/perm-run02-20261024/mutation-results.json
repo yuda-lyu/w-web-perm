@@ -41,7 +41,7 @@
   },
   {
     "id": "MA5",
-    "desc": "①isExtAdminUser 恆真(任何物件皆為管理員)",
+    "desc": "①isExtAdminUser 恆真(任何物件皆為系統管理者)",
     "file": "server/adminCheck.mjs",
     "caught": true,
     "passing": 3,
@@ -56,7 +56,7 @@
     "caught": true,
     "passing": 24,
     "failing": 1,
-    "firstFail": "MX-P1 AU 綁管理員: 該管理員被降為一般使用者 → AU 同步失去管理員服務(資料通道、後台登入、應用路由皆拒); 升回後恢復  [AU＝同綁定者, perm 列為權威]",
+    "firstFail": "MX-P1 AU 綁系統管理者: 該系統管理者被降為一般使用者 → AU 同步失去系統管理者服務(資料通道、後台登入、應用路由皆拒); 升回後恢復  [AU＝同綁定者, perm 列為權威]",
     "sec": 11
   },
   {
@@ -66,7 +66,7 @@
     "caught": true,
     "passing": 1,
     "failing": 1,
-    "firstFail": "MX-H2 GET /api/getUserByToken(後台登入檢查): 後端管理員服務等級(A／AUA／AS)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料(含 id 非 app: 開頭之 APP／AUX)  [P-2: AS 放行; perm-run02②: AS 須 app: 前綴]",
+    "firstFail": "MX-H2 GET /api/getUserByToken(後台登入檢查): 後端系統管理者服務等級(A／AUA／AS)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料(含 id 非 app: 開頭之 APP／AUX)  [P-2: AS 放行; perm-run02②: AS 須 app: 前綴]",
     "sec": 4
   },
   {
@@ -76,7 +76,7 @@
     "caught": true,
     "passing": 53,
     "failing": 1,
-    "firstFail": "AT-001b 輸入空間 id × isApp × isAdmin: 僅 (以 'app:' 開頭之字串, y, y) 為 true  [perm-run02②: 使用者用途綁不在表之 sso 管理員〔id 非 app: 開頭〕不是系統服務用途]",
+    "firstFail": "AT-001b 輸入空間 id × isApp × isAdmin: 僅 (以 'app:' 開頭之字串, y, y) 為 true  [perm-run02②: 使用者用途綁不在表之 sso 系統管理者〔id 非 app: 開頭〕不是系統服務用途]",
     "sec": 24
   },
   {
@@ -86,7 +86,7 @@
     "caught": true,
     "passing": 53,
     "failing": 1,
-    "firstFail": "AT-001b 輸入空間 id × isApp × isAdmin: 僅 (以 'app:' 開頭之字串, y, y) 為 true  [perm-run02②: 使用者用途綁不在表之 sso 管理員〔id 非 app: 開頭〕不是系統服務用途]",
+    "firstFail": "AT-001b 輸入空間 id × isApp × isAdmin: 僅 (以 'app:' 開頭之字串, y, y) 為 true  [perm-run02②: 使用者用途綁不在表之 sso 系統管理者〔id 非 app: 開頭〕不是系統服務用途]",
     "sec": 24
   },
   {
@@ -96,7 +96,7 @@
     "caught": true,
     "passing": 53,
     "failing": 1,
-    "firstFail": "AT-001b 輸入空間 id × isApp × isAdmin: 僅 (以 'app:' 開頭之字串, y, y) 為 true  [perm-run02②: 使用者用途綁不在表之 sso 管理員〔id 非 app: 開頭〕不是系統服務用途]",
+    "firstFail": "AT-001b 輸入空間 id × isApp × isAdmin: 僅 (以 'app:' 開頭之字串, y, y) 為 true  [perm-run02②: 使用者用途綁不在表之 sso 系統管理者〔id 非 app: 開頭〕不是系統服務用途]",
     "sec": 24
   },
   {
@@ -106,7 +106,7 @@
     "caught": true,
     "passing": 53,
     "failing": 1,
-    "firstFail": "AT-001b 輸入空間 id × isApp × isAdmin: 僅 (以 'app:' 開頭之字串, y, y) 為 true  [perm-run02②: 使用者用途綁不在表之 sso 管理員〔id 非 app: 開頭〕不是系統服務用途]",
+    "firstFail": "AT-001b 輸入空間 id × isApp × isAdmin: 僅 (以 'app:' 開頭之字串, y, y) 為 true  [perm-run02②: 使用者用途綁不在表之 sso 系統管理者〔id 非 app: 開頭〕不是系統服務用途]",
     "sec": 24
   },
   {
@@ -116,7 +116,7 @@
     "caught": true,
     "passing": 1,
     "failing": 1,
-    "firstFail": "MX-H2 GET /api/getUserByToken(後台登入檢查): 後端管理員服務等級(A／AUA／AS)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料(含 id 非 app: 開頭之 APP／AUX)  [P-2: AS 放行; perm-run02②: AS 須 app: 前綴]",
+    "firstFail": "MX-H2 GET /api/getUserByToken(後台登入檢查): 後端系統管理者服務等級(A／AUA／AS)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料(含 id 非 app: 開頭之 APP／AUX)  [P-2: AS 放行; perm-run02②: AS 須 app: 前綴]",
     "sec": 4
   },
   {
@@ -126,7 +126,7 @@
     "caught": true,
     "passing": 1,
     "failing": 1,
-    "firstFail": "MX-H2 GET /api/getUserByToken(後台登入檢查): 後端管理員服務等級(A／AUA／AS)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料(含 id 非 app: 開頭之 APP／AUX)  [P-2: AS 放行; perm-run02②: AS 須 app: 前綴]",
+    "firstFail": "MX-H2 GET /api/getUserByToken(後台登入檢查): 後端系統管理者服務等級(A／AUA／AS)通過並回該身分; 其餘一律拒、固定語系鍵、不回資料(含 id 非 app: 開頭之 APP／AUX)  [P-2: AS 放行; perm-run02②: AS 須 app: 前綴]",
     "sec": 4
   },
   {
@@ -146,7 +146,7 @@
     "caught": true,
     "passing": 38,
     "failing": 1,
-    "firstFail": "MX-M6 [外審 sol F3] 近期系統服務用途登錄不得被「經 perm 列通過驗證、其後該列於 requireAdmin 讀取前被刪」之請求沿用: AS(app:key-ghost)先登錄 → perm 建立主鍵同為 app:key-ghost 之管理員列(email 對應) → 一般 sso 管理員經該列通過身分驗證(部署方驗證等待約 2 秒) → 等待期間該列被刪 → 寫入函數須 userNotAdmin、零寫入",
+    "firstFail": "MX-M6 [外審 sol F3] 近期系統服務用途登錄不得被「經 perm 列通過驗證、其後該列於 requireAdmin 讀取前被刪」之請求沿用: AS(app:key-ghost)先登錄 → perm 建立主鍵同為 app:key-ghost 之系統管理者列(email 對應) → 一般 sso 系統管理者經該列通過身分驗證(部署方驗證等待約 2 秒) → 等待期間該列被刪 → 寫入函數須 userNotAdmin、零寫入",
     "sec": 24
   },
   {
@@ -156,7 +156,7 @@
     "caught": true,
     "passing": 38,
     "failing": 1,
-    "firstFail": "MX-M6 [外審 sol F3] 近期系統服務用途登錄不得被「經 perm 列通過驗證、其後該列於 requireAdmin 讀取前被刪」之請求沿用: AS(app:key-ghost)先登錄 → perm 建立主鍵同為 app:key-ghost 之管理員列(email 對應) → 一般 sso 管理員經該列通過身分驗證(部署方驗證等待約 2 秒) → 等待期間該列被刪 → 寫入函數須 userNotAdmin、零寫入",
+    "firstFail": "MX-M6 [外審 sol F3] 近期系統服務用途登錄不得被「經 perm 列通過驗證、其後該列於 requireAdmin 讀取前被刪」之請求沿用: AS(app:key-ghost)先登錄 → perm 建立主鍵同為 app:key-ghost 之系統管理者列(email 對應) → 一般 sso 系統管理者經該列通過身分驗證(部署方驗證等待約 2 秒) → 等待期間該列被刪 → 寫入函數須 userNotAdmin、零寫入",
     "sec": 23
   },
   {
@@ -166,7 +166,7 @@
     "caught": true,
     "passing": 38,
     "failing": 1,
-    "firstFail": "MX-M6 [外審 sol F3] 近期系統服務用途登錄不得被「經 perm 列通過驗證、其後該列於 requireAdmin 讀取前被刪」之請求沿用: AS(app:key-ghost)先登錄 → perm 建立主鍵同為 app:key-ghost 之管理員列(email 對應) → 一般 sso 管理員經該列通過身分驗證(部署方驗證等待約 2 秒) → 等待期間該列被刪 → 寫入函數須 userNotAdmin、零寫入",
+    "firstFail": "MX-M6 [外審 sol F3] 近期系統服務用途登錄不得被「經 perm 列通過驗證、其後該列於 requireAdmin 讀取前被刪」之請求沿用: AS(app:key-ghost)先登錄 → perm 建立主鍵同為 app:key-ghost 之系統管理者列(email 對應) → 一般 sso 系統管理者經該列通過身分驗證(部署方驗證等待約 2 秒) → 等待期間該列被刪 → 寫入函數須 userNotAdmin、零寫入",
     "sec": 23
   },
   {
@@ -176,7 +176,7 @@
     "caught": true,
     "passing": 38,
     "failing": 1,
-    "firstFail": "MX-M6 [外審 sol F3] 近期系統服務用途登錄不得被「經 perm 列通過驗證、其後該列於 requireAdmin 讀取前被刪」之請求沿用: AS(app:key-ghost)先登錄 → perm 建立主鍵同為 app:key-ghost 之管理員列(email 對應) → 一般 sso 管理員經該列通過身分驗證(部署方驗證等待約 2 秒) → 等待期間該列被刪 → 寫入函數須 userNotAdmin、零寫入",
+    "firstFail": "MX-M6 [外審 sol F3] 近期系統服務用途登錄不得被「經 perm 列通過驗證、其後該列於 requireAdmin 讀取前被刪」之請求沿用: AS(app:key-ghost)先登錄 → perm 建立主鍵同為 app:key-ghost 之系統管理者列(email 對應) → 一般 sso 系統管理者經該列通過身分驗證(部署方驗證等待約 2 秒) → 等待期間該列被刪 → 寫入函數須 userNotAdmin、零寫入",
     "sec": 23
   },
   {
@@ -186,7 +186,7 @@
     "caught": true,
     "passing": 38,
     "failing": 1,
-    "firstFail": "MX-M6 [外審 sol F3] 近期系統服務用途登錄不得被「經 perm 列通過驗證、其後該列於 requireAdmin 讀取前被刪」之請求沿用: AS(app:key-ghost)先登錄 → perm 建立主鍵同為 app:key-ghost 之管理員列(email 對應) → 一般 sso 管理員經該列通過身分驗證(部署方驗證等待約 2 秒) → 等待期間該列被刪 → 寫入函數須 userNotAdmin、零寫入",
+    "firstFail": "MX-M6 [外審 sol F3] 近期系統服務用途登錄不得被「經 perm 列通過驗證、其後該列於 requireAdmin 讀取前被刪」之請求沿用: AS(app:key-ghost)先登錄 → perm 建立主鍵同為 app:key-ghost 之系統管理者列(email 對應) → 一般 sso 系統管理者經該列通過身分驗證(部署方驗證等待約 2 秒) → 等待期間該列被刪 → 寫入函數須 userNotAdmin、零寫入",
     "sec": 23
   },
   {
@@ -206,7 +206,7 @@
     "caught": true,
     "passing": 27,
     "failing": 1,
-    "firstFail": "MX-P4 管理員之 perm 列因非角色因素被 verifyClientUser 否決(TOKEN_DENY): userNoPermission  [P-7: 部署方否決者之固定鍵]",
+    "firstFail": "MX-P4 系統管理者之 perm 列因非角色因素被 verifyClientUser 否決(TOKEN_DENY): userNoPermission  [P-7: 部署方否決者之固定鍵]",
     "sec": 11
   }
 ]

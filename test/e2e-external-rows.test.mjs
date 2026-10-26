@@ -21,7 +21,7 @@
 //  已測案例 26 × 語系 2 = 52 個 it(標準圖 8 案: run07 6 案 ＋ run11 E2E-016、020 各 1 張／語系)。
 //
 //夾具(皆以外部來源 from 為界之真同步端點建立; 外部列 id 標籤／名稱前綴 xr／ext-, 不撞他檔夾具): 使用者 ext-u1(cgrups 引用 權限群組M2)、ext-u2、ext-u3(引用 ext-g1); 群組 ext-g1(cpemis 含 權限P1)、ext-g2;
-//  後台列夾具由管理者寫入 RPC(editTableRows)先於外部列建立。收尾 restoreTables(purgeExternalRows 直刪外部列夾具 → 整表寫回快照)並回驗筆數與無外部列殘留(R-E2E-ISO-01)。
+//  後台列夾具由系統管理者寫入 RPC(editTableRows)先於外部列建立。收尾 restoreTables(purgeExternalRows 直刪外部列夾具 → 整表寫回快照)並回驗筆數與無外部列殘留(R-E2E-ISO-01)。
 //perm-run03(外部匯入改依來源鍵 srcKey 差異同步, R-IMPORT-01): 外部列夾具之 id 標籤(id-xr-u1 等)是送入同步端點之 srcKey(syncRows 改送 srcKey 並丟掉 id), 庫內外部列之真實 id 由伺服端產生、不等於標籤;
 //  凡以 id 運作者(store 欄位等待)先經 idOfSrc 取真實 id; getPermUserInfor 查授權者 perm-run05 起 userId 依登入對應解析(mappingBy 為 id: 外部列傳 srcKey〔夾具標籤〕、後台列傳 id); 比對庫內外部列依 srcKey(rowOf／hasRow、PICK_UX／PICK_GX); 後台列夾具(editTableRows)id 不變。
 //授權樹期望值由 base seed 規則集依 R-AUTH-MERGE-00 推導(見 test/tools/e2eExt.mjs 之 TREE), 不抄實測值。
@@ -573,7 +573,7 @@ const CASES = [
             //spec E2E-011 驗證1(前提): 勾選後、他人改動前, 對話框內過期提示為 0 節點; mary 已勾選
             assert.equal(await staleCount(page, FM_BLNG_USERS_STALE), 0, '前提: 尚無過期提示')
             assert.equal(await page.locator(dialogEnableCheckboxSel(1)).first().isChecked(), true, '前提: mary 已勾選')
-            //他人改了 mary 之列(說明): 經管理者寫入 RPC; 前端 store 隨廣播更新, 對話框有草稿故保留草稿與開框時之基準
+            //他人改了 mary 之列(說明): 經系統管理者寫入 RPC; 前端 store 隨廣播更新, 對話框有草稿故保留草稿與開框時之基準
             const OTHER = '他人於對話框開啟後改過之說明'
             await editTableRows('users', (rows) => {
                 rows.find((r) => r.id === 'id-for-mary').description = OTHER
@@ -736,7 +736,7 @@ const CASES = [
     },
     {
         //E2E-014: 後端設定 lockExternalRows:'n'(回到舊行為)下, 使用者頁之外部列無鎖頭、無外部列橫幅、身分欄可編(雙擊 name 可進入編輯並可儲存改名)、核選方塊可點。純語意。
-        //6 步 user path: ①部署方已設 lockExternalRows 為 n, 管理員登入點「使用者」 ②看不到橫幅與鎖頭 ③外部列 isAdmin／isActive 核選方塊可點 ④雙擊外部列 name 可編輯並改名 ⑤按儲存 ⑥看到成功訊息, 庫內改名、來源不變
+        //6 步 user path: ①部署方已設 lockExternalRows 為 n, 系統管理者登入點「使用者」 ②看不到橫幅與鎖頭 ③外部列 isAdmin／isActive 核選方塊可點 ④雙擊外部列 name 可編輯並改名 ⑤按儲存 ⑥看到成功訊息, 庫內改名、來源不變
         name: 'E2E-014-lock-off',
         stages: [],
         settings: { lockExternalRows: 'n' },
@@ -802,11 +802,11 @@ const CASES = [
             const k = await rowIndexByCell(page, 'name', 'mary')
             const emailOld = await cellText(page, k, 'email')
             const descOld = await cellText(page, k, 'description')
-            const DRAFT = 'A管理員未儲存之說明'
+            const DRAFT = 'A系統管理者未儲存之說明'
             await typeIntoCell(page, k, 'description', DRAFT)
             assert.equal(await pageSaveShown(page), true, '前提: 有未存編輯, 儲存鈕現身')
             assert.equal(await staleCount(page, 'users-banner-stale'), 0, '前提: 尚無過期提示')
-            //他人改了 mary 之 email(同一列; 經管理者寫入 RPC); 前端 store 隨推播更新
+            //他人改了 mary 之 email(同一列; 經系統管理者寫入 RPC); 前端 store 隨推播更新
             const OTHER = 'mary-by-other@example.com'
             await editTableRows('users', (rows) => {
                 rows.find((r) => r.id === 'id-for-mary').email = OTHER
@@ -837,7 +837,7 @@ const CASES = [
             assert.equal(await cellText(page, k, 'email'), OTHER, '重新載入: email 欄為他人之版本')
             assert.equal(await pageSaveShown(page), false, '重新載入: 無未存編輯, 儲存鈕消失')
             //spec E2E-016 驗證4: 重新載入後(新基準)再編輯、存檔 → 成功
-            const AFTER = 'A管理員重新載入後之說明'
+            const AFTER = 'A系統管理者重新載入後之說明'
             await typeIntoCell(page, k, 'description', AFTER)
             await saveAndWaitModal(page)
             await assertModalMsg(page, 'userSaveUsersSuccess')
@@ -847,7 +847,7 @@ const CASES = [
         semantic: async () => {
             const mary = rowOf(await selectAllRows('users'), 'id-for-mary')
             assert.equal(mary.email, 'mary-by-other@example.com', '他人之 email 版本保留(被拒之儲存未覆蓋)')
-            assert.equal(mary.description, 'A管理員重新載入後之說明', '重新載入後之編輯已存')
+            assert.equal(mary.description, 'A系統管理者重新載入後之說明', '重新載入後之編輯已存')
         },
     },
     {
@@ -859,7 +859,7 @@ const CASES = [
         run: async (page, lang) => {
             await enter(page, 'grups', 6)
             const k = await rowIndexByCell(page, 'name', '權限群組M1')
-            const DRAFT = 'A管理員未儲存之群組說明'
+            const DRAFT = 'A系統管理者未儲存之群組說明'
             await typeIntoCell(page, k, 'description', DRAFT)
             assert.equal(await pageSaveShown(page), true, '前提: 有未存編輯')
             const NEW = '外部來源改過之說明(別列)'
@@ -879,7 +879,7 @@ const CASES = [
         },
         semantic: async () => {
             const gs = await selectAllRows('grups')
-            assert.notEqual(rowOf(gs, 'id-for-權限群組M1').description, 'A管理員未儲存之群組說明', 'M1 之說明未被被拒之儲存寫入')
+            assert.notEqual(rowOf(gs, 'id-for-權限群組M1').description, 'A系統管理者未儲存之群組說明', 'M1 之說明未被被拒之儲存寫入')
             assert.equal(rowOf(gs, 'id-xr-g2').description, '外部來源改過之說明(別列)', 'ext-g2 維持外部新值')
         },
     },
@@ -891,7 +891,7 @@ const CASES = [
         run: async (page, lang) => {
             await enter(page, 'pemis', 4)
             const k = await rowIndexByCell(page, 'name', '權限P1')
-            const DRAFT = 'A管理員未儲存之權限說明'
+            const DRAFT = 'A系統管理者未儲存之權限說明'
             await typeIntoCell(page, k, 'description', DRAFT)
             assert.equal(await pageSaveShown(page), true, '前提: 有未存編輯')
             await editTableRows('pemis', (rows) => [...rows, { id: 'id-xr-p9', order: 99, name: 'xr-late-pemi', description: '他人新增之權限', from: '', crules: '{}' }])
@@ -911,7 +911,7 @@ const CASES = [
         semantic: async () => {
             const ps = await selectAllRows('pemis')
             assert.ok(hasRow(ps, 'id-xr-p9'), '他人新增之權限仍在(未被草稿整表 diff 刪除)')
-            assert.notEqual(rowOf(ps, 'id-for-權限P1').description, 'A管理員未儲存之權限說明', 'P1 之說明未被被拒之儲存寫入')
+            assert.notEqual(rowOf(ps, 'id-for-權限P1').description, 'A系統管理者未儲存之權限說明', 'P1 之說明未被被拒之儲存寫入')
         },
     },
     {
@@ -924,7 +924,7 @@ const CASES = [
             await gotoTargets(page)
             await waitStoreCount(page, 'targets', 23)
             const k = await rowIndexByCell(page, 'id', T.A)
-            const DRAFT = 'A管理員未儲存之標的說明'
+            const DRAFT = 'A系統管理者未儲存之標的說明'
             await typeIntoCell(page, k, 'description', DRAFT)
             assert.equal(await pageSaveShown(page), true, '前提: 有未存編輯')
             await editTableRows('targets', (rows) => rows.filter((r) => r.id !== 'zz-xr/t1'))
@@ -943,7 +943,7 @@ const CASES = [
         semantic: async () => {
             const ts = await selectAllRows('targets')
             assert.ok(!hasRow(ts, 'zz-xr/t1'), '他人刪除之標的維持已刪(被拒之草稿未使其復活)')
-            assert.notEqual(rowOf(ts, T.A).description, 'A管理員未儲存之標的說明', '首列之說明未被被拒之儲存寫入')
+            assert.notEqual(rowOf(ts, T.A).description, 'A系統管理者未儲存之標的說明', '首列之說明未被被拒之儲存寫入')
         },
     },
     {
@@ -1031,7 +1031,7 @@ const CASES = [
         run: async (page) => {
             await enter(page, 'users', 6)
             const k = await rowIndexByCell(page, 'name', 'mary')
-            const DRAFT = 'A管理員未儲存之說明'
+            const DRAFT = 'A系統管理者未儲存之說明'
             await typeIntoCell(page, k, 'description', DRAFT)
             assert.equal(await pageSaveShown(page), true, '前提: 有未存編輯')
             assert.deepEqual(await syncRows('users', [X_U1, X_U2], F_U), { nAdd: 0, nUpdate: 0, nDel: 0, nSame: 2 }, '原樣重送(內容與夾具逐欄相同): 差異同步全為不變(零寫入, 冪等)')
@@ -1049,7 +1049,7 @@ const CASES = [
         },
         semantic: async () => {
             const us = await selectAllRows('users')
-            assert.equal(rowOf(us, 'id-for-mary').description, 'A管理員未儲存之說明', 'mary 之編輯已存')
+            assert.equal(rowOf(us, 'id-for-mary').description, 'A系統管理者未儲存之說明', 'mary 之編輯已存')
             assert.deepEqual(pickRow(rowOf(us, 'id-xr-u1'), PICK_UX), pickRow(asExt(X_U1, F_U), PICK_UX), 'ext-u1 逐欄不變')
             assert.deepEqual(pickRow(rowOf(us, 'id-xr-u2'), PICK_UX), pickRow(asExt(X_U2, F_U), PICK_UX), 'ext-u2 逐欄不變')
         },
@@ -1108,7 +1108,7 @@ const CASES = [
         run: async (page, lang) => {
             await enter(page, 'users', 4)
             const k = await rowIndexByCell(page, 'name', 'mary')
-            await typeIntoCell(page, k, 'description', 'A管理員未儲存之說明(025)')
+            await typeIntoCell(page, k, 'description', 'A系統管理者未儲存之說明(025)')
             assert.equal(await pageSaveShown(page), true, '前提: 有未存編輯')
             const OTHER = 'mary-by-other-25@example.com'
             await editTableRows('users', (rows) => {
@@ -1190,7 +1190,7 @@ const CASES = [
         run: async (page) => {
             await enter(page, 'users', 4)
             const k = await rowIndexByCell(page, 'name', 'mary')
-            const DRAFT = 'A管理員自己儲存之說明(027)'
+            const DRAFT = 'A系統管理者自己儲存之說明(027)'
             await typeIntoCell(page, k, 'description', DRAFT)
             assert.equal(await pageSaveShown(page), true, '前提: 有未存編輯')
             await holdPushes(page)
@@ -1209,7 +1209,7 @@ const CASES = [
             return null
         },
         semantic: async () => {
-            assert.equal(rowOf(await selectAllRows('users'), 'id-for-mary').description, 'A管理員自己儲存之說明(027)', 'mary 之編輯已存')
+            assert.equal(rowOf(await selectAllRows('users'), 'id-for-mary').description, 'A系統管理者自己儲存之說明(027)', 'mary 之編輯已存')
         },
     },
     {
@@ -1221,7 +1221,7 @@ const CASES = [
         run: async (page) => {
             await enter(page, 'users', 4)
             const k = await rowIndexByCell(page, 'name', 'mary')
-            const DRAFT = 'A管理員自己儲存之說明(028)'
+            const DRAFT = 'A系統管理者自己儲存之說明(028)'
             await typeIntoCell(page, k, 'description', DRAFT)
             assert.equal(await pageSaveShown(page), true, '前提: 有未存編輯')
             await holdSaveResponse(page, 'updateUsers')
@@ -1244,7 +1244,7 @@ const CASES = [
             return null
         },
         semantic: async () => {
-            assert.equal(rowOf(await selectAllRows('users'), 'id-for-mary').description, 'A管理員自己儲存之說明(028)', 'mary 之編輯已存')
+            assert.equal(rowOf(await selectAllRows('users'), 'id-for-mary').description, 'A系統管理者自己儲存之說明(028)', 'mary 之編輯已存')
         },
     },
     {

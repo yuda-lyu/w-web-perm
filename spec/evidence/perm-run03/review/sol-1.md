@@ -38,7 +38,7 @@
 - **後果**：案例只能守住「使用者不存在」，守不到 `verifyClientUser` 拋錯時的 fail-closed 行為；即使把驗證器拋錯的處理改成放行，這個案例仍會通過。
 - **依據**：案例預期鍵是 `cannotGetUserFromPerm`；`getTokenUser` 在 `WWebPerm.mjs:475–480` 已拒收，無法走到第 500 行的 `verifyClientUser`。`srv.mjs:91–92` 的合成秘密拋錯分支因此也沒有執行。
 - **把握度**：`確定`。
-- **建議**：先建立有效的 `id-for-verify-throw` 使用者，再用有效管理員標頭與該本體 token，斷言拒收、零寫入及回應／log 不洩漏秘密。
+- **建議**：先建立有效的 `id-for-verify-throw` 使用者，再用有效系統管理者標頭與該本體 token，斷言拒收、零寫入及回應／log 不洩漏秘密。
 
 ### 已檢視而未發現問題的範圍
 

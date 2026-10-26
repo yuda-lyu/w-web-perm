@@ -5,7 +5,7 @@
 //本檔刻意不含 resetDb(browser, '<表>', …) 字樣: unit-e2e-lifecycle LC-001 以該字樣盤點「用 resetDb 之 e2e 檔」, 新檔改走 readTables／restoreTables 對稱收尾(同 e2e-array-form, R-E2E-ISO-01)。
 //
 //夾具原則(外部列一律經真 /syncAndReplaceTabs 建立, 後台整表寫入 updateXxx 不得新增／改／刪外部列):
-//  ①後台列(from 為 '')以 api-setup 之 editTableRows 經管理者寫入 RPC 建立; ②外部列以 syncRows 經真同步端點建立(以 from 為界全量取代該分區);
+//  ①後台列(from 為 '')以 api-setup 之 editTableRows 經系統管理者寫入 RPC 建立; ②外部列以 syncRows 經真同步端點建立(以 from 為界全量取代該分區);
 //  ③先建後台列、再建外部列(editTableRows 為整表寫入, 外部列尚未存在時不涉及外部列守門); ④收尾以 restoreTables 還原(先 purgeExternalRows 直接刪外部列, 再整表寫回快照)並回驗。
 
 import assert from 'assert'
@@ -146,7 +146,7 @@ export function hasRow(rows, id) {
 }
 
 //檔級收尾對稱: capture() 於 before 擷取三表現況(須為 pristine base seed 且無外部列), restore() 於每案 afterCase 與 after 還原並回驗筆數
-//  (restoreTables: 先以 purgeExternalRows 直接刪外部列夾具, 再經管理者寫入 RPC 整表寫回快照; 見 api-setup.mjs)
+//  (restoreTables: 先以 purgeExternalRows 直接刪外部列夾具, 再經系統管理者寫入 RPC 整表寫回快照; 見 api-setup.mjs)
 export function createIsolation() {
     let snap = null
     return {

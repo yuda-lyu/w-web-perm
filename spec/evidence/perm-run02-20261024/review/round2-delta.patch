@@ -44,8 +44,8 @@ diff -ru -x diff.patch -x diff-stat.txt tmp/perm-run02/review-copy/server/WWebPe
   *     console.log('verifyAppUser/user', user)
   *     // return false //測試無法登入
   *     console.log('於生產環境時得加入限制應用程式使用者身份機制')
-- *     //本套件於此函數通過後另自行要求管理員等級(users表有效之系統管理員，或系統服務用途之應用系統token)，一般使用者即使本函數放行亦被拒(userNotAdmin)，故不必再以isAdmin判斷；僅需放行有效之應用系統，或依from與自家政策再收緊
-+ *     //本套件於此函數通過後另自行要求管理員等級(在users表者須為有效之系統管理員；不在表者只看getUserByToken反查之isAdmin為'y'，不要求isApp與'app:'前綴)，一般使用者即使本函數放行亦被拒(userNotAdmin)，故不必再以isAdmin判斷；僅需放行有效之應用系統，或依from與自家政策再收緊
+- *     //本套件於此函數通過後另自行要求系統管理者等級(users表有效之系統管理者，或系統服務用途之應用系統token)，一般使用者即使本函數放行亦被拒(userNotAdmin)，故不必再以isAdmin判斷；僅需放行有效之應用系統，或依from與自家政策再收緊
++ *     //本套件於此函數通過後另自行要求系統管理者等級(在users表者須為有效之系統管理者；不在表者只看getUserByToken反查之isAdmin為'y'，不要求isApp與'app:'前綴)，一般使用者即使本函數放行亦被拒(userNotAdmin)，故不必再以isAdmin判斷；僅需放行有效之應用系統，或依from與自家政策再收緊
   *     return true
   * }
   *
@@ -65,8 +65,8 @@ diff -ru -x diff.patch -x diff-stat.txt tmp/perm-run02/review-copy/server/WWebPe
      //不符即 reject 固定錯誤鍵 userNotAdmin、零寫入(先於 lockSave／表鎖／任何讀庫), 記 srLog(只記函數名與 userId, 不記 token 與使用者資料); 讀取失敗(ORM 例外)一律視同不符(fail-closed)
      //perm-run01(本輪, R-APP-TOKEN-01, P-2): 系統服務用途之應用系統身分不在 perm users 表, userId 為其外部 id(如 'app:<金鑰主鍵>'): 該 id 在 perm 表中對不到任何列(不論 isActive)
      //  且於最近 SYSTEM_APP_TTL_MS(60 秒)內曾由 getUserIdByToken 以系統服務用途通過完整驗證(kpSystemAppIds)才視為有效; 在表者(含停用)一律以該列為準, 不受登錄影響; 登錄只憑 getUserIdByToken(驗證 token 後)寫入, 前端與外部無法提供.
--    //  kpSystemAppIds 僅作縱深防禦之憑據(每個函數呼叫前 getUserIdByToken 已重新驗證 token 並更新登錄, 金鑰被撤銷後無法再抵達此處); perm 管理員之列被刪除後不因此退化為系統服務用途(其 id 不在登錄中; 外部 id 等於表中某列主鍵者共同驗證階段即視為在表, 見 countPermRows).
-+    //  kpSystemAppIds 僅作縱深防禦之憑據(每個函數呼叫前 getUserIdByToken 已重新驗證 token 並更新登錄, 金鑰被撤銷後無法再抵達此處); perm 管理員之列被刪除後不因此退化為系統服務用途(其 id 不在登錄中; 外部 id 等於表中某列主鍵者共同驗證階段即視為在表, 見 countPermRows;
+-    //  kpSystemAppIds 僅作縱深防禦之憑據(每個函數呼叫前 getUserIdByToken 已重新驗證 token 並更新登錄, 金鑰被撤銷後無法再抵達此處); perm 系統管理者之列被刪除後不因此退化為系統服務用途(其 id 不在登錄中; 外部 id 等於表中某列主鍵者共同驗證階段即視為在表, 見 countPermRows).
++    //  kpSystemAppIds 僅作縱深防禦之憑據(每個函數呼叫前 getUserIdByToken 已重新驗證 token 並更新登錄, 金鑰被撤銷後無法再抵達此處); perm 系統管理者之列被刪除後不因此退化為系統服務用途(其 id 不在登錄中; 外部 id 等於表中某列主鍵者共同驗證階段即視為在表, 見 countPermRows;
 +    //  登錄是跨請求共用的, 故 getUserIdByToken 對以 perm 列通過者會清除該 id 之登錄〔clearSystemAppId; perm-run02 外審 sol F3: 否則同 id 之系統服務用途近期登錄會被「經該列通過驗證、列其後被刪」之請求沿用〕).
      let requireAdmin = async (userId, funcName) => {
          let ok = false
@@ -86,7 +86,7 @@ diff -ru -x diff.patch -x diff-stat.txt tmp/perm-run02/review-copy/server/adminC
 +++ tmp/perm-run02/review-copy2/server/adminCheck.mjs	2026-10-24 21:28:12.677878000 +0800
 @@ -50,7 +50,8 @@
  /**
-  * 外部反查結果是否宣稱為管理員(僅供應用系統路由對「不在 perm users 表」之呼叫者做相容認定; perm-run02①, 原則二.8 改版預設相容)
+  * 外部反查結果是否宣稱為系統管理者(僅供應用系統路由對「不在 perm users 表」之呼叫者做相容認定; perm-run02①, 原則二.8 改版預設相容)
   *
 - * 判準單一擁有者: 只看自有屬性 isAdmin 是否嚴格等於 'y'; 不要求 isApp(舊版 sso 之應用系統身分即 isAdmin='y', 未轉傳 isApp 之既有部署升版後不中斷)、不要求 id 形狀(id 是否可作稽核欄由路由另檢).
 + * 判準單一擁有者: 只看自有屬性 isAdmin 是否嚴格等於 'y'; 不要求 isApp(舊版 sso 之應用系統身分即 isAdmin='y', 未轉傳 isApp 之既有部署升版後不中斷)、不要求 'app:' 前綴, 等級判準本身也不檢查 id 形狀
@@ -98,23 +98,23 @@ diff -ru -x diff.patch -x diff-stat.txt tmp/perm-run02/review-copy/sgud/rule/rul
 --- tmp/perm-run02/review-copy/sgud/rule/rulebook_security.md	2026-10-24 21:00:03.943633900 +0800
 +++ tmp/perm-run02/review-copy2/sgud/rule/rulebook_security.md	2026-10-24 21:28:13.170112100 +0800
 @@ -77,21 +77,47 @@
- 軸: 入口 24(靜態檔 1、hapi 路由 4、通訊路由 5、資料通道函數 14〔表 `select` ×4、`getWebInfor`、`update*` ×4、`getStaEvent`／`getStaEventTable`、系統函數 ×3〕; 資料通道另分標頭／本體兩個身分來源) × 呼叫者 6(N 無 token、U 一般使用者、A 管理員、AUA 使用者用途綁管理員、AUM 使用者用途綁一般使用者、AS 系統服務用途)＋相容 4(NF `isApp` 未轉傳、ASN AS 形狀但 isAdmin n、AUD 使用者用途綁停用者、APP 虛擬應用系統〔轉傳 isApp〕). 目標格見 `w-web存取管控表.md` 第二節; 驗收: `test/api-callerMatrix.test.mjs`.
+ 軸: 入口 24(靜態檔 1、hapi 路由 4、通訊路由 5、資料通道函數 14〔表 `select` ×4、`getWebInfor`、`update*` ×4、`getStaEvent`／`getStaEventTable`、系統函數 ×3〕; 資料通道另分標頭／本體兩個身分來源) × 呼叫者 6(N 無 token、U 一般使用者、A 系統管理者、AUA 使用者用途綁系統管理者、AUM 使用者用途綁一般使用者、AS 系統服務用途)＋相容 4(NF `isApp` 未轉傳、ASN AS 形狀但 isAdmin n、AUD 使用者用途綁停用者、APP 虛擬應用系統〔轉傳 isApp〕). 目標格見 `w-web存取管控表.md` 第二節; 驗收: `test/api-callerMatrix.test.mjs`.
  
  - **R-APP-TOKEN-01 規則**:
--  1. **系統服務用途之判準(單一擁有者 `server/adminCheck.mjs:isSystemAppUser`)**: 外部反查結果有非空字串 `id`、`isApp==='y'`、`isAdmin==='y'`(自有屬性、嚴格相等; `email`／`name` 可空), **且**在 perm users 表中對不到任何列——`server/keyCheck.mjs:countLoginRows`(對應規則同 `findLoginUsers`, **不篩 isActive**)為 0. 兩條件缺一即走既有 client 路徑. 不篩 isActive 的理由: 使用者用途綁定之使用者在 perm 被停用時, `findLoginUsers` 視同「查無」(count 0); 若以它判斷「不在表」, 停用之管理員的使用者用途 token 會落入系統服務用途而取得管理員服務(`api-callerMatrix` MX-P2 守護). 外部 `getUserByToken` 一次請求只呼叫一次(`getExtUser`), 結果共用(`getTokenUser(token, userExt)`).
-+  1. **系統服務用途之判準(單一擁有者 `server/adminCheck.mjs:isSystemAppUser`)**: 外部反查結果的 `id` 為**以 `app:` 開頭之字串**(perm-run02②更正: 原只要非空字串; 常數 `SYSTEM_APP_ID_PREFIX`, 區分大小寫、不 trim、`startsWith`)、`isApp==='y'`、`isAdmin==='y'`(自有屬性、嚴格相等; `email`／`name` 可空), **且**在 perm users 表中對不到任何列——`server/keyCheck.mjs:countLoginRows`(對應規則同 `findLoginUsers`, **不篩 isActive**)為 0. 兩條件缺一即走既有 client 路徑. 不篩 isActive 的理由: 使用者用途綁定之使用者在 perm 被停用時, `findLoginUsers` 視同「查無」(count 0); 若以它判斷「不在表」, 停用之管理員的使用者用途 token 會落入系統服務用途而取得管理員服務(`api-callerMatrix` MX-P2 守護). 外部 `getUserByToken` 一次請求只呼叫一次(`getExtUser`), 結果共用(`getTokenUser(token, userExt)`).
+-  1. **系統服務用途之判準(單一擁有者 `server/adminCheck.mjs:isSystemAppUser`)**: 外部反查結果有非空字串 `id`、`isApp==='y'`、`isAdmin==='y'`(自有屬性、嚴格相等; `email`／`name` 可空), **且**在 perm users 表中對不到任何列——`server/keyCheck.mjs:countLoginRows`(對應規則同 `findLoginUsers`, **不篩 isActive**)為 0. 兩條件缺一即走既有 client 路徑. 不篩 isActive 的理由: 使用者用途綁定之使用者在 perm 被停用時, `findLoginUsers` 視同「查無」(count 0); 若以它判斷「不在表」, 停用之系統管理者的使用者用途 token 會落入系統服務用途而取得系統管理者服務(`api-callerMatrix` MX-P2 守護). 外部 `getUserByToken` 一次請求只呼叫一次(`getExtUser`), 結果共用(`getTokenUser(token, userExt)`).
++  1. **系統服務用途之判準(單一擁有者 `server/adminCheck.mjs:isSystemAppUser`)**: 外部反查結果的 `id` 為**以 `app:` 開頭之字串**(perm-run02②更正: 原只要非空字串; 常數 `SYSTEM_APP_ID_PREFIX`, 區分大小寫、不 trim、`startsWith`)、`isApp==='y'`、`isAdmin==='y'`(自有屬性、嚴格相等; `email`／`name` 可空), **且**在 perm users 表中對不到任何列——`server/keyCheck.mjs:countLoginRows`(對應規則同 `findLoginUsers`, **不篩 isActive**)為 0. 兩條件缺一即走既有 client 路徑. 不篩 isActive 的理由: 使用者用途綁定之使用者在 perm 被停用時, `findLoginUsers` 視同「查無」(count 0); 若以它判斷「不在表」, 停用之系統管理者的使用者用途 token 會落入系統服務用途而取得系統管理者服務(`api-callerMatrix` MX-P2 守護). 外部 `getUserByToken` 一次請求只呼叫一次(`getExtUser`), 結果共用(`getTokenUser(token, userExt)`).
    1a. **「在表」之定義再補(外審 sol F03／F04)**: `countPermRows`＝對應鍵對得到(`countLoginRows`)**或**外部 id 等於表中某列主鍵(`getGenUserByKV('id', id, false)`, 不論 isActive). 後者使『共同驗證階段』與『`requireAdmin` 以 id 查列』的「在表」一致, 免同一服務身分在登入／連線閘判成 AS 而在寫入函數判成某使用者列(對應鍵為 email／name 而服務身分缺 email／name 時分歧). 外部反查結果於 `getExtUser` 取淺層快照, 部署方保留引用並於非同步等待期間改寫不影響判定(F05).
    1b. **應用路由之執行身分(F02)**: `getAndVerifyAppUser` 對在表者回傳之 `id` 為 **perm 列主鍵**(`{ ...user, id: userPerm.id }`), 與資料通道 `getUserIdByToken` 一致; 不在表者(系統服務用途)為其外部 id. 修前回外部 id, mappingBy 為 email／name 或外部列(srcKey 對應)時稽核欄與資料通道不一致. 行為變更見 README Upgrade Notes 第 1 項.
-   2. **使用者用途不特別處理**: 在 perm 表者(含 AU)一律以 perm 列判定(`getAndVerifyClientUser`), 與其使用者 token 相同; 綁管理員得管理員服務、綁一般使用者只能 `/api/getPerm`(所綁使用者之樹)、綁停用或不存在者得 client 路徑之既有拒絕鍵.
-   3. **P-2 系統服務用途可用管理員之後端服務**: `getAndVerifyAdminUser` 對系統服務用途改經 `verifySystemApp`(部署方 `verifyAppUser(user, from)`, 只收淺層副本; 身分物件 `{id,name,email,isAdmin:'y',isApp:'y'}` 於交給部署方之前建立, 通過後登錄 `kpSystemAppUser`); 涵蓋後台登入檢查、資料通道連線閘＋執行身分(含四表 `select`、四個 `update*`、唯讀函數、系統函數、上傳下載)、四個寫入函數之 `requireAdmin`. 不可用 `/api/getPerm`(無「本人」樹). 稽核欄 `userId`／`userIdUpdate` 記其 `id`(`app:…`). `requireAdmin`(只拿 userId): 在表者(不論 isActive)以該列為準, 不在表者須為 `getUserIdByToken` **近期**(`SYSTEM_APP_TTL_MS`＝60 秒內, 每次函數呼叫前皆重新登錄)登錄之系統服務用途 id(`kpSystemAppIds` Map id→時間; 登錄點唯一〔`markSystemAppId`〕; 不以 `app:` 前綴判斷, 免 perm 管理員之列被刪後退化為系統服務用途; 外審 sol F06: 永久登錄會使『後來才建立之同 id 使用者列於連線後被刪』之競態被誤放行).
--  4. **P-1 應用系統路由管理員等級**: `getAndVerifyAppUser`: 在 perm 表(`countPermRows>0`)→ `getTokenUser`(欄位齊備、對應鍵唯一、列有效)並要求 `isAdminRow`; 不在表 → `isSystemAppUser`; 次序: 部署方 `verifyAppUser`(`userNoPermission`)先於等級不足(`userNotAdmin`, srLog 只記 from); 等級於交給部署方之前判定, 回傳為交給部署方之前取得者. 拒: 一般使用者、AU 綁一般使用者、AU 綁停用者、`isApp` 未轉傳之虛擬帳號、AS 形狀但 isAdmin n.
-+  4. **P-1 應用系統路由管理員等級**: `getAndVerifyAppUser`: 在 perm 表(`countPermRows>0`)→ `getTokenUser`(欄位齊備、對應鍵唯一、列有效)並要求 `isAdminRow`; 不在表 → `isExtAdminUser`(**perm-run02①更正**: 原 `isSystemAppUser`; 改為只看反查 `isAdmin==='y'`, 不要求 `isApp`、不要求 `app:` 前綴, 相容: 舊版 sso 之應用系統身分即 `isAdmin='y'`, 未轉傳 `isApp` 之既有部署升版不中斷); 次序: 部署方 `verifyAppUser`(`userNoPermission`)先於等級不足(`userNotAdmin`, srLog 只記 from); 等級於交給部署方之前判定, 回傳為交給部署方之前取得者. 拒: 在表一般使用者、AU 綁一般使用者、AU 綁停用者(由列拒, `cannotGetUserFromPerm`)、不在表且 `isAdmin` 非 `'y'`(含 AS 形狀但 isAdmin n). 放行(新): 不在表而 `isAdmin='y'` 者(含 `isApp` 未轉傳之虛擬帳號、AU 綁不在表之 sso 管理員).
+   2. **使用者用途不特別處理**: 在 perm 表者(含 AU)一律以 perm 列判定(`getAndVerifyClientUser`), 與其使用者 token 相同; 綁系統管理者得系統管理者服務、綁一般使用者只能 `/api/getPerm`(所綁使用者之樹)、綁停用或不存在者得 client 路徑之既有拒絕鍵.
+   3. **P-2 系統服務用途可用系統管理者之後端服務**: `getAndVerifyAdminUser` 對系統服務用途改經 `verifySystemApp`(部署方 `verifyAppUser(user, from)`, 只收淺層副本; 身分物件 `{id,name,email,isAdmin:'y',isApp:'y'}` 於交給部署方之前建立, 通過後登錄 `kpSystemAppUser`); 涵蓋後台登入檢查、資料通道連線閘＋執行身分(含四表 `select`、四個 `update*`、唯讀函數、系統函數、上傳下載)、四個寫入函數之 `requireAdmin`. 不可用 `/api/getPerm`(無「本人」樹). 稽核欄 `userId`／`userIdUpdate` 記其 `id`(`app:…`). `requireAdmin`(只拿 userId): 在表者(不論 isActive)以該列為準, 不在表者須為 `getUserIdByToken` **近期**(`SYSTEM_APP_TTL_MS`＝60 秒內, 每次函數呼叫前皆重新登錄)登錄之系統服務用途 id(`kpSystemAppIds` Map id→時間; 登錄點唯一〔`markSystemAppId`〕; 不以 `app:` 前綴判斷, 免 perm 系統管理者之列被刪後退化為系統服務用途; 外審 sol F06: 永久登錄會使『後來才建立之同 id 使用者列於連線後被刪』之競態被誤放行).
+-  4. **P-1 應用系統路由系統管理者等級**: `getAndVerifyAppUser`: 在 perm 表(`countPermRows>0`)→ `getTokenUser`(欄位齊備、對應鍵唯一、列有效)並要求 `isAdminRow`; 不在表 → `isSystemAppUser`; 次序: 部署方 `verifyAppUser`(`userNoPermission`)先於等級不足(`userNotAdmin`, srLog 只記 from); 等級於交給部署方之前判定, 回傳為交給部署方之前取得者. 拒: 一般使用者、AU 綁一般使用者、AU 綁停用者、`isApp` 未轉傳之虛擬帳號、AS 形狀但 isAdmin n.
++  4. **P-1 應用系統路由系統管理者等級**: `getAndVerifyAppUser`: 在 perm 表(`countPermRows>0`)→ `getTokenUser`(欄位齊備、對應鍵唯一、列有效)並要求 `isAdminRow`; 不在表 → `isExtAdminUser`(**perm-run02①更正**: 原 `isSystemAppUser`; 改為只看反查 `isAdmin==='y'`, 不要求 `isApp`、不要求 `app:` 前綴, 相容: 舊版 sso 之應用系統身分即 `isAdmin='y'`, 未轉傳 `isApp` 之既有部署升版不中斷); 次序: 部署方 `verifyAppUser`(`userNoPermission`)先於等級不足(`userNotAdmin`, srLog 只記 from); 等級於交給部署方之前判定, 回傳為交給部署方之前取得者. 拒: 在表一般使用者、AU 綁一般使用者、AU 綁停用者(由列拒, `cannotGetUserFromPerm`)、不在表且 `isAdmin` 非 `'y'`(含 AS 形狀但 isAdmin n). 放行(新): 不在表而 `isAdmin='y'` 者(含 `isApp` 未轉傳之虛擬帳號、AU 綁不在表之 sso 系統管理者).
    5. **P-5 先驗身分再驗參數**: `/syncAndReplaceTabs` 順序: token → `getAndVerifyAppUser` → `user.id` → `keyTable` → 白名單 → `parsePayload`; 未驗證者之回應與 srLog 皆與 `keyTable` 無關(`api-callerMatrix` MX-Q1; srLog 以未知表名為記號掃描).
-   6. **P-7 範例與文件**: `srv.mjs` 之 `verifyClientUser`／`verifyAppUser` 不以 `isAdmin` 判斷(`unit-appToken` AT-S7); JSDoc／README 寫明部署方否決(非角色因素)＝`userNoPermission`＋「拒絕登入」＋轉址, 非管理員一律由套件拒絕並顯示「無權進入權限後台」(E2E-007 含 peter 變體、E2E-008). 不改畫面與標準圖.
+   6. **P-7 範例與文件**: `srv.mjs` 之 `verifyClientUser`／`verifyAppUser` 不以 `isAdmin` 判斷(`unit-appToken` AT-S7); JSDoc／README 寫明部署方否決(非角色因素)＝`userNoPermission`＋「拒絕登入」＋轉址, 非系統管理者一律由套件拒絕並顯示「無權進入權限後台」(E2E-007 含 peter 變體、E2E-008). 不改畫面與標準圖.
  - **R-BEARER-01 規則(P-3)**: 連線閘 `verifyConn` 以 `reBearerAuth = /^Bearer (\S+)$/i` 取 token(方案名不分大小寫、其後恰一個空白、憑證非空白字元序列、整段吻合); 其餘(`Basic`、`Token`、無方案、兩個空白、Tab、缺憑證、無標頭)視同無 token(`permission denied`, srLog `verifyConn-error` `tokenNoPermission`). 不得以固定長度截斷 `Authorization`(修前 `strdelleft(authorization, 7)` 使 `Basic <token>` 通過). 測試: `api-callerMatrix` MX-B1／B2、`unit-appToken` AT-S3.
  - **R-ROUTE-MSG-01 規則(外審 sol#5)**: 四條 hapi 路由失敗結果經 `server/routeResult.mjs:createRouteResult`: 拒絕值(Error 取 message)為已知語系鍵(`toOutKey`)原樣, 其餘一律 `anUnexpectedErrorOccurred`, 原文只入 srLog(`api/<route>-error`, `raw` 前 500 字). 不得再有 `r.msg = r.msg.message`. 測試: `unit-routeResult` RR-001～005、`unit-appToken` AT-S6、`api-callerMatrix` 各格「失敗 msg 皆為語系鍵」.
  - **站點全集與盤點指令**(2026-10-24 第三輪): `grep -nE "getAndVerifyAdminUser\(" server/WWebPerm.mjs` 3 處呼叫(`checkToken`、`getUserIdByToken`、`/api/getUserByToken`); `getAndVerifyClientUser\(` 2 處(`getAndVerifyAdminUser` 轉呼叫、`/api/getPerm`); `getAndVerifyAppUser\(` 2 處(`/api/getPermUserInfor`、`/syncAndReplaceTabs`); `isAdminRow\(` 於 WWebPerm 3 處(`getAndVerifyClientUser`、`getAndVerifyAppUser`、`requireAdmin`); `isSystemAppUser\(` 於 WWebPerm 2 處(`getAndVerifyAdminUser`、`getAndVerifyAppUser`); `countPermRows\(` 2 處; `getUserByToken\(token\)` 於 WWebPerm 僅 `getExtUser` 1 處; `isApp` 之比對只在 `adminCheck.mjs`(`unit-appToken` AT-S8). 站點守護: `unit-adminOnlySite` AOS-S1～S7、`unit-appToken` AT-S1～S8.
--- **已知限制(待裁示)**: 使用者用途綁定之使用者**不在 perm users 表**且上游 `isAdmin='y'`, 與系統服務用途無從區分(皆 `isApp='y'`、`isAdmin='y'`、不在表), 該 token 取得管理員服務而該使用者的使用者 token 被拒; 權限不超過鑄造者本可鑄造之系統服務用途 token(原則二之一 5b). 可選收緊: `isSystemAppUser` 再要求 `id` 以 `app:` 開頭(單處修改). 另: `[sys:polling]` 本體 `__sysToken__` 之身分檢查屬框架(w-serv-webdata ≥1.1.16 `verifyPolling`, 排程第 128 項), `api-callerMatrix` 該入口只測標頭來源.
+-- **已知限制(待裁示)**: 使用者用途綁定之使用者**不在 perm users 表**且上游 `isAdmin='y'`, 與系統服務用途無從區分(皆 `isApp='y'`、`isAdmin='y'`、不在表), 該 token 取得系統管理者服務而該使用者的使用者 token 被拒; 權限不超過鑄造者本可鑄造之系統服務用途 token(原則二之一 5b). 可選收緊: `isSystemAppUser` 再要求 `id` 以 `app:` 開頭(單處修改). 另: `[sys:polling]` 本體 `__sysToken__` 之身分檢查屬框架(w-serv-webdata ≥1.1.16 `verifyPolling`, 排程第 128 項), `api-callerMatrix` 該入口只測標頭來源.
 -- **相容性**: 不在 perm 表且 `getUserByToken` 未轉傳 `isApp` 之虛擬應用系統, 在應用系統路由升版後被拒(`userNotAdmin`), 為 P-1 明文目標; README Upgrade Notes 第 1 項. 資料通道與後台登入對此類身分維持拒絕(行為同修正前).
 +- **已結案(perm-run02②, 主控裁示)**: 原『使用者用途綁定之使用者不在 perm users 表且上游 `isAdmin='y'`, 與系統服務用途無從區分』已由 `isSystemAppUser` 要求 `id` 以 `app:` 開頭收緊解決——該 token 於後台與資料通道被拒, 與該使用者的自身使用者 token 一致(`api-callerMatrix` MX-R3／R4); 應用系統路由仍放行(相容, 同其自身使用者 token). **已知限制**: `[sys:polling]` 本體 `__sysToken__` 之身分檢查屬框架(w-serv-webdata ≥1.1.16 `verifyPolling`, 排程第 128 項), `api-callerMatrix` 該入口只測標頭來源.
 +- **相容性**(perm-run02①更正): ~~不在 perm 表且 `getUserByToken` 未轉傳 `isApp` 之虛擬應用系統, 在應用系統路由升版後被拒~~——改為**放行**(只看 `isAdmin==='y'`; 原則二.8 改版預設相容, 主控裁示); 僅 `isAdmin` 非 `'y'` 之應用系統身分被拒(窄破壞性); README Upgrade Notes 第 1 項. 資料通道與後台登入對此類身分維持拒絕(行為同修正前: 系統服務用途須 `isApp` y＋`isAdmin` y＋`app:` 前綴).
@@ -122,29 +122,29 @@ diff -ru -x diff.patch -x diff-stat.txt tmp/perm-run02/review-copy/sgud/rule/rul
  
 +### R-APP-TOKEN-01 補述(2026-10-24 perm-run02, 修正輪單輪; 主控裁示①②; ADR-040 Update(perm-run02))
 +
-+來源: 主控任務 20261024182735 perm-run02(新 session). 依據: `使用者身分驗證原則.md` 二.8(改版預設相容)、二之一(使用者用途＝所綁使用者自己之 token 能用者; 系統服務用途能用管理員之服務); sso 之系統服務用途反查 `id` 恆為 `app:<金鑰主鍵>`, sso 拒收以 `app:` 開頭之使用者主鍵(保留前綴).
++來源: 主控任務 20261024182735 perm-run02(新 session). 依據: `使用者身分驗證原則.md` 二.8(改版預設相容)、二之一(使用者用途＝所綁使用者自己之 token 能用者; 系統服務用途能用系統管理者之服務); sso 之系統服務用途反查 `id` 恆為 `app:<金鑰主鍵>`, sso 拒收以 `app:` 開頭之使用者主鍵(保留前綴).
 +
 +- **規則 7(兩套等級判準, 各為單一擁有者, 都在 `server/adminCheck.mjs`)**:
-+  - `isSystemAppUser`(**嚴格**, 用於後台登入檢查〔`/api/getUserByToken`〕、資料通道〔連線閘＋執行身分〕、`requireAdmin`): 不在 perm users 表(`countPermRows`＝0)＋反查 `isApp==='y'`＋`isAdmin==='y'`＋`id` 以 `app:` 開頭(`SYSTEM_APP_ID_PREFIX`; 區分大小寫、不 trim、`startsWith`; 前綴後不另要求非空). 使用者用途綁定「不在表之 sso 管理員」(id 為該使用者主鍵、不以 `app:` 開頭)**不是**系統服務用途, 於上述入口被拒, 與其自身使用者 token 逐字相同的回應(`api-callerMatrix` MX-R3／R4).
++  - `isSystemAppUser`(**嚴格**, 用於後台登入檢查〔`/api/getUserByToken`〕、資料通道〔連線閘＋執行身分〕、`requireAdmin`): 不在 perm users 表(`countPermRows`＝0)＋反查 `isApp==='y'`＋`isAdmin==='y'`＋`id` 以 `app:` 開頭(`SYSTEM_APP_ID_PREFIX`; 區分大小寫、不 trim、`startsWith`; 前綴後不另要求非空). 使用者用途綁定「不在表之 sso 系統管理者」(id 為該使用者主鍵、不以 `app:` 開頭)**不是**系統服務用途, 於上述入口被拒, 與其自身使用者 token 逐字相同的回應(`api-callerMatrix` MX-R3／R4).
 +  - `isExtAdminUser`(**相容**, 只用於應用系統路由 `/api/getPermUserInfor`、`/syncAndReplaceTabs` 且呼叫者**不在表**時): 自有屬性 `isAdmin` 嚴格等於 `'y'`; 不要求 `isApp`、不要求 `app:` 前綴、不看 id 形狀(`/syncAndReplaceTabs` 另要求非空字串 id 才可作稽核欄). 在表者仍以 perm 列(`isAdminRow`; 反查之 `isAdmin` 不採信, `api-callerMatrix` MX-R2). 部署方 `verifyAppUser` 照舊, 拒絕鍵次序不變.
 +  - 兩函數以外不得自行比對 `isApp`／`'app:'`／外部 `isAdmin`(`unit-appToken` AT-S8／S9; 應用系統路由主體不得出現 `isApp` 與 `isSystemAppUser`, AT-S2).
-+- **規則 8(存取表對照, 本 repo 版; `dspec/w-web存取管控表.md` 第二節由主控維護)**: 欄 = 入口; 後端管理員服務 = 後台登入檢查＋資料通道(含四個寫入函數); 應用系統路由 = `/api/getPermUserInfor`、`/syncAndReplaceTabs`.
++- **規則 8(存取表對照, 本 repo 版; `dspec/w-web存取管控表.md` 第二節由主控維護)**: 欄 = 入口; 後端系統管理者服務 = 後台登入檢查＋資料通道(含四個寫入函數); 應用系統路由 = `/api/getPermUserInfor`、`/syncAndReplaceTabs`.
 +
-+  | 呼叫者(測試代號) | 後端管理員服務 | `/api/getPerm`(本人樹) | 應用系統路由 | 備註 |
++  | 呼叫者(測試代號) | 後端系統管理者服務 | `/api/getPerm`(本人樹) | 應用系統路由 | 備註 |
 +  |---|---|---|---|---|
 +  | 無 token(N) | 拒 | 拒 | 拒 | 固定語系鍵 |
 +  | 在表一般使用者(U、AUM 綁一般使用者) | 拒 `userNotAdmin`／連線閘 permission denied | 通過(U 本人; AUM＝所綁使用者之樹) | 拒 `userNotAdmin` | |
-+  | 在表管理員(A、AUA 綁管理員) | 通過 | 通過 | 通過 | AU＝所綁使用者 |
++  | 在表系統管理者(A、AUA 綁系統管理者) | 通過 | 通過 | 通過 | AU＝所綁使用者 |
 +  | 系統服務用途(AS: 不在表、isApp y、isAdmin y、`app:` 前綴) | 通過(稽核欄記其 id) | 拒(無本人) | 通過 | 經 `verifyAppUser` |
-+  | 使用者用途綁不在表之 sso 管理員(AUX: isApp y、isAdmin y、id 非 `app:`) | 拒 `cannotGetUserFromPerm` | 拒 | **通過**(①) | ≡ 其自身使用者 token(NFV) |
++  | 使用者用途綁不在表之 sso 系統管理者(AUX: isApp y、isAdmin y、id 非 `app:`) | 拒 `cannotGetUserFromPerm` | 拒 | **通過**(①) | ≡ 其自身使用者 token(NFV) |
 +  | 虛擬應用系統 id 非 `app:`(APP: isApp y、isAdmin y) | 拒 | 拒 | **通過**(①) | 範例 `{token-for-application}` |
 +  | isApp 未轉傳、isAdmin y、不在表(NF: `app:` id; NFV: 非 `app:`) | 拒 | 拒 | **通過**(①相容) | 舊版 sso 之應用系統身分 |
 +  | 不在表且 isAdmin n(NFN、ASN) | 拒 | 拒 | 拒 `userNotAdmin` | |
 +  | 綁停用之使用者(AUD) | 拒 | 拒 | 拒 `cannotGetUserFromPerm` | 在表以列為準 |
 +
 +- **站點全集與盤點指令**: `rg -n "isSystemAppUser\(" server` → 定義(`adminCheck.mjs`)＋`WWebPerm.mjs:getAndVerifyAdminUser` 1 處; `rg -n "isExtAdminUser\(" server` → 定義＋`WWebPerm.mjs:getAndVerifyAppUser` 1 處; `rg -n "['\"\`]app:" server --glob '*.mjs'`(排除註解)只在 `adminCheck.mjs`(`unit-appToken` AT-S9 守護).
-+- **測試**: `api-callerMatrix`(44 案; 呼叫者 6＋相容 7 × 入口 24, `lvl` 拆為 `svc`〔後端管理員服務〕／`app`〔應用系統路由〕; MX-R1～R4 為本輪專屬; 計數器 804 格)、`unit-appToken`(20 案; AT-001b 輸入空間 22×13×13、AT-003 `isExtAdminUser`、AT-S9). 新測試權杖(`srv.mjs`、`test/tools/api-setup.mjs`): `{token-for-noflag-n}`、`{token-for-sso-admin}`、`{token-for-app-bind-sso}`. 修前紅 30 敗／14 過、變異 16／16 被抓到: `spec/evidence/perm-run02-20261024/`.
-+- **相容性結論**: 窄破壞性——僅『反查 `isAdmin` 非 `'y'` 之應用系統身分』於應用系統路由被拒(舊版 sso 之應用系統身分 isAdmin 恆 `'y'`, 預期不受影響); 後台登入與資料通道在已發布之 1.1.15 本就拒絕一切不在表者(perm-run01 才新增系統服務用途, 尚未發布), 故收緊 `app:` 前綴不使任何已發布版本可用之身分失去可用性; 相對 perm-run01 檢查點(`daddd01`)則是收緊: 原放行之『id 非 `app:` 開頭之不在表身分』現於後端管理員服務被拒.
++- **測試**: `api-callerMatrix`(44 案; 呼叫者 6＋相容 7 × 入口 24, `lvl` 拆為 `svc`〔後端系統管理者服務〕／`app`〔應用系統路由〕; MX-R1～R4 為本輪專屬; 計數器 804 格)、`unit-appToken`(20 案; AT-001b 輸入空間 22×13×13、AT-003 `isExtAdminUser`、AT-S9). 新測試權杖(`srv.mjs`、`test/tools/api-setup.mjs`): `{token-for-noflag-n}`、`{token-for-sso-admin}`、`{token-for-app-bind-sso}`. 修前紅 30 敗／14 過、變異 16／16 被抓到: `spec/evidence/perm-run02-20261024/`.
++- **相容性結論**: 窄破壞性——僅『反查 `isAdmin` 非 `'y'` 之應用系統身分』於應用系統路由被拒(舊版 sso 之應用系統身分 isAdmin 恆 `'y'`, 預期不受影響); 後台登入與資料通道在已發布之 1.1.15 本就拒絕一切不在表者(perm-run01 才新增系統服務用途, 尚未發布), 故收緊 `app:` 前綴不使任何已發布版本可用之身分失去可用性; 相對 perm-run01 檢查點(`daddd01`)則是收緊: 原放行之『id 非 `app:` 開頭之不在表身分』現於後端系統管理者服務被拒.
 +
  ## 迭代使用端傳入之物件(2026-10-20, R-OBJ-ITER-01; 對應 wsemi `sgud/rule/rulebook.md` 同名規則; 來源: 主控第 85 項建議書 `建議w-web-perm修正.md`)
  
@@ -156,8 +156,8 @@ diff -ru -x diff.patch -x diff-stat.txt "tmp/perm-run02/review-copy/spec/�\201�
  
  `provideTabs(url, keyTable, from, rows)`（`server/provideTabs.mjs:provideTabs`）為外部應用端的呼叫輔助函式：依 `keyTable` 取對應欄位白名單 `ks_*`（`server/provideTabs.mjs:ks_targets` / `ks_pemis` / `ks_grups` / `ks_users`；perm-run03 起白名單以 `srcKey` 取代 `id`，**不送出 `id`**，列內即使夾帶 `id` 也被挑欄剝除，見 E2E-037），以 `ltdtpick` 僅保留白名單欄位（`server/provideTabs.mjs:provideTabs`），組成 `{ from, rows }` payload，再以內建 fetch（`src/fetchJson.mjs`）POST 至 `url`（範例 `http://localhost:11006/syncAndReplaceTabs?keyTable={keyTable}&token={token}`，`server/provideTabs.mjs:provideTabs`）。`keyTable` 與 `token` 由 query 帶入，`from` / `rows` 由 JSON body 帶入。連線失敗 / 非 2xx / 非 JSON 時 reject `{ kind, status, message }`，`message` 只含例外名稱與代碼（不含網址，網址內有 token；2026-09-25 起，見 ADR-023）。
  
--伺服器端點僅以 query `token` 經 `getAndVerifyAppUser`（`server/WWebPerm.mjs:getAndVerifyAppUser`）守門，且**先驗身分再驗參數**（2026-10-24 perm-run01 本輪 P-5：身分驗證通過後才讀 `keyTable`、白名單與 payload；未通過驗證者之回應與 srLog 皆與 `keyTable` 無關，不得由參數錯誤鍵之差異探測表名）：以 `getUserByToken` 由 token 取出使用者，**套件自行要求管理員等級**（P-1、R-APP-TOKEN-01：呼叫者在 perm `users` 表者以該列為準，須有效且 `isAdmin='y'`〔含綁定該使用者之使用者用途應用系統 token〕；不在表者只看 `getUserByToken` 反查結果之 `isAdmin='y'`〔2026-10-24 perm-run02①相容認定：不要求 `isApp`、不要求 id 形狀（`adminCheck.mjs:isExtAdminUser`）；舊版 sso 之應用系統身分即 `isAdmin='y'`，未轉傳 `isApp` 之既有部署升版後不中斷；使用者用途綁定「不在表之 sso 管理員」者亦放行，與其自身使用者 token 一致〕；在表之一般使用者、綁一般使用者之應用系統 token、不在表且 `isAdmin` 非 `'y'` 者皆拒，`msg` 為 `userNotAdmin`），再以部署方提供的 `verifyAppUser(user, from)` 判定（只能再收緊；否決 `userNoPermission` 先於等級不足 `userNotAdmin`）；任一步失敗即 reject、回傳 `state='error'`。部署方傳入之 `getUserByToken` / `verifyAppUser` 拋錯或 reject 分別視同取不到使用者 / 未通過（W 契約，ADR-023），`msg` 為自家 key（`cannotFindUserFromToken` / `userNoPermission`），上游錯誤原文不回應、不入 log；路由失敗之 `msg` 一律為已知語系鍵，其餘原文（ORM／I/O 錯誤）改回 `anUnexpectedErrorOccurred` 並只入 srLog（R-ROUTE-MSG-01）。稽核欄 `userId` 記呼叫者 id（在表者記 perm 列主鍵；不在表者記外部 id，如系統服務用途 `app:<金鑰主鍵>`，`api-callerMatrix` MX-H5、MX-R1）。〔2026-10-24 perm-run02 更正：本段「不在表者須為系統服務用途〔`isApp='y'` 且 `isAdmin='y'`〕」之 perm-run01 版本不成立——應用系統路由對不在表者只看 `isAdmin='y'`，系統服務用途之嚴格認定（`isApp='y'`、`isAdmin='y'`、id 以 `app:` 開頭）只用於後台登入檢查、資料通道與 `requireAdmin`。〕〔原載「僅以 token 取出使用者再以 `verifyAppUser` 判定是否為合法 app 使用者」於 2026-10-24 不成立（套件未要求管理員等級；先驗 `keyTable` 再驗身分）。〕
-+伺服器端點僅以 query `token` 經 `getAndVerifyAppUser`（`server/WWebPerm.mjs:getAndVerifyAppUser`）守門，且**先驗身分再驗參數**（2026-10-24 perm-run01 本輪 P-5：身分驗證通過後才讀 `keyTable`、白名單與 payload；未通過驗證者之回應與 srLog 皆與 `keyTable` 無關，不得由參數錯誤鍵之差異探測表名）：以 `getUserByToken` 由 token 取出使用者，**套件自行要求管理員等級**（P-1、R-APP-TOKEN-01：呼叫者在 perm `users` 表者以該列為準，須有效且 `isAdmin='y'`〔含綁定該使用者之使用者用途應用系統 token〕；不在表者只看 `getUserByToken` 反查結果之 `isAdmin='y'`〔2026-10-24 perm-run02①相容認定：不要求 `isApp`、不要求 `app:` 前綴，等級判準本身不檢查 id 形狀（`adminCheck.mjs:isExtAdminUser`；本端點另要求呼叫者 id 為非空字串才可作稽核欄，缺者回 `tokenNoPermission`、零寫入；`/api/getPermUserInfor` 不使用呼叫者 id，維持 1.1.15 行為）；舊版 sso 之應用系統身分即 `isAdmin='y'`，未轉傳 `isApp` 之既有部署升版後不中斷；使用者用途綁定「不在表之 sso 管理員」者亦放行，與其自身使用者 token 一致〕；在表之一般使用者、綁一般使用者之應用系統 token、不在表且 `isAdmin` 非 `'y'` 者皆拒，`msg` 為 `userNotAdmin`），再以部署方提供的 `verifyAppUser(user, from)` 判定（只能再收緊；否決 `userNoPermission` 先於等級不足 `userNotAdmin`）；任一步失敗即 reject、回傳 `state='error'`。部署方傳入之 `getUserByToken` / `verifyAppUser` 拋錯或 reject 分別視同取不到使用者 / 未通過（W 契約，ADR-023），`msg` 為自家 key（`cannotFindUserFromToken` / `userNoPermission`），上游錯誤原文不回應、不入 log；路由失敗之 `msg` 一律為已知語系鍵，其餘原文（ORM／I/O 錯誤）改回 `anUnexpectedErrorOccurred` 並只入 srLog（R-ROUTE-MSG-01）。稽核欄 `userId` 記呼叫者 id（在表者記 perm 列主鍵；不在表者記外部 id，如系統服務用途 `app:<金鑰主鍵>`，`api-callerMatrix` MX-H5、MX-R1）。〔2026-10-24 perm-run02 更正：本段「不在表者須為系統服務用途〔`isApp='y'` 且 `isAdmin='y'`〕」之 perm-run01 版本不成立——應用系統路由對不在表者只看 `isAdmin='y'`，系統服務用途之嚴格認定（`isApp='y'`、`isAdmin='y'`、id 以 `app:` 開頭）只用於後台登入檢查、資料通道與 `requireAdmin`。〕〔原載「僅以 token 取出使用者再以 `verifyAppUser` 判定是否為合法 app 使用者」於 2026-10-24 不成立（套件未要求管理員等級；先驗 `keyTable` 再驗身分）。〕
+-伺服器端點僅以 query `token` 經 `getAndVerifyAppUser`（`server/WWebPerm.mjs:getAndVerifyAppUser`）守門，且**先驗身分再驗參數**（2026-10-24 perm-run01 本輪 P-5：身分驗證通過後才讀 `keyTable`、白名單與 payload；未通過驗證者之回應與 srLog 皆與 `keyTable` 無關，不得由參數錯誤鍵之差異探測表名）：以 `getUserByToken` 由 token 取出使用者，**套件自行要求系統管理者等級**（P-1、R-APP-TOKEN-01：呼叫者在 perm `users` 表者以該列為準，須有效且 `isAdmin='y'`〔含綁定該使用者之使用者用途應用系統 token〕；不在表者只看 `getUserByToken` 反查結果之 `isAdmin='y'`〔2026-10-24 perm-run02①相容認定：不要求 `isApp`、不要求 id 形狀（`adminCheck.mjs:isExtAdminUser`）；舊版 sso 之應用系統身分即 `isAdmin='y'`，未轉傳 `isApp` 之既有部署升版後不中斷；使用者用途綁定「不在表之 sso 系統管理者」者亦放行，與其自身使用者 token 一致〕；在表之一般使用者、綁一般使用者之應用系統 token、不在表且 `isAdmin` 非 `'y'` 者皆拒，`msg` 為 `userNotAdmin`），再以部署方提供的 `verifyAppUser(user, from)` 判定（只能再收緊；否決 `userNoPermission` 先於等級不足 `userNotAdmin`）；任一步失敗即 reject、回傳 `state='error'`。部署方傳入之 `getUserByToken` / `verifyAppUser` 拋錯或 reject 分別視同取不到使用者 / 未通過（W 契約，ADR-023），`msg` 為自家 key（`cannotFindUserFromToken` / `userNoPermission`），上游錯誤原文不回應、不入 log；路由失敗之 `msg` 一律為已知語系鍵，其餘原文（ORM／I/O 錯誤）改回 `anUnexpectedErrorOccurred` 並只入 srLog（R-ROUTE-MSG-01）。稽核欄 `userId` 記呼叫者 id（在表者記 perm 列主鍵；不在表者記外部 id，如系統服務用途 `app:<金鑰主鍵>`，`api-callerMatrix` MX-H5、MX-R1）。〔2026-10-24 perm-run02 更正：本段「不在表者須為系統服務用途〔`isApp='y'` 且 `isAdmin='y'`〕」之 perm-run01 版本不成立——應用系統路由對不在表者只看 `isAdmin='y'`，系統服務用途之嚴格認定（`isApp='y'`、`isAdmin='y'`、id 以 `app:` 開頭）只用於後台登入檢查、資料通道與 `requireAdmin`。〕〔原載「僅以 token 取出使用者再以 `verifyAppUser` 判定是否為合法 app 使用者」於 2026-10-24 不成立（套件未要求系統管理者等級；先驗 `keyTable` 再驗身分）。〕
++伺服器端點僅以 query `token` 經 `getAndVerifyAppUser`（`server/WWebPerm.mjs:getAndVerifyAppUser`）守門，且**先驗身分再驗參數**（2026-10-24 perm-run01 本輪 P-5：身分驗證通過後才讀 `keyTable`、白名單與 payload；未通過驗證者之回應與 srLog 皆與 `keyTable` 無關，不得由參數錯誤鍵之差異探測表名）：以 `getUserByToken` 由 token 取出使用者，**套件自行要求系統管理者等級**（P-1、R-APP-TOKEN-01：呼叫者在 perm `users` 表者以該列為準，須有效且 `isAdmin='y'`〔含綁定該使用者之使用者用途應用系統 token〕；不在表者只看 `getUserByToken` 反查結果之 `isAdmin='y'`〔2026-10-24 perm-run02①相容認定：不要求 `isApp`、不要求 `app:` 前綴，等級判準本身不檢查 id 形狀（`adminCheck.mjs:isExtAdminUser`；本端點另要求呼叫者 id 為非空字串才可作稽核欄，缺者回 `tokenNoPermission`、零寫入；`/api/getPermUserInfor` 不使用呼叫者 id，維持 1.1.15 行為）；舊版 sso 之應用系統身分即 `isAdmin='y'`，未轉傳 `isApp` 之既有部署升版後不中斷；使用者用途綁定「不在表之 sso 系統管理者」者亦放行，與其自身使用者 token 一致〕；在表之一般使用者、綁一般使用者之應用系統 token、不在表且 `isAdmin` 非 `'y'` 者皆拒，`msg` 為 `userNotAdmin`），再以部署方提供的 `verifyAppUser(user, from)` 判定（只能再收緊；否決 `userNoPermission` 先於等級不足 `userNotAdmin`）；任一步失敗即 reject、回傳 `state='error'`。部署方傳入之 `getUserByToken` / `verifyAppUser` 拋錯或 reject 分別視同取不到使用者 / 未通過（W 契約，ADR-023），`msg` 為自家 key（`cannotFindUserFromToken` / `userNoPermission`），上游錯誤原文不回應、不入 log；路由失敗之 `msg` 一律為已知語系鍵，其餘原文（ORM／I/O 錯誤）改回 `anUnexpectedErrorOccurred` 並只入 srLog（R-ROUTE-MSG-01）。稽核欄 `userId` 記呼叫者 id（在表者記 perm 列主鍵；不在表者記外部 id，如系統服務用途 `app:<金鑰主鍵>`，`api-callerMatrix` MX-H5、MX-R1）。〔2026-10-24 perm-run02 更正：本段「不在表者須為系統服務用途〔`isApp='y'` 且 `isAdmin='y'`〕」之 perm-run01 版本不成立——應用系統路由對不在表者只看 `isAdmin='y'`，系統服務用途之嚴格認定（`isApp='y'`、`isAdmin='y'`、id 以 `app:` 開頭）只用於後台登入檢查、資料通道與 `requireAdmin`。〕〔原載「僅以 token 取出使用者再以 `verifyAppUser` 判定是否為合法 app 使用者」於 2026-10-24 不成立（套件未要求系統管理者等級；先驗 `keyTable` 再驗身分）。〕
  
  ## 重要流程
  
@@ -165,14 +165,14 @@ diff -ru -x diff.patch -x diff-stat.txt "tmp/perm-run02/review-copy/spec/設�\2
 --- "tmp/perm-run02/review-copy/spec/設�\210�\201�\236�\210\207�\217\226�\215�.md"	2026-10-24 21:00:03.951000700 +0800
 +++ "tmp/perm-run02/review-copy2/spec/設�\210�\201�\236�\210\207�\217\226�\215�.md"	2026-10-24 21:28:13.176158800 +0800
 @@ -1675,9 +1675,9 @@
- 96. **外審 sol(gpt-6.1-sol, read-only, 36 分, 提出 F01～F10; 全數對照原始碼核對: 屬實 10〔F03／F04 部分屬實〕, 採納修正 8〔F02、F03、F05、F06、F08 改碼; F01、F09、F10 補測試〕, 部分採納 1〔F04〕, 備查 1〔F07〕)**: ①(F02)`getAndVerifyAppUser` 對在表者回 perm 列主鍵 id 為執行身分(稽核欄), 與資料通道一致——修前回外部 id, mappingBy 為 email／name 或外部列(srcKey 對應)時兩條路徑之稽核欄不一致; ②(F03)「在表」＝對應鍵對得到**或**外部 id 等於表中某列主鍵(`countPermRows`), 使共同驗證階段與 `requireAdmin` 以 id 查列一致, 服務身分之外部 id 與使用者列主鍵衝突時各入口一致被拒; ③(F04)同一機制收斂『AU 之對應欄位失效』中外部 id 等於列主鍵者; 其餘(AU 綁定之使用者不在 perm 表且對應欄位失效)與待裁示 ③ 同源, 無從與 AS 區分, 維持限制; ④(F05)`getExtUser` 回淺層快照; ⑤(F06)系統服務用途 id 登錄改為 60 秒 TTL(`SYSTEM_APP_TTL_MS`)而非永久; ⑥(F08)`routeResult` 診斷字串化包 try/catch(`[unprintable]`); ⑦(F01)新增 `mappingBy`＝email／name 之入口層案例(MX-M1)、標頭×本體不同身分交叉(MX-P7)、perm 內 id≠外部 id(MX-M3); ⑧(F09)MX-P4 補『部署方否決＋非管理員』雙原因(鍵次序); ⑨(F10)MX-P3 補 AS 否決之 srLog 斷言; ⑩(F07 備查)同步路由於缺 token 分支以 `maskQuery(get(req,'query'))` 寫 console.log(含 `keyTable`)——不經回應與 srLog、呼叫端不可見, 屬既有除錯輸出, 未改(P-5 之範圍為回應與 srLog 不得依 keyTable 分流). nemotron-3.5-super-vl-free 與 beam-free 於 18:51 皆回 `Free usage limit reached`, 依指示不再派.
+ 96. **外審 sol(gpt-6.1-sol, read-only, 36 分, 提出 F01～F10; 全數對照原始碼核對: 屬實 10〔F03／F04 部分屬實〕, 採納修正 8〔F02、F03、F05、F06、F08 改碼; F01、F09、F10 補測試〕, 部分採納 1〔F04〕, 備查 1〔F07〕)**: ①(F02)`getAndVerifyAppUser` 對在表者回 perm 列主鍵 id 為執行身分(稽核欄), 與資料通道一致——修前回外部 id, mappingBy 為 email／name 或外部列(srcKey 對應)時兩條路徑之稽核欄不一致; ②(F03)「在表」＝對應鍵對得到**或**外部 id 等於表中某列主鍵(`countPermRows`), 使共同驗證階段與 `requireAdmin` 以 id 查列一致, 服務身分之外部 id 與使用者列主鍵衝突時各入口一致被拒; ③(F04)同一機制收斂『AU 之對應欄位失效』中外部 id 等於列主鍵者; 其餘(AU 綁定之使用者不在 perm 表且對應欄位失效)與待裁示 ③ 同源, 無從與 AS 區分, 維持限制; ④(F05)`getExtUser` 回淺層快照; ⑤(F06)系統服務用途 id 登錄改為 60 秒 TTL(`SYSTEM_APP_TTL_MS`)而非永久; ⑥(F08)`routeResult` 診斷字串化包 try/catch(`[unprintable]`); ⑦(F01)新增 `mappingBy`＝email／name 之入口層案例(MX-M1)、標頭×本體不同身分交叉(MX-P7)、perm 內 id≠外部 id(MX-M3); ⑧(F09)MX-P4 補『部署方否決＋非系統管理者』雙原因(鍵次序); ⑨(F10)MX-P3 補 AS 否決之 srLog 斷言; ⑩(F07 備查)同步路由於缺 token 分支以 `maskQuery(get(req,'query'))` 寫 console.log(含 `keyTable`)——不經回應與 srLog、呼叫端不可見, 屬既有除錯輸出, 未改(P-5 之範圍為回應與 srLog 不得依 keyTable 分流). nemotron-3.5-super-vl-free 與 beam-free 於 18:51 皆回 `Free usage limit reached`, 依指示不再派.
  
  **Consequences**:
 -- ⚠️ **破壞性變更(README Upgrade Notes 第 1 項)**: 不在 perm 表且 `getUserByToken` 未轉傳 `isApp` 之虛擬應用系統, 在應用系統路由改回 `userNotAdmin`(P-1 明文目標); 部署方須轉傳 `isApp`。**回報主控確認**: 現行部署中若有此類整合, 升版前須先改部署方的 `getUserByToken`; 此為「patch 版收緊」, 與使用者原則二.8「框架新增之收緊預設須相容」不同層級(本套件為使用方, 且收緊為明文目標)。
 +- ⚠️ 〔**perm-run02①取代**: 主控裁示改為相容放行, 本條「破壞性」不成立, 見下方 ADR-040 Update(perm-run02) 決定 97、100; 原文留痕如下〕**破壞性變更(README Upgrade Notes 第 1 項)**: 不在 perm 表且 `getUserByToken` 未轉傳 `isApp` 之虛擬應用系統, 在應用系統路由改回 `userNotAdmin`(P-1 明文目標); 部署方須轉傳 `isApp`。**回報主控確認**: 現行部署中若有此類整合, 升版前須先改部署方的 `getUserByToken`; 此為「patch 版收緊」, 與使用者原則二.8「框架新增之收緊預設須相容」不同層級(本套件為使用方, 且收緊為明文目標)。
  - ⚠️ 行為變更: 範例 `srv.mjs` 之兩個驗證函數不再以 `isAdmin` 否決(P-7); 原契約測試(`TOKEN_PETER` 預期 `userNoPermission` 者)改預期 `userNotAdmin`, 部署方否決改以 `TOKEN_DENY` 代表。
--- ⚠️ 已知限制/待確認 ③(**待主控裁示**): 使用者用途綁定之使用者**不在 perm users 表**且上游 `isAdmin='y'` 時(sso 管理員但未建於 perm), 套件無法與系統服務用途區分(皆為 `isApp='y'`、`isAdmin='y'`、不在表), 該 token 取得管理員服務, 而該使用者以其使用者 token 則被拒。權限不超過鑄造該 token 之 sso 管理員本可鑄造的系統服務用途 token(原則二之一 5b), 故主責未再收緊; 若要區分, 可要求 `id` 以 `app:` 開頭(上游契約已定 `app:<金鑰主鍵>`), 單處修改 `isSystemAppUser` 即可。
-+- ⚠️ 〔**perm-run02②已結案**: 主控裁示 `isSystemAppUser` 要求 `id` 以 `app:` 開頭, 見下方 ADR-040 Update(perm-run02) 決定 98、99; 原文留痕如下〕已知限制/待確認 ③(**待主控裁示**): 使用者用途綁定之使用者**不在 perm users 表**且上游 `isAdmin='y'` 時(sso 管理員但未建於 perm), 套件無法與系統服務用途區分(皆為 `isApp='y'`、`isAdmin='y'`、不在表), 該 token 取得管理員服務, 而該使用者以其使用者 token 則被拒。權限不超過鑄造該 token 之 sso 管理員本可鑄造的系統服務用途 token(原則二之一 5b), 故主責未再收緊; 若要區分, 可要求 `id` 以 `app:` 開頭(上游契約已定 `app:<金鑰主鍵>`), 單處修改 `isSystemAppUser` 即可。
+-- ⚠️ 已知限制/待確認 ③(**待主控裁示**): 使用者用途綁定之使用者**不在 perm users 表**且上游 `isAdmin='y'` 時(sso 系統管理者但未建於 perm), 套件無法與系統服務用途區分(皆為 `isApp='y'`、`isAdmin='y'`、不在表), 該 token 取得系統管理者服務, 而該使用者以其使用者 token 則被拒。權限不超過鑄造該 token 之 sso 系統管理者本可鑄造的系統服務用途 token(原則二之一 5b), 故主責未再收緊; 若要區分, 可要求 `id` 以 `app:` 開頭(上游契約已定 `app:<金鑰主鍵>`), 單處修改 `isSystemAppUser` 即可。
++- ⚠️ 〔**perm-run02②已結案**: 主控裁示 `isSystemAppUser` 要求 `id` 以 `app:` 開頭, 見下方 ADR-040 Update(perm-run02) 決定 98、99; 原文留痕如下〕已知限制/待確認 ③(**待主控裁示**): 使用者用途綁定之使用者**不在 perm users 表**且上游 `isAdmin='y'` 時(sso 系統管理者但未建於 perm), 套件無法與系統服務用途區分(皆為 `isApp='y'`、`isAdmin='y'`、不在表), 該 token 取得系統管理者服務, 而該使用者以其使用者 token 則被拒。權限不超過鑄造該 token 之 sso 系統管理者本可鑄造的系統服務用途 token(原則二之一 5b), 故主責未再收緊; 若要區分, 可要求 `id` 以 `app:` 開頭(上游契約已定 `app:<金鑰主鍵>`), 單處修改 `isSystemAppUser` 即可。
  - ⚠️ `[sys:polling]` 之本體 `__sysToken__` 身分檢查屬框架(w-serv-webdata ≥1.1.16 `verifyPolling`; 本機 w-serv-broadcast 1.1.10 無), 排程第 128 項, 本輪不測本體來源。
  - ✅ 測試: `api-callerMatrix`(MX-*, 呼叫者 6＋相容 4 × 入口 24, 資料通道另分標頭／本體兩個身分來源)、`unit-appToken`(AT-*)、`unit-routeResult`(RR-*)、改寫 `api-adminOnly`／`api-callerIdentity`／`api-verifyConn-auth`／`api-tokenSafety`／`unit-adminOnlySite`／`unit-keyCheck`／`e2e-init`(E2E-007 peter 變體、E2E-008); 變異驗證與修前紅見 `spec/evidence/perm-run01-20261024b/`。
  
@@ -183,13 +183,13 @@ diff -ru -x diff.patch -x diff-stat.txt tmp/perm-run02/review-copy/srv.mjs tmp/p
      // console.log('getUserByToken/token', token)
      // console.log('於生產環境時得加入SSO等驗證token機制')
      // return {} //測試無法登入
--    if (token === '{token-for-application}') { //提供外部應用系統作為存取使用者(應用系統token・系統服務用途: 部署方須轉傳上游反查結果之 isApp, 否則 perm 只認 users 表中有效之系統管理員, README Upgrade Notes)
+-    if (token === '{token-for-application}') { //提供外部應用系統作為存取使用者(應用系統token・系統服務用途: 部署方須轉傳上游反查結果之 isApp, 否則 perm 只認 users 表中有效之系統管理者, README Upgrade Notes)
 +    if (token === '{token-for-application}') { //提供外部應用系統作為存取使用者(應用系統token: 部署方須轉傳上游反查結果之 isApp。此例的 id 不以 'app:' 開頭, 故只用於應用系統路由〔/api/getPermUserInfor、/syncAndReplaceTabs; 不在 users 表者只看 isAdmin 為 'y'〕, 後台與資料通道須系統服務用途〔isApp y、isAdmin y、id 以 'app:' 開頭〕, 見 {token-for-app-system}; README Upgrade Notes)
          return {
              id: 'id-for-application',
              name: 'application',
 @@ -112,6 +112,27 @@
-         if (token === '{token-for-sso-admin}') { //不在 perm users 表之 sso 管理員, 以其**自身使用者 token**(perm-run02): 未轉傳 isApp; 與下一個權杖為同一人(id 同)
+         if (token === '{token-for-sso-admin}') { //不在 perm users 表之 sso 系統管理者, 以其**自身使用者 token**(perm-run02): 未轉傳 isApp; 與下一個權杖為同一人(id 同)
              return { id: 'sso-admin-77', name: 'sso-admin', email: 'sso-admin@example.com', isAdmin: 'y' }
          }
 +        if (token === '{token-for-app-flag-n}') { //不在表、isAdmin='y'、isApp 明確為 'n'(perm-run02 外審 sol F1): 非系統服務用途(後端拒), 應用系統路由只看 isAdmin 而放行
@@ -210,10 +210,10 @@ diff -ru -x diff.patch -x diff-stat.txt tmp/perm-run02/review-copy/srv.mjs tmp/p
 +        if (token === '{token-for-app-ghost}') { //系統服務用途(perm-run02 外審 sol F3): 先以此權杖登錄近期系統服務用途 id 'app:key-ghost'
 +            return { id: 'app:key-ghost', name: 'key-ghost', email: '', isAdmin: 'y', isApp: 'y' }
 +        }
-+        if (token === '{token-for-ghost-user}') { //一般 sso 管理員(perm-run02 外審 sol F3): email 對應 perm 列(主鍵恰為 'app:key-ghost'; 僅 mappingBy='email' 之測試設定), 經該列通過驗證後該列被刪
++        if (token === '{token-for-ghost-user}') { //一般 sso 系統管理者(perm-run02 外審 sol F3): email 對應 perm 列(主鍵恰為 'app:key-ghost'; 僅 mappingBy='email' 之測試設定), 經該列通過驗證後該列被刪
 +            return { id: 'sso-ghost-1', name: 'ghost', email: 'ghost@example.com', isAdmin: 'y' }
 +        }
-         if (token === '{token-for-app-bind-sso}') { //使用者用途(AU)綁定「不在 perm users 表之 sso 管理員」(perm-run02): 反查回該使用者實際資料(id 非 'app:' 開頭)＋isApp='y', isAdmin='y'; 不是系統服務用途(須 id 以 'app:' 開頭)
+         if (token === '{token-for-app-bind-sso}') { //使用者用途(AU)綁定「不在 perm users 表之 sso 系統管理者」(perm-run02): 反查回該使用者實際資料(id 非 'app:' 開頭)＋isApp='y', isAdmin='y'; 不是系統服務用途(須 id 以 'app:' 開頭)
              return { id: 'sso-admin-77', name: 'sso-admin', email: 'sso-admin@example.com', isAdmin: 'y', isApp: 'y' }
          }
 @@ -162,6 +183,9 @@
@@ -241,7 +241,7 @@ diff -ru -x diff.patch -x diff-stat.txt tmp/perm-run02/review-copy/test/api-call
 @@ -56,6 +56,8 @@
      { k: 'AUD', label: '使用者用途綁停用之使用者', token: TOKEN_AU_DISABLED, svc: false, app: false, own: null, aud: null },
      { k: 'APP', label: '虛擬應用系統 TOKEN_APP(isApp y、isAdmin y、id 非 app: 開頭)', token: TOKEN_APP, svc: false, app: true, own: null, aud: 'id-for-application' },
-     { k: 'AUX', label: '使用者用途綁不在表之 sso 管理員(isApp y、id 非 app: 開頭)', token: TOKEN_AU_SSO, svc: false, app: true, own: null, aud: 'sso-admin-77' },
+     { k: 'AUX', label: '使用者用途綁不在表之 sso 系統管理者(isApp y、id 非 app: 開頭)', token: TOKEN_AU_SSO, svc: false, app: true, own: null, aud: 'sso-admin-77' },
 +    { k: 'AFN', label: 'app: 前綴、isAdmin y、isApp 明確 n、不在表', token: TOKEN_FLAG_N, svc: false, app: true, own: null, aud: 'app:key-flag-n' }, //外審 sol F1
 +    { k: 'AFO', label: "app: 前綴、isAdmin y、isApp 'Y'(非嚴格 y)、不在表", token: TOKEN_FLAG_ODD, svc: false, app: true, own: null, aud: 'app:key-flag-odd' }, //外審 sol F1
  ]
@@ -260,8 +260,8 @@ diff -ru -x diff.patch -x diff-stat.txt tmp/perm-run02/review-copy/test/api-call
  
  
      // ===== [C] 通訊路由 =====
--    describe('C 通訊路由(ulctr／slc／dwgfn／dwgf／dw × 13 呼叫者): 同一連線閘, 後端管理員服務等級過閘, 其餘 permission denied', function() {
-+    describe('C 通訊路由(ulctr／slc／dwgfn／dwgf／dw × 15 呼叫者): 同一連線閘, 後端管理員服務等級過閘, 其餘 permission denied', function() {
+-    describe('C 通訊路由(ulctr／slc／dwgfn／dwgf／dw × 13 呼叫者): 同一連線閘, 後端系統管理者服務等級過閘, 其餘 permission denied', function() {
++    describe('C 通訊路由(ulctr／slc／dwgfn／dwgf／dw × 15 呼叫者): 同一連線閘, 後端系統管理者服務等級過閘, 其餘 permission denied', function() {
          let routes = [
              { name: '/api/ulctr(upload-controller)', path: '/api/ulctr', method: 'POST' },
              { name: '/api/slc(upload-slice)', path: '/api/slc', method: 'POST' },
@@ -288,7 +288,7 @@ diff -ru -x diff.patch -x diff-stat.txt tmp/perm-run02/review-copy/test/api-call
                      stat.cells += 5
                  })
 +
-+                it(`MX-M5 [${mb}] 主鍵同為服務身分 id 之**停用管理員**列(外審 sol F1: 嚴格系統服務形狀×停用列): 在表以列為準, 各入口一致被拒(不得因停用而落入系統服務用途), 零寫入`, async function() {
++                it(`MX-M5 [${mb}] 主鍵同為服務身分 id 之**停用系統管理者**列(外審 sol F1: 嚴格系統服務形狀×停用列): 在表以列為準, 各入口一致被拒(不得因停用而落入系統服務用途), 零寫入`, async function() {
 +                    let users = [...(await rowsOf('users')), userRow('app:key-sys', 'collide', 'y', 'n', '{}')]
 +                    A.equal((await callRpc('updateUsers', [users], TOKEN_ADMIN)).ok, true)
 +                    let s0 = await snap4()
@@ -307,11 +307,11 @@ diff -ru -x diff.patch -x diff-stat.txt tmp/perm-run02/review-copy/test/api-call
                  stat.cells += 4
              })
  
-+            it('MX-M6 [外審 sol F3] 近期系統服務用途登錄不得被「經 perm 列通過驗證、其後該列於 requireAdmin 讀取前被刪」之請求沿用: AS(app:key-ghost)先登錄 → perm 建立主鍵同為 app:key-ghost 之管理員列(email 對應) → 一般 sso 管理員經該列通過身分驗證(部署方驗證等待約 2 秒) → 等待期間該列被刪 → 寫入函數須 userNotAdmin、零寫入', async function() {
++            it('MX-M6 [外審 sol F3] 近期系統服務用途登錄不得被「經 perm 列通過驗證、其後該列於 requireAdmin 讀取前被刪」之請求沿用: AS(app:key-ghost)先登錄 → perm 建立主鍵同為 app:key-ghost 之系統管理者列(email 對應) → 一般 sso 系統管理者經該列通過身分驗證(部署方驗證等待約 2 秒) → 等待期間該列被刪 → 寫入函數須 userNotAdmin、零寫入', async function() {
 +                this.timeout(120000)
 +                A.equal((await callRpc('getWebInfor', [], TOKEN_AS_GHOST)).ok, true, '前置: AS 通過並登錄近期 id')
 +                let users = [...(await rowsOf('users')), { ...userRow('app:key-ghost', 'ghost', 'y', 'y', '{}'), email: 'ghost@example.com' }]
-+                A.equal((await callRpc('updateUsers', [users], TOKEN_ADMIN)).ok, true, '前置: 建立主鍵同為服務 id 之管理員列')
++                A.equal((await callRpc('updateUsers', [users], TOKEN_ADMIN)).ok, true, '前置: 建立主鍵同為服務 id 之系統管理者列')
 +                let rows = (await rowsOf('grups')).concat([{ id: 'id-mx-m6', order: 0, name: 'mx-m6', description: '', from: '', cpemis: '{}' }])
 +                let pending = callRpc('updateGrups', [rows], TOKEN_ADMIN, { sysToken: TOKEN_GHOST_USER })
 +                await sleep(600) //身分驗證已過 perm 列、停在部署方 verifyClientUser 之等待中(srv.mjs 對 app:key-ghost 列等待約 2 秒)
@@ -333,7 +333,7 @@ diff -ru -x diff.patch -x diff-stat.txt tmp/perm-run02/review-copy/test/api-call
          })
 +
 +        it('MX-R5 [外審 sol F1] 嚴格系統服務形狀(AS: app:key-sys、isApp y、isAdmin y)而 perm 有主鍵同為其 id 之停用列 → 在表, 不落入系統服務用途: 後台登入、資料通道(標頭／本體)、應用路由皆拒(固定語系鍵)、零寫入', async function() {
-+            //人造帶 email 之嚴格形狀(TOKEN_AS_EMAIL: app:key-email、isApp y、isAdmin y), perm 有主鍵同為其 id 之停用管理員列
++            //人造帶 email 之嚴格形狀(TOKEN_AS_EMAIL: app:key-email、isApp y、isAdmin y), perm 有主鍵同為其 id 之停用系統管理者列
 +            let setRow = async (patch) => setUsers((us) => us.map((u) => (u.id === 'app:key-email' ? { ...u, ...patch } : u)))
 +            await setUsers((us) => [...us, { ...userRow('app:key-email', 'key-email', 'y', 'n', '{}'), email: 'key-email@example.com' }])
 +            let s0 = await snap4()
@@ -347,11 +347,11 @@ diff -ru -x diff.patch -x diff-stat.txt tmp/perm-run02/review-copy/test/api-call
 +            A.equal(b.ok, false)
 +            A.ok(KEYS.has(b.msg), `本體: 執行身分拒絕鍵 ${b.msg}`)
 +            A.equal(await snap4(), s0, '零寫入')
-+            //啟用且為管理員: 以列通過(回 perm 列, 不經 verifyAppUser 之系統服務用途); 降為一般使用者: 依列拒
++            //啟用且為系統管理者: 以列通過(回 perm 列, 不經 verifyAppUser 之系統服務用途); 降為一般使用者: 依列拒
 +            await setRow({ isActive: 'y' })
 +            let ok = await getJson(`/api/getUserByToken?token=${q(TOKEN_AS_EMAIL)}`)
 +            A.equal(ok.state, 'success', JSON.stringify(ok).slice(0, 200))
-+            A.equal((await callRpc('getWebInfor', [], TOKEN_AS_EMAIL)).ok, true, '啟用且為管理員後以列通過')
++            A.equal((await callRpc('getWebInfor', [], TOKEN_AS_EMAIL)).ok, true, '啟用且為系統管理者後以列通過')
 +            await setRow({ isAdmin: 'n' })
 +            A.equal((await getJson(`/api/getUserByToken?token=${q(TOKEN_AS_EMAIL)}`)).msg, 'userNotAdmin')
 +            A.equal((await getJson(`/api/getPermUserInfor?token=${q(TOKEN_AS_EMAIL)}&userId=id-for-peter`)).msg, 'userNotAdmin', '在表以列為準, 反查之 isAdmin y 不採信')
@@ -369,7 +369,7 @@ diff -ru -x diff.patch -x diff-stat.txt tmp/perm-run02/review-copy/test/api-call
 +            stat.cells += 5
 +        })
 +
-+        it('MX-R7 [外審 sol F1] 外部列管理員(經匯入建立, srcKey ≡ 外部 id sso-ext-5, 內部 id 為系統配發): 後台登入、資料通道、兩條應用系統路由皆通過, 稽核欄一律記 perm 內部 id(≠ srcKey)', async function() {
++        it('MX-R7 [外審 sol F1] 外部列系統管理者(經匯入建立, srcKey ≡ 外部 id sso-ext-5, 內部 id 為系統配發): 後台登入、資料通道、兩條應用系統路由皆通過, 稽核欄一律記 perm 內部 id(≠ srcKey)', async function() {
 +            let imp = await (await fetch(urlSync.replace('{keyTable}', 'users').replace('{token}', q(TOKEN_ADMIN)), { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify({ from: 'appMatrixU', rows: [{ srcKey: 'sso-ext-5', order: 0, name: 'ext5', email: 'ext5@example.com', description: 'ext', cgrups: '{}', isAdmin: 'y', isActive: 'y' }] }) })).json()
 +            A.equal(imp.state, 'success', JSON.stringify(imp).slice(0, 300))
 +            let ur = (await rowsOf('users')).find((r) => r.srcKey === 'sso-ext-5')
@@ -398,16 +398,16 @@ diff -ru -x diff.patch -x diff-stat.txt tmp/perm-run02/review-copy/test/tools/ap
 +++ tmp/perm-run02/review-copy2/test/tools/api-setup.mjs	2026-10-24 21:28:13.180202700 +0800
 @@ -50,6 +50,13 @@
  export const TOKEN_NOFLAG_N = '{token-for-noflag-n}'          // → perm-run02: 不在 perm users 表、isAdmin n、未轉傳 isApp（各入口皆拒）
- export const TOKEN_SSO_ADMIN = '{token-for-sso-admin}'        // → perm-run02: 不在 perm users 表之 sso 管理員以自身使用者 token（id 'sso-admin-77'、未轉傳 isApp）
- export const TOKEN_AU_SSO = '{token-for-app-bind-sso}'        // → perm-run02: 使用者用途綁「不在 perm users 表之 sso 管理員」（同上 id＋isApp y; id 非 'app:' 開頭, 不是系統服務用途）
+ export const TOKEN_SSO_ADMIN = '{token-for-sso-admin}'        // → perm-run02: 不在 perm users 表之 sso 系統管理者以自身使用者 token（id 'sso-admin-77'、未轉傳 isApp）
+ export const TOKEN_AU_SSO = '{token-for-app-bind-sso}'        // → perm-run02: 使用者用途綁「不在 perm users 表之 sso 系統管理者」（同上 id＋isApp y; id 非 'app:' 開頭, 不是系統服務用途）
 +export const TOKEN_FLAG_N = '{token-for-app-flag-n}'          // → perm-run02 外審 F1: 'app:key-flag-n'、isAdmin y、isApp 明確 'n'（非系統服務用途; 應用系統路由只看 isAdmin 而放行）
 +export const TOKEN_FLAG_ODD = '{token-for-app-flag-odd}'      // → perm-run02 外審 F1: 'app:key-flag-odd'、isAdmin y、isApp 'Y'（非嚴格 'y'）
 +export const TOKEN_APP_DENY_N = '{token-for-app-deny-n}'      // → perm-run02 外審 F1: id 'app:key-deny'（verifyAppUser 否決）、isAdmin n、不在表: 拒絕鍵次序（部署方否決先於等級不足）
 +export const TOKEN_EXT_ROW = '{token-for-ext-row}'            // → perm-run02 外審 F1: 外部 id 'sso-ext-5'（對應 perm 外部列之 srcKey; 列由測試經 /syncAndReplaceTabs 建立）
 +export const TOKEN_AS_EMAIL = '{token-for-app-email}'         // → perm-run02 外審 F1: 'app:key-email'、email 非空、isApp y、isAdmin y（嚴格系統服務形狀; 人造帶 email, 供停用列案例）
 +export const TOKEN_AS_GHOST ='{token-for-app-ghost}'         // → perm-run02 外審 F3: 系統服務用途 'app:key-ghost'（登錄近期系統服務用途 id）
-+export const TOKEN_GHOST_USER = '{token-for-ghost-user}'      // → perm-run02 外審 F3: 一般 sso 管理員（email ghost@example.com）, 經 perm 列（主鍵 'app:key-ghost', mappingBy=email）通過驗證; srv.mjs 之 verifyClientUser 對該列等待約 2 秒
- export const TOKEN_AU_ADMIN = '{token-for-app-bind-admin}'    // → 使用者用途綁管理員（base seed admin 之實際資料 + isApp y）
++export const TOKEN_GHOST_USER = '{token-for-ghost-user}'      // → perm-run02 外審 F3: 一般 sso 系統管理者（email ghost@example.com）, 經 perm 列（主鍵 'app:key-ghost', mappingBy=email）通過驗證; srv.mjs 之 verifyClientUser 對該列等待約 2 秒
+ export const TOKEN_AU_ADMIN = '{token-for-app-bind-admin}'    // → 使用者用途綁系統管理者（base seed admin 之實際資料 + isApp y）
  export const TOKEN_AU_MEMBER = '{token-for-app-bind-member}'  // → 使用者用途綁一般使用者（base seed peter 之實際資料 + isApp y）
  export const TOKEN_AU_DISABLED = '{token-for-app-bind-disabled}' // → 使用者用途綁定之使用者在 perm users 表但停用（列由測試自建; 上游 isAdmin y）
 diff -ru -x diff.patch -x diff-stat.txt tmp/perm-run02/review-copy/test/unit-appToken.test.mjs tmp/perm-run02/review-copy2/test/unit-appToken.test.mjs

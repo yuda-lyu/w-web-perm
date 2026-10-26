@@ -1,0 +1,18 @@
+[quiet-run] exit=0 time=2s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261026-180634-perm-run02-final-rolename.log (13 行, 5 KB)
+[quiet-run] cmd: npx mocha --no-parallel test/unit-roleName.test.mjs --reporter list --timeout 60000
+[quiet-run] lock: 取得並已釋放(等待 0s)
+== 統計 ==
+  8 passing (435ms)
+== 最後 11 行(非空,不含上列失敗段落) ==
+npm notice run w-web-perm@1.1.17 npx
+npm notice run mocha --no-parallel test/unit-roleName.test.mjs --reporter list --timeout 60000
+    unit-roleName (角色名稱統一為「系統管理者」之顯示文字與站點, perm-run01／perm-run02 2026-10-26) 顯示文字(RN-001～003c) RN-001 procLang: cht.isAdmin 為「是否為系統管理者」、eng.isAdmin 不動、鍵名 isAdmin 仍存在  [建議書 §1; 欄位標題來源]:   ✔ unit-roleName (角色名稱統一為「系統管理者」之顯示文字與站點, perm-run01／perm-run02 2026-10-26) 顯示文字(RN-001～003c) RN-001 procLang: ch…
+    unit-roleName (角色名稱統一為「系統管理者」之顯示文字與站點, perm-run01／perm-run02 2026-10-26) 顯示文字(RN-001～003c) RN-002 schema users: settings.isAdmin.name 與 procLang cht.isAdmin 同字、鍵名 isAdmin 不變  [建議書 §1 兩處同改]:   ✔ unit-roleName (角色名稱統一為「系統管理者」之顯示文字與站點, perm-run01／perm-run02 2026-10-26) 顯示文字(RN-001～003c) RN-002 sch…
+    unit-roleName (角色名稱統一為「系統管理者」之顯示文字與站點, perm-run01／perm-run02 2026-10-26) 顯示文字(RN-001～003c) RN-003 procLang: cht.userNotAdmin 為「僅系統管理者可存取或變更此資料」、eng 不動  [perm-run01 範圍 3: 使用者看得到之訊息]:   ✔ unit-roleName (角色名稱統一為「系統管理者」之顯示文字與站點, perm-run01／perm-run02 2026-10-26) 顯示文字(RN-001～003c) RN-003 procLang: c…
+    unit-roleName (角色名稱統一為「系統管理者」之顯示文字與站點, perm-run01／perm-run02 2026-10-26) 顯示文字(RN-001～003c) RN-003b procLang 全部 cht 文字: 不含舊稱; 「管理＋者」之前一律為「系統」(同源顯示文字全掃):   ✔ unit-roleName (角色名稱統一為「系統管理者」之顯示文字與站點, perm-run01／perm-run02 2026-10-26) 顯示文字(RN-001～003c) RN-003b procLang 全部 cht 文字: 不含舊稱; 「管理＋者」之前一律為「系統…
+    unit-roleName (角色名稱統一為「系統管理者」之顯示文字與站點, perm-run01／perm-run02 2026-10-26) 顯示文字(RN-001～003c) RN-003c 無「系統」前綴之舊稱訊息已統一(使用者 2026-10-26 裁示); eng 不動:   ✔ unit-roleName (角色名稱統一為「系統管理者」之顯示文字與站點, perm-run01／perm-run02 2026-10-26) 顯示文字(RN-001～003c) RN-003c 無「系統」前綴之舊稱訊息已統一(使用者 2026-10-26 裁示); eng 不動: 0ms
+    unit-roleName (角色名稱統一為「系統管理者」之顯示文字與站點, perm-run01／perm-run02 2026-10-26) 站點(RN-S1～S3) RN-S1 src/、server/、srv.mjs 之可執行碼(排除註解)不含舊稱、「管理＋者」前一律為「系統」:   ✔ unit-roleName (角色名稱統一為「系統管理者」之顯示文字與站點, perm-run01／perm-run02 2026-10-26) 站點(RN-S1～S3) RN-S1 src/、server/、srv.mjs 之可執行碼(排除註解)不含舊稱、「管理＋者」前一律為「系統」: 1…
+    unit-roleName (角色名稱統一為「系統管理者」之顯示文字與站點, perm-run01／perm-run02 2026-10-26) 站點(RN-S1～S3) RN-S2 掃描器自測: 字串字面值／模板文字／.vue 腳本內之舊稱與單獨「管理＋者」必命中, // 註解與 JSDoc 於 code 模式不命中, 「系統管理者」不命中:   ✔ unit-roleName (角色名稱統一為「系統管理者」之顯示文字與站點, perm-run01／perm-run02 2026-10-26) 站點(RN-S1～S3) RN-S2 掃描器自測: 字串字面值／模板文字／.vue 腳本…
+    unit-roleName (角色名稱統一為「系統管理者」之顯示文字與站點, perm-run01／perm-run02 2026-10-26) 站點(RN-S1～S3) RN-S3 git 追蹤之全部文字檔(含註解、README、spec、sgud、docs、dist、測試): 舊稱 0 處、單獨「管理＋者」0 處  [完成條件: 全 repo 用詞統一]:   ✔ unit-roleName (角色名稱統一為「系統管理者」之顯示文字與站點, perm-run01／perm-run02 2026-10-26) 站點(RN-S1～S3) RN-S3 git 追蹤之全部文字檔(含註解、…
+  8 passing (435ms)
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)

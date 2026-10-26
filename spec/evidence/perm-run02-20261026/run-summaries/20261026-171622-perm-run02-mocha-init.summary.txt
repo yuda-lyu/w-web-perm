@@ -1,0 +1,11 @@
+[quiet-run] exit=0 time=2m06s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261026-171622-perm-run02-mocha-init.log (7 行, 0 KB)
+[quiet-run] cmd: npx mocha --no-parallel test/e2e-init.test.mjs --timeout 180000 --reporter dot
+[quiet-run] lock: 取得並已釋放(等待 0s)
+== 統計 ==
+  20 passing (2m)
+== 最後 4 行(非空,不含上列失敗段落) ==
+npm notice run w-web-perm@1.1.17 npx
+npm notice run mocha --no-parallel test/e2e-init.test.mjs --timeout 180000 --reporter dot
+  ....................
+  20 passing (2m)
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)

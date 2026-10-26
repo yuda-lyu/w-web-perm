@@ -8,7 +8,7 @@
 - 結果: **7 passing／25 failing**。
 - 失敗項(皆為「一般使用者〔TOKEN_MEMBER: perm 列 isAdmin n 且啟用, 部署方放行〕應被拒卻成功」): AO-A1 × 13 個入口(RPC `getWebInfor`／`getStaEvent`／`getStaEventTable`、表 `select` ×4、系統函數 `[sys:getFuncList]`／`[sys:getTableTags]`、寫入 ×4〔寫入原被 `requireAdmin` 拒為 `userNotAdmin`, 現期望連線閘 `permission denied`〕)、AO-A2 後段(降級後仍可連)、AO-A5(無 `verifyConn-error`)、AO-A6 × 5(上傳下載路由回應≠無效 token)、AO-B1(本體 token 為一般使用者仍執行)、AO-C1／C2／C4(登入檢查回 success)。
 - 實測外洩樣態(修前): 一般使用者 `users.select` 回全部使用者列(含 `admin@example.com` 等)、`grups.select`／`pemis.select`／`targets.select` 回全表、`getWebInfor`／`getStaEventTable` 成功。
-- 修前即綠者(7): AO-A3(停用管理員)、AO-A4(P／X／B 角色)、AO-B2、AO-B3(部分)、AO-C3、AO-D1～D3——為「不變」契約之對照(`/api/getPerm`、應用路由、其餘角色之既有鍵)。
+- 修前即綠者(7): AO-A3(停用系統管理者)、AO-A4(P／X／B 角色)、AO-B2、AO-B3(部分)、AO-C3、AO-D1～D3——為「不變」契約之對照(`/api/getPerm`、應用路由、其餘角色之既有鍵)。
 
 ## 範圍二 `test/unit-procCore-writeValidate.test.mjs` WV-DUPID
 

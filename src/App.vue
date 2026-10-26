@@ -83,7 +83,7 @@ export default {
 
         function loginError(data) {
             console.log('login error', cloneDeep(data))
-            //登入者不是系統管理員(後端 userNotAdmin; 即使部署方放行亦拒絕, R-ADMIN-ONLY-01): 顯示「無權進入權限後台」並停留, 不轉址(轉走則使用者看不到原因); 一般使用者查本人權限樹走 /api/getPerm
+            //登入者不是系統管理者(後端 userNotAdmin; 即使部署方放行亦拒絕, R-ADMIN-ONLY-01): 顯示「無權進入權限後台」並停留, 不轉址(轉走則使用者看不到原因); 一般使用者查本人權限樹走 /api/getPerm
             let isNotAdmin = get(data, 'msg') === 'userNotAdmin'
             vo.$ui.updateConnState(isNotAdmin ? 'csErrNotAdmin' : 'csErrLogin')
             vo.$ui.updateUserToken('')

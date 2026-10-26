@@ -6,7 +6,7 @@
   2 failing
 == 失敗段落(前 28 行) ==
   1) api-sysFuncs (系統函數 × 呼叫者 × 新舊協定, perm-run01 R-SYSFUNCS-01, 真後端)
-       [sys:polling] × 協定 old: 管理員服務等級(A／AUA／AS)只在 new／body 放行(內容正確), 其餘一律拒(固定鍵)、不回資料:
+       [sys:polling] × 協定 old: 系統管理者服務等級(A／AUA／AS)只在 new／body 放行(內容正確), 其餘一律拒(固定鍵)、不回資料:
       AssertionError [ERR_ASSERTION]: [sys:polling]/old 有 3 格不符
 + actual - expected
 + [
@@ -25,7 +25,7 @@
       at Context.<anonymous> (file:///C:/opensrc/%E9%96%8B%E6%BA%90-JS-411-8-w-web-perm/w-web-perm/test/api-sysFuncs.test.mjs:205:19)
       at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
   2) api-sysFuncs (系統函數 × 呼叫者 × 新舊協定, perm-run01 R-SYSFUNCS-01, 真後端)
-       被拒者零副作用: 舊協定輪詢被拒後, 該 clientId 不綁定空身分(之後以新協定管理員身分首次輪詢仍可綁定):
+       被拒者零副作用: 舊協定輪詢被拒後, 該 clientId 不綁定空身分(之後以新協定系統管理者身分首次輪詢仍可綁定):
       AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
 + actual - expected
 + 'allow'

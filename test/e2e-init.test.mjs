@@ -403,7 +403,7 @@ else {
                 finally {
                     //還原預設設定; 逐檔隔離執行時本行程未持有 lmdb 映射, reseed 刪得掉 ./db 而得全新種子
                     await restartBackend('./settings.json', { reseed: true })
-                    //id-mk-dup 為外部列(from=FROM_006): 後台整表寫入不得刪(Lv1 saveExternalRowChanged, 2026-10-22 全套實測以管理者寫入移除而失敗)、
+                    //id-mk-dup 為外部列(from=FROM_006): 後台整表寫入不得刪(Lv1 saveExternalRowChanged, 2026-10-22 全套實測以系統管理者寫入移除而失敗)、
                     //  外部同步又拒空 rows, 且單一 mocha 行程全跑(npm test)時 api 檔已使本行程持有 lmdb 映射, reseed 退化為 upsert 而不移除多餘列(殘留列污染其後的
                     //  e2e-ref-cascade／e2e-rela-user-grup／e2e-targets／e2e-users 之 captureBaseSeedOnce)。故經單一收尾入口(規則帳本 R-TEST-EXT-CLEAN-01)移除本案分區並回驗 users 為 base seed
                     await cleanExternalFixtures({ kts: ['users'], froms: [FROM_006], pristine: true })
@@ -413,7 +413,7 @@ else {
 
         //E2E-007（perm-run01, 2026-10-24; spec 流程_應用啟動與登入 E2E-007; 規則帳本 R-ADMIN-ONLY-01）: 一般使用者(部署方放行)登入權限後台 → 被拒並顯示「無權進入權限後台」。
         //  語意斷言（真實登入流程）; 不在 cases 陣列內。畫面標準圖由 cases 之 E2E-007-err-not-admin-screen（強制狀態法）產製比對（主控 2026-10-24 授權）。
-        //  資料前置（非使用者操作）: 管理員(sys)經資料通道把 member(TOKEN_MEMBER: srv.mjs 之 verifyClientUser 放行、perm 列 isAdmin='n' 且啟用)加入 users。
+        //  資料前置（非使用者操作）: 系統管理者(sys)經資料通道把 member(TOKEN_MEMBER: srv.mjs 之 verifyClientUser 放行、perm 列 isAdmin='n' 且啟用)加入 users。
         //  開啟網址用 127.0.0.1（非開發環境）: 其他登入失敗在非開發環境會立即轉址 urlRedirect, 本案證明一般使用者被拒時改為停在提示畫面（不轉址）, 使用者才看得到原因。
         //  清理: restoreTables(擷取快照)移除 member 並還原三表、還原 ./settings.json。
         //perm-run01 本輪(P-7): 變體 peter＝base seed 之一般使用者（perm 列 isAdmin n; 原 srv.mjs 之 verifyClientUser 以 isAdmin 先否決而走「拒絕登入」並轉址, 現範例不再否決, 與 member 同樣看到「無權進入權限後台」）;
@@ -428,7 +428,7 @@ else {
                 let snap = null
                 try {
                     await restartBackend(genTempSettings({ language: lang, urlRedirect: `${apiBaseUrl}/__e2e-redirect-007__` }))
-                    snap = await readTables() //擷取收尾用快照(與 restoreTables 對稱; 不使用 callRpc('updateUsers')——LC-005 禁 e2e-init 以管理者寫入收尾外部列夾具, 本案夾具為後台列, 走共用層)
+                    snap = await readTables() //擷取收尾用快照(與 restoreTables 對稱; 不使用 callRpc('updateUsers')——LC-005 禁 e2e-init 以系統管理者寫入收尾外部列夾具, 本案夾具為後台列, 走共用層)
                     if (variant.row !== null) {
                         await editTableRows('users', (rows) => {
                             rows.push({ ...variant.row })
@@ -492,10 +492,10 @@ else {
         }
 
         //E2E-008（perm-run01 本輪, P-7; spec 流程_應用啟動與登入 E2E-008）: 部署方因非角色因素否決（srv.mjs 之 verifyClientUser 對 id-for-deny 回 false）→ 後端 userNoPermission、畫面為一般的拒絕登入流程（非開發環境立即轉址至 urlRedirect）;
-        //  對照 E2E-007: 角色因素（非管理員）由本套件拒絕並停在「無權進入權限後台」, 非角色因素由部署方否決並走拒絕登入＋轉址。語意斷言, 不產標準圖（拒絕登入畫面見 E2E-004）。
-        //  資料前置（非使用者操作）: 管理員經共用層把 deny（isAdmin y、啟用）加入 users。
+        //  對照 E2E-007: 角色因素（非系統管理者）由本套件拒絕並停在「無權進入權限後台」, 非角色因素由部署方否決並走拒絕登入＋轉址。語意斷言, 不產標準圖（拒絕登入畫面見 E2E-004）。
+        //  資料前置（非使用者操作）: 系統管理者經共用層把 deny（isAdmin y、啟用）加入 users。
         for (const lang of langs) {
-            it(`E2E-008-veto-by-deployer [${lang}]: 管理員之 perm 列因非角色因素被部署方 verifyClientUser 否決 → 後端 userNoPermission、轉址至 urlRedirect（非「無權進入權限後台」）`, async function() {
+            it(`E2E-008-veto-by-deployer [${lang}]: 系統管理者之 perm 列因非角色因素被部署方 verifyClientUser 否決 → 後端 userNoPermission、轉址至 urlRedirect（非「無權進入權限後台」）`, async function() {
                 this.timeout(300000)
                 let snap = null
                 try {

@@ -4,8 +4,8 @@
 //測試權杖(srv.mjs, 非 production 才有):
 //  '{token-for-reject}'       → getUserByToken 以舊版 w-web-sso helper(≤1.1.4)之失敗形狀 reject: 字串含已代入權杖之完整網址(夾 SYNTH-SYS-SECRET-FOR-TEST 與所送權杖)
 //  '{token-for-verify-throw}' → getUserByToken 回 id-for-verify-throw; verifyClientUser / verifyAppUser 對其 throw Error('SYNTH-VERIFY-SECRET-FOR-TEST')
-//  client 通道(api/getUserByToken、api/getPerm、資料通道)會反查 perm users 表(mappingBy), 故 before 以管理者寫入 RPC(updateUsers, editTableRows)於 perm users 表建立後台列
-//  id-for-verify-throw(from ''; isActive='y')使驗證走到 verifyClientUser; after 以管理者寫入 RPC 移除該列。
+//  client 通道(api/getUserByToken、api/getPerm、資料通道)會反查 perm users 表(mappingBy), 故 before 以系統管理者寫入 RPC(updateUsers, editTableRows)於 perm users 表建立後台列
+//  id-for-verify-throw(from ''; isActive='y')使驗證走到 verifyClientUser; after 以系統管理者寫入 RPC 移除該列。
 //  perm-run03 變更: 原以 app token 經 /syncAndReplaceTabs 灌入此列, 但外部匯入改依 srcKey 差異同步(R-IMPORT-01), 內部主鍵 id 由伺服端產生而不再是外部給的值,
 //  而本專案測試 server 之登入對應 mappingBy 為預設 'id'(以 perm users 列之 id 比對 token 使用者之 id, 本輪未改, 待裁示), 經同步建立之列不再能與 '{token-for-verify-throw}' 對應, 故改以後台列建立。
 //  資料通道之執行身分(__sysToken__ → getUserIdByToken)本輪起與連線閘同等完整驗證(外部 getUserByToken → perm users 存在且啟用 → verifyClientUser), 任一關不過即拒、函數不執行(見 TS-003 E6／E6b)。
@@ -68,7 +68,7 @@ describe('api-tokenSafety', function() {
     before(async function() {
         await startApi()
         mark = await markSrLog()
-        //建立 id-for-verify-throw(後台列, isActive='y'), 使 client 通道之驗證走到 verifyClientUser(editTableRows 經管理者寫入 RPC, 失敗即拋錯)
+        //建立 id-for-verify-throw(後台列, isActive='y'), 使 client 通道之驗證走到 verifyClientUser(editTableRows 經系統管理者寫入 RPC, 失敗即拋錯)
         await editTableRows('users', (rows) => {
             assert.strict.ok(!rows.some((v) => v.id === ID_VT), `前置: perm users 不得已有 ${ID_VT}(上一檔殘留)`)
             rows.push({ ...ROW_VT })
@@ -159,7 +159,7 @@ describe('api-tokenSafety', function() {
 
         //哨兵: keyTable 不在白名單時 srLog 會記 keyTable(本次唯一值); 同一行程之 srLog 依呼叫序落檔, 見哨兵即前面各行已落檔
         let sentinel = `tsSentinel${process.pid}x${Date.now()}`
-        //應用系統路由先驗身分再驗 keyTable(perm-run01 P-5): 哨兵請求須帶管理員等級之 token(TOKEN_APP＝系統服務用途)才會走到 keyTable 檢查並記 srLog
+        //應用系統路由先驗身分再驗 keyTable(perm-run01 P-5): 哨兵請求須帶系統管理者等級之 token(TOKEN_APP＝系統服務用途)才會走到 keyTable 檢查並記 srLog
         await httpText(`${apiBaseUrl}/syncAndReplaceTabs?keyTable=${sentinel}&token=${encodeURIComponent(TOKEN_APP)}`, { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: '{}' })
         let lines = []
         let tEnd = Date.now() + 30000

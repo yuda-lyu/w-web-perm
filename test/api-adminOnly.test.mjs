@@ -1,15 +1,15 @@
-//權限後台與資料通道只限系統管理員(perm-run01; 使用者 2026-10-24 裁示「系統管理員才能讀寫 4 表, 一般使用者是沒法進權限後台的, 故只能用 token 查自己權限樹」; 真後端)。
+//權限後台與資料通道只限系統管理者(perm-run01; 使用者 2026-10-24 裁示「系統管理者才能讀寫 4 表, 一般使用者是沒法進權限後台的, 故只能用 token 查自己權限樹」; 真後端)。
 //規格: C:\opensrcOper\dspec\使用者身分驗證原則.md 二.4(函數層級須另檢查角色, 不得只靠部署方之授權設定); 規則帳本 R-ADMIN-ONLY-01(sgud/rule/rulebook_security.md)。
 //
-//定義: 系統管理員＝perm users 表中 isAdmin='y' 且 isActive='y' 之列(perm 以自身表為權威, 不採 token 宣稱值); 一般使用者＝isAdmin='n' 者。
-//角色軸: A 管理員(sys)、M 一般使用者(TOKEN_MEMBER: perm 列 isAdmin n 且啟用, srv.mjs 之 verifyClientUser 放行 → 「部署方放行」)、M+ 一般使用者被升為管理員(perm 為權威)、
-//        D 停用之管理員(TOKEN_ADMIN2, isAdmin y 但 isActive n)、P 部署方放行之一般使用者(TOKEN_PETER; perm-run01 本輪 P-7 起 srv.mjs 之 verifyClientUser 不再以 isAdmin 否決)、
+//定義: 系統管理者＝perm users 表中 isAdmin='y' 且 isActive='y' 之列(perm 以自身表為權威, 不採 token 宣稱值); 一般使用者＝isAdmin='n' 者。
+//角色軸: A 系統管理者(sys)、M 一般使用者(TOKEN_MEMBER: perm 列 isAdmin n 且啟用, srv.mjs 之 verifyClientUser 放行 → 「部署方放行」)、M+ 一般使用者被升為系統管理者(perm 為權威)、
+//        D 停用之系統管理者(TOKEN_ADMIN2, isAdmin y 但 isActive n)、P 部署方放行之一般使用者(TOKEN_PETER; perm-run01 本輪 P-7 起 srv.mjs 之 verifyClientUser 不再以 isAdmin 否決)、
 //        X 不在 perm 且 isApp 未轉傳(TOKEN_NOFLAG; 原 TOKEN_APP, 現屬系統服務用途, 見 api-callerMatrix)、B 無效 token。
 //入口軸: 資料通道 RPC(唯讀 getWebInfor／getStaEvent／getStaEventTable、寫入 updateXxx ×4)、表 select ×4、系統函數([sys:getFuncList]／[sys:getTableTags])、
 //        上傳下載入口(/api/ulctr、slc、dwgfn、dwgf、dw)、本體 __sysToken__(執行身分)、/api/getUserByToken(後台登入檢查)、/api/getPerm(查本人權限樹, 一般使用者照常開放)。
-//[A] 連線閘: 一般使用者(部署方放行)經任何入口皆被拒(傳輸層 permission denied)、回應不含資料、記 srLog verifyConn-error msg userNotAdmin(不含 token); 管理員照常。
-//[B] 執行身分: 標頭 token 為管理員、本體 __sysToken__ 為一般使用者 → reject userNotAdmin、函數不執行(零寫入、零資料)、記 srLog getUserIdByToken-error。
-//[C] /api/getUserByToken: 一般使用者(部署方放行) → {state:'error', msg:'userNotAdmin'}; 管理員照常; 部署方拒絕者仍為 userNoPermission(不改既有鍵)。
+//[A] 連線閘: 一般使用者(部署方放行)經任何入口皆被拒(傳輸層 permission denied)、回應不含資料、記 srLog verifyConn-error msg userNotAdmin(不含 token); 系統管理者照常。
+//[B] 執行身分: 標頭 token 為系統管理者、本體 __sysToken__ 為一般使用者 → reject userNotAdmin、函數不執行(零寫入、零資料)、記 srLog getUserIdByToken-error。
+//[C] /api/getUserByToken: 一般使用者(部署方放行) → {state:'error', msg:'userNotAdmin'}; 系統管理者照常; 部署方拒絕者仍為 userNoPermission(不改既有鍵)。
 //[D] /api/getPerm 與應用路由不變: 一般使用者取得本人權限樹(與同授權之既有使用者 getPermUserInfor 結果一致)、非本人不可查。
 //跑法(需測試鎖): node C:/opensrcOper/tools/quiet-run.mjs --name tadmin --lock --timeout 1800 -- npx mocha test/api-adminOnly.test.mjs --timeout 300000
 import assert from 'assert'
@@ -57,11 +57,11 @@ let getUserByTokenApi = async (token) => {
     return await r.json()
 }
 
-//回應不得含之個資與資料特徵(base seed 之使用者 email／名稱; 管理員視角之資料)
+//回應不得含之個資與資料特徵(base seed 之使用者 email／名稱; 系統管理者視角之資料)
 const LEAK = ['admin@example.com', 'peter@example.com', 'mary@example.com', 'john@example.com', '權限群組M1', '權限群組M4']
 
 
-describe('api-adminOnly (權限後台與資料通道只限系統管理員, perm-run01, 真後端)', function() {
+describe('api-adminOnly (權限後台與資料通道只限系統管理者, perm-run01, 真後端)', function() {
     this.timeout(300000)
 
     let BASE = null
@@ -78,7 +78,7 @@ describe('api-adminOnly (權限後台與資料通道只限系統管理員, perm-
         }
     }
 
-    //addUsers: 以管理員在 base seed 的 users 之上追加夾具使用者
+    //addUsers: 以系統管理者在 base seed 的 users 之上追加夾具使用者
     let addUsers = async (rows) => {
         let cur = await rowsOf('users')
         let r = await callRpc('updateUsers', [[...cur, ...rows]], TOKEN_ADMIN)
@@ -116,7 +116,7 @@ describe('api-adminOnly (權限後台與資料通道只限系統管理員, perm-
     describe('A 連線閘(checkToken): 一般使用者(部署方放行)經任何資料通道入口皆被拒', function() {
 
         let grupsAdd = async () => (await rowsOf('grups')).concat([{ id: 'id-ao-new', order: 0, name: 'ao-new', description: '', from: '', cpemis: '{}' }])
-        //入口表: 名稱、函數、參數(函數回傳參數陣列)、管理員對照是否應成功
+        //入口表: 名稱、函數、參數(函數回傳參數陣列)、系統管理者對照是否應成功
         let entries = [
             { name: 'RPC 唯讀 getWebInfor', fn: 'getWebInfor', args: async () => [] },
             { name: 'RPC 唯讀 getStaEventTable', fn: 'getStaEventTable', args: async () => [] },
@@ -134,7 +134,7 @@ describe('api-adminOnly (權限後台與資料通道只限系統管理員, perm-
         ]
 
         for (let e of entries) {
-            it(`AO-A1 ${e.name}: 一般使用者被連線閘拒絕(permission denied)、回應無資料、零寫入; 管理員同一輸入照常  [使用者裁示: 一般使用者沒法進權限後台]`, async function() {
+            it(`AO-A1 ${e.name}: 一般使用者被連線閘拒絕(permission denied)、回應無資料、零寫入; 系統管理者同一輸入照常  [使用者裁示: 一般使用者沒法進權限後台]`, async function() {
                 await addMember()
                 let before = await snap4()
                 let args = await e.args()
@@ -146,9 +146,9 @@ describe('api-adminOnly (權限後台與資料通道只限系統管理員, perm-
                 }
                 A.ok(!r.raw.includes(TOKEN_MEMBER), '回應不得回顯 token')
                 A.equal(await snap4(), before, '零寫入')
-                //對照: 管理員同一輸入成功(差別只在角色)
+                //對照: 系統管理者同一輸入成功(差別只在角色)
                 let ok = await callRpc(e.fn, args, TOKEN_ADMIN)
-                A.equal(ok.ok, true, `管理員照常 ${e.fn}: ${JSON.stringify(ok).slice(0, 200)}`)
+                A.equal(ok.ok, true, `系統管理者照常 ${e.fn}: ${JSON.stringify(ok).slice(0, 200)}`)
             })
         }
 
@@ -159,8 +159,8 @@ describe('api-adminOnly (權限後台與資料通道只限系統管理員, perm-
             let rows = (await rowsOf('grups')).concat([{ id: 'id-ao-a2', order: 0, name: 'ao-a2', description: '', from: '', cpemis: '{}' }])
             let w = await callRpc('updateGrups', [rows], TOKEN_MEMBER)
             A.equal(w.ok, true, JSON.stringify(w).slice(0, 300))
-            A.ok((await rowsOf('grups')).some((g) => g.id === 'id-ao-a2'), '升為管理員後之寫入生效')
-            //管理員(sys)把 member 降為一般使用者 → 立即被拒(每次請求新鮮讀 perm 列, 不快取)
+            A.ok((await rowsOf('grups')).some((g) => g.id === 'id-ao-a2'), '升為系統管理者後之寫入生效')
+            //系統管理者(sys)把 member 降為一般使用者 → 立即被拒(每次請求新鮮讀 perm 列, 不快取)
             let users = (await rowsOf('users')).map((u) => (u.id === 'id-for-member' ? { ...u, isAdmin: 'n' } : u))
             let d = await callRpc('updateUsers', [users], TOKEN_ADMIN)
             A.equal(d.ok, true, JSON.stringify(d).slice(0, 300))
@@ -169,7 +169,7 @@ describe('api-adminOnly (權限後台與資料通道只限系統管理員, perm-
             A.equal(r2.msg, 'permission denied')
         })
 
-        it('AO-A3 停用之管理員(perm 列 isAdmin y、isActive n)被拒(permission denied), 與角色檢查無關的既有關卡不退讓', async function() {
+        it('AO-A3 停用之系統管理者(perm 列 isAdmin y、isActive n)被拒(permission denied), 與角色檢查無關的既有關卡不退讓', async function() {
             await addUsers([userRow('id-for-admin2', 'admin2', 'y', 'n', '{}')])
             let r = await callRpc('getWebInfor', [], TOKEN_ADMIN2)
             A.equal(r.ok, false)
@@ -199,7 +199,7 @@ describe('api-adminOnly (權限後台與資料通道只限系統管理員, perm-
             A.ok(!JSON.stringify(lines).includes(TOKEN_MEMBER), 'log 不得含 token 值')
         })
 
-        //上傳下載入口: 各路由先經同一連線閘(apiType 為 upload-controller／upload-slice／download-get-filename／download-get-file／download); 一般使用者之回應須與無效 token 之回應完全相同(permission denied), 且不同於管理員(管理員過閘後因缺參數得到另一種回應)
+        //上傳下載入口: 各路由先經同一連線閘(apiType 為 upload-controller／upload-slice／download-get-filename／download-get-file／download); 一般使用者之回應須與無效 token 之回應完全相同(permission denied), 且不同於系統管理者(系統管理者過閘後因缺參數得到另一種回應)
         let routes = [
             { name: '/api/ulctr(upload-controller)', path: '/api/ulctr', method: 'POST' },
             { name: '/api/slc(upload-slice)', path: '/api/slc', method: 'POST' },
@@ -214,7 +214,7 @@ describe('api-adminOnly (權限後台與資料通道只限系統管理員, perm-
             return { status: r.status, body }
         }
         for (let rt of routes) {
-            it(`AO-A6 ${rt.name}: 一般使用者之回應 ≡ 無效 token 之回應(permission denied), ≢ 管理員之回應(已過閘)  [所有入口名皆經同一連線閘]`, async function() {
+            it(`AO-A6 ${rt.name}: 一般使用者之回應 ≡ 無效 token 之回應(permission denied), ≢ 系統管理者之回應(已過閘)  [所有入口名皆經同一連線閘]`, async function() {
                 await addMember()
                 let rm = await callRoute(rt, TOKEN_MEMBER)
                 let rb = await callRoute(rt, TOKEN_BAD)
@@ -222,14 +222,14 @@ describe('api-adminOnly (權限後台與資料通道只限系統管理員, perm-
                 A.equal(rm.status, rb.status, '一般使用者與無效 token 之 HTTP 狀態相同')
                 A.equal(rm.body, rb.body, '一般使用者與無效 token 之回應本體相同(皆為 permission denied)')
                 A.ok(rm.body.includes('permission denied'), `回應應為 permission denied: ${rm.body.slice(0, 120)}`)
-                A.ok(!ra.body.includes('permission denied'), `管理員已過閘(回應為參數類錯誤, 非 permission denied): ${ra.body.slice(0, 120)}`)
+                A.ok(!ra.body.includes('permission denied'), `系統管理者已過閘(回應為參數類錯誤, 非 permission denied): ${ra.body.slice(0, 120)}`)
             })
         }
     })
 
 
     // ===== [B] 執行身分: 本體 __sysToken__ =====
-    describe('B 執行身分(getUserIdByToken): 標頭 token 為管理員、本體 token 為一般使用者', function() {
+    describe('B 執行身分(getUserIdByToken): 標頭 token 為系統管理者、本體 token 為一般使用者', function() {
 
         it('AO-B1 本體 token 為一般使用者(部署方放行) → reject userNotAdmin; 寫入函數不執行(零寫入)、唯讀函數與表 select 亦不回資料  [框架對本體 token 反查即驗證身分]', async function() {
             await addMember()
@@ -247,7 +247,7 @@ describe('api-adminOnly (權限後台與資料通道只限系統管理員, perm-
             A.equal(await snap4(), before, '零寫入')
         })
 
-        it('AO-B2 本體 token 之使用者被升為管理員(perm 列 isAdmin y) → 以其身分執行(對照: 差別只在 perm 角色)', async function() {
+        it('AO-B2 本體 token 之使用者被升為系統管理者(perm 列 isAdmin y) → 以其身分執行(對照: 差別只在 perm 角色)', async function() {
             await addMember('y', 'y')
             let rows = (await rowsOf('grups')).concat([{ id: 'id-ao-b2', order: 0, name: 'ao-b2', description: '', from: '', cpemis: '{}' }])
             let r = await callRpc('updateGrups', [rows], TOKEN_ADMIN, { sysToken: TOKEN_MEMBER })
@@ -270,9 +270,9 @@ describe('api-adminOnly (權限後台與資料通道只限系統管理員, perm-
 
 
     // ===== [C] /api/getUserByToken(後台登入檢查) =====
-    describe('C 後台登入檢查(/api/getUserByToken): 非系統管理員一律拒絕', function() {
+    describe('C 後台登入檢查(/api/getUserByToken): 非系統管理者一律拒絕', function() {
 
-        it('AO-C1 一般使用者(部署方放行)登入檢查 → state error、msg userNotAdmin(固定錯誤鍵); 不回使用者資料; 管理員照常', async function() {
+        it('AO-C1 一般使用者(部署方放行)登入檢查 → state error、msg userNotAdmin(固定錯誤鍵); 不回使用者資料; 系統管理者照常', async function() {
             await addMember()
             let r = await getUserByTokenApi(TOKEN_MEMBER)
             A.equal(r.state, 'error', JSON.stringify(r).slice(0, 200))
@@ -286,7 +286,7 @@ describe('api-adminOnly (權限後台與資料通道只限系統管理員, perm-
             A.equal(ok.msg.id, 'id-for-admin')
         })
 
-        it('AO-C2 perm 為權威: member 之 perm 列升為管理員 → 登入檢查通過; 降回一般使用者 → 拒', async function() {
+        it('AO-C2 perm 為權威: member 之 perm 列升為系統管理者 → 登入檢查通過; 降回一般使用者 → 拒', async function() {
             await addMember('y', 'y')
             let r1 = await getUserByTokenApi(TOKEN_MEMBER)
             A.equal(r1.state, 'success', JSON.stringify(r1).slice(0, 200))
@@ -298,7 +298,7 @@ describe('api-adminOnly (權限後台與資料通道只限系統管理員, perm-
             A.equal(r2.msg, 'userNotAdmin')
         })
 
-        it('AO-C3 其餘角色之既有錯誤鍵不變: 部署方拒絕者 userNoPermission、不在 perm 者 cannotGetUserFromPerm、無效 token cannotFindUserFromToken、停用之管理員 cannotGetUserFromPerm', async function() {
+        it('AO-C3 其餘角色之既有錯誤鍵不變: 部署方拒絕者 userNoPermission、不在 perm 者 cannotGetUserFromPerm、無效 token cannotFindUserFromToken、停用之系統管理者 cannotGetUserFromPerm', async function() {
             await addUsers([userRow('id-for-admin2', 'admin2', 'y', 'n', '{}'), userRow('id-for-deny', 'deny', 'y', 'y', '{}')])
             //perm-run01 本輪(P-7): srv.mjs 之 verifyClientUser 不再以 isAdmin 否決, peter 通過部署方後由本套件以 userNotAdmin 拒絕; 「部署方拒絕」改以非角色因素否決之 TOKEN_DENY 代表
             A.equal((await getUserByTokenApi(TOKEN_PETER)).msg, 'userNotAdmin')
@@ -372,7 +372,7 @@ describe('api-adminOnly (權限後台與資料通道只限系統管理員, perm-
             A.ok(ur.rules.some((r) => r.isActive === 'y'), '權限樹非空(有 y 項)')
         })
 
-        it('AO-D2 /api/getPerm 只回「token 所屬」之本人權限樹: 管理員 token 得管理員之樹(與 member 不同)', async function() {
+        it('AO-D2 /api/getPerm 只回「token 所屬」之本人權限樹: 系統管理者 token 得系統管理者之樹(與 member 不同)', async function() {
             await addMember()
             let ua = await getPerm(urlGetPerm, TOKEN_ADMIN)
             A.equal(ua.user.id, 'id-for-admin')

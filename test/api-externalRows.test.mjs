@@ -254,7 +254,7 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
 
     let BASE = null //base seed 快照(users／grups／pemis 依 order; targets 依 order)
 
-    //restoreBase: 移除外部列夾具(purgeExternalRows, 測試框架之重置)後以管理者寫入 RPC 把四表還原為 base seed(後台列)
+    //restoreBase: 移除外部列夾具(purgeExternalRows, 測試框架之重置)後以系統管理者寫入 RPC 把四表還原為 base seed(後台列)
     let restoreBase = async () => {
         RID.clear() //外部列將被移除重建, 內部 id 隨之改變
         await restoreTables(BASE)
@@ -463,7 +463,7 @@ describe('api-externalRows (外部列守門與過期快照基準, 真後端)', f
                 rows = await rowsOf(kt)
                 await expectReject(`${kt} 空陣列基準`, kt, mk(rows, AV[kt][1]), 'saveStale', { baseline: [] })
 
-                //(c2) 過期: 持舊基準 B1, 另一路徑(管理者二)以正確基準改了同一列之指派欄後, 再以 B1 存檔 → saveStale
+                //(c2) 過期: 持舊基準 B1, 另一路徑(系統管理者二)以正確基準改了同一列之指派欄後, 再以 B1 存檔 → saveStale
                 let B1 = baselineOf(kt, rows)
                 await mustWrite(`${kt} 另一路徑改同列指派欄`, kt, mk(rows, AV[kt][1]), { baseline: B1 })
                 await expectReject(`${kt} 持過期基準(他人已改該列)`, kt, mk(await rowsOf(kt), AV[kt][2]), 'saveStale', { baseline: B1 })

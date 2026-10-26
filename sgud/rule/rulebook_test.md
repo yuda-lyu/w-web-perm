@@ -107,22 +107,22 @@
 
 ## 測試輔助之規則: 外部列夾具之收尾與還原(2026-10-22 run09; 來源: 主控全套 `af43394` 之 12 敗同一根因〔`C:\opensrcOper\dnow\20261021095534\master-final.log`〕)
 
-### R-TEST-EXT-CLEAN-01 外部列夾具只經單一入口 `cleanExternalFixtures` 移除並回驗; 收尾不得以管理者寫入、reseed 或各檔自寫 delAll 代之
+### R-TEST-EXT-CLEAN-01 外部列夾具只經單一入口 `cleanExternalFixtures` 移除並回驗; 收尾不得以系統管理者寫入、reseed 或各檔自寫 delAll 代之
 
-軸: 夾具建立方式 { 經 `/syncAndReplaceTabs`〔外部列, `from` 非空字串〕, 管理者寫入 RPC〔後台列, `from` 為 `''`〕, `restartBackend` 之 `seedExtra` 旁路〔後台歷史列〕 } × 收尾手段 { 同步路徑重送、測試框架直接重置〔`purgeExternalRows`〕、管理者寫入 `updateXxx`、`restartBackend({ reseed:true })`、各檔自寫 `woItems[kt].delAll({ from })` } × 執行方式 { 逐檔隔離〔每檔重種 ./db〕, 單一 mocha 行程〔`npm test`, 後端與 ./db 共用〕 }。
+軸: 夾具建立方式 { 經 `/syncAndReplaceTabs`〔外部列, `from` 非空字串〕, 系統管理者寫入 RPC〔後台列, `from` 為 `''`〕, `restartBackend` 之 `seedExtra` 旁路〔後台歷史列〕 } × 收尾手段 { 同步路徑重送、測試框架直接重置〔`purgeExternalRows`〕、系統管理者寫入 `updateXxx`、`restartBackend({ reseed:true })`、各檔自寫 `woItems[kt].delAll({ from })` } × 執行方式 { 逐檔隔離〔每檔重種 ./db〕, 單一 mocha 行程〔`npm test`, 後端與 ./db 共用〕 }。
 
-- **根因(證據)**: 全套 `af43394`〔3199 過、12 敗〕: `e2e-init` E2E-006 經 `/syncAndReplaceTabs` 灌入 `id-mk-dup`(`from=appE2eInit006`), 收尾 `restartBackend('./settings.json', { reseed:true })` 在單一 mocha 行程內刪不掉 `./db`〔api 檔經 `getWoItems()` 使**本行程**持有 lmdb 映射, `wipeDbVerified(strict:false)` 退化為 upsert, 只補種子列、不移除多餘列〕, 於是退而以**管理者寫入** `updateUsers` 移除 → 回 `saveExternalRowChanged`(run07 起後台不得刪外部列, 產品正常運作)。`id-mk-dup` 殘留使其後 `e2e-ref-cascade`／`e2e-rela-user-grup`／`e2e-targets`／`e2e-users` 之 `captureBaseSeedOnce('users')` 擷取到 5 筆而失敗〔守門正常運作〕。**問題在測試收尾, 不在產品, 也不在前置檢查。**
+- **根因(證據)**: 全套 `af43394`〔3199 過、12 敗〕: `e2e-init` E2E-006 經 `/syncAndReplaceTabs` 灌入 `id-mk-dup`(`from=appE2eInit006`), 收尾 `restartBackend('./settings.json', { reseed:true })` 在單一 mocha 行程內刪不掉 `./db`〔api 檔經 `getWoItems()` 使**本行程**持有 lmdb 映射, `wipeDbVerified(strict:false)` 退化為 upsert, 只補種子列、不移除多餘列〕, 於是退而以**系統管理者寫入** `updateUsers` 移除 → 回 `saveExternalRowChanged`(run07 起後台不得刪外部列, 產品正常運作)。`id-mk-dup` 殘留使其後 `e2e-ref-cascade`／`e2e-rela-user-grup`／`e2e-targets`／`e2e-users` 之 `captureBaseSeedOnce('users')` 擷取到 5 筆而失敗〔守門正常運作〕。**問題在測試收尾, 不在產品, 也不在前置檢查。**
 - **規則**:
-  1. **外部列(`from` 非空字串)夾具之移除只有兩條合規路徑**: ①**同步路徑**——同一 `from` 重送不含該列之批次(只在分區仍保留 ≥1 列時可用; 外部同步端點拒空 rows〔`isearr` 閘, ADR-008〕, 清空整個分區走不通); ②**測試框架之直接重置**——經單一入口 `cleanExternalFixtures`(`test/tools/api-setup.mjs`; 底層 `purgeExternalRows`, 直接刪庫內該 `from` 之列, 不經產品寫入入口, **產品 Lv1 守門與前置檢查皆不放寬**; 對照案 `api-cleanExternal` CE-003: 管理者寫入仍回 `saveExternalRowChanged`)。
-  2. **禁止**: ①以管理者寫入(`updateUsers`／`updateGrups`／`updatePemis`／`updateTargets`)移除外部列; ②倚賴 `restartBackend({ reseed:true })` 移除夾具(逐檔隔離才會真重種; 單一行程只 upsert 種子列, 不移除多餘列, 見 `e2e-setup.mjs` `restartBackend` 註解); ③各檔自寫 `woItems[kt].delAll({ from })`; ④為過關放寬 `assertPristineSeed`／`captureBaseSeedOnce` 前置檢查或產品之外部列保護。
+  1. **外部列(`from` 非空字串)夾具之移除只有兩條合規路徑**: ①**同步路徑**——同一 `from` 重送不含該列之批次(只在分區仍保留 ≥1 列時可用; 外部同步端點拒空 rows〔`isearr` 閘, ADR-008〕, 清空整個分區走不通); ②**測試框架之直接重置**——經單一入口 `cleanExternalFixtures`(`test/tools/api-setup.mjs`; 底層 `purgeExternalRows`, 直接刪庫內該 `from` 之列, 不經產品寫入入口, **產品 Lv1 守門與前置檢查皆不放寬**; 對照案 `api-cleanExternal` CE-003: 系統管理者寫入仍回 `saveExternalRowChanged`)。
+  2. **禁止**: ①以系統管理者寫入(`updateUsers`／`updateGrups`／`updatePemis`／`updateTargets`)移除外部列; ②倚賴 `restartBackend({ reseed:true })` 移除夾具(逐檔隔離才會真重種; 單一行程只 upsert 種子列, 不移除多餘列, 見 `e2e-setup.mjs` `restartBackend` 註解); ③各檔自寫 `woItems[kt].delAll({ from })`; ④為過關放寬 `assertPristineSeed`／`captureBaseSeedOnce` 前置檢查或產品之外部列保護。
   3. **每個建立外部列夾具之測試檔須在收尾呼叫 `cleanExternalFixtures`**(或其同系底層 `restoreTables`／`purgeExternalRows`／`createIsolation`)並**回驗**: 函式內建①經資料通道 `select` 偵測〔無待清者不 import `g_mOrm`, 不使本行程新增 lmdb 映射〕②移除③再 `select` 確認無殘留; 整檔只動外部夾具者加 `pristine:true`(各表主鍵集合＝種子, 後台多餘列即拋錯)。只清自己專屬之 `from`(`froms`), 不動他人分區; 收尾快照本身含外部列者以 `keepIds` 保留。
   4. **夾具各用專屬 `from`(檔名可辨)**: `assertPristineSeed` 訊息於多出之外部列主鍵後註記 `(from=…)`(如 `id-mk-dup(from=appE2eInit006)`), 前置檢查失敗時即可指向遺留之檔。
-  5. 後台列夾具(`from` 為 `''`, 管理者寫入 RPC 或 `seedExtra` 旁路建立)之收尾不在本規則: 仍走 `restoreTables`／`restoreDbOnce`／`editTableRows`(管理者寫入可刪後台列; `restoreTables` 內已先 `purgeExternalRows`)。
+  5. 後台列夾具(`from` 為 `''`, 系統管理者寫入 RPC 或 `seedExtra` 旁路建立)之收尾不在本規則: 仍走 `restoreTables`／`restoreDbOnce`／`editTableRows`(系統管理者寫入可刪後台列; `restoreTables` 內已先 `purgeExternalRows`)。
 - **站點全集(2026-10-22 run09 盤點; `unit-e2e-lifecycle` LC-004 以靜態掃描釘住建立外部列夾具之檔〔2026-10-23 perm-run01 起 16 檔; 原 14 檔〕, 新增者須同步更新該清單與本表)**:
 
 | 檔 | 外部列夾具之 `from` | 收尾 | 判定 |
 |---|---|---|---|
-| `e2e-init`(E2E-006) | `appE2eInit006` | `restartBackend(reseed)` 後 `cleanExternalFixtures({ kts:['users'], froms:[FROM_006], pristine:true })` | **本輪修正**(原: 管理者寫入 `updateUsers` 移除 → `saveExternalRowChanged`) |
+| `e2e-init`(E2E-006) | `appE2eInit006` | `restartBackend(reseed)` 後 `cleanExternalFixtures({ kts:['users'], froms:[FROM_006], pristine:true })` | **本輪修正**(原: 系統管理者寫入 `updateUsers` 移除 → `saveExternalRowChanged`) |
 | `api-authMerge` | `appTest-chm`／`appTest-chm2` | `cleanExternalFixtures({ froms })` | 本輪改走單一入口(原自寫 `delAll({ from })`) |
 | `api-getPermUserInfor` | `appTest-oi`／`appTest-ap` | 同上 | 同上 |
 | `api-tokenSafety` | `apiTokenSafety`／`apiTokenSafety-blocked` | 同上 | 同上 |
@@ -137,7 +137,7 @@
 | `e2e-array-form` | `appArrForm` | `restoreTables`; 旁路歷史同名列〔後台列〕段 `reseed` 後殘留則 `restoreTables` | 原已合規, 未動(本輪未擴大跑此檔: 未改其呼叫之任一函式之行為) |
 | `e2e-external-rows`／`e2e-ref-cascade` | `appExtU`／`appExtG`／`appExtWarn`／`appExtLate`／`appRefCascade` | `createIsolation().restore()` → `restoreTables` | 原已合規, 未動 |
 | `api-cleanExternal`(新) | `appCe-1`／`appCe-2` | 本入口之行為契約 CE-001～007 | 新增 |
-| `api-baseline`(perm-run01 新) | `appAbSync` | `purgeExternalRows`(`froms:[F_SYNC]`; 全表以 `keepIds` 保留種子列)後依「targets → pemis → grups → users」以管理者寫入還原四表(同 `api-refCascade` 之 `restoreAll`; 不用 `restoreTables`——其次序 users→grups→pemis 在群組改名連帶之後會使 grups 改回原名被 `renameCascadeNameInUse` 拒收) | 新增(2026-10-23) |
+| `api-baseline`(perm-run01 新) | `appAbSync` | `purgeExternalRows`(`froms:[F_SYNC]`; 全表以 `keepIds` 保留種子列)後依「targets → pemis → grups → users」以系統管理者寫入還原四表(同 `api-refCascade` 之 `restoreAll`; 不用 `restoreTables`——其次序 users→grups→pemis 在群組改名連帶之後會使 grups 改回原名被 `renameCascadeNameInUse` 拒收) | 新增(2026-10-23) |
 | `e2e-concurrent-edit`(perm-run01 新) | `appCeX` | `createIsolation`(含本檔對 targets 表之擷取／還原: 共用快照只含 users／grups／pemis, 見 R-E2E-ISO-01) | 新增(2026-10-23) |
 
   其餘 `reseed` 站點: `api-verifyConn-auth` after(還原 admin `isActive`, 不建立多餘列, upsert 足夠)——不涉外部列。
@@ -147,12 +147,12 @@
   rg -n "\.delAll\(\s*\{\s*from\b" test/api-*.test.mjs test/e2e-*.test.mjs
   # 2) 單一入口之使用點. 期望: api-authMerge 1／api-getPermUserInfor 2／api-mapKey 1／api-syncAndReplaceTabs 1／api-tokenSafety 1／e2e-init 1／api-cleanExternal 13(含註解)／unit-e2e-lifecycle 2／tools/api-setup.mjs 5(定義與註解)
   rg -c "cleanExternalFixtures\(" test
-  # 3) e2e-init 不得以管理者寫入收尾. 期望: 0 命中
+  # 3) e2e-init 不得以系統管理者寫入收尾. 期望: 0 命中
   rg -n "updateUsers" test/e2e-init.test.mjs
   # 4) reseed 站點(收尾不得倚賴其移除多餘列). 期望(含註解): api-mapKey 1／api-verifyConn-auth 1／api-refCascade 1／e2e-array-form 1／e2e-init 2／api-cleanExternal 1(註解)
   rg -c "reseed: ?true" test/*.test.mjs
   ```
-- **測試**: `api-cleanExternal`(CE-001～007, 真後端: 限定分區、不限分區＋pristine、**管理者寫入仍刪不掉外部列〔不放寬產品〕**、`keepIds`、pristine 回驗不放寬且訊息含 `from`、`froms` 含 `''` 即拋錯、無外部列回 0)、`unit-e2e-lifecycle`(LC-004／004b 站點不變式與判定器自測、LC-005 e2e-init E2E-006 收尾形狀、BS-002b `(from=…)` 註記)。**修前紅**: 全套順序之單一 mocha 行程重現(見 run09 報告); 靜態不變式對 `af43394` 之檔亦會紅(LC-004: 5 檔自寫 `delAll({ from })`; LC-005: e2e-init 無 `cleanExternalFixtures`)。
+- **測試**: `api-cleanExternal`(CE-001～007, 真後端: 限定分區、不限分區＋pristine、**系統管理者寫入仍刪不掉外部列〔不放寬產品〕**、`keepIds`、pristine 回驗不放寬且訊息含 `from`、`froms` 含 `''` 即拋錯、無外部列回 0)、`unit-e2e-lifecycle`(LC-004／004b 站點不變式與判定器自測、LC-005 e2e-init E2E-006 收尾形狀、BS-002b `(from=…)` 註記)。**修前紅**: 全套順序之單一 mocha 行程重現(見 run09 報告); 靜態不變式對 `af43394` 之檔亦會紅(LC-004: 5 檔自寫 `delAll({ from })`; LC-005: e2e-init 無 `cleanExternalFixtures`)。
 - **驗證紀錄(2026-10-22 run09; 同一 mocha 行程、依全套相對順序)**: `api-*`(14 檔)→ `e2e-external-rows` → `e2e-init` → `e2e-ref-cascade` → `e2e-rela-user-grup` → `e2e-targets` → `e2e-users` → `unit-*`(50 檔): **修後 3105 passing／1 pending／0 failing(51 分 57 秒, 離開碼 0)**; 修前同順序(不含 unit、api 為 13 檔)**295 passing／12 failing**(失敗項與主控全套逐項相同: E2E-006×2、ref-cascade before／after all×4、rela-user-grup before all×2、targets run06 段 before／after all×2、users before all×2)。既有標準圖 0 張改變(`git status test/pics` 無輸出), `./testPending/` 無新增。未跑之 e2e 檔(array-form／grups／layout／pemis／rela-grup-pemi／rela-pemi-rule／stainfor)由主控收尾輪全套涵蓋。偶發註記: 修後第 2 輪曾有 `api-refCascade` API-RC-044 一案「srLog 30 秒內讀到 0 行」(同碼首輪與第 3 輪皆通過), 見 `sgud/exp/experience.md` run09 末條。
 
 ## 單一行程全跑之 DB 收尾對稱、授權資料共用解碼、欄位值純量(2026-10-20 run01, ADR-030; 來源: 主控第 89、92 項建議書 `建議w-web-perm修正.md`)
@@ -243,7 +243,7 @@
 
 - **規則**:
   1. 單元: `test/tools/declHelper.mjs:autoDecl(pc, woItems)` 把 `pc.updateUsers／updateGrups／updatePemis` 包成「合規客戶端」——未帶 `refs`／`subject` 時，依送出之整表與替身資料表目前內容以 `buildRefDecl`（無 picks 路徑，同清單頁）組宣告，**僅在宣告非空（本次存檔改變了引用）時附上**（空宣告會使伺服端取被引用表鎖，改變取鎖軌跡／持鎖互斥類測試的被測前提）；讀替身時用 `snapshot()`，不計入 `select` 次數。要測缺宣告被拒者在 opt 加 `__noDecl: true`。直接測宣告本身的檔（`unit-procCore-identity`、`unit-refIdentity`）**不包**。
-  2. API: `test/tools/api-setup.mjs:callRpc` 對 `updateUsers／updateGrups／updatePemis` 自動附 `refs`（讀庫以管理者權杖經資料通道 `select`）；`opt.noDecl: true` 略過。已帶 `refs`／`subject` 者不覆蓋。
+  2. API: `test/tools/api-setup.mjs:callRpc` 對 `updateUsers／updateGrups／updatePemis` 自動附 `refs`（讀庫以系統管理者權杖經資料通道 `select`）；`opt.noDecl: true` 略過。已帶 `refs`／`subject` 者不覆蓋。
   3. e2e 置備: `test/tools/e2e-setup.mjs:resetDb／resetDbTables` 經 `updateWithDecl` 於 throwaway page 附宣告；e2e UI 案例不包（應用程式碼自行送）。
   4. 外部匯入夾具: `test/tools/e2eExt.mjs:syncRows(kt, rows, from)` 把夾具列的 `id`（夾具標籤）改送為 `srcKey` 並丟掉 `id`（同步端點不收 `id`），`rowOf`／`hasRow` 在 id 找不到時以 `srcKey` 找，`idOfSrc(kt, srcKey)` 取真實 id；外部列的真實 id 由伺服端產生（targets 例外: id＝srcKey）。
 - **why**: 不如此，每個「直打 update」的既有測試都得逐案補宣告，案例意圖被樣板淹沒；而測的是各自的規則，不是宣告本身。宣告本身由 `unit-refIdentity`／`unit-procCore-identity`／`api-identity` 與 e2e `e2e-concurrent-edit` 專測。

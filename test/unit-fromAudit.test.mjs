@@ -1473,7 +1473,7 @@ describe('unit-fromAudit (來源欄 from 之稽核、型別正規化與整來源
             await noWrite(wo, '參數錯誤')
         })
 
-        it('FA-080 users 清除: 報告含管理員警示與 id(不含姓名／email); 被清除列缺主鍵者規劃被拒(purgeRowNoId); 超過上限之列從略並註明', async function() {
+        it('FA-080 users 清除: 報告含系統管理者警示與 id(不含姓名／email); 被清除列缺主鍵者規劃被拒(purgeRowNoId); 超過上限之列從略並註明', async function() {
             let fx = stdFx()
             fx.users.push({ id: 'u6', name: 'NAME-u6-zzq', email: 'secret-u6@x.com', from: 'X', isAdmin: 'y', cgrups: '{}' })
             let { logs, log } = mkLog()

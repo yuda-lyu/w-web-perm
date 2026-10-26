@@ -1,0 +1,20 @@
+[quiet-run] exit=0 time=10m08s log=C:\opensrc\開源-JS-411-8-w-web-perm\w-web-perm\tmp\quiet-run\20261026-151547-perm-run01-regen-rela-user-grup.log (141 行, 7 KB)
+[quiet-run] cmd: node test/e2e-rela-user-grup.test.mjs --baseline
+[quiet-run] lock: 取得並已釋放(等待 0s)
+== 最後 15 行(非空,不含上列失敗段落) ==
+  [write] cht-E2E-009-5-row-collapsed (all)
+  [write] cht-E2E-009-6-click-more (all)
+  [write] cht-E2E-009-7-popup-open (all)
+  [write] cht-E2E-009-8-click-mode (all)
+  [write] cht-E2E-009-9-list-open (all)
+  [write] cht-E2E-009-10-click-and (all)
+  [write] cht-E2E-009-11-row-toggled (all)
+  [write] cht-E2E-009-12-row-expanded (all)
+  cht-E2E-010-same-name-users
+  [write] cht-E2E-010-1-dialog-open (all)
+  [write] cht-E2E-010-2-click-enable (all)
+  [write] cht-E2E-010-3-enable-checked (all)
+  [write] cht-E2E-010-4-click-save (all)
+  [write] cht-E2E-010-5-belong-saved (all)
+=== 產製 rela-user-grup baseline 完成 ===
+(完整輸出在 log;要看更多請用 Grep 搜該檔,或 Read 加 offset/limit 讀片段,不要整份讀入)

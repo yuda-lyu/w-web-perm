@@ -7,13 +7,13 @@
 //  M1 經匯入新增之外部使用者(內部 id 為系統配)以其 srcKey 登入成功, 回 perm 列(id＝內部 id); 登入入口、資料通道(連線閘＋執行身分)、getPerm 皆通;
 //  M2 外部列的內部 id 不是登入識別: 外部列的 id 恰等於 token 使用者 id 而 srcKey 不同 → 查無(cannotGetUserFromPerm), 資料通道 permission denied;
 //  M3 遷移: 遷移前之舊外部列(無 srcKey)暫以 id 登入(同升版前); 首次匯入補上 srcKey(srcKey＝舊 id)後照常登入、id 不變;
-//  M4 後台列(from 空)仍以 id 登入(不變); 預設管理者 'sys' 不受影響;
+//  M4 後台列(from 空)仍以 id 登入(不變); 預設系統管理者 'sys' 不受影響;
 //  M5 匯入撞值: 批次 srcKey 等於有效後台列 id → 整批拒收 loginIdCollision、零寫入;
 //  M6 後台存檔撞值: 新增之後台列 id 等於有效外部列 srcKey → 整次拒收 loginIdCollision、零變更;
 //  M7 登入撞多筆(歷史資料: 後台列 id 與外部列 srcKey 相同, 皆有效)→ ambiguousUserFromPerm, 不取首筆; 資料通道 permission denied;
 //  M8 mappingBy 為 email／name 時行為不變: 以該欄位登入(與 srcKey 無關), 匯入 srcKey 等於後台 id 不拒;
 //  M9 停用的外部列不能登入(恰 1 筆且停用 → 查無); 重新匯入為有效後可登入; perm-run05 起停用列仍構成撞值(不論 isActive): 匯入／後台存檔皆拒;
-//  M10 以 srcKey 登入之外部管理員呼叫寫入函數: 執行身分為其 perm 內部 id(稽核欄位記內部 id, 非 srcKey)。
+//  M10 以 srcKey 登入之外部系統管理者呼叫寫入函數: 執行身分為其 perm 內部 id(稽核欄位記內部 id, 非 srcKey)。
 //perm-run05(主控 2026-10-24 收件裁示; 規則帳本 R-MAPKEY-05): 登入識別值須跨全表唯一、不論 isActive、含他來源——
 //  M11 匯入撞值(他來源): 批次 srcKey 等於他來源既有外部列之 srcKey(含停用者)→ 整批 loginIdCollision、零寫入; 同來源重送自己之列不算;
 //  M12 登入撞多筆不論有效與否: 兩來源同 srcKey 且一有效一停用 → ambiguousUserFromPerm(不以「只有一列有效」放行); 清掉其一後恰 1 筆有效照常登入;
@@ -52,7 +52,7 @@ let putRows = async (rows) => {
 let rowsFrom = async (from) => (await (await getWoItems()).users.select({ from }))
 //newAdminRow: 後台新增之使用者列(from ''; 稽核欄位由伺服端填)
 let backendRow = (id, o = {}) => ({ id, order: 99, name: 'admin2-b', email: 'admin2-b@example.com', description: '', from: '', cgrups: '{}', isAdmin: 'y', isActive: 'y', ...o })
-//addBackend: 以管理員在現況之上追加後台列(回 callRpc 結果, 不丟錯)
+//addBackend: 以系統管理者在現況之上追加後台列(回 callRpc 結果, 不丟錯)
 let addBackend = async (rows) => {
     let cur = (await selectAllRows('users')).slice().sort((a, b) => (a.order || 0) - (b.order || 0)).map((v) => JSON.parse(JSON.stringify(v)))
     return await callRpc('updateUsers', [[...cur, ...rows]], TOKEN_ADMIN)
@@ -142,7 +142,7 @@ describe('api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 
         A.equal(r1.msg.id, X2)
     })
 
-    it('MI-004 後台列仍以 id 登入(不變); 預設管理者 sys 不受影響  [M4]', async function() {
+    it('MI-004 後台列仍以 id 登入(不變); 預設系統管理者 sys 不受影響  [M4]', async function() {
         let ra = await addBackend([backendRow(X2)])
         A.equal(ra.ok, true, JSON.stringify(ra))
         let r = await getUserByTokenApi(TOKEN_ADMIN2)
@@ -208,7 +208,7 @@ describe('api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 
             A.equal(r.state, 'success', `mappingBy=${mode} 以 ${mode} 登入, 實得: ${JSON.stringify(r)}`)
             A.equal(r.msg.srcKey, 'id-for-admin', '對到的是該外部列(與其 srcKey 無關)')
             let rs = await getUserByTokenApi(TOKEN_ADMIN)
-            A.equal(rs.state, 'success', `mappingBy=${mode} 後台管理者 sys 仍以 ${mode} 登入`)
+            A.equal(rs.state, 'success', `mappingBy=${mode} 後台系統管理者 sys 仍以 ${mode} 登入`)
             A.equal(rs.msg.id, 'id-for-admin')
             await cleanExternalFixtures({ kts: ['users'], froms: [from] })
         }
@@ -234,14 +234,14 @@ describe('api-mapKeyId (mappingBy=id 之 O1: 外部列對 srcKey、後台列對 
         A.equal(r1.msg.srcKey, X2)
     })
 
-    it('MI-010 以 srcKey 登入之外部管理員呼叫寫入函數: 通過 requireAdmin, 稽核欄位記其 perm 內部 id(不是 srcKey)  [M10]', async function() {
+    it('MI-010 以 srcKey 登入之外部系統管理者呼叫寫入函數: 通過 requireAdmin, 稽核欄位記其 perm 內部 id(不是 srcKey)  [M10]', async function() {
         let res = await postSync('users', { from: 'appMi-10', rows: [extRow(X2)] })
         A.equal(res.state, 'success', JSON.stringify(res))
         let me = (await rowsFrom('appMi-10'))[0]
         let grups = (await selectAllRows('grups')).slice().sort((a, b) => (a.order || 0) - (b.order || 0)).map((v) => JSON.parse(JSON.stringify(v)))
         let add = { id: 'id-mi10-g', order: 0, name: 'mi10-g', description: 'mi10', from: '', cpemis: '{}' }
         let rc = await callRpc('updateGrups', [[...grups, add]], TOKEN_ADMIN2)
-        A.equal(rc.ok, true, `外部管理員(srcKey 登入)可寫入, 實得: ${JSON.stringify(rc).slice(0, 200)}`)
+        A.equal(rc.ok, true, `外部系統管理者(srcKey 登入)可寫入, 實得: ${JSON.stringify(rc).slice(0, 200)}`)
         let g = (await selectAllRows('grups')).find((v) => v.id === 'id-mi10-g')
         A.ok(g)
         A.equal(g.userId, me.id, '建立者記 perm 內部 id')

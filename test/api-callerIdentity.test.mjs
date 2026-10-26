@@ -5,9 +5,9 @@
 //    標頭 token(連線閘)有效、本體 token 無效之輸入空間: {不在 perm users〔app 權杖〕、perm 內但被 verifyClientUser 拒〔isAdmin n〕、perm 內但已停用、getUserByToken 查無〔無效〕、
 //    getUserByToken reject 上游原文、verifyClientUser 拋錯〔perm users 內有此列且啟用, 才走到驗證器〕、perm users 無此列〔admin2 尚未建立〕} × 被呼叫函數 {寫入 updateGrups、唯讀 getWebInfor}。
 //    兩 token 皆有效且為不同使用者時以本體 token 之使用者執行(稽核欄位為本體使用者)。mappingBy=email 時回傳 perm 內之 id(非外部 token 宣稱之 id)。
-//[A] requireAdmin: updateTargets／updatePemis／updateGrups／updateUsers 僅 perm users 表中有效且 isAdmin='y' 之使用者可呼叫; 通過部署方 verifyClientUser 之非管理員(TOKEN_MEMBER: srv.mjs 放行)
-//    零寫入; perm 為權威(token 宣稱 isAdmin 'n'、perm 列 'y' 者可呼叫); 管理員照常。
-//    〔perm-run01 更新(R-ADMIN-ONLY-01)〕資料通道的連線閘與執行身分已改為只限系統管理員(getAndVerifyAdminUser), 非管理員於連線閘即被拒(permission denied; 整個入口矩陣見 api-adminOnly),
+//[A] requireAdmin: updateTargets／updatePemis／updateGrups／updateUsers 僅 perm users 表中有效且 isAdmin='y' 之使用者可呼叫; 通過部署方 verifyClientUser 之非系統管理者(TOKEN_MEMBER: srv.mjs 放行)
+//    零寫入; perm 為權威(token 宣稱 isAdmin 'n'、perm 列 'y' 者可呼叫); 系統管理者照常。
+//    〔perm-run01 更新(R-ADMIN-ONLY-01)〕資料通道的連線閘與執行身分已改為只限系統管理者(getAndVerifyAdminUser), 非系統管理者於連線閘即被拒(permission denied; 整個入口矩陣見 api-adminOnly),
 //    不會再走到 requireAdmin——requireAdmin 轉為縱深防禦(僅「連線後角色被降級」之競態可達, 黑箱測不到, 以 unit-adminOnlySite 之站點守護與變異驗證涵蓋); 本組 A1／A4／A5 改驗新的拒絕點。
 //跑法(需測試鎖): node C:/opensrcOper/tools/quiet-run.mjs --name tcid --lock --timeout 1800 -- npx mocha test/api-callerIdentity.test.mjs --timeout 300000
 import assert from 'assert'
@@ -32,7 +32,7 @@ let sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 //perm users 夾具列(後台列, from ''): admin2(isAdmin y)、member(isAdmin n)
 let userRow = (id, name, isAdmin, isActive = 'y', extra = {}) => ({ id, order: 50, name, email: `${name}@example.com`, description: '', from: '', cgrups: '{}', isAdmin, isActive, ...extra })
-//newGrup: 追加一個群組之整表(以管理員視角讀現況再加一列; id 由呼叫端給)
+//newGrup: 追加一個群組之整表(以系統管理者視角讀現況再加一列; id 由呼叫端給)
 let grupRow = (id, name) => ({ id, order: 0, name, description: `${name}說明`, from: '', cpemis: '{}' })
 
 //waitLines: srLog 經 pino 非同步落檔, 以標記(動作之前取)定位後輪詢到符合 pred 之行
@@ -66,7 +66,7 @@ describe('api-callerIdentity (資料通道執行身分完整驗證＋寫入函�
         }
     }
 
-    //addUsers: 以管理員在 base seed 的 users 之上追加夾具使用者
+    //addUsers: 以系統管理者在 base seed 的 users 之上追加夾具使用者
     let addUsers = async (rows) => {
         let cur = await rowsOf('users')
         let r = await callRpc('updateUsers', [[...cur, ...rows]], TOKEN_ADMIN)
@@ -100,11 +100,11 @@ describe('api-callerIdentity (資料通道執行身分完整驗證＋寫入函�
         //標頭 token 有效(TOKEN_ADMIN, 過連線閘), 本體 token 為下列各種「無法通過完整驗證」者 → 函數不執行
         //預期之固定語系鍵由 getAndVerifyClientUser 之各關決定(見 server/WWebPerm.mjs getTokenUser／getAndVerifyClientUser)
         let bodyCases = [
-            //perm-run01 本輪(R-APP-TOKEN-01): 原用 TOKEN_APP(isApp 未轉傳)代表「不在 perm 表」; TOKEN_APP 現轉傳 isApp='y' 屬系統服務用途(可用管理員之服務, 見 api-callerMatrix), 故改用 TOKEN_NOFLAG(isApp 未轉傳, 視同非應用系統)
+            //perm-run01 本輪(R-APP-TOKEN-01): 原用 TOKEN_APP(isApp 未轉傳)代表「不在 perm 表」; TOKEN_APP 現轉傳 isApp='y' 屬系統服務用途(可用系統管理者之服務, 見 api-callerMatrix), 故改用 TOKEN_NOFLAG(isApp 未轉傳, 視同非應用系統)
             { title: '不在 perm users 表(外部 getUserByToken 有效、perm 無此列、isApp 未轉傳)', token: TOKEN_NOFLAG, key: 'cannotGetUserFromPerm' },
             //perm-run01 本輪(P-7): srv.mjs 之 verifyClientUser 不再以 isAdmin 否決, peter(一般使用者)通過部署方、由本套件以 userNotAdmin 拒絕; 部署方因非角色因素否決者另列下一案
-            { title: 'perm 內有效使用者(一般使用者, isAdmin n)通過部署方但非系統管理員', token: TOKEN_PETER, key: 'userNotAdmin' },
-            { title: 'perm 內有效之管理員但被部署方 verifyClientUser 因非角色因素否決(TOKEN_DENY)', token: TOKEN_DENY, key: 'userNoPermission', pre: async () => addUsers([userRow('id-for-deny', 'deny', 'y', 'y', { email: 'deny@example.com' })]) },
+            { title: 'perm 內有效使用者(一般使用者, isAdmin n)通過部署方但非系統管理者', token: TOKEN_PETER, key: 'userNotAdmin' },
+            { title: 'perm 內有效之系統管理者但被部署方 verifyClientUser 因非角色因素否決(TOKEN_DENY)', token: TOKEN_DENY, key: 'userNoPermission', pre: async () => addUsers([userRow('id-for-deny', 'deny', 'y', 'y', { email: 'deny@example.com' })]) },
             { title: 'getUserByToken 查無(無效 token)', token: TOKEN_BAD, key: 'cannotFindUserFromToken' },
             { title: 'getUserByToken reject 上游原文(含合成秘密; W 契約視同查無)', token: TOKEN_REJECT, key: 'cannotFindUserFromToken' },
             //perm users 內有此列且啟用(才會走到 verifyClientUser; 否則先於驗證器被 cannotGetUserFromPerm 拒收而守不到驗證器拋錯之 fail-closed; 外審 sol#5); 驗證器拋錯 ≡ 無權限
@@ -147,7 +147,7 @@ describe('api-callerIdentity (資料通道執行身分完整驗證＋寫入函�
             A.equal(await snap4(), before)
         })
 
-        it('CI-G4 perm 內 isAdmin 已被降為 n 之管理員(admin2 列 isAdmin n)之本體 token → 非系統管理員被拒(userNotAdmin)、零寫入  [perm 以自身 users 表為權威; P-7: 部署方範例不再以 isAdmin 否決, 由套件拒絕]', async function() {
+        it('CI-G4 perm 內 isAdmin 已被降為 n 之系統管理者(admin2 列 isAdmin n)之本體 token → 非系統管理者被拒(userNotAdmin)、零寫入  [perm 以自身 users 表為權威; P-7: 部署方範例不再以 isAdmin 否決, 由套件拒絕]', async function() {
             await addUsers([userRow('id-for-admin2', 'admin2', 'n', 'y')])
             let before = await snap4()
             let rows = (await rowsOf('grups')).concat([grupRow('id-ci-g4', 'ci-g4')])
@@ -197,14 +197,14 @@ describe('api-callerIdentity (資料通道執行身分完整驗證＋寫入函�
     })
 
 
-    describe('A 非管理員之寫入(perm-run01 起於連線閘拒; requireAdmin 為縱深防禦)', function() {
+    describe('A 非系統管理者之寫入(perm-run01 起於連線閘拒; requireAdmin 為縱深防禦)', function() {
 
         //通過連線閘(srv.mjs 之 verifyClientUser 放行 id-for-member)但 perm 列 isAdmin='n' 之使用者
         let memberReady = async (isAdmin = 'n', isActive = 'y') => {
             await addUsers([userRow('id-for-member', 'member', isAdmin, isActive)])
         }
 
-        it('CI-A0 前提: member 通過部署方 verifyClientUser(經 /api/getPerm 取得本人權限樹; 自 perm-run01 起資料通道與後台登入另限管理員, 見 api-adminOnly)', async function() {
+        it('CI-A0 前提: member 通過部署方 verifyClientUser(經 /api/getPerm 取得本人權限樹; 自 perm-run01 起資料通道與後台登入另限系統管理者, 見 api-adminOnly)', async function() {
             await memberReady()
             let r = await fetch(`http://127.0.0.1:11006/api/getPerm?token=${encodeURIComponent(TOKEN_MEMBER)}`)
             let j = await r.json()
@@ -213,18 +213,18 @@ describe('api-callerIdentity (資料通道執行身分完整驗證＋寫入函�
         })
 
         for (let kt of KTS) {
-            it(`CI-A1 ${FN[kt]}: 通過部署方之非管理員(perm 列 isAdmin n)被拒、零寫入; 管理員照常  [C2、使用者身分驗證原則 二.4; perm-run01 起於連線閘即拒(permission denied), 原為 requireAdmin 之 userNotAdmin]`, async function() {
+            it(`CI-A1 ${FN[kt]}: 通過部署方之非系統管理者(perm 列 isAdmin n)被拒、零寫入; 系統管理者照常  [C2、使用者身分驗證原則 二.4; perm-run01 起於連線閘即拒(permission denied), 原為 requireAdmin 之 userNotAdmin]`, async function() {
                 await memberReady()
                 let before = await snap4()
                 let rows = await rowsOf(kt)
                 let edited = rows.map((r, k) => (k === 0 ? { ...r, description: 'edited-by-member' } : r))
                 let r = await callRpc(FN[kt], [edited], TOKEN_MEMBER)
-                A.equal(r.ok, false, `非管理員不得寫入, 實得 ${JSON.stringify(r).slice(0, 200)}`)
+                A.equal(r.ok, false, `非系統管理者不得寫入, 實得 ${JSON.stringify(r).slice(0, 200)}`)
                 A.equal(r.msg, 'permission denied')
                 A.equal(await snap4(), before, '零寫入')
                 let ok = await callRpc(FN[kt], [edited], TOKEN_ADMIN)
-                A.equal(ok.ok, true, `管理員照常: ${JSON.stringify(ok).slice(0, 200)}`)
-                A.equal((await rowsOf(kt))[0].description, 'edited-by-member', '管理員之寫入生效(對照: 同一輸入, 差別只在角色)')
+                A.equal(ok.ok, true, `系統管理者照常: ${JSON.stringify(ok).slice(0, 200)}`)
+                A.equal((await rowsOf(kt))[0].description, 'edited-by-member', '系統管理者之寫入生效(對照: 同一輸入, 差別只在角色)')
             })
         }
 
@@ -258,7 +258,7 @@ describe('api-callerIdentity (資料通道執行身分完整驗證＋寫入函�
             A.ok(!lines.some((l) => l.event === 'requireAdmin-error'), '連線閘已拒, 不會走到 requireAdmin')
         })
 
-        it('CI-A5 唯讀函數亦限管理員(perm-run01, R-ADMIN-ONLY-01; 原為「唯讀函數不受角色檢查約束」): member 呼叫 getWebInfor 於連線閘被拒', async function() {
+        it('CI-A5 唯讀函數亦限系統管理者(perm-run01, R-ADMIN-ONLY-01; 原為「唯讀函數不受角色檢查約束」): member 呼叫 getWebInfor 於連線閘被拒', async function() {
             await memberReady()
             let r = await callRpc('getWebInfor', [], TOKEN_MEMBER)
             A.equal(r.ok, false)
