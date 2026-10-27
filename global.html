@@ -135,7 +135,7 @@
     
     <dt class="tag-description">Description:</dt>
     <dd class="tag-description"><ul class="dummy"><li><p>系統服務用途之外部 id 前綴: 上游(w-web-sso)對系統服務用途(應用系統金鑰本身, 不綁使用者)反查回 id 恆為 'app:&lt;金鑰主鍵&gt;', 且 sso 拒收以此前綴開頭之使用者主鍵(保留前綴),
-故以此前綴開頭之 id 不可能是一般使用者(perm-run02②; 使用者用途綁定之 sso 管理員其 id 是該使用者之主鍵, 不以此前綴開頭).
+故以此前綴開頭之 id 不可能是一般使用者(perm-run02②; 使用者用途綁定之 sso 系統管理者其 id 是該使用者之主鍵, 不以此前綴開頭).
 判準單一擁有者: 此前綴只在本檔定義與比對.</p></li></ul></dd>
     
 
@@ -183,7 +183,7 @@
 
 <div class="description usertext">
     <p>系統服務用途之外部 id 前綴: 上游(w-web-sso)對系統服務用途(應用系統金鑰本身, 不綁使用者)反查回 id 恆為 'app:&lt;金鑰主鍵&gt;', 且 sso 拒收以此前綴開頭之使用者主鍵(保留前綴),
-故以此前綴開頭之 id 不可能是一般使用者(perm-run02②; 使用者用途綁定之 sso 管理員其 id 是該使用者之主鍵, 不以此前綴開頭).
+故以此前綴開頭之 id 不可能是一般使用者(perm-run02②; 使用者用途綁定之 sso 系統管理者其 id 是該使用者之主鍵, 不以此前綴開頭).
 判準單一擁有者: 此前綴只在本檔定義與比對.</p>
 </div>
 
@@ -7843,7 +7843,7 @@ console.log(cvKpToArr([{ name: 'A', isActive: 'y' }]))
     <dt class="tag-description">Description:</dt>
     <dd class="tag-description"><ul class="dummy"><li><p>授權資料(JSON5.parse(cgrups／cpemis／crules) 之結果)統一為以名稱為鍵之物件形式, 供編輯對話框依名稱查值(getOwn／getRuleEnable)</p>
 <p>外部應用可直接寫入陣列形式 [{ &quot;name&quot;: &quot;A&quot;, &quot;isActive&quot;: &quot;y&quot; }], 伺服端 getUserRules 相容並授權(規則帳本 R-AUTH-DECODE-01);
-編輯對話框若依名稱為鍵查值會查不到陣列元素 → 顯示停用 → 管理者存檔即撤銷有效授權. 本函數與伺服端共用 cvKpToArr 之解碼(單一擁有者),
+編輯對話框若依名稱為鍵查值會查不到陣列元素 → 顯示停用 → 系統管理者存檔即撤銷有效授權. 本函數與伺服端共用 cvKpToArr 之解碼(單一擁有者),
 並使「編輯器顯示啟用 ⇔ 該元素被伺服端採納(納入合併; 元素層級, 非最終權限樹)」.</p>
 <p>存檔後授權不變(複審 R3／R4, 規則帳本 R-AUTH-LOSSY-01): 合併規則與項目之儲存順序、物件鍵序、陣列元素序無關(R-AUTH-MERGE-00 第 4 條), 故編輯器不需保留原鍵序;
 物件形式無法無損表示之格(同名有效 OR／AND 並存)由 getKpLossy 判定, 編輯器對之拒存並顯示固定訊息(authLossyBlocked), 不寫出.
@@ -15600,9 +15600,9 @@ console.log(getDelRefCount(['g1'], [{ id: 'g1', name: 'G1' }], users, 'cgrups', 
 R-PRINCIPLE-00 c), 靜默丟棄即放寬, 故拒存(R-PRINCIPLE-00 f 之「無法原樣保留則拒存」; 空字串名稱則可原樣保留為物件鍵 '', 不在此格). 名稱以 <code>#&lt;序號&gt;</code>(1 起算)表示.</li>
 </ul>
 <p>不判定「該層啟用項皆 mode 缺或非法」(原第三格, ADR-035 決定 e; run06 使用者裁示放寬, ADR-035 Update 2026-10-22): mode 缺或非法之啟用項伺服端只當限制項
-(R-PRINCIPLE-00 e, 該層無任何 mode 合法之啟用項時結果全 n), 編輯器雖顯示為「AND、啟用」, 但存檔時對未被管理者改動者原樣寫回其原始 mode(editorRefRows 之
-getRawModeMap／putRowsToKp／putRefEntry, 方案 A; R-EDIT-KEEP-01), 故未改動時存檔前後授權相等、不會成為唯一 AND 基底而多給; 放寬前此格拒存只會使管理者無法存任何變更.
-該項之 mode 缺漏提示仍由 getAuthWarn 之 modeInvalid 警告圖示承擔(不變). 管理者在對話框內明確改動(改為 OR／AND、啟用其他項)之結果, 等於伺服端對「改動後之狀態」之解讀,
+(R-PRINCIPLE-00 e, 該層無任何 mode 合法之啟用項時結果全 n), 編輯器雖顯示為「AND、啟用」, 但存檔時對未被系統管理者改動者原樣寫回其原始 mode(editorRefRows 之
+getRawModeMap／putRowsToKp／putRefEntry, 方案 A; R-EDIT-KEEP-01), 故未改動時存檔前後授權相等、不會成為唯一 AND 基底而多給; 放寬前此格拒存只會使系統管理者無法存任何變更.
+該項之 mode 缺漏提示仍由 getAuthWarn 之 modeInvalid 警告圖示承擔(不變). 系統管理者在對話框內明確改動(改為 OR／AND、啟用其他項)之結果, 等於伺服端對「改動後之狀態」之解讀,
 未被改動之項不放寬(以真 getUserRules 窮舉證明見 unit-editorRows RT-LOSSY3-*).</p>
 <p>不再判定「AND 名稱之相對順序」: 合併規則下結果與項目之儲存順序、物件鍵序、陣列元素序無關(R-AUTH-MERGE-00 第 4 條; ADR-033 取代 ADR-001 非對稱條),
 整數式名稱被 JS 屬性序排前不再改變授權(原 run02 之排序保護 keepKeyOrder／getKeyOrderLost／getKpWriteLost 隨之移除).
@@ -17165,11 +17165,11 @@ console.log(getPropKey({ toString: null }))
 <dl class="details">
     
     <dt class="tag-description">Description:</dt>
-    <dd class="tag-description"><ul class="dummy"><li><p>取得「mode 缺或非法之啟用引用」(伺服端之限制項)之原始 mode, 供存檔時原樣寫回(R-PRINCIPLE-00 e; 未被管理者改動之項寫回其原始 mode)</p>
+    <dd class="tag-description"><ul class="dummy"><li><p>取得「mode 缺或非法之啟用引用」(伺服端之限制項)之原始 mode, 供存檔時原樣寫回(R-PRINCIPLE-00 e; 未被系統管理者改動之項寫回其原始 mode)</p>
 <p>伺服端 mergeRules 把 mode 缺或非 OR／AND 之啟用項當「限制項」: 只當 AND 交集項、不單獨當基底, 該層沒有任何 mode 合法之啟用項時全 n.
-編輯器(cvKpToObj)把此類項顯示為「AND、啟用」; 存檔若寫出合法 AND, 限制項即變成可當基底之 AND——例: { G1: 缺 mode, G2: AND } 管理者停用唯一合法項 G2 後存檔,
+編輯器(cvKpToObj)把此類項顯示為「AND、啟用」; 存檔若寫出合法 AND, 限制項即變成可當基底之 AND——例: { G1: 缺 mode, G2: AND } 系統管理者停用唯一合法項 G2 後存檔,
 G1 成為唯一基底而授予其內容(預期為全 n, 多給). 故記下原始 mode, 存檔時對仍為「AND、啟用」(開啟時之狀態, 視為未改)者寫回原始 mode(putRowsToKp／putRefEntry);
-管理者改過 mode 或停用者照其選擇寫出.
+系統管理者改過 mode 或停用者照其選擇寫出.
 只記「該名稱所有啟用元素皆 mode 缺或非法」者: 同名另有 mode 合法之啟用元素時(如陣列 [AND, 缺 mode]), 伺服端結果同該合法項, 寫出合法 mode 即授權不變, 寫回限制項反而收回.
 純量值({ &quot;G1&quot;: &quot;y&quot; })伺服端解為 { isActive: 'y' }(無 mode), 視同缺 mode. 名稱非字串之元素不記(由 getKpLossy 拒存).</p></li></ul></dd>
     
@@ -20732,7 +20732,7 @@ conflicts  [{ name(屬性鍵), n(列數), nY(勾選列數) }]; names 受影響�
 <dl class="details">
     
     <dt class="tag-description">Description:</dt>
-    <dd class="tag-description"><ul class="dummy"><li><p>是否為系統管理員: perm users 表之列 isActive 為 'y' 且 isAdmin 為 'y'(自有屬性、嚴格相等, 其餘值一律視為否)</p>
+    <dd class="tag-description"><ul class="dummy"><li><p>是否為系統管理者: perm users 表之列 isActive 為 'y' 且 isAdmin 為 'y'(自有屬性、嚴格相等, 其餘值一律視為否)</p>
 <p>判準單一擁有者(R-ADMIN-ONLY-01): 資料通道連線閘(checkToken)、資料通道執行身分(getUserIdByToken)、後台登入檢查(/api/getUserByToken)與寫入函數之角色檢查(requireAdmin)都只呼叫本函數.
 perm 以自身 users 表為權威, 不採外部 token(getUserByToken)宣稱之 isAdmin; 呼叫端須傳入 perm users 表之列(getTokenUser 反查所得, 或 requireAdmin 新鮮讀取之列), 不得傳 token 使用者物件.
 只認自有屬性: 原型鏈上繼承而來之 isAdmin／isActive 不算(防禦性, 資料庫列恆為自有屬性).</p></li></ul></dd>
@@ -20856,7 +20856,7 @@ perm 以自身 users 表為權威, 不採外部 token(getUserByToken)宣稱之 i
 
         
 <div class="param-desc">
-    <p>回傳是否為有效之系統管理員</p>
+    <p>回傳是否為有效之系統管理者</p>
 </div>
 
 
@@ -21632,7 +21632,7 @@ perm 以自身 users 表為權威, 不採外部 token(getUserByToken)宣稱之 i
 <dl class="details">
     
     <dt class="tag-description">Description:</dt>
-    <dd class="tag-description"><ul class="dummy"><li><p>外部反查結果是否宣稱為管理員(僅供應用系統路由對「不在 perm users 表」之呼叫者做相容認定; perm-run02①, 原則二.8 改版預設相容)</p>
+    <dd class="tag-description"><ul class="dummy"><li><p>外部反查結果是否宣稱為系統管理者(僅供應用系統路由對「不在 perm users 表」之呼叫者做相容認定; perm-run02①, 原則二.8 改版預設相容)</p>
 <p>判準單一擁有者: 只看自有屬性 isAdmin 是否嚴格等於 'y'; 不要求 isApp(舊版 sso 之應用系統身分即 isAdmin='y', 未轉傳 isApp 之既有部署升版後不中斷)、不要求 'app:' 前綴, 等級判準本身也不檢查 id 形狀
 (id 是否為非空字串: /syncAndReplaceTabs 另要求才可作稽核欄; /api/getPermUserInfor 不使用呼叫者 id, 維持 1.1.15 行為, 契約上 getUserByToken 本就須提供 id).
 只用於 /api/getPermUserInfor、/syncAndReplaceTabs 且呼叫者不在 perm users 表時; 在表者一律以 perm 列(isAdminRow)為準; 後台登入檢查、資料通道、requireAdmin 不得使用本函數(那些入口用 isSystemAppUser 之嚴格認定).
@@ -22636,7 +22636,7 @@ isExternalRow({ id: '1', from: null })
 且仍須經部署方 verifyAppUser.
 用於後台登入檢查、資料通道與 requireAdmin(系統服務用途); 應用系統路由(getPermUserInfor、syncAndReplaceTabs)不用本判準, 對不在表者改用較寬之 isExtAdminUser(相容).
 使用者用途之應用系統 token(以 userId 綁定使用者)其反查回所綁使用者之實際資料(isApp 為 'y'、isAdmin 依該使用者、id 為該使用者之主鍵而非 'app:' 開頭): 所綁使用者在 perm users 表者以 perm 列判定;
-不在表者(如只存在於 sso 之管理員)不是系統服務用途, 於後台與資料通道被拒, 與其自身使用者 token 相同.</p></li></ul></dd>
+不在表者(如只存在於 sso 之系統管理者)不是系統服務用途, 於後台與資料通道被拒, 與其自身使用者 token 相同.</p></li></ul></dd>
     
 
     
@@ -26177,7 +26177,7 @@ mappingBy 為 email／name 時, 以 id 對到之舊列其對應鍵值須與本�
     <dt class="tag-description">Description:</dt>
     <dd class="tag-description"><ul class="dummy"><li><p>把對話框之列以「列身分」配對到存檔當下取得之資料快照(不用列索引)</p>
 <p>反向關聯對話框(群組頁「所屬使用者」、權限頁「所屬群組」)開啟時依 store 當時的列序產生對話框的列; 存檔時重新取 store 快照.
-兩者以列索引配對時, store 於開框期間被更新(另一位管理者增刪列或改 order)即錯位, 關聯寫到另一個使用者／群組(規則帳本 R-REL-PAIR-01).
+兩者以列索引配對時, store 於開框期間被更新(另一位系統管理者增刪列或改 order)即錯位, 關聯寫到另一個使用者／群組(規則帳本 R-REL-PAIR-01).
 本函數以身分欄位(預設 id)配對: 每列配到快照中身分相同(且 verifyKeys 欄位值全相等)的列; 配不到者列入 missing,
 由呼叫端整次拒存並提示重新整理, 不得退而配到其他列.</p></li></ul></dd>
     
@@ -29438,7 +29438,7 @@ console.log(putRefEntry(kp, { GX: { mode: 'AND', isActive: 'y' } }, 'G1', 'y', '
 <p>名稱為字串者(含 '', R-PRINCIPLE-00 f: 原樣保留; 含懸空之額外列)寫出; 名稱非字串、mode 非 OR／AND、enable 非非空字串之列略過(對話框不會產生此類列).
 同名多列後者覆蓋前者(呼叫端須先以 getDupRowsInconsistent 拒存不一致者; 一致者覆蓋結果相同).
 rawModeMap(getRawModeMap 之結果, 選填): 限制項之列仍為「啟用、mode 為其有效值(AND)」(開啟時之狀態, 視為未改)者寫回原始 mode(restoreLim), 不寫成合法 AND——
-否則限制項變為可當基底之 AND 而多給(見 getRawModeMap); 管理者改過 mode 或停用者照列寫出. 不給＝一律照列寫出.</p></li></ul></dd>
+否則限制項變為可當基底之 AND 而多給(見 getRawModeMap); 系統管理者改過 mode 或停用者照列寫出. 不給＝一律照列寫出.</p></li></ul></dd>
     
 
     
@@ -35826,7 +35826,7 @@ held 非空時, keyTables 之階層須全數高於 held(否則拋錯, 即違反�
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Sun Oct 25 2026 22:10:32 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Wed Oct 28 2026 00:15:06 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
 </footer>
 
 <script>prettyPrint();</script>
