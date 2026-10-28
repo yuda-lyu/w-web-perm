@@ -30,6 +30,7 @@ import syncCore from './syncCore.mjs'
 import createLockSave from './lockSave.mjs'
 import procLang from './procLang.mjs'
 import srLogInit from './srLog.mjs'
+import { mkOrmFunLog } from './ormDiag.mjs'
 import procStaInfor from './procStaInfor.mjs'
 import { maskTok, maskQuery, maskUrl } from './maskLog.mjs'
 import wrapInjected from './wrapInjected.mjs'
@@ -321,10 +322,11 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     verifyAppUser = wrapInjected(verifyAppUser, { failValue: false, onFail: logInjectFail('verifyAppUser') })
 
 
-    //WServOrm, w-serv-orm 1.1.10 起無設定鍵(不帶 opt)
+    //WServOrm, 唯一給的設定為 funLog(w-serv-orm 1.1.10 起已移除之三鍵不得給, 見上 checkOptRemoved; 不開 useCache):
+    //1.1.20 起診斷輸出預設只走 console 且不含個資, 以 opt.funLog 導入 srLog(只寫標籤與不含個資之摘要, 不寫細節; server/ormDiag.mjs, R-ORM-DIAG-01)
     let wp = {}
     try {
-        wp = WServOrm(ds, WOrm, url, db)
+        wp = WServOrm(ds, WOrm, url, db, { funLog: mkOrmFunLog(srLog) })
     }
     catch (err) {
         console.log(err)

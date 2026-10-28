@@ -122,7 +122,8 @@ export function mkProcOrm(ds, woItems) {
 
 //mkCore: 以**真的** WServOrm(w-serv-orm 1.1.17)包住替身資料表, 取得同一實例之 procOrm、withTabLocks、guardWrite(多人同時編輯之共用核心, 每實例一個鎖管理器; 規則帳本 R-LOCK-CORE-01):
 //  WOrm 以替身建構子代之(建構子回傳既有替身表, 故 woItems 即傳入之替身, 測試對替身所做之故障注入與快照照常有效);
-//  使測試走真 procOrm(含 mustExist)、真 withTabLocks／guardWrite, 與 WWebPerm 內 WServOrm(ds, WOrm, url, db) 回傳物件同一組裝
+//  使測試走真 procOrm(含 mustExist)、真 withTabLocks／guardWrite, 與 WWebPerm 內 WServOrm(ds, WOrm, url, db, { funLog }) 回傳物件同一組裝
+//  (WWebPerm 另給 funLog 把診斷輸出導入 srLog, R-ORM-DIAG-01; 此處不給, 診斷輸出照預設走 console——診斷輸出之去向見 test/unit-ormDiag.test.mjs)
 export function mkCore(ds, woItems) {
     function WOrmReplica(opt) {
         return woItems[opt.cl]

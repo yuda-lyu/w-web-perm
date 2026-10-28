@@ -2,6 +2,14 @@
 
 本檔記本套件**當前已開發功能之最新狀態**;與規則帳本(`sgud/rule/rulebook.md`,藍圖)比對即知尚未做到者,接續工作先讀此檔.2026-10-22 主控遷移為 sgud 配置時建立,先移入原帳本之「已知缺口 / 待辦」;**各功能之完成狀態整理為下一次派工之待辦**(主責 agent 依規則帳本各節之「狀態」行與近期報告彙整至本檔).
 
+## 近期進度(2026-10-28 perm-run01〔任務 20261028054319, 第 154 項〕:w-serv-orm 診斷輸出以 `opt.funLog` 導入 srLog,只寫標籤與摘要; 修正輪＝單輪,未發布,待主控全套)
+
+> 注意: 承 w-serv-orm 1.1.20(Gitea #12; 預設診斷輸出不含個資、不再有主鍵於 console); 規則 R-ORM-DIAG-01(`sgud/rule/rulebook_security.md`), ADR-043, 報告 `C:\opensrcOper\dnow\20261028054319\agent-out\perm-run01-修正報告.md`. 依賴 `w-serv-orm ^1.1.20`(實裝 1.1.20, 未動 package.json).
+
+- **改動(完成)**: ①新增 `server/ormDiag.mjs:mkOrmFunLog(srLog)`→`(label, safe)`, 以 `srLog.warn({ event: 'WServOrm-diag', label, safe })` 記錄, **detail(主鍵與引擎錯誤原文)一律不寫**(日誌政策不記 id／個資; 理由見 ADR-043 決定 2); ②`server/WWebPerm.mjs` 以 `WServOrm(ds, WOrm, url, db, { funLog: mkOrmFunLog(srLog) })` 建構(`WServOrm(` 站點全集 5 處: 伺服器 1 處帶 funLog; 離線工具 `g_mOrm.mjs`／`g_authRefsClean.mjs`／`g_fixFromType.mjs`／`g_purgeFrom.mjs` 4 處刻意不帶, 不寫 srLog); ③行為改變: 診斷行不再出現在行程標準輸出, 改入 srLog(README〈Upgrade Notes〉). 產品其餘行為、API 回傳、畫面、標準圖皆不變.
+- **測試**: 新增 `unit-ormDiag`(18 案: 契約 6、真 WServOrm 失敗形狀 8、站點 4)、`api-ormDiag`(3 案; 真 WWebPerm＋真 HTTP＋ORM 縫注入故障, 子行程 `test/tools/ormDiagChild.mjs`, port 8561); 更新 `unit-wwebperm-init` SITE-OPT-001(建構順序斷言含 funLog). 修前紅: api 3 敗(srLog 無 `WServOrm-diag`、標準輸出含診斷行)、unit 站點 3 敗(程式缺); 變異 12/12 被殺. 全套分三段(單一 `npm test` 因背景指令 2 小時上限〔連排隊等鎖計入〕於 e2e 中途被終止, 其餘補跑, 檔案集合 106 檔涵蓋完整): ①`npm test` 前段 837 過／0 敗(api 全部 23 檔含 `api-ormDiag`, e2e 10 檔: array-form、concurrent-edit、external-rows、grups、init、layout、pemis、ref-cascade、rela-grup-pemi、rela-pemi-rule); ②補跑 e2e 4 檔(rela-user-grup、stainfor、targets、users)86 過／0 敗; ③unit 69 檔 4327 過／1 pending(既有)／0 敗; 合計 5250 過／1 pending／0 敗, `[baseline-headroom]` 0, `test/pics` 0 張改變, `testPending` 無新增. 主控收尾輪仍須於凍結碼跑單一全套.
+- **未做／備查**: ①`server/WWebPerm.mjs` 約 :168-184 之 `console.log('invalid url', url)`／`'invalid db'`／`'invalid WOrm'` 於參數無效時印出傳入值(url 為物件時可能含連線字串帳密), 與本輪方向相反, 範圍外未改, 待另案裁示; ②`db/wperm/**` 為版控中之資料庫檔, 起後端之測試後顯示 modified, 非本輪改動.
+
 ## 近期進度(2026-10-26 perm-run02〔任務 20261026143318〕:全 repo 用詞統一為「系統管理者」; 修正輪＝單輪,未發布,待主控全套)
 
 > 注意: 承 perm-run01(檢查點 `432bca6`); 使用者 2026-10-26 裁示全系統指系統管理者角色之詞統一為「系統管理者」(與 w-web-sso／w-web-api／w-web-task 同). 證據 `spec/evidence/perm-run02-20261026/`(`README.md` 方法與判準、`replace-inventory.tsv` 逐行、`replace-inventory.per-file.json` 逐檔、`scripts/`), ADR-042, 規則 R-ROLE-NAME-01(`sgud/rule/rulebook_security.md`), 報告 `C:\opensrcOper\dnow\20261026143318\agent-out\perm-run02-修正報告.md`.

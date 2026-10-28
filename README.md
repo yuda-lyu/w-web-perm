@@ -129,6 +129,13 @@ instWWebPerm.on('error', (err) => {
 
 ## Upgrade Notes
 
+### Unreleased: ORM diagnostic lines move from the process output to srLog (2026-10-28, perm-run01, R-ORM-DIAG-01) — one behavior change
+
+- **Dependency**: `w-serv-orm ^1.1.20`. From that version the ORM's diagnostic output (a failed write, a rejected input) no longer prints primary keys, data values or database error text to the console, only a label such as `users.save fail` and a summary that contains no personal data (how many rows failed and at which positions, the error class and machine code, a fixed rejection sentence).
+- **What changed**: `WWebPerm` gives `opt.funLog` to w-serv-orm, which replaces the console output. Each diagnostic line is now one srLog entry at level `warn`: `{ event: 'WServOrm-diag', label, safe }`. The full detail (primary keys, the failed rows, the database error text) is **never** written, because srLog does not record row ids or personal values.
+- **Check before upgrading**: if you collect the process output and alert on lines such as `users.save fail { n: 1, ks: [ 0 ] }`, alert on the srLog event `WServOrm-diag` instead (`label` carries the table and the operation, `safe.n` the number of failed rows, `safe.ks` their positions in the saved batch).
+- The offline tools (`g_*.mjs`) are unchanged: they print the same safe summary to the terminal that runs them.
+
 ### Unreleased: system functions need an identity — `[sys:polling]` and `[sys:getTableTags]` are no longer public (2026-10-25, perm-run01 of this round, R-SYSFUNCS-01) — one behavior change
 
 **1. Polling must carry the token; front-end bundles built before this release stop syncing until the page is reloaded (behavior change)**

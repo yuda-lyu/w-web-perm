@@ -4,6 +4,16 @@
 
 - **2026-10-22 抽出歷史經驗**:2026-10-20 以前之各節(e2e 側欄位移、統計頁、升版、授權存檔不變等)移至 `experience_20261022.md`(標題與內容不變);查久遠經驗時再調閱.
 
+## w-serv-orm 診斷輸出(opt.funLog)導入 srLog(2026-10-28 perm-run01〔任務 20261028054319, 第 154 項〕; R-ORM-DIAG-01; ADR-043; w-serv-orm 1.1.20、Gitea #12; 報告 `C:\opensrcOper\dnow\20261028054319\agent-out\perm-run01-修正報告.md`)
+- **「遮罩後寫 detail」與「只寫 safe」要依日誌政策二選一, 先找政策出處再選**: 任務給兩條路; 本套件 srLog 一貫「不記列 id／個資值」(`procCore`／`syncCore`／`cascadeWrite` 之 srLog 註解、帳本 R-EXT-OWN-01 第 5 點), 且 detail 是任意結構(失敗列清單、查詢條件快照、引擎錯誤原文、無效參數時的連線字串), 樣式遮罩無從證明完整 → 只寫 `label＋safe`。先 `rg -n "不記.{0,8}(id|個資)" server sgud` 找政策, 再決定, 不先動手寫遮罩器。
+- **真後端上 w-serv-orm 的失敗路徑幾乎全被前置驗證擋下, 不能「自然觸發」**: 資料通道 `users.select` 送壞 find 在 w-serv-webdata 就回 `invalid find[…]`; 寫入的 HTML 標記、過長主鍵、重複 id 在 `procCore`／`syncCore` 就拒(`validateRows`)。探測結果: 以真 srv 後端送 3 種壞 find, srLog 只有 `verifyConn`、沒有任何 ORM 診斷行。要驗「診斷輸出的去向」只能在 ORM 縫(`WOrm` 建構子)注入引擎故障: `test/tools/ormDiagChild.mjs` 以真 `WWebPerm`＋包裝後的 `WOrmLmdb`(targets 表 `select` 一律 reject 帶 `code:'ENOSPC'` 且訊息含主鍵與 email)起獨立後端, 再經真 HTTP 資料通道 `targets.select` 觸發。
+- **子行程種子要用 `genTestData(ds, woItems, { bLog:false })` 自建庫**, 不能借 `seedDb`(綁死 `./db`); 資料通道連線閘需 perm users 表有 `id-for-admin`(`isAdmin:'y'`、`isActive:'y'`)之列, `genTestData` 的種子已含。種子後 `so.closeAll()` 再開 `WWebPerm`(同行程重開 LMDB 目錄)。
+- **「console 不多出輸出」要有對照組**: 單元測試以攔截 `console.log／info／warn／error／debug` 驗零呼叫, 並配一個不帶 funLog 的對照案(ORMDIAG-100)證明攔截有效且預設確實印到 console; 否則「零呼叫」可能是攔截壞了。api 測試取子行程 `READY` 之後的標準輸出; 修前紅時等待事件要用「修前修後皆有」的事件(`operOrm-error`), 不能等新事件, 否則紅在逾時而非紅在斷言。
+- **WWebPerm 的前置檢查使 w-serv-orm 的無效參數診斷在 WWebPerm 路徑不可達**: `WWebPerm` 自己先檢查 `WOrm／url／db` 型別(並 `console.log('invalid url', url)`)。因此「建構期診斷」無法作端到端探針, 改用執行期故障。**備查(範圍外, 未改)**: `server/WWebPerm.mjs` 之 `console.log('invalid url', url)`／`'invalid db'`／`'invalid WOrm'`(約 :168-184)在參數無效時印出傳入值本身(url 為物件時可能含連線字串帳密); 與本輪 w-serv-orm 預設不印無效參數值之方向相反, 另案裁示是否改為只印型別。
+- **變異驗證用 Write 寫腳本(不用 `node -e`、不用 `sed -i`, 守門 hook 會擋)**: `tmp/perm-run01/mutate.mjs` 對每個變異做「find 恰出現 1 次 → 寫入 → 跑 unit(＋部分加跑 api)→ 還原」, `finally` 與 `process.on('exit')` 雙重還原, 結束比對備份; 12/12 被殺。`safe` 拷貝(`JSON.parse(JSON.stringify)`)一度是存活變異(等價輸出), 補「事後改動上游物件不影響已記錄內容」斷言後被殺。
+- **`db/wperm/**` 為版控中之資料庫檔**, 任何起後端之測試(含探測)都會重新種子而使其顯示 modified, 非本輪改動; 不可用 checkout 還原(禁止), 由主控檢查點處理。
+- **全套 `npm test`(實測約 87 分)經 `--lock` 排隊時, 背景指令之 2 小時上限連「排隊等鎖」一併計**: 12:11 送出、等鎖 22 分(兩槽被他套件 `npm test` 占滿)、12:33 取得鎖, 14:11 被工具終止(e2e 做到 `e2e-rela-user-grup` 一半), quiet-run 行程死亡而鎖檔仍列我方 pid → 以 `quiet-run --release-stale --cwd <repo>` 回收(只回收我方且持有者已結束者)。**下次**: 預估「等鎖＋跑」可能逾 115 分鐘時, 全套改 detached 執行(`nohup … &`, 分段以輸出檔盯)而非 `run_in_background`; 或先 `ls C:/opensrcOper/tmp/locks/*/owner.txt` 看兩槽佔用再決定何時送。被終止後未跑之檔(依字母序為其後之 e2e 檔)與 unit 可分開補跑(unit 不需鎖: `mocha "test/unit-*.test.mjs" --no-parallel`, 約 6 分)。
+
 ## 全 repo 用詞統一為「系統管理者」之機械替換(2026-10-26 perm-run02〔任務 20261026143318〕; R-ROLE-NAME-01; ADR-042; 證據 `spec/evidence/perm-run02-20261026/`)
 - **替換順序與正則是關鍵**: 先處理「舊稱＋者」連用(否則產生疊字「者者」, 本專案有 2 處「…員者」連用之句), 再「系統＋舊稱」、單獨舊稱, 最後以負向後行斷言 `(?<!系統)` 處理單獨之「管理＋者」(不加斷言會把已是「系統管理者」者再冠一個「系統」而連續兩個「系統」). 先 dry-run 輸出逐行清單與疊字統計, 看過前後文才 apply。
 - **替換前先確認「其他角色」是否存在**: 以前一漢字統計找複合詞(資料庫／網站／專案…); 本套件 2,019 處全指系統管理者(改前之「管理＋者寫入 RPC」141 處、「後台」「外部」「函數級」「啟用中」等皆同), 才敢全域機械替換。
