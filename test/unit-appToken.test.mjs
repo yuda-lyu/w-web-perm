@@ -283,7 +283,7 @@ describe('unit-appToken (應用系統 token 之判準與站點不變式, perm-ru
             }
             A.equal(count(code, /\br = routeResult\(/g), 4)
             A.ok(!/r\.msg = r\.msg\.message/.test(code), '不得 r.msg = r.msg.message')
-            A.ok(code.includes('createRouteResult({ srLog })'))
+            A.ok(code.includes('createRouteResult({ srLog, secrets: rawSecrets })'))
         })
 
         it('AT-S7 srv.mjs(範例部署): 轉傳 isApp; verifyClientUser／verifyAppUser 不以 isAdmin 判斷(P-7)', function() {

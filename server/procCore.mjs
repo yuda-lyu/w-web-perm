@@ -20,6 +20,7 @@ import { getRefTarget, parseSubject, parseRefDecl, checkSubjectIdentity, checkRe
 import { getRejectKey } from 'w-serv-orm/src/baseline.mjs'
 import { findTouchedDup, findDupIndex, withTabLocks, checkUsersWrite, mapKeyOf, loginIdOf, findLoginIdClashDetail } from './keyCheck.mjs'
 import { checkCascadePlan, writeWithCascade } from './cascadeWrite.mjs'
+import { checkRawSecrets, msgOfErr, rawOfErr } from './maskRaw.mjs'
 
 
 //isRowObj: 待寫入之列須為至少有一個自有可列舉鍵之物件(非 null、非陣列; 不用依 toString 判型之 iseobj, 免被 Symbol.toStringTag 偽稱)
@@ -107,7 +108,10 @@ function pickClientOpt(opt) {
 //cascadeRename: 群組／權限改名時是否連帶更新引用(預設 true; 只管改名, 刪除連帶清理不受影響, R-REF-CASCADE-01)
 //lockExternalRows: 後台是否不得改外部列(from 為非空字串者)之身分／結構欄(預設 true, R-EXT-OWN-01; 'n' 時回到舊行為, 僅保留 from 型別檢查)
 //withTabLocks(別名 lockTabs), guardWrite: w-serv-orm 實例(WServOrm 回傳物件)之每表一鍵表鎖與原子防護(R-LOCK-CORE-01), 與外部同步(WWebPerm.syncAndReplaceTabs)共用同一個鎖管理器; 未注入即 TypeError(fail-closed, 不寫入)
-function proc(woItems, procOrm, { srLog, withTabLocks: lockTabs, guardWrite, lockSave, mappingBy = 'id', cascadeRename = true, lockExternalRows = true }) {
+//secrets: maskRaw.getRawSecrets(url) 之結果(必帶, 不留無秘密之舊介面; 缺即 TypeError): 直接呼叫 woItems 之 ORM 錯誤原文(驅動訊息可能回顯連線字串)寫入 srLog 之 raw 前, 先經 wsemi maskDiagText 移除連線憑證(R-ORM-DIAG-02)
+function proc(woItems, procOrm, { srLog, withTabLocks: lockTabs, guardWrite, lockSave, secrets, mappingBy = 'id', cascadeRename = true, lockExternalRows = true }) {
+
+    checkRawSecrets(secrets, 'procCore')
 
 
     //mapGuardErr: guardWrite／procOrm(mustExist)之拒收轉本套件語系鍵並記 srLog(只記錯誤鍵、原因與差異筆數, 不記列 id／個資值); rowsInvalid(庫內主鍵缺漏或重複)屬伺服端資料錯誤, 回 saveWriteFail 並記 log;
@@ -523,7 +527,7 @@ function proc(woItems, procOrm, { srLog, withTabLocks: lockTabs, guardWrite, loc
                 return out
             }
             catch (err) {
-                srLog.error({ event: 'updateTabItems-readBack-error', keyTable, userId, msg: 'getDataError', raw: (typeof err === 'string') ? err : ((err && err.message) || String(err)) })
+                srLog.error({ event: 'updateTabItems-readBack-error', keyTable, userId, msg: 'getDataError', raw: rawOfErr(err, secrets) })
                 return null
             }
         }
@@ -545,7 +549,7 @@ function proc(woItems, procOrm, { srLog, withTabLocks: lockTabs, guardWrite, loc
                     srLog.error({ event: 'updateTabItems-refCascade-error', keyTable, msg: errPlan })
                     return Promise.reject(errPlan)
                 }
-                await writeWithCascade({ plan, holdersOld, woItems, procOrm, userId, srLog, writeMain })
+                await writeWithCascade({ plan, holdersOld, woItems, procOrm, userId, srLog, writeMain, secrets })
                 return await readAfter(plan.changes.length > 0 ? holder : null)
             }, [keyTable])
         }
@@ -563,10 +567,10 @@ function proc(woItems, procOrm, { srLog, withTabLocks: lockTabs, guardWrite, loc
     //拒絕值來源: updateTabItems 自身之 reject 為本套件語系鍵字串(saveRowFieldInvalid、htmlMarkupNotAllowed、saveInProgress 等), 原樣轉出;
     //procOrm 之拒絕為 w-serv-orm 之英文原文字串(1.1.10 起, 如 failed to save data…)或 Error, updateTabItems 內直接呼叫之 woItems[keyTable].select()
     //失敗為 ORM 之原錯誤(可能為 Error)——此兩類原文只入 srLog 之 raw, 對前端與外部改回 saveWriteFail(修正前原樣外送, 前端 tErr 換算為「無法連線至伺服器」)
+    //raw 入 srLog 前經 rawOfErr 移除連線憑證(R-ORM-DIAG-02); 是否為語系鍵(固定詞彙)以未遮罩之原文判定, msg(key)不經遮罩
     let errLog = (event, userId, err) => {
         let key = toOutKey(err)
-        let raw = (typeof err === 'string') ? err : ((err && err.message) || String(err))
-        srLog.error({ event, userId, msg: key, ...(raw !== key ? { raw } : {}) })
+        srLog.error({ event, userId, msg: key, ...(msgOfErr(err) !== key ? { raw: rawOfErr(err, secrets) } : {}) })
         return key
     }
 

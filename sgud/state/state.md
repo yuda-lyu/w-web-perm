@@ -2,6 +2,22 @@
 
 本檔記本套件**當前已開發功能之最新狀態**;與規則帳本(`sgud/rule/rulebook.md`,藍圖)比對即知尚未做到者,接續工作先讀此檔.2026-10-22 主控遷移為 sgud 配置時建立,先移入原帳本之「已知缺口 / 待辦」;**各功能之完成狀態整理為下一次派工之待辦**(主責 agent 依規則帳本各節之「狀態」行與近期報告彙整至本檔).
 
+## 近期進度(2026-10-30 mig-perm2〔任務 20261029002013, 承 mig-perm 之修正輪〕:直接呼叫 `woItems` 之錯誤原文入 srLog 前移除連線憑證〔T-a 主控裁定選 B〕; 修正輪＝單輪,未發布,待主控複審)
+
+> 注意: 規則 R-ORM-DIAG-02-⑦(`sgud/rule/rulebook_security.md`), ADR-045, 報告 `C:\opensrcOper\dnow\20261029002013\agent-out\mig-perm2-修正報告.md`. T-b(離線工具逐筆 `err`)主控裁定維持(操作者即憑證持有者, README〈Not covered〉); T-c(請求驗證失敗之 console 診斷)不在本輪(主控另立項目, 涉及四個 w-web-* 之共用契約).
+
+- **改動(完成)**: ①新 `server/maskRaw.mjs`(`getRawSecrets(url)`／`checkRawSecrets`／`msgOfErr`／`maskRaw`／`rawOfErr`／`msgForLog`; 唯一之 wsemi 入口, 遮罩為 `maskDiagText(原文, secrets.reject)`, 不建 `getDiag` 實例); ②`WWebPerm` 由 `url` 導出 `rawSecrets` 一次, 以必帶參數 `secrets` 傳入 `procCore`、`syncCore`、`writeWithCascade`、`createRouteResult`(缺即 `TypeError`, 不留舊介面), 並用於 `verifyConn` 之 msg; ③8 站點群: procCore 讀回／errLog、syncCore 讀庫／doWrite／引用端讀庫、cascadeWrite toRaw(raw、rawRestore)、routeResult raw、verifyConn msg(主控原列 7 群＋**更正前一輪**: `routeResult` 與 `verifyConn` 之原文實為 `woItems` 直接讀取〔getPerm 之權限樹、連線閘之使用者反查〕之出口, 前一輪誤歸固定詞彙); ④固定詞彙與 msg／key 不遮; routeResult 先遮再截 500 字; ⑤README〈Upgrade Notes〉〈Breaking changes〉〈Not covered〉.
+- **測試**: 新 `unit-maskRaw`(19 案: 模組 7〔含 MR-007 WWebPerm 接線靜態把關〕、procCore 3、syncCore 3、cascadeWrite 3、routeResult 3)、`api-maskRaw`(5 案〔MASKRAW-104 廢止保留編號: 同步端點路徑會被 `unit-e2e-lifecycle` LC-004 判為建立外部列夾具〕, 真 WWebPerm〔url 含帳密〕＋ORM 縫注入回顯連線字串與裸密碼之故障, 子行程 `test/tools/maskRawChild.mjs`, port 8563); 既有 `unit-routeResult`／`unit-syncCore`／`unit-procCore-*`／`unit-appToken` 隨介面加 `secrets`(`test/tools/unitOrm.mjs` 之 `mkCore().secrets`). 變異 26 項＋對照組＋修前紅(結果見報告). 全套首輪(首版測試檔)5285 過／1 pending／1 敗(敗者為 `unit-e2e-lifecycle` LC-004 對本輪新測試之站點不變式); 已修(`api-maskRaw` 廢止 MASKRAW-104、`unit-maskRaw` 加 MR-007), 修後受影響 10 檔 157 過／0 敗、全部 unit-* 4357 過／1 pending／0 敗; **修後全套未整套重跑, 待收尾輪確認**. 受影響檔與全套結果見報告(測試槽排隊, 以報告為準).
+- **待辦**: ①凍結碼上之收尾全套(含 e2e; 既有標準圖 0 張改變); ②T-c 另立項目.
+
+## 近期進度(2026-10-29 mig-perm〔任務 20261029002013, 排程第 161 項〕:診斷輸出遷移到 wsemi 共用模組; 修正輪＝單輪,未發布,待主控複審)
+
+> 注意: 承 perm-run01(2026-10-28)之 `opt.funLog` 導入 srLog; 依跨套件規格〈診斷輸出與遮罩〉(`C:\opensrcOper\dspec\診斷輸出與遮罩.md`; wsemi R-DIAG-01)D1 單一實作. 規則 R-ORM-DIAG-02(`sgud/rule/rulebook_security.md` 緊接 R-ORM-DIAG-01), ADR-044, 報告 `C:\opensrcOper\dnow\20261029002013\agent-out\mig-perm-修正報告.md`(站點全集表與證據在同夾 `mig-perm-evidence\`). 依賴 `wsemi ^1.9.31`(實裝 1.9.31)、`w-serv-orm ^1.1.22`(實裝 1.1.22); 其餘自有相依亦升最新(w-aggrid-vue 2.1.13、w-component-vue 2.5.33、w-serv-hapi 1.1.10、w-orm-lmdb 1.0.46、w-package-tools-e2e 1.0.11), `dist/`、`docs/` 未重建.
+
+- **改動(完成)**: ①刪 `server/ormDiag.mjs`(自寫轉接器), `server/WWebPerm.mjs` 改 `WServOrm(ds, WOrm, url, db, { funLog: genDiagFunLog((o) => srLog.warn(o)).funLog })`(唯一的 funLog 站點; 只寫安全摘要, 帶 `noDetail`); ②事件名 `WServOrm-diag` → `orm-diag`(無別名; 統計頁顯示之事件名隨之改變, 前端 `src/` 不以事件名篩選); ③參數檢查失敗之 6 處 `console.log('invalid X', X)` 改只印 `typeof`; ④`package.json` `engines.node` `>=20.16`; ⑤README〈Upgrade Notes〉〈Breaking changes〉. 外來值之單一擁有者在 w-serv-orm 1.1.22, 本套件不持有秘密清單、不重複包 `diag.err`; 站點全集 reject 95／throw 27／console 113／逐筆 err 與 raw／emit('error') 0 全有處置.
+- **測試**: `unit-ormDiag`(29 案: 共用語料 group A 子集 7 案經呼叫點運算式原文重跑、不適用登錄 3、全集比對 1、真 WServOrm 1.1.22 之 9 案、WOrm 建構拋含連線憑證之錯誤 3〔子行程 `test/tools/ormDiagInitChild.mjs`〕、站點與 engines 6)、`api-ormDiag`(4 案, ORM 縫注入含憑證之故障)、`unit-wwebperm-init`(5 案). 修前紅(HEAD 碼＋w-serv-orm 1.1.20 之副本): unit 29 案中 20 紅、api 4 案中 2 紅; 變異 11 項全被抓到(對照組全綠). **全套 `npm test`(quiet-run --lock, 143 分 52 秒): 5261 過／1 pending(既有 RA-036e)／1 敗**——敗者為 `unit-wrapInjected` WRAP-SITE-002(本輪把 6 處 `console.log('invalid X', X)` 改 `typeof X`, 該站點不變式之白名單寫死舊寫法); 已改白名單為 `typeof X` 寫法(`test/unit-wrapInjected.test.mjs`), **修後之 mocha 重跑因測試槽被他套件獨佔負載試驗佔住而未執行(INCONCLUSIVE; 暫代驗證等價邏輯腳本 0 違反), 待主控收尾全套確認 `unit-wrapInjected` 轉綠**; `[baseline-headroom]` 0、`test/pics` 0 張改變、`testPending` 無新增、e2e 14 檔全綠.
+- **未做／待裁示**: T-a `procCore`／`syncCore`／`cascadeWrite` 取自 `woItems` 直接 ORM 呼叫之錯誤原文寫入 srLog `raw`(R-ORM-02 既有政策, 驅動訊息可能回顯連線字串, 本套件無秘密清單); T-b 離線工具 `fromTools`／`authRefsClean` 之逐筆 `err`; T-c `WWebPerm` 請求驗證失敗之 console 診斷印出使用者物件與請求本體(27 處). 皆為設計 §4.1 對本套件未要求者.
+
 ## 近期進度(2026-10-28 perm-run01〔任務 20261028054319, 第 154 項〕:w-serv-orm 診斷輸出以 `opt.funLog` 導入 srLog,只寫標籤與摘要; 修正輪＝單輪,未發布,待主控全套)
 
 > 注意: 承 w-serv-orm 1.1.20(Gitea #12; 預設診斷輸出不含個資、不再有主鍵於 console); 規則 R-ORM-DIAG-01(`sgud/rule/rulebook_security.md`), ADR-043, 報告 `C:\opensrcOper\dnow\20261028054319\agent-out\perm-run01-修正報告.md`. 依賴 `w-serv-orm ^1.1.20`(實裝 1.1.20, 未動 package.json).

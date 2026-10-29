@@ -170,7 +170,7 @@ function createEnv(opt = {}) {
     let cst = cacheSt()
     let core = mkCore(ds, woItems)
     let lock = opt.lockOf ? opt.lockOf(core) : core.lock
-    let pc = proc(woItems, core.procOrm, { srLog, ...lock, lockSave: createLockSave(cst) })
+    let pc = proc(woItems, core.procOrm, { srLog, secrets: core.secrets, ...lock, lockSave: createLockSave(cst) }) //lockOf 回之物件不含 secrets(R-ORM-DIAG-02 必帶), 故另帶
     let env = { seed, woItems, logs, cst, core, pc }
     envs.push(env)
     return env

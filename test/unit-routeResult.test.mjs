@@ -5,14 +5,16 @@
 //跑法: npx mocha test/unit-routeResult.test.mjs --reporter list --timeout 30000
 import assert from 'assert'
 import createRouteResult from '../server/routeResult.mjs'
+import { getRawSecrets } from '../server/maskRaw.mjs'
 import procLang from '../server/procLang.mjs'
 
 const A = assert.strict
 
+//secrets: R-ORM-DIAG-02 必帶(srLog raw 移除連線憑證); 本檔之案例不涉憑證, 以儲存路徑形式之連線字串(reject 清單空)建立, 憑證遮罩見 unit-maskRaw
 let mk = () => {
     let logs = []
     let srLog = { error: (o) => logs.push(o) }
-    return { logs, rr: createRouteResult({ srLog }) }
+    return { logs, rr: createRouteResult({ srLog, secrets: getRawSecrets('./db') }) }
 }
 
 

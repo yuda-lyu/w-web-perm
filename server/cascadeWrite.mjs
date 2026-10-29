@@ -1,5 +1,6 @@
 import truncate from 'lodash-es/truncate.js'
 import validateRowsBeforeWrite from './validateRows.mjs'
+import { checkRawSecrets, msgOfErr, maskRaw } from './maskRaw.mjs'
 
 
 //引用連帶之寫入(規則帳本 R-REF-CASCADE-01, ADR-036): 把 planRefChanges(src/js/refCascade.mjs)算出之引用端改寫與被引用表自身之寫入串成「引用端先、主體後」, 並於失敗時補償還原引用端.
@@ -43,9 +44,11 @@ function checkCascadePlan(plan) {
  * @param {String} p.userId 輸入操作者 id
  * @param {Object} p.srLog 輸入 srLog
  * @param {Function} p.writeMain 輸入被引用表自身之寫入函數(async)
+ * @param {Object} p.secrets 輸入 maskRaw.getRawSecrets(url) 之結果(必帶, 缺即 TypeError; srLog 之 raw、rawRestore 入 log 前移除連線憑證, R-ORM-DIAG-02)
  * @returns {Promise} 回傳 writeMain 之結果
  */
-async function writeWithCascade({ plan, holdersOld, woItems, procOrm, userId, srLog, writeMain }) {
+async function writeWithCascade({ plan, holdersOld, woItems, procOrm, userId, srLog, writeMain, secrets }) {
+    checkRawSecrets(secrets, 'writeWithCascade')
     if (!plan || plan.changes.length === 0) {
         return await writeMain()
     }
@@ -83,7 +86,8 @@ async function writeWithCascade({ plan, holdersOld, woItems, procOrm, userId, sr
         })
         return s.replace(/id\[[^\]]*\]/g, 'id[*]')
     }
-    let toRaw = (e) => maskId((typeof e === 'string') ? e : ((e && e.message) || String(e)))
+    //其後再經 maskRaw 移除連線憑證(R-ORM-DIAG-02; 先遮 id 再遮憑證: id 字面內若含憑證字樣, 亦隨 id 一併遮去, 且不因憑證遮罩改動 id 字面而使 id 比對落空)
+    let toRaw = (e) => maskRaw(maskId(msgOfErr(e)), secrets)
 
     let rm = null
     let stage = 'holder'

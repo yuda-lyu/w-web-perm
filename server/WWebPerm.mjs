@@ -20,6 +20,7 @@ import fsIsFolder from 'wsemi/src/fsIsFolder.mjs'
 import fsIsFile from 'wsemi/src/fsIsFile.mjs'
 import replace from 'wsemi/src/replace.mjs'
 import cacheSt from 'wsemi/src/cacheSt.mjs'
+import genDiagFunLog from 'wsemi/src/genDiagFunLog.mjs'
 import WServHapiServer from 'w-serv-hapi/src/WServHapiServer.mjs'
 import WServOrm from 'w-serv-orm/src/WServOrm.mjs'
 import checkOptRemoved from 'w-serv-orm/src/checkOptRemoved.mjs'
@@ -30,7 +31,6 @@ import syncCore from './syncCore.mjs'
 import createLockSave from './lockSave.mjs'
 import procLang from './procLang.mjs'
 import srLogInit from './srLog.mjs'
-import { mkOrmFunLog } from './ormDiag.mjs'
 import procStaInfor from './procStaInfor.mjs'
 import { maskTok, maskQuery, maskUrl } from './maskLog.mjs'
 import wrapInjected from './wrapInjected.mjs'
@@ -38,6 +38,7 @@ import { pickUniqueUser, findLoginUsers, countLoginRows, mapKeyOf } from './keyC
 import { createAuthorizeExec, wrapOperOrm } from './dataChannel.mjs'
 import { isAdminRow, isSystemAppUser, isExtAdminUser } from './adminCheck.mjs'
 import createRouteResult from './routeResult.mjs'
+import { getRawSecrets, msgForLog } from './maskRaw.mjs'
 
 
 /**
@@ -52,6 +53,12 @@ import createRouteResult from './routeResult.mjs'
  * 系統函數(dspec/使用者身分驗證原則.md 二.7、二.8; 規則帳本 R-SYSFUNCS-01): 本套件設定 sysFuncsPublic 為只公開 [sys:getFuncList](函數名稱清單); [sys:polling](輪詢, 取走廣播與同步表時間戳)與 [sys:getTableTags](同步表名與時間戳)須有效身分——
  * 前端元件(w-serv-hapi 1.1.8／w-serv-webdata 1.1.16／w-serv-broadcast 1.1.12 起)於輪詢本體帶 __sysToken__, 每輪經 getUserIdByToken 反查(須為系統管理者; 缺 __sysToken__ 鍵之輪詢不反查, 直接被拒). 因 getUserIdByToken 對空 token 與非系統管理者 fail-closed 且連線閘先擋, [sys:getFuncList] 實際仍須有效系統管理者身分.
  * 登入前前端不連線(src/main.js 之 useWaitToken: true), 不依賴公開之系統函數; 已發布之舊前端建置檔(輪詢不帶 __sysToken__)升版後輪詢被拒, 使用者需重新載入頁面.
+ *
+ * 診斷輸出(跨套件規格〈診斷輸出與遮罩〉R-DIAG-01; 規則帳本 R-ORM-DIAG-01／02): w-serv-orm 的診斷輸出不走行程標準輸出, 由 wsemi 之 genDiagFunLog 轉寫至 srLog, 一筆一個 warn 事件 { event: 'orm-diag', label, safe }(事件名原為 'WServOrm-diag');
+ * 只寫標籤與不含個資之安全摘要(表名與操作、失敗筆數與位置、錯誤類別與機器代碼), 不寫細節(主鍵、資料列、引擎錯誤原文). 外來值(ORM 建構與經 procOrm 讀寫之錯誤)的連線憑證由 w-serv-orm 在其 catch 站點遮罩後才轉出(procOrm 之失敗為固定詞彙), 本套件不重複遮罩.
+ * 本套件直接呼叫 woItems(不經 procOrm)所取得之錯誤原文(寫入時之讀庫、讀回、外部匯入、引用連帶補償、getPerm 之權限樹讀取、連線閘之使用者反查)驅動訊息可能回顯連線字串, 入 srLog 之 raw／rawRestore／verifyConn 之 msg 前,
+ * 經 wsemi 之 maskDiagText 移除連線憑證(秘密清單由 url 導出一次, 經 server/maskRaw.mjs 之 getRawSecrets; 以參數 secrets 傳入 procCore、syncCore、writeWithCascade、createRouteResult, 必帶; R-ORM-DIAG-02); 語系鍵(固定詞彙)與 msg／key 欄位不遮, 只遮原文.
+ * 參數(WOrm、url、db、三個注入函數)無效時, console 只印該參數之型別(如 'invalid url object'), 不印其值; 需要 Node >=20.16.
  *
  * token 種類與等級(使用者 2026-10-24 定案, dspec/使用者身分驗證原則.md 二之一; 規則帳本 R-APP-TOKEN-01): 使用者 token(一般使用者／系統管理者)代表登入者, 等級以 perm users 表之列判定; 應用系統 token(部署方 getUserByToken 回傳 isApp 為 'y')分兩種用途——
  * 使用者用途(以 userId 綁定使用者, 反查回所綁使用者之實際資料與 isApp='y'): 以所綁使用者之 perm users 列判定, 與其使用者 token 相同, 不需特別處理;
@@ -164,44 +171,46 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
     let instWServHapiServer = null
 
 
+    //以下六項參數檢查失敗時, console 只印參數之型別, 不印參數之值(R-DIAG-01 D2 預設不輸出資料值): 無效之 url 可能是含帳密之設定物件(如 { host, user, password }),
+    //原樣印出等於把連線憑證寫進行程標準輸出; 拋出之 Error 本就只含固定詞彙
     //check WOrm
     if (!isfun(WOrm)) {
-        console.log('invalid WOrm', WOrm)
+        console.log('invalid WOrm', typeof WOrm)
         throw new Error('invalid WOrm')
     }
 
 
     //check url
     if (!isestr(url)) {
-        console.log('invalid url', url)
+        console.log('invalid url', typeof url)
         throw new Error('invalid url')
     }
 
 
     //check db
     if (!isestr(db)) {
-        console.log('invalid db', db)
+        console.log('invalid db', typeof db)
         throw new Error('invalid db')
     }
 
 
     //check getUserByToken
     if (!isfun(getUserByToken)) {
-        console.log('invalid getUserByToken', getUserByToken)
+        console.log('invalid getUserByToken', typeof getUserByToken)
         throw new Error('invalid getUserByToken')
     }
 
 
     //check verifyClientUser
     if (!isfun(verifyClientUser)) {
-        console.log('invalid verifyClientUser', verifyClientUser)
+        console.log('invalid verifyClientUser', typeof verifyClientUser)
         throw new Error('invalid verifyClientUser')
     }
 
 
     //check verifyAppUser
     if (!isfun(verifyAppUser)) {
-        console.log('invalid verifyAppUser', verifyAppUser)
+        console.log('invalid verifyAppUser', typeof verifyAppUser)
         throw new Error('invalid verifyAppUser')
     }
 
@@ -323,10 +332,12 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
 
     //WServOrm, 唯一給的設定為 funLog(w-serv-orm 1.1.10 起已移除之三鍵不得給, 見上 checkOptRemoved; 不開 useCache):
-    //1.1.20 起診斷輸出預設只走 console 且不含個資, 以 opt.funLog 導入 srLog(只寫標籤與不含個資之摘要, 不寫細節; server/ormDiag.mjs, R-ORM-DIAG-01)
+    //1.1.20 起診斷輸出預設只走 console 且不含個資, 以 opt.funLog 導入 srLog(只寫標籤與不含個資之摘要, 不寫細節; 規則帳本 R-ORM-DIAG-01, 跨套件規格〈診斷輸出與遮罩〉R-DIAG-01)
+    //轉接器為 wsemi 之 genDiagFunLog(單一實作, 本套件不自寫): funLog 帶 noDetail, w-serv-orm 見之不取細節、不做拷貝; 寫入 srLog.warn({ event: 'orm-diag', label, safe });
+    //label 正規化(控制字元換 ? 、至多 200 字元)、safe 白名單正規化、write 同步拋錯與 rejected promise 之吞下皆在該函數內; write 為此處固定之箭頭函數, 不會觸發其建構期之 TypeError
     let wp = {}
     try {
-        wp = WServOrm(ds, WOrm, url, db, { funLog: mkOrmFunLog(srLog) })
+        wp = WServOrm(ds, WOrm, url, db, { funLog: genDiagFunLog((o) => srLog.warn(o)).funLog })
     }
     catch (err) {
         console.log(err)
@@ -334,6 +345,11 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         throw err //fail-fast: ORM 初始化失敗直接終止啟動, 不以 wp={} 繼續組裝出「port 起得來但 woItems/procOrm 為 undefined、CRUD 全 crash」的半死伺服器
     }
     let { woItems, procOrm } = wp
+
+
+    //rawSecrets: srLog 之 raw(錯誤原文)移除連線憑證用之秘密清單(R-ORM-DIAG-02, 主控 2026-10-30 裁定 T-a 選 B): 本套件直接呼叫 woItems 之 ORM 方法(不經 procOrm)所拋出之錯誤,
+    //驅動之訊息可能回顯連線字串, 入 srLog 前經 wsemi maskDiagText(maskRaw.mjs)遮罩; 秘密只來自 url(唯一之連線憑證輸入), 以參數傳入 syncCore、procCore、createRouteResult 與 verifyConn 之站點
+    let rawSecrets = getRawSecrets(url)
 
 
     //lockTabs, guardWrite: w-serv-orm 1.1.17 的每表一鍵表鎖與原子防護(多人同時編輯規格第 6、7 節; 規則帳本 R-LOCK-CORE-01), 取自 WServOrm 回傳物件——**唯一**的鎖管理器.
@@ -345,7 +361,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
     //sc: 外部匯入(POST /syncAndReplaceTabs)核心(server/syncCore.mjs; perm-run03 起依來源鍵 srcKey 差異同步, R-IMPORT-01): 與後台整表寫入共用同一個鎖管理器(lockTabs).
     //syncWarns(同一 from 同名異 srcKey 之疑似來源鍵重編提示)之登錄亦在其內(記憶體, 重啟即清; 不含個資, 僅表名、來源名稱、筆數、時間)
-    let sc = syncCore({ woItems, procOrm, lockTabs, srLog, mappingBy, cascadeRename })
+    let sc = syncCore({ woItems, procOrm, lockTabs, srLog, mappingBy, cascadeRename, secrets: rawSecrets })
 
 
     //lockSave: 後台整表寫入(updateTabItems)之雙擊防護(後端, 見 lockSave.mjs, ADR-025): 以「updateTabItems:{表名}:{操作者 id}」於 cacheSt 原子占位,
@@ -355,7 +371,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
 
     //procCore: 整表批次 diff 寫入邏輯 (updateTabItems + updateTargets/Pemis/Grups/Users)
-    let pc = procCore(woItems, procOrm, { srLog, withTabLocks: lockTabs, guardWrite, lockSave, mappingBy, cascadeRename, lockExternalRows }) //mappingBy 供 users 整表寫入的對應鍵檢查(R-PRINCIPLE-00 適用表 h); cascadeRename 供群組／權限改名之引用級聯(適用表 m); lockExternalRows 供後台對外部列之守門(F-23)
+    let pc = procCore(woItems, procOrm, { srLog, withTabLocks: lockTabs, guardWrite, lockSave, mappingBy, cascadeRename, lockExternalRows, secrets: rawSecrets }) //mappingBy 供 users 整表寫入的對應鍵檢查(R-PRINCIPLE-00 適用表 h); cascadeRename 供群組／權限改名之引用級聯(適用表 m); lockExternalRows 供後台對外部列之守門(F-23); secrets 供 srLog raw 移除連線憑證(R-ORM-DIAG-02)
 
 
     //procStaInfor: 統計資訊, fdLog 對齊 srLog 使用同一目錄(讀 settings.logFd, fallback 邏輯同 srLog.mjs); mock 由 settings.staEventMock 注入(e2e 統計圖穩定用)
@@ -923,7 +939,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
     //routeResult: hapi 路由失敗(state 為 error)時之 msg 一律為固定語系鍵(R-ROUTE-MSG-01; perm-run01 本輪, 外審 sol#5; 判準在 routeResult.mjs):
     //已知語系鍵原樣回傳, 其餘(Error.message、ORM／I/O 原文、非鍵字串)改回 anUnexpectedErrorOccurred, 原文只入 srLog. 四條 hapi 路由(/api/getUserByToken、/api/getPerm、/api/getPermUserInfor、/syncAndReplaceTabs)皆經此
-    let routeResult = createRouteResult({ srLog })
+    let routeResult = createRouteResult({ srLog, secrets: rawSecrets })
 
 
     //apis
@@ -1262,7 +1278,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                     b = true
                 })
                 .catch((err) => {
-                    msg = (typeof err === 'string') ? err : ((err && err.message) || 'checkTokenFail')
+                    //已知語系鍵(固定詞彙)原樣; 其餘為 ORM／I/O 之原文(反查 users 表直接呼叫 woItems 之錯誤, 驅動訊息可能回顯連線字串), 移除連線憑證後才入 log(R-ORM-DIAG-02)
+                    msg = msgForLog(err, (s) => toOutKey(s, '') !== '', rawSecrets, 'checkTokenFail')
                 })
             // console.log('b', b)
 

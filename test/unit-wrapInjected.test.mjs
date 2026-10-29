@@ -199,7 +199,7 @@ describe('unit-wrapInjected-sites', function() {
             let allowed = [
                 /^\s*function WWebPerm\(/,
                 new RegExp(`isfun\\(${nm}\\)`),
-                new RegExp(`console\\.log\\('invalid ${nm}', ${nm}\\)`),
+                new RegExp(`console\\.log\\('invalid ${nm}', typeof ${nm}\\)`), //mig-perm(20261029): 參數檢查失敗之 console 只印 typeof, 不印值(R-DIAG-01 D2; unit-ormDiag SITE-DIAG-006)
                 new RegExp(`throw new Error\\('invalid ${nm}'\\)`),
             ]
             for (let l of ls) {

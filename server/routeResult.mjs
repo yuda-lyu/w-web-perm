@@ -1,5 +1,6 @@
 import isErr from 'wsemi/src/isErr.mjs'
 import { toOutKey } from './procCore.mjs'
+import { checkRawSecrets, maskRaw } from './maskRaw.mjs'
 
 
 //hapi 路由失敗結果之收斂(R-ROUTE-MSG-01; perm-run01 本輪, 外審 sol#5; 對照資料通道之 wrapOperOrm: ORM 拒絕之原文只入 srLog、對前端回 anUnexpectedErrorOccurred):
@@ -13,10 +14,12 @@ import { toOutKey } from './procCore.mjs'
  *
  * @param {Object} p 輸入物件
  * @param {Object} p.srLog 輸入 srLog(須有 error 方法)
+ * @param {Object} p.secrets 輸入 maskRaw.getRawSecrets(url) 之結果(必帶, 缺即 TypeError): 路由核心函數直接呼叫 woItems 之 ORM(getPerm 之 woItems.*.select 等)之錯誤原文可能回顯連線字串, 入 srLog 之 raw 前先移除連線憑證(R-ORM-DIAG-02)
  * @returns {Function} 回傳 (r, event) => r: r 為 pm2resolve 結果 { state, msg }, event 為記 srLog 用之事件名(如 'api/getPerm-error');
- *   state 非 'error'(成功、取消)原樣回傳; 為 'error' 時 r.msg 改為語系鍵(已知鍵原樣, 其餘 anUnexpectedErrorOccurred 並於 srLog 記 { event, msg:'anUnexpectedErrorOccurred', raw: 原文前 500 字 })
+ *   state 非 'error'(成功、取消)原樣回傳; 為 'error' 時 r.msg 改為語系鍵(已知鍵原樣, 其餘 anUnexpectedErrorOccurred 並於 srLog 記 { event, msg:'anUnexpectedErrorOccurred', raw: 移除連線憑證後之原文前 500 字 })
  */
-function createRouteResult({ srLog }) {
+function createRouteResult({ srLog, secrets }) {
+    checkRawSecrets(secrets, 'createRouteResult')
     return (r, event) => {
         if (r === null || typeof r !== 'object' || r.state !== 'error') {
             return r
@@ -32,7 +35,8 @@ function createRouteResult({ srLog }) {
             catch (err) {
                 rawStr = '[unprintable]'
             }
-            srLog.error({ event, msg: 'anUnexpectedErrorOccurred', raw: rawStr.slice(0, 500) })
+            //先遮罩再截斷: 先截斷會把跨在第 500 字之憑證切成殘片而不再命中秘密清單
+            srLog.error({ event, msg: 'anUnexpectedErrorOccurred', raw: maskRaw(rawStr, secrets).slice(0, 500) })
         }
         r.msg = key
         return r

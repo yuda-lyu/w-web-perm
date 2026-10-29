@@ -12,6 +12,7 @@ import { findDupIndex, findKeyOtherFrom, withTabLocks, mapKeyOf, checkMapKeyBatc
 import { checkCascadePlan, writeWithCascade } from './cascadeWrite.mjs'
 import { markHasKey, keepAssignOnMissing, keepAssignByEntity, countSrcKeyRenumber } from './syncKeep.mjs'
 import { toOutKey, isRowObj } from './procCore.mjs'
+import { checkRawSecrets, rawOfErr } from './maskRaw.mjs'
 
 
 //外部匯入(外部同步)之核心: 依外部自訂之來源鍵 srcKey 於表鎖內做差異同步(perm-run03 範圍二; 使用者 2026-10-22 裁示原則 11、2026-10-23 裁示不提供呼叫端相容;
@@ -66,9 +67,12 @@ let KEY_ASSIGN = { users: 'cgrups', grups: 'cpemis', pemis: 'crules', targets: n
  * @param {Object} p.srLog 輸入 srLog
  * @param {String} [p.mappingBy='id'] 輸入使用者對應鍵('id'｜'email'｜'name')
  * @param {Boolean} [p.cascadeRename=true] 輸入改名是否連帶更新引用
+ * @param {Object} p.secrets 輸入 maskRaw.getRawSecrets(url) 之結果(必帶, 缺即 TypeError; 直接呼叫 woItems 之 ORM 錯誤原文入 srLog 之 raw 前移除連線憑證, R-ORM-DIAG-02)
  * @returns {Object} 回傳 { syncAndReplaceTabs(userId, inp, keyTable), getSyncWarns() }
  */
-function syncCore({ woItems, procOrm, lockTabs, srLog, mappingBy = 'id', cascadeRename = true }) {
+function syncCore({ woItems, procOrm, lockTabs, srLog, mappingBy = 'id', cascadeRename = true, secrets }) {
+
+    checkRawSecrets(secrets, 'syncCore')
 
 
     //syncWarns: 外部同步「同一 from 同名異 srcKey」(疑似來源鍵重編)之提示登錄(記憶體, 重啟即清; 主控定案: 不加開關, 記 warn log 並使頁面可提示):
@@ -191,7 +195,7 @@ function syncCore({ woItems, procOrm, lockTabs, srLog, mappingBy = 'id', cascade
                 rsAll = await woItems[keyTable].select()
             }
             catch (err) {
-                let raw = (typeof err === 'string') ? err : ((err && err.message) || String(err))
+                let raw = rawOfErr(err, secrets) //ORM 原文移除連線憑證後才入 log(R-ORM-DIAG-02)
                 let key = toOutKey(err, 'anUnexpectedErrorOccurred')
                 logErr(key, { raw, from, step: 'select' })
                 return Promise.reject(key)
@@ -408,10 +412,10 @@ function syncCore({ woItems, procOrm, lockTabs, srLog, mappingBy = 'id', cascade
             //doWrite: ORM／I/O 失敗之原文只入 srLog, 外部應用收 saveWriteFail(規則帳本 R-ORM-02); 引用端先寫、失敗補償還原(cascadeWrite.mjs)
             let doWrite = async (plan, holdersOld) => {
                 try {
-                    await writeWithCascade({ plan, holdersOld, woItems, procOrm, userId, srLog, writeMain })
+                    await writeWithCascade({ plan, holdersOld, woItems, procOrm, userId, srLog, writeMain, secrets })
                 }
                 catch (err) {
-                    let raw = (typeof err === 'string') ? err : ((err && err.message) || String(err))
+                    let raw = rawOfErr(err, secrets)
                     let key = toOutKey(err)
                     if (key === 'saveCascadePartial') {
                         key = 'saveWriteFail' //引用端補償失敗(雙重故障): 同步端點之固定錯誤契約為 saveWriteFail(規格 §5.6); 引用端懸空由 cascadeWrite 之 refCascade-restore-error 供稽核(外審 sol#3)
@@ -432,7 +436,7 @@ function syncCore({ woItems, procOrm, lockTabs, srLog, mappingBy = 'id', cascade
                         holdersOld = await woItems[holder].select()
                     }
                     catch (err) {
-                        let raw = (typeof err === 'string') ? err : ((err && err.message) || String(err))
+                        let raw = rawOfErr(err, secrets)
                         let key = toOutKey(err, 'anUnexpectedErrorOccurred')
                         logErr(key, { raw, from, step: 'select' })
                         return Promise.reject(key)

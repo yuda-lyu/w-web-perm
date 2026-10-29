@@ -69,7 +69,7 @@ describe('unit-syncCore (外部匯入依 srcKey 差異同步, perm-run03, R-IMPO
         let { srLog, logs } = mkSrLog()
         let cst = cacheSt()
         let core = mkCore(ds, woItems)
-        let sc = syncCore({ woItems, procOrm: core.procOrm, lockTabs: core.withTabLocks, srLog, mappingBy: opt.mappingBy || 'id', cascadeRename: opt.cascadeRename !== false })
+        let sc = syncCore({ woItems, procOrm: core.procOrm, lockTabs: core.withTabLocks, srLog, mappingBy: opt.mappingBy || 'id', cascadeRename: opt.cascadeRename !== false, secrets: core.secrets })
         let pc = autoDecl(proc(woItems, core.procOrm, { srLog, ...core.lock, lockSave: createLockSave(cst) }), woItems)
         let env = { seed, woItems, logs, cst, core, sc, pc }
         envs.push(env)

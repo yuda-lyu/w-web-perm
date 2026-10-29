@@ -10,6 +10,7 @@ import merge from 'lodash-es/merge.js'
 import getMapOrm from 'w-serv-orm/src/getMapOrm.mjs'
 import getProc from 'w-serv-orm/src/getProc.mjs'
 import WServOrm from 'w-serv-orm/src/WServOrm.mjs'
+import { getRawSecrets } from '../../server/maskRaw.mjs'
 
 const MAX_KEY_BYTES = 1978
 
@@ -129,12 +130,14 @@ export function mkCore(ds, woItems) {
         return woItems[opt.cl]
     }
     let so = WServOrm(ds, WOrmReplica, 'replica', 'replica')
+    let secrets = getRawSecrets('replica') //與上方 WServOrm 之 url 同值; srLog raw 移除連線憑證用之秘密清單(R-ORM-DIAG-02; procCore、syncCore、writeWithCascade、createRouteResult 必帶 secrets)
     return {
         so,
         procOrm: so.procOrm,
         withTabLocks: so.withTabLocks,
         guardWrite: so.guardWrite,
-        lock: { withTabLocks: so.withTabLocks, guardWrite: so.guardWrite }, //可直接展開進 proc(woItems, procOrm, { srLog, ...core.lock, lockSave })
+        secrets,
+        lock: { withTabLocks: so.withTabLocks, guardWrite: so.guardWrite, secrets }, //可直接展開進 proc(woItems, procOrm, { srLog, ...core.lock, lockSave }): 含鎖與 secrets 兩類必帶之注入項
     }
 }
 

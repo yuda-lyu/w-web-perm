@@ -31,6 +31,7 @@ import { autoDecl, buildDecl } from './tools/declHelper.mjs'
 import createLockSave from '../server/lockSave.mjs'
 import { withTabLocks } from '../server/keyCheck.mjs'
 import { checkCascadePlan, writeWithCascade } from '../server/cascadeWrite.mjs'
+import { getRawSecrets } from '../server/maskRaw.mjs'
 import planRefChanges, { fillIdlessIds } from '../src/js/refCascade.mjs'
 import { getUserRules } from '../src/plugins/mShare.mjs'
 import { mkTable, mkCore, mkSrLog } from './tools/unitOrm.mjs'
@@ -147,7 +148,7 @@ function createEnv(opt = {}) {
     let cst = cacheSt()
     let core = mkCore(ds, woItems) //perm-run01: 原 mkProcOrm(ds, woItems)＋kmx: pmKeyMutex() 改 mkCore
     let lock = opt.lockOf ? opt.lockOf(core) : core.lock
-    let pc = autoDecl(proc(woItems, core.procOrm, { srLog, ...lock, lockSave: createLockSave(cst), ...(opt.proc || {}) }), woItems)
+    let pc = autoDecl(proc(woItems, core.procOrm, { srLog, secrets: core.secrets, ...lock, lockSave: createLockSave(cst), ...(opt.proc || {}) }), woItems) //lockOf 回之物件不含 secrets(R-ORM-DIAG-02 必帶), 故另帶
     let env = { seed, woItems, logs, cst, core, pc }
     envs.push(env)
     return env
@@ -1668,7 +1669,7 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
                 let plan = planRefChanges({ keyTable: 'grups', rowsOld, rowsNew, holdersOld })
                 assert.strict.ok(plan.changes.some((c) => c.id === w.id), '前提: 該長 id 使用者為引用端改寫列')
                 let { srLog, logs: logs2 } = mkSrLog()
-                let e = await writeWithCascade({ plan, holdersOld, woItems, procOrm: env.core.procOrm, userId: 'id-op', srLog, writeMain: async () => 'MAIN' }).then(() => 'RESOLVED', (err) => err) //perm-run01: 原 mkProcOrm(ds, woItems) 改 env.core.procOrm(mkCore 之真 procOrm, 同一組替身表)
+                let e = await writeWithCascade({ plan, holdersOld, woItems, procOrm: env.core.procOrm, userId: 'id-op', srLog, writeMain: async () => 'MAIN', secrets: env.core.secrets }).then(() => 'RESOLVED', (err) => err) //perm-run01: 原 mkProcOrm(ds, woItems) 改 env.core.procOrm(mkCore 之真 procOrm, 同一組替身表)
                 assert.strict.notEqual(e, 'RESOLVED')
                 let msg = (typeof e === 'string') ? e : e.message
                 assert.strict.equal(msg, 'failed to save data: id[*]')
@@ -2830,7 +2831,7 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
                     }
                     return 'MAIN'
                 }
-                let go = () => writeWithCascade({ plan, holdersOld, woItems, procOrm, userId: 'id-op', srLog, writeMain })
+                let go = () => writeWithCascade({ plan, holdersOld, woItems, procOrm, userId: 'id-op', srLog, writeMain, secrets: getRawSecrets('replica') })
                 return { calls, logs, plan, go }
             }
 
@@ -2840,7 +2841,7 @@ describe('unit-procCore-refCascade (引用連帶: 改名級聯與刪除連帶清
                 assert.strict.deepEqual(t.calls, [['main']])
                 assert.strict.deepEqual(t.logs, [])
                 let calls = []
-                let r = await writeWithCascade({ plan: null, holdersOld: [], woItems: {}, procOrm: async () => calls.push('procOrm'), userId: 'u', srLog: mkSrLog().srLog, writeMain: async () => 'M2' })
+                let r = await writeWithCascade({ plan: null, holdersOld: [], woItems: {}, procOrm: async () => calls.push('procOrm'), userId: 'u', srLog: mkSrLog().srLog, writeMain: async () => 'M2', secrets: getRawSecrets('replica') })
                 assert.strict.equal(r, 'M2')
                 assert.strict.deepEqual(calls, [])
             })
