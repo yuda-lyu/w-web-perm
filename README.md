@@ -74,7 +74,7 @@ let getUserByToken = async (token) => {
 }
 
 let verifyClientUser = (user, from) => {
-    console.log('verifyClientUser/user', user)
+    console.log('verifyClientUser/from', from) //勿印使用者物件與欄位值(含個資)
     // return false //測試無法登入
     console.log('於生產環境時得加入限制瀏覽器使用者身份機制')
     //本套件於此函數通過後，另要求資料通道與後台登入限系統管理者(perm users 表之 isAdmin 為 'y')，一般使用者仍可經 /api/getPerm(from 為 'getPerm')以 token 查本人權限樹，
@@ -83,7 +83,7 @@ let verifyClientUser = (user, from) => {
 }
 
 let verifyAppUser = (user, from) => {
-    console.log('verifyAppUser/user', user)
+    console.log('verifyAppUser/from', from) //勿印使用者物件與欄位值(含個資)
     // return false //測試無法登入
     console.log('於生產環境時得加入限制應用程式使用者身份機制')
     //本套件於此函數通過後另自行要求系統管理者等級(users表有效之系統管理者，或系統服務用途之應用系統token)，一般使用者即使本函數放行亦被拒(userNotAdmin)，故不必再以isAdmin判斷；
@@ -95,7 +95,7 @@ let verifyAppUser = (user, from) => {
 let instWWebPerm = WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser, opt)
 
 instWWebPerm.on('error', (err) => {
-    console.log(err)
+    console.log('error', err && err.name) //只印錯誤類別名稱, 不印訊息與內容
 })
 ```
 
@@ -129,6 +129,16 @@ instWWebPerm.on('error', (err) => {
 
 ## Upgrade Notes
 
+### Unreleased: console diagnostics print no data values (2026-10-31, perm 20261031023204, R-CONSOLE-NOVAL-01, ADR-047) — breaking changes (the content of console lines changes)
+
+- **What changed**: the diagnostic lines that `WWebPerm` writes to the process output (`console.log`) no longer print data values. When a request fails validation or the identity check fails, the lines used to print the user object returned by your `getUserByToken` (or the row of the `users` table), the request body, the query parameters, the user id, the `keyTable` and the error object; they now print only **key names, types or fixed words**: `user (keys: id,name,email)`, `payload (keys: from,rows)`, `userId (typeof string)`, `req.query (keys: token,userId)`, and for an error only its class (`getUserRules (TypeError)`, `WServOrm init error (Error)`). The same rule holds for the code shared with the browser that the server runs (`src/plugins/mShare.mjs`: an invalid authorization text prints `(typeof string)` and the error class, not the text), for the test-data generators of the schema (`已產生: users 測試資料 (N 筆)`: the count, not the rows) and for the reference deployment `srv.mjs` and the examples below (the `error` event prints the class). Tokens are still shown through `maskTok` (a few leading and trailing characters and the length) and URLs through `maskUrl`, as before.
+- **Breaking changes**
+  - **The content of those console lines changed**: if you collect the process output and search it for a user id, an email, a request body or the text of an error (for example to find which request carried a malformed user object), you will find key names and types instead. The full error message of the cases that already had one is still in srLog (`WServOrm-init-error`, `WServHapiServer-init-error`, `getGenUserAndRulesByUserId-error` and the other events carry the key or the credential-free text, as before); the console never carries it now.
+  - **`maskQuery` is removed from `server/maskLog.mjs`** (it printed every query parameter except `token` as it came; there is no replacement with the same behavior). Code that imported it yourself must use `describeShape` (keys and types only) or drop the line. `server/maskLog.mjs` now exports `maskTok`, `maskUrl`, `describeShape` and `describeErr`.
+  - **The examples no longer print the user object**: the `verifyClientUser` / `verifyAppUser` examples print `from` instead of `user`, and the `error` handler prints `err.name`. Copy the new examples; a deployer function that prints the whole `user` writes personal data (name, email) into the process output.
+- **Not changed**: parameter errors already printed only the type (`invalid url object`, since mig-perm); the fixed words (`[API]getPerm/check token: invalid token` and the like), `mappingBy` (always `id`, `email` or `name`), counts, `apiType` (a fixed route name) and the path of the missing entry file are printed as before. srLog events are unchanged by this release (they carry user ids as before; `syncAndReplaceTabs-error` carries the rejected `keyTable` text).
+- **Not covered**: see "Not covered" in the next section for the offline tools and the browser console.
+
 ### Unreleased: ORM diagnostic lines move from the process output to srLog, produced by the shared wsemi module (2026-10-28 perm-run01 and 2026-10-29 mig-perm, R-ORM-DIAG-01 / R-ORM-DIAG-02) — one behavior change and breaking changes
 
 - **Dependencies**: `w-serv-orm ^1.1.23` and `wsemi ^1.9.33` (2026-10-30 b-perm: `SAFE_KEYS` of w-serv-orm 1.1.23 and the `safeKeys` option of wsemi 1.9.33's `genDiagFunLog` are required, see the breaking change below; before that `^1.1.22` and `^1.9.31`). From w-serv-orm 1.1.20 the ORM's diagnostic output (a failed write, a rejected input) no longer prints primary keys, data values or database error text to the console, only a label such as `users.save fail` and a summary that contains no personal data (how many rows failed and at which positions, the error class and machine code, a fixed rejection sentence). From 1.1.22 the summary's keys and values follow the shared diagnostics rules of wsemi (only a whitelist of keys is kept, `errType` lists built-in class names only, `errCode` only codes of a published set).
@@ -146,7 +156,7 @@ instWWebPerm.on('error', (err) => {
 - The offline tools (`g_*.mjs`) are unchanged: they print the same safe summary to the terminal that runs them.
 - **Not covered**
   - **Offline maintenance tools** (`server/tools/fromTools.mjs`, `authRefsClean.mjs`, run from `g_*.mjs`): the error text of a failed read or write is printed as it comes from the driver, to the terminal of the person who runs the tool (and into the `failed[].err` of the result the tool returns). That person already holds the connection credentials; nothing is written into srLog by these tools.
-  - **Console lines of the request checks in `WWebPerm`**: when a request fails validation, some lines print the user object returned by your `getUserByToken` or the request body (`console.log('user', user)`, `'payload'`, ...); tokens in them are masked, other fields are not. These lines are not changed by this release.
+  - **The console of the bundled front end** (the browser's developer tools; `src/**/*.vue`, `src/main.js`): its diagnostic lines (for example the selected row or the authorization text of an editor dialog) are not changed by the release in "console diagnostics print no data values" above; they run in the browser of the person who is logged in as an administrator and are not part of the server's process output or srLog.
   - **The credential list comes from the `url` argument only.** A credential that reaches the driver by another route (an environment variable, a separate password setting inside your `WOrm`) is not known to this package; only the generic patterns of `maskDiagText` (`scheme://user:password@`, `password=...`, `Bearer ...`) apply to it. A password of fewer than four characters is not masked as a bare word (it is masked inside the connection string).
   - **Text that your injected functions throw** (`getUserByToken`, `verifyClientUser`, `verifyAppUser`) is not logged at all: `wrapInjected` turns a failure into a negative result and logs only a key or the error class.
 

@@ -2,6 +2,7 @@ import fs from 'fs'
 import JSON5 from 'json5'
 import WOrm from 'w-orm-lmdb/src/WOrmLmdb.mjs'
 import WWebPerm from './server/WWebPerm.mjs'
+import { describeErr } from './server/maskLog.mjs'
 import getSettings from './g_getSettings.mjs'
 
 
@@ -219,7 +220,7 @@ let verifyAppUser = (user, from) => {
 let instWWebPerm = WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser, opt)
 
 instWWebPerm.on('error', (err) => {
-    console.log(err)
+    console.log('error', describeErr(err)) //只印錯誤類別, 不印訊息與內容(R-DIAG-01 D2, ADR-047)
 })
 
 //node srv.mjs

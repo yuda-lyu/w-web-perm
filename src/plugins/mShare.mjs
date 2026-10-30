@@ -22,6 +22,19 @@ import getEffMode from '../js/getEffMode.mjs'
 import isAuthMode from '../js/isAuthMode.mjs'
 
 
+//nameOfErr: console 診斷用之錯誤類別名稱(只取識別字形狀之 name, 不取訊息; 非 Error 只回型別); 本檔前後端共用, 故不引用 server/maskLog.mjs 之 describeErr(ADR-047)
+let nameOfErr = (err) => {
+    let n = null
+    try {
+        n = (err instanceof Error) ? err.name : null
+    }
+    catch (e) {
+        n = null
+    }
+    return (typeof n === 'string' && /^\w{1,40}$/.test(n)) ? n : `(typeof ${typeof err})`
+}
+
+
 // //dlm
 // let dlm = '/'
 
@@ -218,8 +231,8 @@ function getUserRules(user, grups, pemis, targets) {
             // console.log('kp', kp)
         }
         catch (err) {
-            console.log('c', c)
-            console.log(err)
+            //console 只印型別與錯誤類別, 不印授權字串之內容與錯誤訊息(JSON5 之訊息含原文片段; R-DIAG-01 D2, ADR-047)
+            console.log('cvStrToArr: JSON5.parse failed', `(typeof ${typeof c})`, nameOfErr(err))
         }
 
         //arr
@@ -229,9 +242,7 @@ function getUserRules(user, grups, pemis, targets) {
             // console.log('arr', arr)
         }
         catch (err) {
-            console.log('c', c)
-            console.log('kp', kp)
-            console.log(err)
+            console.log('cvStrToArr: cvKpToArr failed', `(typeof ${typeof c})`, `(typeof ${typeof kp})`, nameOfErr(err))
         }
 
         return arr

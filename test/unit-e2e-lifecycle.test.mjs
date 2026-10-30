@@ -185,6 +185,13 @@ describe('unit-e2e-lifecycle (e2e 檔 DB 收尾對稱, R-E2E-ISO-01)', function(
     let importsName = (code, name) => new RegExp(`import\\s*\\{[^}]*\\b${name}\\b[^}]*\\}\\s*from`).test(code)
     let callsName = (code, name) => new RegExp(`\\b${name}\\(`).test(code)
 
+    //只「觸碰」同步端點而不建立外部列夾具之檔(perm 修正輪 20261031023204): 自起子行程後端於 test/_tmp 專屬資料夾(不經共用後端、不 import api-setup), 對同步端點只送被拒絕之請求(請求本體驗證失敗), 零寫入,
+    //故無外部列夾具可收尾; 先例 api-maskRaw 之 MASKRAW-104 曾因此廢止(本檔之 payload 站點須經同步端點才觸發, 不廢止, 改以明列豁免並以下列條件把關)
+    let ISOLATED_NO_WRITE = {
+        'api-consoleNoValues.test.mjs': '請求本體(payload)驗證失敗之 console 站點須經 /syncAndReplaceTabs 觸發; 後端為子行程自有資料夾, 只送被拒絕之請求, 零寫入',
+    }
+    let isIsolatedBackend = (code) => /spawn\(process\.execPath/.test(code) && !/from\s*['"]\.\/tools\/api-setup\.mjs['"]/.test(code)
+
     it('LC-004 站點不變式: api-／e2e- 測試檔不自寫 delAll({ from … }) 收尾; 凡經同步端點建立外部列夾具者, 必有 cleanExternalFixtures／restoreTables／purgeExternalRows／createIsolation 之收尾; 呼叫收尾輔助者必已 import', function() {
         let bad = []
         let makers = []
@@ -197,6 +204,12 @@ describe('unit-e2e-lifecycle (e2e 檔 DB 收尾對稱, R-E2E-ISO-01)', function(
                 if (callsName(code, name) && !importsName(code, name)) {
                     bad.push(`${fn}: 呼叫 ${name}( 但未自 ./tools/api-setup.mjs import(執行到才 ReferenceError)`)
                 }
+            }
+            if (RE_MAKES_EXT.test(code) && Object.prototype.hasOwnProperty.call(ISOLATED_NO_WRITE, fn)) {
+                if (!isIsolatedBackend(code)) {
+                    bad.push(`${fn}: 列於 ISOLATED_NO_WRITE(自起子行程後端、不 import api-setup)但不符條件, 不得豁免`)
+                }
+                continue
             }
             if (RE_MAKES_EXT.test(code)) {
                 makers.push(fn)

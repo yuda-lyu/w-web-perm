@@ -171,7 +171,7 @@ describe('unit-adminOnlySite (權限後台與資料通道只限系統管理者�
                 })
             }
             //允許: adminCheck.mjs(row.isAdmin 比對)、WWebPerm.mjs checkUser 之格式檢查('y'／'n' 二值)與其 console.log、fromTools(離線維運之報告統計)
-            let bad = hits.filter((h) => !/^server\/adminCheck\.mjs:/.test(h) && !/^server\/WWebPerm\.mjs:\d+: (if \(isAdmin !== 'y' && isAdmin !== 'n'\) \{|console\.log\('user\.isAdmin is not y or n', user\.isAdmin\))/.test(h) && !/^server\/tools\/fromTools\.mjs:/.test(h))
+            let bad = hits.filter((h) => !/^server\/adminCheck\.mjs:/.test(h) && !/^server\/WWebPerm\.mjs:\d+: (if \(isAdmin !== 'y' && isAdmin !== 'n'\) \{|console\.log\('user\.isAdmin is not y or n', describeShape\(isAdmin\)\))/.test(h) && !/^server\/tools\/fromTools\.mjs:/.test(h))
             A.deepEqual(bad, [], `角色判斷須只經 isAdminRow:\n${bad.join('\n')}`)
         })
     })

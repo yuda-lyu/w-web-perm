@@ -1,8 +1,9 @@
 import isestr from 'wsemi/src/isestr.mjs'
 import isarr from 'wsemi/src/isarr.mjs'
+import getDiagBriefErr from 'wsemi/src/getDiagBriefErr.mjs'
 
 
-//maskLog: 權杖與網址寫入 console / srLog 前之遮罩(M 契約, spec/設計要點與取捨.md ADR-023)
+//maskLog: 權杖與網址寫入 console / srLog 前之遮罩(M 契約, spec/設計要點與取捨.md ADR-023); console 診斷不印資料值之形狀摘要 describeShape／describeErr(ADR-047)
 //四 repo 一致(w-web-sso server/srLog.mjs 之 maskToken 與 src/maskUrl.mjs、w-web-api / w-web-task 之 maskTok), 以同一組測資守護(test/unit-maskLog.test.mjs)
 //why: 原 console 站點原樣印出 token / req.query / authorization(Hapi 對重複之 query 參數給陣列, 型別檢查失敗之分支正是印出處), verifyConn 之 srLog 原樣記 referer
 
@@ -45,22 +46,66 @@ function maskTok(token) {
 }
 
 
+//console 診斷之形狀摘要上限: 鍵名最多列 MAX_KEYS 個、單一鍵名至多 MAX_KEY_LEN 字(超出者截斷並標示), 避免請求端以巨量鍵名灌爆行程標準輸出
+const MAX_KEYS = 20
+const MAX_KEY_LEN = 40
+
+
 /**
- * 查詢參數遮罩: 淺拷貝, 鍵名小寫為 token 者以 maskTok 處理, 其餘原樣(供印出 req.query)
- * 非物件輸入依 maskTok 處理
+ * 形狀摘要: console 診斷只印型別、鍵名或筆數, 絕不印任何值(R-DIAG-01 D2「預設不輸出資料值」; V20; ADR-047)
+ * - null → '(null)'; undefined → '(undefined)'; 字串 → '(typeof string)'(空字串另標 empty, 便於區分「空」與「非字串」); 其他非物件 → '(typeof 型別)'
+ * - 陣列 → '(array, length=N)'; 物件 → '(keys: a,b,c)'(自有可列舉之字串鍵, 至多 20 個、單鍵至多 40 字, 控制字元換 '?'; 無鍵 '(keys: none)')
+ * - 永不拋錯(存取器、Proxy 陷阱之例外回 '(typeof object)')
+ * 取代原 maskQuery(其印出 req.query 之非 token 值, 與 D2 相衝)
  *
- * @param {*} q 輸入查詢參數物件(Hapi 之 req.query 為 null-prototype 物件)
- * @returns {Object|String|Array} 回傳遮罩後之淺拷貝
+ * @param {*} v 輸入任意值(使用者物件、請求本體、查詢參數、傳入參數等)
+ * @returns {String} 回傳不含值之摘要字串
  */
-function maskQuery(q) {
-    if (q === null || typeof q !== 'object' || isarr(q)) {
-        return maskTok(q)
+function describeShape(v) {
+    try {
+        if (v === null) {
+            return '(null)'
+        }
+        if (v === undefined) {
+            return '(undefined)'
+        }
+        if (typeof v === 'string') {
+            return v === '' ? '(typeof string, empty)' : '(typeof string)'
+        }
+        if (typeof v !== 'object') {
+            return `(typeof ${typeof v})`
+        }
+        if (isarr(v)) {
+            return `(array, length=${v.length})`
+        }
+        let ks = Object.keys(v)
+        if (ks.length === 0) {
+            return '(keys: none)'
+        }
+        let s = ks.slice(0, MAX_KEYS).map((k) => {
+            return safe(k.length > MAX_KEY_LEN ? `${k.slice(0, MAX_KEY_LEN)}...` : k)
+        }).join(',')
+        if (ks.length > MAX_KEYS) {
+            s += `,...+${ks.length - MAX_KEYS}`
+        }
+        return `(keys: ${s})`
     }
-    let r = {}
-    for (let k of Object.keys(q)) {
-        r[k] = (k.toLowerCase() === 'token') ? maskTok(q[k]) : q[k]
+    catch (err) {
+        return '(typeof object)'
     }
-    return r
+}
+
+
+/**
+ * 錯誤摘要: console 診斷只印錯誤類別與白名單內之機器代碼, 不印訊息文字(訊息可能含資料值、路徑或驅動原文; 原文只入 srLog 並依 maskRaw 遮憑證)
+ * 經 wsemi getDiagBriefErr(單一實作, 規格 D1), 不自寫; 回 '(Error)' 或 '(Error ENOENT)'; 永不拋錯
+ *
+ * @param {*} err 輸入錯誤或任意值
+ * @returns {String} 回傳不含訊息文字之摘要字串
+ */
+function describeErr(err) {
+    let b = getDiagBriefErr(err)
+    return b.errCode === undefined ? `(${safe(String(b.errType))})` : `(${safe(String(b.errType))} ${safe(String(b.errCode))})`
 }
 
 
@@ -99,6 +144,7 @@ function maskUrl(u) {
 
 export {
     maskTok,
-    maskQuery,
-    maskUrl
+    maskUrl,
+    describeShape,
+    describeErr
 }
