@@ -5,7 +5,7 @@
 //       WWebPerm 之 verifyConn msg 見 api-maskRaw. [前一輪(mig-perm)將 routeResult 歸為固定詞彙, 本輪更正: getPerm 之 woItems.*.select 錯誤由此出口入 log]
 //  [S2] 秘密經參數 secrets 傳入, 必帶(不留無秘密之舊介面): procCore、syncCore、writeWithCascade、createRouteResult 缺 secrets 即 TypeError／reject TypeError(fail-closed).
 //  [S3] 固定詞彙(語系鍵、procOrm 之固定英文詞彙)與 msg／key 欄位不經遮罩: errLog 之 msg 與對外 reject 值為 key 原樣、語系鍵不另記 raw; 只遮 raw 欄位之原文.
-//  [S4] 只遮憑證(D3、P1): 單獨帳號與儲存路徑不遮; 儲存路徑形式之連線字串(w-orm-lmdb './db')之 reject 清單為空(同 w-serv-orm 之 getUrlSecrets).
+//  [S4] 只遮憑證(D3、P1): 單獨帳號與儲存路徑不遮; 儲存路徑形式之連線字串(w-orm-lmdb './db')之 reject 清單為空(同 w-serv-orm 對自家錯誤值之判準: wsemi getDiagSecrets({ conns }); 2026-10-30 b-perm 起 getRawSecrets 直接呼叫之).
 //  [S5] 先遮罩再截斷(routeResult): 跨在第 500 字之憑證不得因先截斷而殘留前綴.
 //  [S6] 非憑證之診斷文字保留(遮罩不把整段原文吞掉).
 //受測: server/maskRaw.mjs、server/procCore.mjs、server/syncCore.mjs、server/cascadeWrite.mjs、server/routeResult.mjs; 依賴真實實作(w-serv-orm 實例 mkCore、wsemi maskDiagText), 僅資料表為記憶體替身(mkTable), 外來錯誤以替身表之 select／save 注入(模擬驅動訊息回顯連線字串).
@@ -137,7 +137,7 @@ describe('unit-maskRaw (srLog raw 移除連線憑證; mig-perm2 T-a 選 B, R-ORM
             A.ok(!SEC.reject.includes(USER), 'reject 清單不得含單獨帳號')
         })
 
-        it('MR-002 [S4] 儲存路徑形式(w-orm-lmdb 之 ./db、絕對路徑): reject 清單為空, 路徑原樣保留(同 w-serv-orm 之 getUrlSecrets); 內建樣式(password=)仍遮', function() {
+        it('MR-002 [S4] 儲存路徑形式(w-orm-lmdb 之 ./db、絕對路徑): reject 清單為空, 路徑原樣保留(同 w-serv-orm 對自家錯誤值之判準: wsemi getDiagSecrets({ conns })); 內建樣式(password=)仍遮', function() {
             for (let u of ['./db', 'C:\\data\\db01', '/var/lib/perm/db']) {
                 let sec = getRawSecrets(u)
                 A.deepEqual([...sec.reject], [], `${u}: 路徑不是憑證, reject 清單應為空`)

@@ -16,16 +16,15 @@ import assert from 'assert'
 import { spawn } from 'child_process'
 import { fileURLToPath } from 'url'
 import WServOrm from 'w-serv-orm/src/WServOrm.mjs'
-import genDiagFunLog from 'wsemi/src/genDiagFunLog.mjs'
 import getDiag from 'wsemi/src/getDiag.mjs'
 import diagCases from 'wsemi/src/_diagCases.mjs'
 import ds from '../src/schema/index.mjs'
 import { mkTable, mkSrLog } from './tools/unitOrm.mjs'
 import { sourceLines, blankStrings } from './tools/srcScan.mjs'
+import { mkSiteFunLog, fpWWebPerm } from './tools/siteFunLog.mjs'
 
 const A = assert.strict
 const projRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
-const fpWWebPerm = path.join(projRoot, 'server', 'WWebPerm.mjs')
 const fpOrmDiag = path.join(projRoot, 'server', 'ormDiag.mjs')
 const fdTmp = path.join(projRoot, 'test', '_tmp', 'unit-ormDiag')
 
@@ -39,22 +38,7 @@ const SECRETS = [SECRET_ID, SECRET_MAIL, SECRET_TEXT, 'simulated save failure', 
 let sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 
-//getSiteExpr: 自 WWebPerm.mjs 之 WServOrm 建構行取出 funLog 運算式原文(本套件實際呼叫點); 找不到回 null
-function getSiteExpr() {
-    let ls = sourceLines(fpWWebPerm, 'code').filter((l) => /\bWServOrm\(ds, WOrm, url, db, \{ funLog: .+ \}\)/.test(l.text))
-    if (ls.length !== 1) {
-        return null
-    }
-    return ls[0].text.match(/\{ funLog: (.+) \}\)/)[1].trim()
-}
-
-//mkSiteFunLog: 以呼叫點之運算式原文建 funLog(srLog 為替身); 呼叫點若被改成別的寫法(例: 自寫轉接器、漏 .funLog)則此處跟著變, 使下列各測試反映真實接線
-function mkSiteFunLog(srLog) {
-    let expr = getSiteExpr()
-    A.ok(expr !== null, '找不到 WWebPerm.mjs 之 WServOrm 建構行(須恰一處且寫成 { funLog: <運算式> })')
-    // eslint-disable-next-line no-new-func
-    return new Function('genDiagFunLog', 'srLog', `return ${expr}`)(genDiagFunLog, srLog)
-}
+//getSiteExpr／mkSiteFunLog 已移至 test/tools/siteFunLog.mjs(與 unit-ormDiagSafeKeys 共用): 自 WWebPerm.mjs 之 WServOrm 建構行取出 funLog 運算式原文, 在 genDiagFunLog／srLog／SAFE_KEYS 三識別字下重建, 使下列各測試反映真實接線
 
 //withConsoleSpy: 執行 fn 期間攔下 console.log／info／warn／error／debug(不呼叫原函數), 回傳 { calls }
 async function withConsoleSpy(fn) {
@@ -80,17 +64,22 @@ async function withConsoleSpy(fn) {
 
 
 //CORPUS_A: 共用語料 group A(genDiagFunLog 轉接器)逐案之適用性。適用者經 mkSiteFunLog 之本套件接線路徑重跑; 不適用者寫明理由。語料新增 A 案時此表須補, 否則 ORMDIAG-000 失敗
+//b-perm(20261030): 接線加 { safeKeys: SAFE_KEYS } 後, 以「白名單外之任意鍵」驅動 safe 正規化之案(A01、A03、A09、A10)其鍵被第二道防線丟棄(預期行為, 不是缺陷), 無法再原樣經本接線重跑;
+//  該類形態(bigint、循環、字串與項數上限)在白名單內之鍵上經本接線之保持, 改由 unit-ormDiagSafeKeys 之 SK-W3 驗; 白名單過濾本身由 SK-W1、SK-W2、SK-W4 驗
 const CORPUS_A = {
-    A01: { wire: true },
+    A01: { wire: false, why: '案例以白名單外之鍵 a 驅動, 本接線帶 safeKeys: SAFE_KEYS 後該鍵被丟棄; 「第3引數 detail 不讀」由 ORMDIAG-120(真 WServOrm 之 funLog 恆兩引數且帶 noDetail)與 SK-W1(接線之 funLog 帶 noDetail)驗' },
     A02: { wire: true },
-    A03: { wire: true },
+    A03: { wire: false, why: '案例以白名單外之鍵(b、s、self)驅動 bigint／循環之正規化, 本接線丟棄之; 同形態在白名單內之鍵(n、ks、msgs)上經本接線之行為由 SK-W3 驗' },
     A04: { wire: true },
     A05: { wire: false, why: '本套件只取 funLog、不保留 close()(轉接器隨行程存續), 呼叫點沒有 close 可驗' },
     A06: { wire: true },
     A07: { wire: false, why: '案例自訂 event 名(x-diag), 本套件固定用預設 orm-diag; 其 getDiag 不呼叫 getDetail 之部分由 ORMDIAG-120 以真 WServOrm(funLog 恆兩引數)驗' },
     A08: { wire: false, why: 'write 恆為本套件固定之箭頭函數 (o) => srLog.warn(o), 不會觸發建構期 TypeError; 非函數之建構拋錯由 wsemi 自身測試(A08)負責' },
-    A09: { wire: true },
-    A10: { wire: true },
+    A09: { wire: false, why: '案例以 3000 個白名單外之鍵驅動鍵數上限, 本接線丟棄之; 本接線之鍵集合恆為 SAFE_KEYS 之子集(至多 11 鍵＋errType、errCode, 遠低於上限), 由 SK-W1／SK-W2 驗' },
+    A10: { wire: false, why: '案例以白名單外之鍵驅動不可列舉鍵之名額與 Proxy 欄位值, 本接線丟棄之; 白名單內之鍵之值正規化由 SK-W3 驗' },
+    A11: { wire: false, why: '案例以自訂 opt(safeKeys 之各形態、event)直接驅動 genDiagFunLog 本身, 本套件之 safeKeys 固定為 w-serv-orm 公開之 SAFE_KEYS, 無可變之 opt; wsemi 自身測試負責各形態, 本接線之過濾效果由 SK-W1、SK-W2、SK-W4 驗' },
+    A12: { wire: false, why: '案例驅動 safeKeys 宣告了而無法使用之各形態(存取器、非陣列、Proxy), 本套件之 safeKeys 為凍結陣列(SK-S4 驗), 不會落入這些形態; wsemi 自身測試負責' },
+    A13: { wire: false, why: '案例驅動 safe 含自有 __proto__ 鍵之正規化與 safeKeys 之各形態, 本接線不列 __proto__(SK-S4 驗名單不含)而丟棄之; wsemi 自身測試負責' },
 }
 
 
@@ -410,16 +399,18 @@ describe('unit-ormDiag-sites (WServOrm 站點之靜態不變式)', function() {
     //本專案可執行碼範圍: server/ 全部、專案根之 g_*.mjs 與 srv.mjs(src/ 為前端, test/ 為測試, 不計)
     let scope = () => [...walk(path.join(projRoot, 'server')), ...fs.readdirSync(projRoot).filter((n) => /^g_.*\.mjs$/.test(n) || n === 'srv.mjs').map((n) => path.join(projRoot, n))]
 
-    //R-ORM-DIAG-01: 生產站點(伺服器)建構 WServOrm 時帶 funLog: genDiagFunLog((o) => srLog.warn(o)).funLog, 且在 srLog 建立之後
-    it('SITE-DIAG-001 server/WWebPerm.mjs 之 WServOrm 建構帶 { funLog: genDiagFunLog((o) => srLog.warn(o)).funLog }, 於 srLogInit 之後; 自 wsemi 匯入', function() {
+    //R-ORM-DIAG-01: 生產站點(伺服器)建構 WServOrm 時帶 funLog: genDiagFunLog((o) => srLog.warn(o), { safeKeys: SAFE_KEYS }).funLog, 且在 srLog 建立之後
+    //(safeKeys 為 w-serv-orm 公開之 SAFE_KEYS, 第二道防線; 其接線之行為案見 unit-ormDiagSafeKeys.test.mjs)
+    it('SITE-DIAG-001 server/WWebPerm.mjs 之 WServOrm 建構帶 { funLog: genDiagFunLog((o) => srLog.warn(o), { safeKeys: SAFE_KEYS }).funLog }, 於 srLogInit 之後; 自 wsemi 匯入', function() {
         let ls = sourceLines(fpWWebPerm, 'code')
         let iSr = ls.find((l) => /let srLog = srLogInit\(opt\)/.test(l.text))
         let iOrm = ls.filter((l) => /\bWServOrm\(/.test(blankStrings(l.text)) && !/^import\b/.test(l.text.trim()))
         A.ok(iSr, '找不到 let srLog = srLogInit(opt)')
         A.equal(iOrm.length, 1, `server/WWebPerm.mjs 內 WServOrm( 呼叫須恰一處, 實得 ${JSON.stringify(iOrm.map((l) => l.no))}`)
-        A.ok(/\bWServOrm\(ds, WOrm, url, db, \{ funLog: genDiagFunLog\(\(o\) => srLog\.warn\(o\)\)\.funLog \}\)/.test(iOrm[0].text), `WServOrm 須帶 { funLog: genDiagFunLog((o) => srLog.warn(o)).funLog }, 實得 :${iOrm[0].no} ${iOrm[0].text.trim()}`)
+        A.ok(/\bWServOrm\(ds, WOrm, url, db, \{ funLog: genDiagFunLog\(\(o\) => srLog\.warn\(o\), \{ safeKeys: SAFE_KEYS \}\)\.funLog \}\)/.test(iOrm[0].text), `WServOrm 須帶 { funLog: genDiagFunLog((o) => srLog.warn(o), { safeKeys: SAFE_KEYS }).funLog }, 實得 :${iOrm[0].no} ${iOrm[0].text.trim()}`)
         A.ok(iSr.no < iOrm[0].no, `srLogInit(:${iSr.no}) 須早於 WServOrm(:${iOrm[0].no})`)
         A.ok(ls.some((l) => /^import genDiagFunLog from 'wsemi\/src\/genDiagFunLog\.mjs'$/.test(l.text.trim())), '須有 import genDiagFunLog from \'wsemi/src/genDiagFunLog.mjs\'')
+        A.ok(ls.some((l) => /^import \{ SAFE_KEYS \} from 'w-serv-orm\/src\/safeKeys\.mjs'$/.test(l.text.trim())), '須有 import { SAFE_KEYS } from \'w-serv-orm/src/safeKeys.mjs\'(w-serv-orm 之公開入口)')
     })
 
     //R-ORM-DIAG-01: 站點全集——WServOrm( 之建構站點必須逐一分類: 伺服器(帶 funLog)與離線維運工具(不寫 srLog, 診斷輸出留在操作者終端機之預設安全摘要)
@@ -468,8 +459,8 @@ describe('unit-ormDiag-sites (WServOrm 站點之靜態不變式)', function() {
         A.ok(hits[0].startsWith('server/WWebPerm.mjs:'), `應在 server/WWebPerm.mjs, 實得 ${hits[0]}`)
     })
 
-    //設計 §6.1: wsemi 於 Node < 20.16 取不到 util.types, Proxy 不可偵測 → engines 提高; 相依 wsemi ≥ 1.9.31(共用診斷模組)、w-serv-orm ≥ 1.1.22(funLog 引數形狀:safe 白名單鍵)
-    it('SITE-DIAG-005 package.json: engines.node >=20.16、wsemi ^1.9.31 以上、w-serv-orm ^1.1.22 以上', function() {
+    //設計 §6.1: wsemi 於 Node < 20.16 取不到 util.types, Proxy 不可偵測 → engines 提高; 相依 wsemi ≥ 1.9.33(genDiagFunLog 之 opt.safeKeys、getDiagSecrets 之 conns)、w-serv-orm ≥ 1.1.23(公開 SAFE_KEYS、已刪 getUrlSecrets)
+    it('SITE-DIAG-005 package.json: engines.node >=20.16、wsemi ^1.9.33 以上、w-serv-orm ^1.1.23 以上', function() {
         let pkg = JSON.parse(fs.readFileSync(path.join(projRoot, 'package.json'), 'utf8'))
         A.equal(pkg.engines.node, '>=20.16')
         let ver = (s) => s.replace(/^[\^~>=\s]+/, '').split('.').map(Number)
@@ -481,8 +472,8 @@ describe('unit-ormDiag-sites (WServOrm 站點之靜態不變式)', function() {
             }
             return true
         }
-        A.ok(ge(ver(pkg.dependencies.wsemi), [1, 9, 31]), `wsemi 須 ≥1.9.31, 實得 ${pkg.dependencies.wsemi}`)
-        A.ok(ge(ver(pkg.dependencies['w-serv-orm']), [1, 1, 22]), `w-serv-orm 須 ≥1.1.22, 實得 ${pkg.dependencies['w-serv-orm']}`)
+        A.ok(ge(ver(pkg.dependencies.wsemi), [1, 9, 33]), `wsemi 須 ≥1.9.33, 實得 ${pkg.dependencies.wsemi}`)
+        A.ok(ge(ver(pkg.dependencies['w-serv-orm']), [1, 1, 23]), `w-serv-orm 須 ≥1.1.23, 實得 ${pkg.dependencies['w-serv-orm']}`)
     })
 
     //R-DIAG-01 D2: 參數檢查失敗之 console 只印型別不印值(無效之 url 可能是含帳密的設定物件)

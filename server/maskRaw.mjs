@@ -1,5 +1,5 @@
 import maskDiagText from 'wsemi/src/maskDiagText.mjs'
-import { getUrlSecrets } from 'w-serv-orm/src/getDiagBrief.mjs'
+import getDiagSecrets from 'wsemi/src/getDiagSecrets.mjs'
 
 
 //srLog 之 raw(錯誤原文)移除連線憑證之單一入口(規則帳本 R-ORM-DIAG-02; 跨套件規格〈診斷輸出與遮罩〉D1 單一實作、D3 對外錯誤值不含憑證; 主控 2026-10-30 裁定 T-a 選 B):
@@ -13,13 +13,13 @@ import { getUrlSecrets } from 'w-serv-orm/src/getDiagBrief.mjs'
  * 由連線字串產生 srLog raw 遮罩用之秘密清單
  *
  * 連線字串(含 :// 或 @)列為網址(帳密為憑證); 其餘(w-orm-lmdb 之 './db' 等儲存路徑)列為路徑(reject 清單為空, 不把儲存路徑當憑證遮),
- * 判準與 w-serv-orm 本身遮罩自家錯誤值者為同一函數(getUrlSecrets), 兩層對同一連線字串之遮罩一致
+ * 判準與 w-serv-orm 本身遮罩自家錯誤值者為同一個 wsemi 函數(getDiagSecrets({ conns: [url] }), w-serv-orm 1.1.23 起兩層皆直接呼叫它), 兩層對同一連線字串之遮罩一致
  *
  * @param {String} url 輸入 WWebPerm 之資料庫連線字串
  * @returns {Object} 回傳 wsemi getDiagSecrets 之結果 { detail, reject }(凍結), 供 rawOfErr、maskRaw 之 secrets 參數使用
  */
 function getRawSecrets(url) {
-    return getUrlSecrets(url)
+    return getDiagSecrets({ conns: [url] })
 }
 
 

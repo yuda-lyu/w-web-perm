@@ -2,6 +2,14 @@
 
 本檔記本套件**當前已開發功能之最新狀態**;與規則帳本(`sgud/rule/rulebook.md`,藍圖)比對即知尚未做到者,接續工作先讀此檔.2026-10-22 主控遷移為 sgud 配置時建立,先移入原帳本之「已知缺口 / 待辦」;**各功能之完成狀態整理為下一次派工之待辦**(主責 agent 依規則帳本各節之「狀態」行與近期報告彙整至本檔).
 
+## 近期進度(2026-10-30 b-perm〔任務 20261030184428, 排程第 187、192 項之下游部分〕:ORM 診斷轉接器帶 w-serv-orm 公開之 `SAFE_KEYS`、秘密清單改 wsemi `getDiagSecrets({ conns })`; 修正輪＝單輪,未發布,待主控複審)
+
+> 注意: 規則 R-ORM-DIAG-03(`sgud/rule/rulebook_security.md` 緊接 R-ORM-DIAG-02), ADR-046, 報告 `C:\opensrcOper\dnow\20261030184428\agent-out\b-perm-修正報告.md`. 依賴 `wsemi ^1.9.33`(實裝 1.9.33)、`w-serv-orm ^1.1.23`(實裝 1.1.23); 其餘自有相依亦升最新(w-aggrid-vue 2.1.14、w-serv-hapi 1.1.11、w-orm-lmdb 1.0.47、w-package-tools-e2e 1.0.12、w-screenctl 1.0.30), `dist/`、`docs/` 未重建.
+
+- **改動(完成)**: ①`server/WWebPerm.mjs`: 自 `w-serv-orm/src/safeKeys.mjs` 匯入 `SAFE_KEYS`, 呼叫點 `genDiagFunLog((o) => srLog.warn(o), { safeKeys: SAFE_KEYS }).funLog`(第二道防線: srLog `orm-diag` 之 `safe` 只含 `SAFE_KEYS` 內之鍵與恆保留之 `errType`、`errCode`; 今日 w-serv-orm 無白名單外之產出, 現有日誌內容不變); ②`server/maskRaw.mjs`: `getRawSecrets(url)` 改 wsemi `getDiagSecrets({ conns: [url] })`(w-serv-orm 1.1.23 已刪 `getUrlSecrets`, 原深層匯入載入即失敗); ③`test/tools/e2eLib.mjs` 刪除對 `w-package-tools-e2e/src/parseListenerPids.mjs` 之死再匯出(1.0.12 已刪該檔, 全 repo 無人使用; 不刪則全部經 e2eLib 之測試檔載入失敗); ④w-serv-orm 深層匯入全表與判定: 公開入口 `WServOrm`／`baseline`／`safeKeys`, 既有非診斷用途 `checkOptRemoved`／`getDb`／`genTestData` 保留並登錄, 診斷內部檔禁止(見 R-ORM-DIAG-03 ③); ⑤README〈Upgrade Notes〉〈Breaking changes〉增兩條.
+- **測試**: 新 `unit-ormDiagSafeKeys`(17 案: 靜態 SK-S1～S4、接線 SK-W1～W4〔SK-W4 為 7 個真 WServOrm 失敗情境與不帶 `safeKeys` 之同轉接器逐情境比對〕、秘密清單 SK-M1～M3)、新 `test/tools/siteFunLog.mjs`(自呼叫點運算式原文重建 funLog, 與 `unit-ormDiag` 共用); `unit-ormDiag`／`unit-wwebperm-init` 之呼叫點斷言與 SITE-DIAG-005 版本下限更新、CORPUS_A 登錄 A01～A13(適用 A02、A04、A06)。變異 13 項＋對照全被抓到; 全部 unit／api 結果見報告. e2e 本輪不跑(不改畫面; 但 e2e 工具相依 `w-package-tools-e2e` 1.0.12／`w-screenctl` 1.0.30 與前端相依 `w-aggrid-vue` 2.1.14 已升, 其影響待收尾全套確認).
+- **待辦**: ①凍結碼上之收尾全套(含 e2e; 既有標準圖 0 張改變); ②`checkOptRemoved`／`getDb`／`genTestData` 三個既有深層匯入是否由 w-serv-orm 對下游公開宣告(待主控裁示, 見 ADR-046); ③T-c(請求驗證失敗之 console 診斷)另立項目(承 mig-perm2).
+
 ## 近期進度(2026-10-30 mig-perm2〔任務 20261029002013, 承 mig-perm 之修正輪〕:直接呼叫 `woItems` 之錯誤原文入 srLog 前移除連線憑證〔T-a 主控裁定選 B〕; 修正輪＝單輪,未發布,待主控複審)
 
 > 注意: 規則 R-ORM-DIAG-02-⑦(`sgud/rule/rulebook_security.md`), ADR-045, 報告 `C:\opensrcOper\dnow\20261029002013\agent-out\mig-perm2-修正報告.md`. T-b(離線工具逐筆 `err`)主控裁定維持(操作者即憑證持有者, README〈Not covered〉); T-c(請求驗證失敗之 console 診斷)不在本輪(主控另立項目, 涉及四個 w-web-* 之共用契約).

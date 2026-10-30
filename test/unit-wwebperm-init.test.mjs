@@ -114,8 +114,8 @@ describe('unit-wwebperm-init (已移除設定之 fail-fast、資料通道授權�
         assert.strict.deepEqual(bad.map((l) => `:${l.no} ${l.text.trim()}`), [], '可執行碼不得出現三鍵之識別字')
         let iSr = ls.find((l) => /let srLog = srLogInit\(opt\)/.test(l.text))
         let iChk = ls.find((l) => /\bcheckOptRemoved\(opt\)/.test(l.text))
-        let iOrm = ls.find((l) => /\bWServOrm\(ds, WOrm, url, db, \{ funLog: genDiagFunLog\(\(o\) => srLog\.warn\(o\)\)\.funLog \}\)/.test(l.text)) //perm-run01(20261028): 第 5 參數僅 funLog(診斷輸出導入 srLog, R-ORM-DIAG-01); mig-perm(20261029): funLog 改由 wsemi 之 genDiagFunLog 產生; 已移除之三鍵仍不得出現(上一斷言)
-        assert.strict.ok(iSr && iChk && iOrm, `須有 srLogInit / checkOptRemoved(opt) / WServOrm(ds, WOrm, url, db, { funLog: genDiagFunLog((o) => srLog.warn(o)).funLog }), 實得 ${JSON.stringify([iSr, iChk, iOrm].map((x) => x && x.no))}`)
+        let iOrm = ls.find((l) => /\bWServOrm\(ds, WOrm, url, db, \{ funLog: genDiagFunLog\(\(o\) => srLog\.warn\(o\), \{ safeKeys: SAFE_KEYS \}\)\.funLog \}\)/.test(l.text)) //perm-run01(20261028): 第 5 參數僅 funLog(診斷輸出導入 srLog, R-ORM-DIAG-01); mig-perm(20261029): funLog 改由 wsemi 之 genDiagFunLog 產生; b-perm(20261030): 加 { safeKeys: SAFE_KEYS }(w-serv-orm 1.1.23 公開名單); 已移除之三鍵仍不得出現(上一斷言)
+        assert.strict.ok(iSr && iChk && iOrm, `須有 srLogInit / checkOptRemoved(opt) / WServOrm(ds, WOrm, url, db, { funLog: genDiagFunLog((o) => srLog.warn(o), { safeKeys: SAFE_KEYS }).funLog }), 實得 ${JSON.stringify([iSr, iChk, iOrm].map((x) => x && x.no))}`)
         assert.strict.ok(iSr.no < iChk.no && iChk.no < iOrm.no, `順序須為 srLogInit(:${iSr.no}) < checkOptRemoved(:${iChk.no}) < WServOrm(:${iOrm.no})`)
     })
 
