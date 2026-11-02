@@ -270,3 +270,13 @@
 - **檔案 EOL 不一致**: `server/*.mjs`、`src/App.vue` 為 LF, `src/plugins/mUI.mjs` 為 CRLF(Edit 工具保持原 EOL); 變異腳本多行字串須依檔案 EOL, `grep -c $'\r'` 在此 shell 判不出, 以 node 讀位元組確認。
 - **`db/wperm/**` 在版控內**(`.gitignore` 列了 `db` 但已追蹤), 任何測試執行後 `git status` 顯示 modified, 非本輪修改; 勿被它誤導成『改到資料庫』。
 - **外審派工**: sol 20.7 分鐘完成(`timeoutMs` 3600000), 7 條中 4 條採納、3 條為既有政策／範圍外備查; 副本內『攻擊面』類字樣用腳本中性化後 sol 未被內容審查擋; 完成後以 SHA1 清單核對副本未被修改。等待 detached 行程用 `tasklist //FI "PID eq N"`。
+
+## 外部同步 targets 改名之審計(Gitea #48)(2026-11-02 wp48〔任務 20261102131843〕; 帳本 R-REF-CASCADE-01 已知限制①、R-IMPORT-01 規則 4; 報告 `C:\opensrcOper\dnow\20261102131843\agent-out\wp48-審計報告.md`)
+
+- **審計草案用『兩份副本對照』**: 以工作樹之追蹤檔(`git ls-files`)複製 `./tmp/wp48/orig` 與 `./tmp/wp48/draft`, 草案只套 draft, 兩份各跑同一組測試, 以腳本比對失敗標題集合(onlyDraft 即草案引入之回歸)。副本位於 repo 之下, 套件解析往上找到 repo 之 `node_modules`, 不必複製或連結; 但有 5 件 unit 因副本環境而紅(unit-legendFit、unit-roleName RN-S3、unit-shipTools ST-002、unit-sysFuncsSite SFS-003、unit-validateRows VR-EQ-002), 兩份同紅即為環境。mocha 一律 `quiet-run --cwd <副本>`, 否則以 cwd 讀檔之站點測試會讀到工作樹。
+- **建議檔內嵌之 diff 會失去 CR**: `patch --binary` 對 CRLF 檔(`server/provideTabs.mjs`、`src/schema/tables/targets.mjs`)失敗; 不加 `--binary` 可套, 但結果變 LF。實作時要保留原換行。
+- **真 LMDB 探測不經 HTTP 即可重現同步行為**: `WServOrm(ds, WOrmLmdb, './tmp/…', 'wp48')` 加副本之 `syncCore`, 結束 `closeAll()`; 可同時以 `getUserRules` 驗『改名前後授權逐對象相同』之端到端不變式(腳本見報告證據夾 `scripts/probe-lmdb.mjs`)。
+- **『選用欄＋缺則預設』在身分欄上是雙軌語意**: 草案之 targets `name` 選用(缺則 `id＝srcKey`), 已改為新制之列若某次漏帶 `name`, 會被當成改名為 srcKey 並改寫引用(E15)。凡缺鍵即套預設值的欄位, 都要問: 對『已以新制寫入之列』, 缺鍵是指『沿用』還是『改成預設』? 有歧義就必填(原則 3、14)。
+- **以資料形狀判『舊制』之遷移必有角落**: 「srcKey 等於 id 即舊制」與「新制之穩定鍵恰等於名稱」無從分辨, 會讓同名新實體接管舊引用(E4)。遷移條件要加只會在遷移前成立之閘門(例: 該 from 之庫內列全為舊制), 並登記移除。
+- **ADR 否決理由要回頭驗前提**: ADR-038 決定 51 以「須改引用鍵」否決「系統配 id 並另存名稱欄」, 但 `crules` 可續以名稱引用、`getUserRules` 輸出不變, 前提不成立。
+- **API 測試之後端經 `test/tools/e2e-setup.mjs` 啟動, `spawn` 未設 `windowsHide`, 且會殺 11006 監聽者**: 審計輪若無必要不跑, 或先確認不會跳出視窗。
