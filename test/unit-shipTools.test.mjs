@@ -1,16 +1,20 @@
 //離線維運工具之出貨完整性單元測試(run08; 主控定案 3: 離線工具核心搬出 test/tools, 使 npm 套件安裝後可執行)
 //
-//受測: 離線維運工具 g_authRefsClean.mjs／g_purgeFrom.mjs／g_fixFromType.mjs(專案根)與 server/tools/{authRefsAudit,authRefsClean,fromTools,nameDupReport,isMain}.mjs 之出貨範圍(.npmignore)與入口判斷.
+//受測: 離線維運工具 g_authRefsClean.mjs／g_purgeFrom.mjs／g_fixFromType.mjs(專案根)與 server/tools/{authRefsAudit,authRefsClean,fromTools,nameDupReport,isMain}.mjs 之出貨範圍(npm pack 清單)與入口判斷.
+//依據: C:/opensrcOper/dspec/自有套件之npm發布範圍.md——原則 1(npm 包＝git 版控之內容)、原則 4(test/tools/ 一律不排除)、「套件測試之 npm 包檢查」①(2026-11-02 使用者裁示 A).
 //
 //規格句:
-//  ST-S1 npm 套件(.npmignore 排除 test、spec)必須帶有上列工具檔; 出貨清單(npm pack --dry-run)不得含任何 test/ 檔(工具核心不得留在 test/tools, 否則發布後只能從原始碼 checkout 執行).
-//  ST-S2 工具的相對 import 閉包(靜態 import／字面動態 import('./…'))內每個檔案都在出貨清單內——工具不得依賴 test/ 下的檔案(如 test/tools/dbHolder.mjs), 也不得依賴被 .npmignore 排除之檔案;
+//  ST-S1 npm 套件必須帶有上列工具檔; 出貨清單(npm pack --dry-run)不得含 dspec「不得入包」項(外部執行檔與壓縮檔〔.exe／.dll／.node／.msi／.zip／.7z／.gz／.tgz〕、bin/ 除 manifest.json 外之檔、CLAUDE*.md、tmp/、test/_tmp/、.env);
+//        test/、spec/、sgud/、docs/、toolg/ 等 git 版控內容依原則 1 隨包, 本檔不斷言其不在(.npmignore 現僅依第 2 條排除 test/ 下 tools 以外之大型資料).
+//        工具核心不得留在 test/tools(離線工具核心歸 server/tools 與 src/js, R-SHIP-TOOLS-01).
+//  ST-S2 工具的相對 import 閉包(靜態 import／字面動態 import('./…'))內每個檔案都在出貨清單內, 且不在 test/、spec/ 之下——工具不得依賴 test/ 下的檔案(如 test/tools/dbHolder.mjs; test/tools 依原則 4 隨包出貨, 「在出貨清單內」擋不住, 故明確斷言)、spec/ 下的檔案, 也不得依賴被 .npmignore 排除之檔案;
 //        閉包內出現掃描器無法靜態解析的載入(非字面 import()、require／createRequire)一律視為不合格(run08 外審 sol #4: 否則依賴會被靜默略過).
-//  ST-S3 離線工具核心只依賴 src/js、server/ 與套件依賴(不 import test/): 以閉包檢查涵蓋(ST-S2).
+//  ST-S3 離線工具核心只依賴 src/js、server/ 與套件依賴(不 import test/、spec/): 以閉包檢查涵蓋(ST-S2).
 //  ST-S4 (run08 外審 sol #5) 套件經 symlink／junction 安裝(npm link、pnpm、workspaces)時, node 以真實路徑載入入口模組而 process.argv[1] 維持命令列所給路徑;
 //        CLI 區塊的進入判斷(server/tools/isMain.mjs)須兩邊取真實路徑比對, 否則 CLI 靜默不執行(無報告卻正常結束).
 //
-//輸入空間: 出貨清單{含工具 8 檔, 不含 test/ 檔, 不含 spec/ 與 CLAUDE*.md 〔同為 .npmignore 排除項, 一併守〕} × 閉包根{5 個入口: 3 個 g_*.mjs＋authRefsAudit＋nameDupReport} 全測;
+//輸入空間: 出貨清單{含工具 8 檔, 不含「不得入包」項〔外部執行檔／壓縮檔／bin 非 manifest／CLAUDE*.md／tmp／test/_tmp／.env〕} × 閉包根{5 個入口: 3 個 g_*.mjs＋authRefsAudit＋nameDupReport} 全測(閉包內檔另斷言不在 test/、spec/ 之下);
+//  禁入判斷式負向對照(ST-002b: 各類禁入路徑必被標記, bin/manifest.json 與 test/、spec/、sgud/、docs/、toolg/ 等隨包項不被標記——防判斷式過鬆或復活對 test/、spec/ 之「不在」斷言);
 //  掃描器負向對照(ST-004: 字面靜態／字面動態／副作用 import 被收錄, 註解內者不收, 非字面 import()／require／createRequire 被標記);
 //  入口判斷(ST-005: 同檔經 junction 為真; 他檔、空值為假; 以 junction 安裝之套件路徑執行兩個 CLI 皆有輸出〔無參數印用法, 離開碼 2〕).
 //  刻意不測: 出貨清單的其他檔案(與本議題無關); 工具實際執行(unit-fromAudit／unit-refAudit／unit-nameDupReport 以真 lmdb 臨時庫與子行程涵蓋); 以符號連結(非 junction)安裝(本環境 EPERM, 與 junction 同走 realpath 路徑).
@@ -45,6 +49,20 @@ let packList = () => {
     let info = Array.isArray(j) ? j[0] : Object.values(j)[0]
     return new Set(info.files.map((f) => f.path.replace(/\\/g, '/')))
 }
+
+//isForbiddenInPack: dspec〈自有套件之npm發布範圍〉「套件測試之 npm 包檢查」①之「不得入包」: 外部執行檔與壓縮檔、bin/ 除 manifest.json 外之檔、CLAUDE*.md、tmp/、test/_tmp/、.env.
+//  CLAUDE*.md／tmp／.env 與 .gitignore 同為不限層級之樣式; test/_tmp 為根錨定. test/、spec/、sgud/、docs/、toolg/ 等 git 版控內容依原則 1 隨包, 不在此列.
+let isForbiddenInPack = (p) => {
+    return /\.(exe|dll|node|msi|zip|7z|gz|tgz)$/i.test(p) ||
+        (p.startsWith('bin/') && p !== 'bin/manifest.json') ||
+        /(^|\/)CLAUDE[^/]*\.md$/.test(p) ||
+        /(^|\/)tmp\//.test(p) ||
+        p.startsWith('test/_tmp/') ||
+        /(^|\/)\.env$/.test(p)
+}
+
+//isDevAsset: 測試與規格文件資產(test/、spec/); 離線維運工具之閉包不得落在其下
+let isDevAsset = (p) => p.startsWith('test/') || p.startsWith('spec/')
 
 //stripComments: 去掉區塊註解(行首起算)與行註解(// 前須為行首或空白, 以免誤傷字串內之 URL)
 let stripComments = (text) => text.replace(/^\s*\/\*[\s\S]*?\*\//gm, '').split(/\r?\n/).map((l) => l.replace(/(^|\s)\/\/.*$/, '$1')).join('\n')
@@ -89,16 +107,25 @@ describe('unit-shipTools (離線維運工具出貨完整性, run08)', function()
         }
     })
 
-    it('ST-002 出貨清單不含 test/、spec/、CLAUDE*.md(.npmignore 排除項; 工具核心不得留在 test/tools)', function() {
-        let bad = [...list].filter((p) => p.startsWith('test/') || p.startsWith('spec/') || /^CLAUDE.*\.md$/.test(p))
+    it('ST-002 出貨清單不含 dspec 所列「不得入包」項(外部執行檔與壓縮檔、bin/ 非 manifest、CLAUDE*.md、tmp/、test/_tmp/、.env); 工具核心不得留在 test/tools  [dspec〈自有套件之npm發布範圍〉套件測試之 npm 包檢查①]', function() {
+        let bad = [...list].filter(isForbiddenInPack)
         assert.strict.deepEqual(bad, [])
         for (let f of ['fromTools', 'authRefsClean', 'authRefsAudit', 'nameDupReport']) {
             assert.strict.equal(fs.existsSync(path.join(projRoot, `test/tools/${f}.mjs`)), false, `test/tools/${f}.mjs 不應存在(已搬至 server/tools)`)
         }
     })
 
+    it('ST-002b 禁入判斷式負向對照: 各類禁入路徑必被標記; bin/manifest.json 與 test/、spec/、sgud/、docs/、toolg/ 等隨包項不被標記(dspec 原則 1: 不得斷言其不在)', function() {
+        for (let p of ['src/a.exe', 'bin/tool.DLL', 'a/b.node', 'x.msi', 'pack.zip', 'a.7z', 'a.gz', 'a.tgz', 'bin/other.json', 'bin/sub/a.txt', 'CLAUDE.md', 'CLAUDE_settings.md', 'sgud/CLAUDE_x.md', 'tmp/a.txt', 'spec/tmp/a.txt', 'test/_tmp/a.json', '.env', 'srv/.env']) {
+            assert.strict.equal(isForbiddenInPack(p), true, `${p} 應被標記為禁入`)
+        }
+        for (let p of ['bin/manifest.json', 'test/tools/dbHolder.mjs', 'test/unit-x.test.mjs', 'test/pics/a.png', 'spec/流程.md', 'spec/evidence/a.json', 'sgud/state/state.md', 'docs/dist/index.html', 'toolg/gDistRollup.mjs', 'script.txt', 'README.md', 'src/js/a.mjs', 'dist/w-web-perm.umd.js', 'test/_tmp2/a.json']) {
+            assert.strict.equal(isForbiddenInPack(p), false, `${p} 依原則 1 隨包, 不應被標記為禁入`)
+        }
+    })
+
     for (let root of ROOTS) {
-        it(`ST-003 ${root} 之相對 import 閉包內每個檔案皆在出貨清單內(不依賴 test/ 或被排除之檔案), 且無法靜態解析之載入為 0`, function() {
+        it(`ST-003 ${root} 之相對 import 閉包內每個檔案皆在出貨清單內(不依賴被排除之檔案)、不在 test/ 與 spec/ 之下(test/tools 隨包出貨, 在清單內不足以擋), 且無法靜態解析之載入為 0`, function() {
             let seen = new Set()
             let queue = [root]
             while (queue.length > 0) {
@@ -107,6 +134,8 @@ describe('unit-shipTools (離線維運工具出貨完整性, run08)', function()
                     continue
                 }
                 seen.add(f)
+                //離線維運工具不得依賴 test/、spec/ 下的檔案: test/tools 依 dspec 原則 4 隨包出貨, 「在出貨清單內」已擋不住, 故明確斷言(工具核心須放 server/tools 或 src/js)
+                assert.strict.ok(!isDevAsset(f), `${root} 的閉包含 ${f}: 離線維運工具不得依賴 test/ 或 spec/ 下的檔案(測試與規格文件資產; test/tools 雖隨包出貨, 工具仍不得依賴之, 核心須放 server/tools 或 src/js)`)
                 assert.strict.ok(fs.existsSync(path.join(projRoot, f)), `${root} 的閉包含不存在之檔案 ${f}`)
                 assert.strict.ok(list.has(f), `${root} 的閉包含不在出貨清單內之檔案 ${f}`)
                 let { targets, dyn } = relImports(f)

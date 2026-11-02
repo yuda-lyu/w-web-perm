@@ -19,4 +19,8 @@ testPending
 dist/index.html
 tableTags-web-perm.json
 
-test
+# 以下為 dspec〈自有套件之npm發布範圍〉第 2 條(大型非程式碼資料)之排除項
+# 第 2 條: test/ 約 42MB(標準圖 test/pics 37MB 與測試資料), 使用端執行時用不到
+# 原則 4: test/tools/ 一律不排除, 故排除 test/ 下其餘並保留 test/tools/
+/test/*
+!/test/tools/

@@ -2,6 +2,14 @@
 
 本檔記本套件**當前已開發功能之最新狀態**;與規則帳本(`sgud/rule/rulebook.md`,藍圖)比對即知尚未做到者,接續工作先讀此檔.2026-10-22 主控遷移為 sgud 配置時建立,先移入原帳本之「已知缺口 / 待辦」;**各功能之完成狀態整理為下一次派工之待辦**(主責 agent 依規則帳本各節之「狀態」行與近期報告彙整至本檔).
 
+## 近期進度(2026-11-02 pm286〔任務 20261031121854〕:全庫跟跑紅 2 案之修正——用詞與出貨清單斷言對齊 dspec〈自有套件之npm發布範圍〉; 修正輪＝單輪,未發布,待主控複審)
+
+> 注意: 與產品行為無關(`src/`、`server/`、`package.json` 0 改動); 報告 `C:\opensrcOper\dnow\20261031121854\agent-out\pm286-修正報告.md`; 帳本 R-SHIP-TOOLS-01(`rulebook_sync_external.md`)、R-ROLE-NAME-01(`rulebook_security.md`).
+
+- **改動(完成)**: ①`sgud/rule/rulebook_principle.md` 1 處、`rulebook_sync.md` 2 處(Gitea #48 文件更新帶入之單獨詞)改為「系統管理者」, `unit-roleName` RN-S3 回綠; ②`test/unit-shipTools.test.mjs`: ST-002 不再斷言 `test/`、`spec/` 不在出貨清單, 改依 dspec「套件測試之 npm 包檢查」①只斷言不得入包項(新判斷式 `isForbiddenInPack`; 新增 ST-002b 負向對照防判斷式過鬆), ST-003 於閉包內明確斷言不在 `test/`、`spec/` 之下(`test/tools` 現隨包, `list.has` 擋不住); ③`.npmignore`: 原 `test` 一行(同時排除 `test/tools/`, 違反 dspec 原則 4)改為 `/test/*` 加 `!/test/tools/` 並註明屬第 2 條(`test/` 42MB 中 `pics` 37MB 仍不入包, `test/tools/` 360KB 隨包); ④README 一句「`authMergeReport.mjs` 不出貨」改為不納入安裝後保證; ⑤帳本 R-SHIP-TOOLS-01 與本檔舊述同步.
+- **驗證**: `npm pack --dry-run` 529 → 555 項(新增 `test/tools/` 26 檔 311KB; 不得入包項 0); 變異: 假 `.exe` 入包 → ST-002 紅、工具閉包 import `test/tools/` 之檔 → ST-003 紅(舊斷言於同情境仍綠, 證明須明確斷言); 兩檔測試 `unit-roleName`＋`unit-shipTools` 19 過 0 敗. 未跑全套(依指示, 由主控全庫連動跟跑).
+- **待辦**: ①主控複審 `.npmignore` 以 `!/test/tools/` 保留 test/tools 是否為其意(dspec 落實表寫「保留排除 `test/`」, 原則 4 寫「`test/tools/` 一律不排除」); ②隨全庫連動發布.
+
 ## 近期進度(2026-10-31 perm〔任務 20261031023204, 排程第 191、165 項〕:console 診斷不輸出資料值——請求驗證失敗與認證階段只印鍵名／型別／錯誤類別; 修正輪＝單輪,未發布,待主控複審)
 
 > 注意: 規則 R-CONSOLE-NOVAL-01(`sgud/rule/rulebook_security.md` 緊接 R-ORM-DIAG-03), ADR-047(**取代** ADR-023 殘留「console 印使用者物件」「`maskQuery` 只遮 token 鍵」之不修, 與 ADR-044／045 之 T-c「另立項目」; 本套件之 ADR-033 是授權合併規則、無 ADR-048, 故同義條目為 ADR-023 殘留與 T-c), 報告 `C:\opensrcOper\dnow\20261031023204\agent-out\perm-修正報告.md`(站點全表在其內). 規格〈診斷輸出與遮罩〉D2、〈輸入參數之檢測機制〉V20; 主控裁定: console 只印鍵名、型別或固定詞彙, 權杖 `maskTok` 照舊.
@@ -195,7 +203,7 @@
   - ①**外部 `grups.cpemis`／`pemis.crules` 缺鍵保留未決**: 外部同步之 users 列缺 `cgrups` 鍵已保留庫內值, `grups`／`pemis` 缺 `cpemis`／`crules` 鍵仍清空(刻意不對稱, 未經使用者裁示不放寬); 待裁示是否比照.
   - ②**w-aggrid-vue 貼上缺口**: `WAggridVue.vue` 貼上路徑對函式型 `editable` 恆為真(`kpEditable` 以真值判斷), Ctrl+V 可寫入逐列唯讀之儲存格; 現以前端 `getExternalEdits` 送出前守門＋伺服端整次拒收兜底, 根治待向 w-aggrid-vue 提 issue(全域 §5.2, 由主控處理).
   - ③`syncWarns` 非即時(前端連線時取一次 `getWebInfor`)、登錄於預檢之後寫入之前(該次同步其後被拒收時警示仍留); 未做即時推播.
-  - ④未做: `requireBaseline`(強制所有寫入必帶基準, 下版再議)、(c2) 差異集 API(待多系統管理者並行成為真實需求)、UI 版 purge 按鈕(目前僅離線 `g_purgeFrom.mjs`; 該腳本依賴 `test/tools/`, npm 套件不出貨〔`.npmignore` 排除 `test`〕, 須自原始碼 checkout 執行, 與 `g_authRefsClean.mjs` 同)、認領與本地停用覆蓋(依裁示不做).
+  - ④未做: `requireBaseline`(強制所有寫入必帶基準, 下版再議)、(c2) 差異集 API(待多系統管理者並行成為真實需求)、UI 版 purge 按鈕(目前僅離線 `g_purgeFrom.mjs`; 〔2026-11-02 註: 離線工具核心 run08 起已搬至 `server/tools/` 隨包出貨, 以下「依賴 `test/tools/`」為搬移前之舊述〕該腳本依賴 `test/tools/`, npm 套件不出貨〔`.npmignore` 排除 `test`〕, 須自原始碼 checkout 執行, 與 `g_authRefsClean.mjs` 同)、認領與本地停用覆蓋(依裁示不做).
   - ⑤~~S10(推播重建清單是否丟棄未存編輯)仍為未驗證之觀察~~ **已實證並修正(run11, verify01 情境 5; R-DRAFT-KEEP-01)**.
   - ⑥**e2e 夾具依 R-EXT-OWN-01 之改寫(進行中, 全數尚未實跑確認)**: 2026-10-22 07:31 後讀 `test/e2e-array-form.test.mjs` 所見, 其外部來源夾具(AF-036／037／038／039／041 之 ren-ext、ren-gx、del-ue、del-ge)已由「後台 RPC 新增 `from:'teamA'`」(會被 `saveFromNotAllowed` 拒收)改經外部同步端點推入分區 `EXT6='teamA'`(`syncRows`, `order` 由外部給 `EXT6_ORDER`), 其餘夾具(被改名／刪除之主體與其他引用端)為後台列, 收尾 `restoreTables` 先 `purgeExternalRows`; 「另一端整表反序」改由 `reverseTableByOtherEnd`(後台列經 `updateXxx`、外部列經同步端點改 `order`)合成. **仍待確認**: ①上列改寫之實跑結果; ②`test/tools/e2e-setup.mjs` 之 `resetDb`／`resetDbTables` 以 `$fapi.updateXxx(seed)`(後台 RPC, 無基準)還原 base seed, 庫內若留有外部列則缺列＝刪除外部列而被拒(依守門次序之推論, 未實跑); ③新檔 `test/e2e-external-rows.test.mjs`(N 子代理撰寫中, 對應預定 spec `spec/流程_外部列保護與過期快照.md`, 含新 flow 標準圖 `test/pics/external-rows/`, 產製須另行授權; 本帳本〈測試配置〉之 e2e 檔數與 R-TEST-SCOPE-01 之「11 檔」須於其定案後由 N 維護); 既有標準圖不得改變.
 
