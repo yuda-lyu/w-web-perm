@@ -35,6 +35,35 @@
 - **自有套件升版之連動檢查程序**(2026-09-24): ①以「上次審查過之版本」為基準(不是上一個安裝版), `npm pack <套件>@<版本> --pack-destination tmp/...` 取兩版原始碼; ②`node tmp/aggrid/classify-diff.mjs <舊src> <新src>` 分出「僅註解」與「含程式變更」; ③grep 本專案實際用到之元件與函式(`w-component-vue/src/(components|js)/…`、`wsemi/src/….mjs`), 與「含程式變更」取交集, 交集內逐一讀 diff; ④間接依賴(如 `WDrawer` 用 `domDragBarAndScroll`)亦列入; ⑤spec 內指向套件原始碼之行號以 `node tmp/aggrid/check-ref-drift.mjs` 核對位移; ⑥交集內有行為變更者以真瀏覽器探測驗證, 修正前先寫會紅之案例. 2026-09-24 一輪(w-aggrid-vue 2.1.4、w-component-vue 2.5.16→2.5.21、wsemi 1.8.94→1.9.3)之結果見該日 spec 條目與 `sgud/exp/experience.md`. 2026-09-27 一輪(w-echarts-vue 1.0.14→1.0.15、w-component-vue 2.5.21→2.5.23、wsemi 1.9.3→1.9.7、dev 之 w-package-tools-e2e 1.0.0→1.0.1; 舊版取於 `tmp/pkgdiff-0927/`): 交集為 `WEchartsVue.vue`(autoresize 兩缺陷修正, 見 ADR-024 修正紀錄)、`domResize`/`domStable`/`domVisible`/`domMutation`/`domDragDrop` 改寫為共用 `createDetectDirective`(屬性名 `ev-resize`/`ev-stable`… 不變, e2e 之 `[ev-stable]` 選擇器不受影響; 重建偵測器後首次量測必觸發)、wsemi `domDetect` 改為 ResizeObserver 偵測且比較基準為上次發出時之尺寸(容差預設 1)、`isnum` 之純空白字串改回 false(四清單頁欄寬設定之解析, 正常數值不受影響); 全系統 `v-domresize` 站點(App、Layout、LayoutContent、五個內容頁、五個 Ve* 對話框、RelationChips、WEchartsVue)以全套 e2e 像素回歸把關, 頂列 RWD 另跑 `tmp/probe-header-rwd.mjs` 六段.
 - **上方標題列 RWD——內容驅動寬窄版**(2026-09-24, ADR-022; 機制同 w-web-sso ADR-067): `Layout.vue` 以 `isNarrow = 20 + 識別區自然寬 + 語系選單 110 + 10 > 標題列寬` 決定寬窄(常數 `hd*` 須與寬版 template 結構一致; 自然寬以 canvas 依名稱 / 說明元素之實際字型量測, 不受省略截斷影響), 窄版右側收為漢堡按鈕, 選單內為登入者(姓名 + Email)與語系(本系統無登出); 寬版標記與樣式不變. 兩條寫法規則: ①漢堡容器用 `v-show` 且其靜態 style 不含 `display`(成因同本檔「收合之項用 `v-if` 不用 `v-show`」條——Vue 2.7.16 每次重繪寫回靜態 style); ②以 v-model 控制開關之 `WPopup`, 觸發區內按鈕外包 `<div @click.stop>`(真實點擊於各監聽器之間先跑 microtask, 按鈕之 `toggleMenu` 關閉並重繪後 WPopup 觸發區仍收到同一 click 而重新開啟). 盤點指令: Grep `<WPopup` 於 `src/`, 非 isolated 者檢查其觸發區按鈕是否包 `@click.stop`(站點全集 2026-09-24: `Layout.vue` 漢堡選單, 已套; 其餘皆 isolated, 不適用). 驗收: 8090 dev server 與 11006 後端起好後 `node tmp/probe-header-rwd.mjs perm <scan|boundary|tooltip|menu|flip|touch>`(各段末行 SUMMARY fails=0; 2026-09-24 六段全過; 觸控段之前置操作一律 tap, 混用滑鼠會使 tap 後多出 mouseleave 之假象). e2e 以 1440 寬為主(恆寬版), 於窄寬度截整頁之案例(layout E2E-003-1 於 400、rela-grup-pemi E2E-006/007 於 440/480、rela-user-grup E2E-009 於 480)會拍到窄版標題列.
 
+## 統計資訊之輸出上界(2026-11-03, Gitea #57, ADR-048; 主控任務 20261103123942 pm57; 同型 w-web-api #58〔R-STA-FUTURE-01〕、w-web-sso #56)
+
+軸: 紀錄時間相對「現在所屬桶」(早於窗起點 / 窗內較早 / 現在所屬桶 ≤ 現在 / 現在所屬桶 > 現在 / 下一桶第 1 毫秒 / 同日較晚小時 / 隔日 / +3 天〜+300 天 / 荒謬值〔年份 ≥ 10000、Date 上限、超出上限〕) × 粒度(hr、day) × 路徑(core 直呼、worker 版、快取開／關、`timeNow` 後移／退回) × 紀錄所在檔(ISO 同時段檔、ISO 未來檔、非 ISO 檔).
+
+- **R-STA-FUTURE-01 `staEvent` 之桶輸出以「現在所屬桶」(`genPlan` 之 `kpTime` 最末桶)為上界, 晚於它之資料桶不輸出; 上界為桶非時刻; 只在輸出層(`buildOutput`)過濾, 掃描與檔級快取不動**: 紀錄 `time` 取寫入當下之真實時鐘, 統計之「現在」可由 `opt.timeNow` 或假時鐘釘住(時鐘回撥亦然), 兩者不一致時輸出若含未來桶, 圖表多出未來刻度並主導 Y 軸, 前端「最近 N 小時」(取陣列末端)位移. 規則:
+  1. `buildOutput(merged, kpTime, labelEnd)`: 窗內桶補零, 資料桶標籤晚於 `labelEnd` 者 `continue`; `labelEnd` 由 `genPlan` 回傳(`plan.labelEnd = now.startOf(unit).format(fmt)`, 窗非空時即 `kpTime` 最末桶), `run` 傳入; 第三參數未給時取 `kpTime` 最末桶. **上界不得只取 `kpTime` 末項**: `timeLength` 為負時窗起點在未來、`kpTime` 為空(`genPlan` 會產生空 `kpTime`), 只取末項則上界失效、未來桶仍輸出(FB-4-empty-window; 變異 M16). 判定函數 `isLaterLabel(label, labelEnd)` ＝ `label.length > labelEnd.length || label > labelEnd`(標籤定寬, 字典序即時間序; 年份 ≥ 10000 之標籤較長但字典序反小於 `2026-…`, 故先比長度; `'Invalid Date'` 字典序大於數字開頭); `kpTime` 為空且未給 `labelEnd`(僅直接呼叫)才以 `null` 顯式表達「不設上界」.
+  2. 現在所屬桶內晚於現在之紀錄照計(FB-2); 同一筆紀錄於 hr 與 day 之歸屬可不同(以各自之桶判定, FB-1).
+  3. **不得**把過濾放進掃描(`scanFile`)或快取前(`kpCache` 之彙總與 `timeNow` 無關): `timeNow` 後移至紀錄之後時該桶須出現(FB-3; 變異 M11 抓此錯誤層級).
+  4. **不得為「對齊改造前實作」而恢復聯集**: 原註解「對齊原 merge({}, kpTime, gsLog)」是重構時連同缺陷保留之舊行為, 非規格(ADR-048 查證).
+  5. `getStaEventTable`(`scanTableFiles` 以 `dh < 0` 略過未來時間)不受影響; 其「未來 30 分鐘 dh 取整為 0 仍計入」為改造前原語意(golden GOLD-002 守護), 與本規則無涉.
+- **站點盤點(2026-11-03; 指令: `rg -n "buildOutput|kpTime|genPlan|labeler|createBucketLabeler|timeNow" server src test --glob '!test/staLogs-golden/legacy/**'`)**:
+
+| 站點 | 輸出或使用未來桶? | 處置 |
+|---|---|---|
+| `staLogsCore.mjs:buildOutput` | 是(唯一輸出點) | **已修**(`isLaterLabel` 上界) |
+| `staLogsCore.mjs:genPlan`(`kpTime`、`tEnd = now.startOf(unit)`) | 否(止於現在所屬桶, 為上界來源) | **增回傳 `labelEnd = tEnd.format(fmt)`**(窗為空時 `kpTime` 為空, 上界不得取自 `kpTime`); 變異 M12、M14、M15 被抓 |
+| `staLogsCore.mjs:run`(呼叫 `buildOutput`) | 否 | **傳入 `plan.labelEnd`**(變異 M16: 不傳則窗為空時上界失效) |
+| `staLogsCore.mjs:scanFile`／`scanFiles`／`run`／`mergeAgg`／檔級快取 | 掃描只有下界, 彙總含未來桶 | **刻意不動**(過濾只在輸出層; FB-3; M11) |
+| `staLogsCore.callWorker.mjs`／`staLogsCore.shellWorker.mjs`／`staEvent.mjs`／`staEvent.callWorker.mjs` | 只回彙總或薄殼, 輸出仍經 `buildOutput` | 不動; FB-1-worker 驗 worker 路徑 |
+| `staLogsCore.mjs:scanTableFiles`／`staTable`／`staEventTable*` | 已略過未來時間(`dh < 0`) | 不動(語意不同, 見規則 5) |
+| `filterVpfsByWindow.mjs` | 檔名層只剔窗前檔(下界); 未來檔名照開 | 不動(由輸出層過濾; FB-1 含未來檔名與同時段檔內之未來紀錄) |
+| `procStaInfor.mjs`(`getStaEvent`) | 非 mock 不傳 `timeNow`, 用真實現在; mock 為固定資料集(48 桶 2025-01-01 起), 不經 `staLogsCore` | 不動 |
+| `src/components/LayoutContentStaInfor.vue`(事件圖、`allEvents`、`resampledData`、統計表) | 消費端, 不產生桶 | 不動(契約單一擁有者在後端) |
+| 測試資產: `test/staLogs-golden/expected.json`、`unit-staEvent-golden` GOLD-001 | 凍入 `future-30m`(hr 13 時桶)、`future-1d`(hr、day 各 1 列) | **已改**: 產生器 `gen-expected.mjs` 之 `dropFuture` 剔除 hr 2 列、day 1 列(逐筆同 HEAD, 見 ADR-048); GOLD-001 增未來桶與最末列斷言 |
+| `test/staLogs-golden/legacy/staEvent.mjs`(改造前實作) | 無上界 | 不動(非 production; 檔頭規定不改其語意) |
+| e2e(`e2e-stainfor`、`e2e-layout`、`e2e-init` E2E-003)與 `test/pics/**` | 皆 `staEventMock` 固定資料集, 不經 `staLogsCore` | 標準圖 0 張重產 |
+
+- **守護**: `test/unit-staLogs-futureBucket.test.mjs`(53 案: FB-1 16、FB-2 4、FB-3 3、FB-4 6〔最末列 2、`genPlan.labelEnd` 2、窗為空 2〕、FB-5 24〔3 seed × hr／day × `timeLength` -1／0／1／7〕; 環境變數 `STALOGS_CORE_MODULE` 可指向另一份副本供「修前紅」與變異重跑)、`test/unit-staEvent-golden.test.mjs` GOLD-001. 狀態: 已落實(2026-11-03). 重跑變異／差異比對: 見 ADR-048 與 `sgud/exp/experience.md` 同日條.
+
 ## 打包後之可用性(2026-10-14, X1; 對應 w-syslog 審計方案④, 三個 w-web-* 同一作法)
 
 軸: 使用方式(repo 內 src / repo 內 dist / 已安裝之 src 深層匯入 / 已安裝之 dist(`main`) / 被下游再打包 / bundle 被搬離 node_modules 樹而由專案根執行) × 定位方式(頂層 `__filename`/`__dirname`、`import.meta.url`、`new URL(…, import.meta.url)`、相對於模組之檔案路徑) × 時機(模組載入時 / 首次使用時). 打包工具: `toolg/gDistRollup.mjs`(w-package-tools rollupFile, format umd, fdSrc `./server`, fn `WWebPerm.mjs`)——bundle 含 `server/` 與其 import 到之 `src/`(schema、mShare)與未列 external 之相依.

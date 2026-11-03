@@ -2,6 +2,7 @@
 //  fixture: test/staLogs-golden/logs/ (由 test/staLogs-golden/gen-expected.mjs fixture 確定性產生, 173 檔)
 //  expected: test/staLogs-golden/expected.json —— 以「改造前」實作 (test/staLogs-golden/legacy/staEvent.mjs / staEventTable.mjs, 原碼留存) 在假時鐘
 //            FIXED=1788150896789 (2026-08-31 12:34:56.789 +08:00) 下產出, 為本測試之真理來源
+//            (唯一加工: staEvent hr / day 剔除晚於現在所屬桶之未來時間桶, 見 gen-expected.mjs dropFuture 與 GOLD-001; 規則另由 test/unit-staLogs-futureBucket.test.mjs 守護)
 //  重產方式: node test/staLogs-golden/gen-expected.mjs fixture; node --import ./test/staLogs-golden/fakeDate.mjs test/staLogs-golden/gen-expected.mjs expected
 import './staLogs-golden/setTz.mjs'
 import assert from 'assert'
@@ -70,6 +71,7 @@ describe('unit-staEvent-golden', function() {
 
 
     //GOLD-001: staEvent hr / day 與舊實作 expected 深比較 (含邊界檔、外溢行、ISO 字串 time、垃圾 time、未來時間桶、day 檔、非 ISO 檔名)
+    //  expected 與舊實作輸出之唯一差異: 晚於現在所屬桶之未來時間桶不輸出 (R-STA-FUTURE-01, ADR-048; 由 gen-expected.mjs 之 dropFuture 於產出時剔除): hr 2 列 (2026-08-31T13 future-30m、2026-09-01T13 future-1d)、day 1 列 (2026-09-01 future-1d)
     it('GOLD-001-staEvent-hr-day-deep-equal-legacy-expected', async function() {
         clearCache()
         let hr = await staEvent(7, 'hr', { fdLog, timeNow: FIXED })
@@ -80,6 +82,14 @@ describe('unit-staEvent-golden', function() {
         assert.strict.equal(sumKey(hr, 'boundary-eq'), 0)
         assert.strict.equal(sumKey(hr, 'iso-string-time'), 1)
         assert.strict.equal(sumKey(hr, 'garbage-time'), 0)
+        //FB-1: 未來時間桶不輸出; future-30m (現在 +30 分, 13:04) 於 hr 屬 13 時桶 → 0, 於 day 仍屬現在所屬日桶 → 1; future-1d (隔日 13:00) 於 hr / day 皆為未來桶 → 0
+        assert.strict.equal(sumKey(hr, 'future-30m'), 0)
+        assert.strict.equal(sumKey(day, 'future-30m'), 1)
+        assert.strict.equal(sumKey(hr, 'future-1d'), 0)
+        assert.strict.equal(sumKey(day, 'future-1d'), 0)
+        //FB-4: 最末列為現在所屬桶
+        assert.strict.equal(hr[hr.length - 1].time, '2026-08-31T12')
+        assert.strict.equal(day[day.length - 1].time, '2026-08-31')
     })
 
 

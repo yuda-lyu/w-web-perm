@@ -18,6 +18,7 @@ import filterVpfsByWindow from './filterVpfsByWindow.mjs'
 //  5. 資料夾項目略過; 單檔讀取錯誤略過該檔 (不入快取、不整體失敗)
 //  輸出形狀與原 staEvent.mjs / staEventTable.mjs 一致 (golden test: test/unit-staEvent-golden.test.mjs 以改造前實作產出之 expected 深比較)
 //  刻意差異 (僅 staEvent): 無 time (或 time 無法解析) 之行不計入任何桶 (原實作 ot(undefined) 視為 now 而計入當前桶); staEventTable 維持原語意
+//  刻意差異 (僅 staEvent; R-STA-FUTURE-01, ADR-048): 輸出以「現在所屬桶」為上界, 晚於它之未來時間桶不輸出 (原實作無上界); 只在 buildOutput 過濾, 掃描與快取不動
 
 
 //快取: `${fdLog}|${fmt}` → Map(檔名 → { size, mtimeMs, minTimeMs, scanTStartMs, agg }); 沿用須「彙總完整 (minTimeMs > scanTStartMs)」且「整檔在新窗內 (minTimeMs > tStartMs)」
@@ -69,7 +70,10 @@ function genPlan(timeLength = 7, timeInterval = 'hr', opt = {}) {
         tCurr = tCurr.add(1, unit)
     }
 
-    return { fdLog, timeInterval: ti, fmt, unit, tStart, tStartMs, kpTime, timeNow: now.valueOf() }
+    //labelEnd, 「現在」所屬桶之標籤 (輸出之上界, 見 buildOutput); 取自 tEnd 而非 kpTime 末項: timeLength 為負時窗起點在未來, kpTime 為空, 上界仍須存在
+    let labelEnd = tEnd.format(fmt)
+
+    return { fdLog, timeInterval: ti, fmt, unit, tStart, tStartMs, kpTime, labelEnd, timeNow: now.valueOf() }
 }
 
 
@@ -261,13 +265,33 @@ function mergeAgg(target, agg) {
 }
 
 
-function buildOutput(merged, kpTime) {
-    //對齊原 merge({}, kpTime, gsLog) + Object.keys().sort(): 窗內桶補零, 資料桶 (含未來時間桶) 聯集
+//label 是否晚於上界桶 labelEnd: 標籤為定寬 YYYY-MM-DD[THH], 字典序即時間序, 故以字串比較;
+//  年份超過 4 位者 (log 之 time 荒謬大, 如 >= 253402300800000) 標籤較長, 字典序卻可能小於上界 ('10000-…' < '2026-…'), 故先比長度;
+//  超出 Date 範圍者標籤為 'Invalid Date', 字典序大於數字開頭之標籤
+function isLaterLabel(label, labelEnd) {
+    return label.length > labelEnd.length || label > labelEnd
+}
+
+
+function buildOutput(merged, kpTime, labelEnd = null) {
+    //【R-STA-FUTURE-01, ADR-048, Gitea #57】窗內桶補零; 資料桶以「現在所屬桶」為上界, 晚於它之未來時間桶不輸出
+    //  上界 labelEnd 由 genPlan 給 (plan.labelEnd, 現在所屬桶之標籤; 窗非空時即 kpTime 最末桶); 未給 (null) 時取 kpTime 最末桶, kpTime 亦空則不設上界
+    //  紀錄之 time 取寫入當下之真實時鐘, 而「現在」可由 opt.timeNow 釘住 (或時鐘回撥), 兩者不一致時會有晚於現在之紀錄:
+    //  輸出若含其桶, 圖表多出一格未來刻度 (Y 軸隨之被主導), 前端以「陣列末桶即現在」取最近 N 桶亦隨之位移
+    //  上界為「桶」非「時刻」: 現在所屬桶內略晚於現在之紀錄 (統計執行期間新寫入者) 照計
+    //  只在輸出層過濾: 掃描 (scanFile) 與檔級快取不依 timeNow 之上界, 故 timeNow 後移至紀錄之後時該桶仍會出現
+    //  (原註解「對齊原 merge({}, kpTime, gsLog)」: 改造前實作無上界, 重構時連同此缺陷保留, 並非規格; 不得為「對齊改造前實作」而恢復聯集)
     let kp = {}
     for (let label of kpTime) {
         kp[label] = { count: 0 }
     }
+    if (labelEnd === null && kpTime.length > 0) {
+        labelEnd = kpTime[kpTime.length - 1]
+    }
     for (let label in merged) {
+        if (labelEnd !== null && isLaterLabel(label, labelEnd)) {
+            continue
+        }
         let b = merged[label]
         kp[label] = { count: b.count, ...b.kp }
     }
@@ -395,7 +419,7 @@ async function run(plan, opt = {}) {
     }
 
     //output
-    let rs = buildOutput(merged, plan.kpTime)
+    let rs = buildOutput(merged, plan.kpTime, plan.labelEnd)
     return {
         rs,
         stat: {

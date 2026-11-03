@@ -5,6 +5,7 @@
 //      → 以「改造前實作」(./legacy/staEvent.mjs, ./legacy/staEventTable.mjs, 即 ADR-021 之前之原碼) 於假時鐘產 expected.json
 //FIXED now = 1788150896789 = 2026-08-31 12:34:56.789 (+08:00); tStart(7d) = 2026-08-24 12:34:56.789
 //擴充 fixture 時: 改本檔 → 依序重跑 fixture 與 expected → 跑 test/unit-staEvent-golden.test.mjs; expected 永遠由 legacy 產出, 不得手改。
+//  唯一加工: staEvent hr / day 於產出時剔除「晚於現在所屬桶」之未來時間桶 (dropFuture; R-STA-FUTURE-01, ADR-048, Gitea #57). legacy 檔本身不動.
 import './setTz.mjs'
 import fs from 'fs'
 import path from 'path'
@@ -97,7 +98,7 @@ function genFixture() {
             }
         }
 
-        //當前小時檔: 加一行未來時間 (時鐘偏移): staEvent 聯集多一桶; staEventTable 未來 30 分鐘 dh 取整為 0 仍計入 (原語意)
+        //當前小時檔: 加一行未來時間 (時鐘偏移): legacy staEvent 聯集多一桶 (現行輸出不含晚於現在所屬桶者, 見 dropFuture; future-30m 於 day 仍屬現在所屬日桶而計入); staEventTable 未來 30 分鐘 dh 取整為 0 仍計入 (原語意)
         if (t.valueOf() === tEnd.valueOf()) {
             lines.push(line(FIXED + 30 * 60000, 'future-30m'))
             lines.push(line(ot(FIXED).add(1, 'day').startOf('hour').add(1, 'hour').valueOf(), 'future-1d'))
@@ -136,6 +137,20 @@ function genFixture() {
     console.log('fixture done', { fdLog, nFiles, nLines })
 }
 
+//R-STA-FUTURE-01 (ADR-048, Gitea #57): staEvent 之輸出以「現在所屬桶」為上界, 晚於它之未來時間桶不輸出; 改造前實作 (legacy) 無此上界,
+//  故 legacy 輸出須先剔除標籤晚於「假時鐘現在」所屬桶之列, 其餘一律原樣 (不手改任何值). 上界標籤由假時鐘之 ot(FIXED) 取, 與被測碼之判定獨立 (被測碼取 kpTime 最末桶)
+//  被剔除之列印出供審閱 (本 fixture 之 future-30m 於 hr 屬 13 時桶、future-1d 屬 09-01 桶)
+function dropFuture(rs, fmt) {
+    let labelNow = ot(FIXED).format(fmt)
+    let kept = rs.filter((v) => !(v.time > labelNow))
+    for (let v of rs) {
+        if (v.time > labelNow) {
+            console.log('dropFuture', fmt, JSON.stringify(v))
+        }
+    }
+    return kept
+}
+
 async function genExpected() {
     if (Date.now() !== FIXED) {
         throw new Error('expected 須於假時鐘下產出: node --import ./test/staLogs-golden/fakeDate.mjs test/staLogs-golden/gen-expected.mjs expected')
@@ -143,8 +158,8 @@ async function genExpected() {
     let staEvent = (await import('./legacy/staEvent.mjs')).default
     let staEventTable = (await import('./legacy/staEventTable.mjs')).default
     console.log('now(fake)', Date.now(), ot().format())
-    let hr = await staEvent(7, 'hr', { fdLog })
-    let day = await staEvent(7, 'day', { fdLog })
+    let hr = dropFuture(await staEvent(7, 'hr', { fdLog }), 'YYYY-MM-DDTHH')
+    let day = dropFuture(await staEvent(7, 'day', { fdLog }), 'YYYY-MM-DD')
     let table = await staEventTable({ fdLog })
     let fp = path.join(fdRoot, 'expected.json')
     fs.writeFileSync(fp, JSON.stringify({ hr, day, table }, null, 2))
