@@ -611,7 +611,7 @@ async function runCase(mode, lang, c, extra = {}) {
 }
 
 //篩選（gate）通過、開始觸及服務後才設為 true；.catch 據此決定是否重啟後端還原。
-//why：篩選報錯（如 --names 打錯）時尚未觸及任何服務，此時不得 restartBackend——無自建後端時它會殺 11006 之監聽者並另起後端（e2e-setup killForeignOnRestart）。
+//why：篩選報錯（如 --names 打錯）時尚未觸及任何服務，此時不得 restartBackend——無自建後端時它會對後端埠之監聽者下殺或拋錯（e2e-setup killForeignOnRestart；2026-11-05 起只殺身分已確認屬本實例者，他人占用即拋錯）。
 let servicesTouched = false
 
 async function generateBaseline() {

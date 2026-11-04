@@ -202,4 +202,4 @@ npx mocha test/e2e-array-form.test.mjs --grep "AF-(014[a-e]|02[67])-" --fail-zer
 node -e "import('./test/tools/e2eLib.mjs').then(async (m)=>{ const r = await m.runIsolatedE2e({ projRoot: process.cwd(), testDir: './test', targets:[{file:'e2e-grups.test.mjs',grep:'E2E-00[135]-'},{file:'e2e-array-form.test.mjs',grep:'AF-(014[a-e]|02[67])-'}] }); process.exit(r.failed===0?0:1) })"
 ```
 
-(最後一個 `node -e` 為示意, 執行即會實跑所列目標, 該指令本身未實跑: 已確認者僅 `e2eLib.mjs` 匯出 `runIsolatedE2e`／`killPortListeners` 為 function〔2026-10-22 以 `typeof` 確認〕, 傳參簽章取自套件 JSDoc `runIsolatedE2e.mjs:24-25`; 每檔前殺 11006 後端之 `beforeEachFile` 須自行補, 可仿 `test/tools/run-e2e-isolated.mjs:30-34`.)
+(最後一個 `node -e` 為示意, 執行即會實跑所列目標, 該指令本身未實跑: 已確認者僅 `e2eLib.mjs` 匯出 `runIsolatedE2e` 為 function〔2026-10-22 以 `typeof` 確認; 2026-11-05 wp309: `killPortListeners` 已自 `e2eLib.mjs` 移除, 見 R-E2E-PORT-01〕, 傳參簽章取自套件 JSDoc `runIsolatedE2e.mjs:24-25`; 每檔前殺本實例後端之 `beforeEachFile` 須自行補, 一律以 `reservation.killOwnListeners`(取自 `test/tools/e2ePorts.mjs`, 不依埠殺人)仿 `test/tools/run-e2e-isolated.mjs` 之 `killOwnBackend`.)

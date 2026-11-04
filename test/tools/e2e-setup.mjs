@@ -35,6 +35,9 @@ import {
     resolveE2ePort,
     probeStuckTooltip as pkgProbeStuckTooltip
 } from './e2eLib.mjs'
+//基準埠與埠保留(排程第 309 項): e2ePorts.mjs 載入時即呼叫 reserveE2ePorts(基準埠有占用時整組位移並寫入 E2E_PORT_OFFSET), 須早於本檔任何 resolveE2ePort／createServiceManager——
+//  ES 模組先評估被匯入者, 故此匯入之副作用先於本檔本體。
+import { BACKEND_PORT, FRONTEND_PORT, reservation } from './e2ePorts.mjs'
 import { runSeedChild } from './seedChild.mjs'
 import { assertPristineSeed } from './baseSeed.mjs'
 import { buildDecl } from './declHelper.mjs'
@@ -51,13 +54,11 @@ const SRV_PATH = join(projRoot, 'srv.mjs')
 //種子旁路追加列之子行程腳本(restartBackend 之 opts.seedExtra; run05)
 const SEED_EXTRA_PATH = join(__dir, 'seedExtraRows.mjs')
 
-//基準埠(正式實例用; 與 vue.config.js 之 proxy 預設 11006、settings.json 之 serverPort 一致)。
+//基準埠(正式實例用; 與 vue.config.js 之 proxy 預設 11006、settings.json 之 serverPort 一致)定義於 e2ePorts.mjs(BACKEND_PORT 11006、FRONTEND_PORT 8090), 並於該處呼叫 reserveE2ePorts。
 //e2e 多開(排程第 302 項; 套件 tools/shardE2e.mjs): 臨時實例以環境變數 E2E_PORT_OFFSET 整體位移, 實際埠經 resolveE2ePort(基準埠) 取得;
-//  未設 E2E_PORT_OFFSET(含 npm test、run-e2e-isolated、單檔直跑)時實際埠＝基準埠, 一切與導入前相同。
+//單開(排程第 309 項, 規格 E1～E8): 基準埠被占用時由 reserveE2ePorts 自動選定位移並寫入 E2E_PORT_OFFSET, 其後取埠方式與多開相同(不是第二套解析)。
+//  沒有占用且未設 E2E_PORT_OFFSET(含 npm test、run-e2e-isolated、單檔直跑)時實際埠＝基準埠, 一切與導入前相同。
 //  常數維持基準埠: createServiceManager 之 services[].port 寫基準埠(其內部已套用位移), 其餘組埠處(網址、臨時設定之 serverPort)一律經 resolveE2ePort。
-const BACKEND_PORT = 11006
-//perm e2e 用獨立的 8090（避開常駐於 8080 的其他專案 dev server），以 --port 顯式指定確保確定性
-const FRONTEND_PORT = 8090
 
 //是否為位移實例(E2E_PORT_OFFSET 非空且非 0); 位移時後端須改讀帶實際埠之臨時設定(serverPort 只能由 settings 決定, srv.mjs 不吃環境變數或命令列埠)
 const isPortShifted = resolveE2ePort(BACKEND_PORT) !== BACKEND_PORT
@@ -201,6 +202,9 @@ const services = createServiceManager({
         },
     ],
     probe: (svc) => probeHttp(svc.url, { timeoutMs: 2500, accept: (st) => st > 0 && st < 500 }),
+    //已導入埠保留(reservation 明確帶入): restart 遇非自建之監聽者時, 管理器只殺「身分已確認屬本實例」者(reservation.killOwnListeners), 其餘占用者拋錯寫明, 不殺(規格 E4);
+    //  killForeignOnRestart 仍須為 true 才會進入該判斷(false 時直接拋錯), 但不再依埠下殺任何人(原依 killPortListeners 殺任何監聽者, 2026-11-05 修前以真實占用者實測會殺到)。
+    reservation,
     killForeignOnRestart: true,
     onCleanup: () => cleanupTempSettings(),
 })
@@ -222,26 +226,51 @@ export async function startServersOnce(opts = {}) {
 //  舊寫法以 CommandLine 含 `srv.mjs` 殺全機, 2026-09-25 曾殺掉 sso 11007 之後端(違反專案 CLAUDE.md「只重啟自己創建的 PID」)。
 //  故後端改以絕對路徑啟動(SRV_PATH), 此處只比對該路徑。路徑含非 ASCII(「開源」), 不放進命令列: PowerShell 以 UTF-8 輸出 JSON(-EncodedCommand 免跳脫), 在 node 端比對。
 //  以相對路徑手動啟動之本 repo 後端不在比對範圍; 其若監聽 11006 則由 restartBackend 之監聽者段處理, 否則 seedDb 刪不掉 ./db 時照常拋錯或警告。
-function killOwnSrvProcesses() {
+//排程第 309 項(規格 E4「絕不殺占用者, 除非已正面確認是本實例之殘留」)查證與收嚴:
+//  ①比對的是 srvPath(本實例之 srv.mjs「絕對路徑」, 含磁碟機與全部上層目錄)之完整字串: 他套件(路徑不同)、他多開實例(各為專案之複本, 路徑不同; 前綴相近之 i1／i10 目錄因其後接分隔字元而不互含)皆不命中,
+//     實測見 unit-e2ePortReserve PR-007。
+//  ②同專案根而不同埠之另一實例(單開自動換埠後, 同一專案根可能同時有兩個行程各占一組埠): 其後端命令列同樣含本路徑, 但正在監聽「非本實例後端埠」之埠, 不是本實例之殘留, 不殺;
+//     只殺「未監聽(卡住/尚未監聽之舊後端; 仍持有 lmdb 映射, 為本函數存在之目的)」或「監聽本實例後端埠」者。查不到監聽表(PowerShell 失敗或表為空)時不殺(寧缺勿濫)。
+//opts.srvPath／opts.ownPort 供測試注入(預設為本實例之 SRV_PATH 與後端實際埠); opts.listenQuery 供測試以另一段 PowerShell 運算式取代監聽表之查詢(模擬取表失敗或表為空); 回傳實際殺掉之 PID 陣列。
+export function killOwnSrvProcesses(opts = {}) {
     if (!isWin) return []
-    const script = '[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-CimInstance Win32_Process -Filter "name=\'node.exe\'" | Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress'
+    const { srvPath = SRV_PATH, ownPort = resolveE2ePort(BACKEND_PORT), listenQuery = 'Get-NetTCPConnection | Where-Object { $_.RemotePort -eq 0 } | Select-Object LocalPort,OwningProcess' } = opts
+    //行程表(node.exe 之命令列)與監聽表(pid → 監聽埠)於同一次 PowerShell 取得。監聽表之判定不看狀態欄(同套件 listenerPids 之作法: 本地埠相符、遠端埠 0 之 TCP 列):
+    //  本機 netstat 會把監聽中之埠列成 FIN_WAIT_1 並漏列新起之監聽, Get-NetTCPConnection 之 State 欄亦為空(-State Listen 查無; 2026-11-05 以真實監聽實測), 皆不可靠。
+    //  $ErrorActionPreference="Stop": 任一查詢失敗即整段失敗(不可對單一 cmdlet 加 -ErrorAction SilentlyContinue, 否則取表失敗時監聽表為空, 會變成「全部視為未監聽而照殺」; 獨立審查 2026-11-05 指出)。
+    const script = '[Console]::OutputEncoding=[Text.Encoding]::UTF8; $ErrorActionPreference="Stop"; ' +
+        '$procs = @(Get-CimInstance Win32_Process -Filter "name=\'node.exe\'" | Select-Object ProcessId,CommandLine); ' +
+        `$listen = @(${listenQuery}); ` +
+        'ConvertTo-Json -Compress -Depth 3 -InputObject @{ procs = $procs; listen = $listen }'
     let rows = []
+    const listening = new Map() //pid → 其監聽中之 TCP 埠集合
     try {
-        const out = execSync(`powershell -NoProfile -EncodedCommand ${Buffer.from(script, 'utf16le').toString('base64')}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true }).trim()
-        rows = out ? [].concat(JSON.parse(out)) : []
+        const out = execSync(`powershell -NoProfile -EncodedCommand ${Buffer.from(script, 'utf16le').toString('base64')}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024, windowsHide: true }).trim()
+        const j = JSON.parse(out)
+        rows = [].concat(j.procs || [])
+        for (const c of [].concat(j.listen || [])) {
+            if (!listening.has(c.OwningProcess)) listening.set(c.OwningProcess, new Set())
+            listening.get(c.OwningProcess).add(c.LocalPort)
+        }
     }
     catch (e) {
         return []
     }
-    const target = SRV_PATH.toLowerCase()
-    const pids = rows.filter((r) => r && typeof r.CommandLine === 'string' && r.CommandLine.toLowerCase().includes(target) && r.ProcessId !== process.pid).map((r) => r.ProcessId)
-    for (const pid of pids) {
+    //監聽表為空＝取不到(本機必有系統服務在監聽, 表不可能為空): 不殺
+    if (listening.size === 0) return []
+    const target = srvPath.toLowerCase()
+    const cands = rows.filter((r) => r && typeof r.CommandLine === 'string' && r.CommandLine.toLowerCase().includes(target) && r.ProcessId !== process.pid).map((r) => r.ProcessId)
+    const killed = []
+    for (const pid of cands) {
+        const ports = listening.get(pid)
+        if (ports && ports.size > 0 && !ports.has(ownPort)) continue //同路徑而監聽他埠者: 另一實例, 不殺
         try {
             execSync(`taskkill /F /T /PID ${pid}`, { stdio: 'ignore', windowsHide: true })
+            killed.push(pid)
         }
         catch (e) {}
     }
-    return pids
+    return killed
 }
 
 //以指定 settings 重啟 backend（殺現有 backend → node <SRV_PATH> <pathSettings> 重啟並等 ready）。

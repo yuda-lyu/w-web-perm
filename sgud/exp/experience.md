@@ -4,6 +4,19 @@
 
 - **2026-10-22 抽出歷史經驗**:2026-10-20 以前之各節(e2e 側欄位移、統計頁、升版、授權存檔不變等)移至 `experience_20261022.md`(標題與內容不變);查久遠經驗時再調閱.
 
+## e2e 單開自動換埠導入(2026-11-05 wp309〔任務 20261105000800, 排程第 309 項〕; R-E2E-PORT-01; 報告 `C:\opensrcOper\dnow\20261105000800\agent-out\wp309-修正報告.md`; 證據 `…\wp309-evidence\`; 本套件為第一個導入者, 給他套件之範本)
+- **「全綠」不能證明沒殺到別人**: 修前以真實占用者(自建 http 監聽占 11006)跑 `e2e-init`, 20 passing／離開碼 0, 但占用者 PID 已被 `restartBackend` 之 `killForeignOnRestart`(依埠殺任何監聽者)殺死; 逐檔 runner 之 `killPortListeners(11006)` 在第一檔開跑前就殺了它; 占 8090 則是前端「沿用」占用者, `e2e-layout` 失敗且占用者被打到 2 次. 驗收一律看「占用者 PID 存活、仍回應、被測碼打到 0 次」(`tmp/wp309/scenario.mjs` 之形狀: 自建占用者 → 跑被測指令 → 占用者狀態 → 收尾回驗埠釋放), 不看測試綠不綠.
+- **修前紅要在動手改碼之前跑**: 現況碼本身就是「修前」, 先跑三組(占後端埠、占前端埠、runner)存證, 再改; 之後不必另建舊碼副本.
+- **本機 `netstat` 與 `Get-NetTCPConnection` 之狀態欄不可靠**: `netstat -ano` 把監聽中之埠列成 `FIN_WAIT_1`、漏列新起之監聽; `Get-NetTCPConnection` 之 `State` 為空(`-State Listen` 查無). 判「某 PID 是否在監聽、監聽哪些埠」改看 `RemotePort -eq 0` 之列(同套件 `listenerPids` 之作法). 套件文件早已寫明, 自己重寫時仍踩到(第一版以 netstat 解析, 監聽他埠者照殺).
+- **`$ErrorActionPreference="Stop"` 之腳本內對單一 cmdlet 加 `-ErrorAction SilentlyContinue`, 會把「取表失敗」變成「表為空」, 下游就變成「全部視為未監聽而照殺」**(獨立審查之 sonnet 子代理指出; 單元測試以 `listenQuery` 注入「拋錯」與「空表」兩形狀守護, 變異 M8 證實可擊殺). 凡「查不到就不殺」之安全閥, 查詢失敗與查詢為空要分開驗.
+- **單元測試不得依賴基準埠空閒**: 同一 mocha 行程(全套 `rest` 段)內 api 測試之後端一直占著 11006, 依賴「11006 空閒」之測試會整批 skip, 守護形同虛設. 占用情境改為「占得到就占, 已被占即視為已占用」, 期望位移由「首個空閒位移」動態算出; 只有「沒有占用 → 基準埠」(PR-001)必須 skip, 其證據改取全套 log 之 `[e2e-port] 埠 [11006, 8090](基準埠)` 行與單檔跑.
+- **`unit-e2ePortShift` 之子行程要設 `E2E_PORT_HOLD`**: 該檔驗「位移量 → 實際埠」之對應, 導入自動換埠後 e2e-setup 載入即偵測, 本機有占用者時「未設位移」案會位移而假紅; `E2E_PORT_HOLD`(視同上層已保留)讓子行程沿用環境變數之位移、不偵測.
+- **基準埠搬到 `test/tools/e2ePorts.mjs`**: `run-e2e-isolated.mjs` 不能 import `e2e-setup.mjs`(載入 playwright 與啟動設施), 又須與 e2e-setup 同一份基準埠與 `avoid`; 共用小模組載入時呼叫 `reserveE2ePorts`, 兩處皆自其匯入(ES 先評估被匯入者, 故早於任何取埠). `unit-e2ePortShift` PS-005 之基準埠字面站點隨之由 3 處改 2 處(皆在 e2ePorts.mjs).
+- **被 `taskkill /F` 之行程所留預約, 下次開跑自動回收**: 情境驅動以 `taskkill /T /F` 終止 runner 後, 下一個行程印 `[e2e-port] 回收本專案之殘留預約(持有者 PID … 已結束): 依身分終止其記下之 N 個行程`——只殺身分(PID＋起始時間＋映像)相符者, 屬預期.
+- **`avoid` 現為保險**: 基準埠 11006／8090 以間距 100 位移, 實際埠恆以 06／90 結尾, 不會落在 85xx; 列出寫死埠是防日後改基準埠或間距, 並以 PR-011 守護清單與實際寫死埠一致. 這些 api 層固定埠與他套件(w-web-api 8561～8565)之撞埠是規格 E8, 本輪未動.
+- **歷史證據腳本也在掃描範圍**: `spec/evidence/perm-run01-20261025/scripts/run-rest.mjs` 仍匯入已移除之 `killPortListeners`(子代理審查發現), 已改與 runner 同形; 日後移除 `e2eLib` 轉出前, 先 `rg` 整個 repo(含 `spec/evidence`), 不只掃 `test/`.
+- **獨立審查值得做**: 子代理(sonnet, 唯讀)讀 diff 找到 2 項真問題(上述 `SilentlyContinue`、`PR-011` 於 mocha 行程內 import `e2ePorts.mjs` 會實際保留埠)與 1 項漏網站點(`run-rest.mjs`), 約 11 分鐘; 其餘提問(子行程繼承保留下 `killOwnListeners` 是否殺得到)經實測證實可行(`post3-runner` 之子行程沿用 `[11106, 8190]`).
+
 ## openApp 開頁競爭: 無 token 預先造訪頁之自發導覽(2026-11-04 wp70〔任務 20261104193657〕; R-TEST-OPENAPP-NOPREVISIT-01; 報告 `C:\opensrcOper\dnow\20261104193657\agent-out\wp70-修正報告.md`; 證據 `…\wp70-evidence\`)
 - **主控初判大方向對, 但轉址目標與觸發條件要實測才寫得對**: 初判「無 token 頁自行跳轉」成立; 實測補正①e2e 前端是 dev server, `public/index.html` 之 `{urlRedirect}` 未被代換, `loginError` 的 `window.location.href = '{urlRedirect}'` 成為相對路徑 `/%7BurlRedirect%7D`(dev server history fallback 回同一個 SPA), 不是 `settings.json` 的外部網址; ②跳轉在 `login...` 後 2.00～2.02 s 發出(= `w-ui-loginout` 的 `timeWaitAnimation` 2000 ms, 不是網路時序); ③**必要條件是測試行程停滯 ≥ 約 2 s**: 阻塞 node 事件迴圈 ≤1800 ms 9／9 綠、≥2300 ms 6／6 紅; 單純 CPU 飽和(24 個空轉行程, openApp 拉長到 12～31 s)20／20 不紅。機制(推測, 由阻塞實驗反推, 未另行證明): 瀏覽器已提交導覽、測試行程卻尚未處理該事件就送出 evaluate, 才會得到此錯; 故重現手段是**同步忙等阻塞測試行程**(接縫包住 `page.goto`, 解決後 `sleepSync`), 不是加 CPU 壓力。
 - **「只拿掉 evaluate」不夠**: 保留預先造訪時, 第二次 `goto(appUrl)` 會被該頁自發導覽打斷(`Navigation to … is interrupted by another navigation to …/%7BurlRedirect%7D`, 阻塞 ≥2300 ms 6／6); 舊碼的 `.catch(() => {})` 只護第一次 goto。所以預先造訪整段須移除; 全新 `browser.newContext` 的 localStorage／cookie 本就是空的(實測 context A 寫入、context B 同源讀為空), 清除是無事可做。

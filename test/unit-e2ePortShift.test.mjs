@@ -6,7 +6,7 @@
 //  1. 未設 E2E_PORT_OFFSET(含 '' 與 '0')時, 所有埠、設定與行為與導入前相同: 基準埠 後端 11006／前端 8090, 臨時設定與 settings.json 逐鍵相同(不多一個鍵).
 //  2. 設 E2E_PORT_OFFSET=N 時, 後端／前端實際埠＝基準埠＋N; 臨時設定一律帶實際後端埠(srv.mjs 之 serverPort 只能由 settings 決定); vue.config.js 之 proxy 指向實際後端埠.
 //  3. 位移量格式錯誤即拋錯, 不靜默沿用基準埠(沿用即會連到他實例之服務).
-//  4. e2e 測試檔不寫死基準埠(11006／8090); 基準埠字面只在 e2e-setup.mjs 兩個常數、run-e2e-isolated.mjs 之 resolveE2ePort(11006).
+//  4. e2e 測試檔不寫死基準埠(11006／8090); 基準埠字面只在 e2ePorts.mjs 兩個常數(2026-11-05 起; 原在 e2e-setup.mjs 兩個常數與 run-e2e-isolated.mjs 之 resolveE2ePort(11006)).
 //  5. test/ 下每個 child_process 呼叫(spawn／spawnSync／execSync／execFileSync…)皆帶 windowsHide: true(本機有人使用, 不彈出視窗).
 //  6. e2eShard.json 與基準埠一致、分組計畫涵蓋全部 e2e 檔各一次.
 //檢查臨時設定時只比對鍵名與 serverPort, 失敗訊息不印設定值.
@@ -44,6 +44,9 @@ let runSetup = (offset) => {
     delete env.E2E_REGEN
     delete env.E2E_BARE
     delete env.E2E_DIAG
+    //2026-11-05(排程第 309 項): e2e-setup 載入時經 e2ePorts.mjs 自動保留埠(基準埠被占用即位移)。本檔只驗「位移量 → 實際埠／臨時設定」之對應, 須與本機當下有無占用者無關,
+    //  故以 E2E_PORT_HOLD(視同上層已保留)讓子行程沿用環境變數之位移、不偵測; 自動換埠本身(空閒／占用／預約競爭)由 unit-e2ePortReserve.test.mjs 以真實監聽驗證。
+    env.E2E_PORT_HOLD = 'unit-e2ePortShift'
     if (offset !== undefined) {
         env.E2E_PORT_OFFSET = offset
     }
@@ -124,7 +127,7 @@ describe('unit-e2ePortShift (e2e 多開之埠位移接線, R-E2E-SHARD-01)', fun
     })
 
     describe('契約 4: 基準埠字面只在固定站點', function() {
-        it('PS-005 e2e-*.test.mjs 之可執行碼不含 11006／8090; test/tools 之字面只在 e2e-setup 兩個常數與 run-e2e-isolated 之 resolveE2ePort(11006)', function() {
+        it('PS-005 e2e-*.test.mjs 之可執行碼不含 11006／8090; test/tools 之字面只在 e2ePorts.mjs 兩個常數(2026-11-05 自 e2e-setup 移入, run-e2e-isolated 改取 e2ePorts 之匯出)', function() {
             let hits = []
             for (let f of e2eFiles()) {
                 for (let l of sourceLines(path.join(fdTest, f), 'code')) {
@@ -143,9 +146,8 @@ describe('unit-e2ePortShift (e2e 多開之埠位移接線, R-E2E-SHARD-01)', fun
                 }
             }
             A.deepEqual(toolHits, [
-                'e2e-setup.mjs: const BACKEND_PORT = 11006',
-                'e2e-setup.mjs: const FRONTEND_PORT = 8090',
-                'run-e2e-isolated.mjs: const BACKEND_PORT = resolveE2ePort(11006)',
+                'e2ePorts.mjs: export const BACKEND_PORT = 11006',
+                'e2ePorts.mjs: export const FRONTEND_PORT = 8090',
             ], `test/tools 之基準埠字面: ${JSON.stringify(toolHits)}`)
         })
 

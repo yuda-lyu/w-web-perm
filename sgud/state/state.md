@@ -2,6 +2,22 @@
 
 本檔記本套件**當前已開發功能之最新狀態**;與規則帳本(`sgud/rule/rulebook.md`,藍圖)比對即知尚未做到者,接續工作先讀此檔.2026-10-22 主控遷移為 sgud 配置時建立,先移入原帳本之「已知缺口 / 待辦」;**各功能之完成狀態整理為下一次派工之待辦**(主責 agent 依規則帳本各節之「狀態」行與近期報告彙整至本檔).
 
+## 近期進度(2026-11-05 wp309〔任務 20261105000800, 排程第 309 項〕:e2e 單開自動換埠(`reserveE2ePorts`)正式導入、依埠下殺全換為只動本實例; 本套件為第一個導入者; 修正輪＝單輪,未發布,待主控複審)
+
+> 報告 `C:\opensrcOper\dnow\20261105000800\agent-out\wp309-修正報告.md`(證據 `…\wp309-evidence\`); 帳本 R-E2E-PORT-01(`rulebook_test.md` 〈e2e 單開自動換埠與只動本實例之下殺〉); 守護 `test/unit-e2ePortReserve.test.mjs`(PR-001～PR-012, 13 案); 規格 `C:/opensrcOper/dspec/e2e埠與多套件同跑.md` E1～E8; 套件 `w-package-tools-e2e` 1.0.22 README §2.12.
+
+- **改動(完成)**: 新增 `test/tools/e2ePorts.mjs`(基準埠 11006／8090 單一定義＋載入時一次 `reserveE2ePorts([11006, 8090], { avoid: [8549, 8561～8565] })`); `e2e-setup.mjs` 改自其匯入基準埠並明確帶入 `reservation` 給 `createServiceManager`; `killOwnSrvProcesses` 收嚴並匯出(同路徑而監聽他埠者不殺、取不到監聽表不殺、監聽判定不看狀態欄); `run-e2e-isolated.mjs` 之依埠下殺 `killPortListeners` 換為 `reservation.killOwnListeners`(每檔前遇他人占用即拋錯中止); `e2eLib.mjs` 轉出 `reserveE2ePorts`、移除 `killPortListeners`; `api-callerIdentity.test.mjs` 寫死之 `127.0.0.1:11006` 改 `${apiBaseUrl}`; 歷史證據腳本 `spec/evidence/perm-run01-20261025/scripts/run-rest.mjs` 同步改; `e2e-layout`／`e2e-stainfor` 兩處註解更正; `unit-e2ePortShift` 子行程設 `E2E_PORT_HOLD`、PS-005 之字面站點改為 e2ePorts.mjs 兩處. `npm test` 指令、`package.json`、`test/tools/e2eShard.json`、產品碼(`src/`、`server/`、`srv.mjs`、`vue.config.js`)、`settings.json`、`CLAUDE*.md`、標準圖 0 改動.
+- **修前紅(真實占用者, 改碼前之現況)**: 占 11006 跑 `e2e-init`＝20 passing／離開碼 0 **但占用者 PID 被殺**; 占 8090 跑 `e2e-layout`＝0 passing／1 failing(沿用占用者之服務, `openApp` 逾時 60 s)且占用者被打到 2 次; runner 占 11006＝占用者於第一檔開跑前即被 `killPortListeners` 殺.
+- **修後綠(同三組情境加一組手動鎖埠)**: 占 11006 與占 8090 各跑 `e2e-init` 20／20＋`e2e-layout` 6／6 全綠, 實際埠 `[11006, 8090] → [11106, 8190]`(位移 100), 占用者 PID 不變、仍回應、被打到 0 次; runner 占 11006: 子行程沿用 `[11106, 8190]`、占用者不動; `E2E_PORT_OFFSET=0` 手動鎖基準埠且被占用: runner 拒殺並中止、占用者不動.
+- **兩個 e2e 套件同時跑**: 本套件(無占用, 基準埠)`e2e-init`＋`e2e-layout` 26／26 與 `w-maplibregl-vue`(8123)`e2e-basemapzoom`／`e2e-displayorder`／`e2e-opacity` 12／12 同時跑全綠(閘 `e2e` 類, 兩者重疊約 2 分); 兩套件無共用埠, 此項驗同機同跑與測試閘, 撞埠由占用實測涵蓋.
+- **變異測試**: 對修正處 8 個變異(不保留埠、runner 改回依埠殺、killOwnSrvProcesses 不看監聽他埠／命令列比對過寬／監聽表為空仍殺、callerIdentity 寫死埠、服務管理器不帶 reservation、avoid 漏列)皆被 `unit-e2ePortReserve` 擊殺, 還原後雜湊相同.
+- **獨立審查**: sonnet 子代理唯讀審 diff, 指出 2 項真問題(取表失敗變成照殺之 `-ErrorAction SilentlyContinue`; PR-011 於 mocha 行程內 import 會實際保留埠)與 1 處漏網站點(`run-rest.mjs`), 皆已改並以測試守護.
+- **全套(凍結碼, 只跑一次; 無占用, 基準埠)**: `node C:/opensrcOper/tools/full-suite.mjs <套件根>` GREEN——`rest` 段 5001 passing／0 failing／2 pending(RA-036e 既有略過＋PR-001〔全套 rest 段內 api 後端占著 11006, 無法造「空閒」情境而 skip, 單檔跑時綠〕)12.8 分; `e2e` 段 5 組 413 passing／0 failing 28 分; 合計 5414 passing, 牆鐘 40 分 48 秒; 開頭印 `[e2e-port] 埠 [11006, 8090](基準埠)`(沒有占用即基準埠); `test/pics` 變更 0 檔(570 檔不變)、`./testPending/` 零新增(1028 不變)、無 `[baseline-headroom]` 告警. log `C:/opensrcOper/tmp/suites/w-web-perm-20261105-031058.{rest,e2e}.log`.
+- **附帶**: 本輪全套之 e2e 段(同一 `e2eShard.json` 之 `durations` 分組, 5 組 413 passing／0 failing, 28 分)即 wp302 待辦 ⓪ 所缺之「第二次全套 e2e 段」, 該待辦可視為已完成(待主控認可).
+- **位元組級等價(E7)**: `e2e-init`、`e2e-layout` 各以「基準埠」與「位移(占 11006 或 8090)」產圖到隔離目錄(`E2E_BASELINE_OUT_DIR`, 不動 `test/pics`), `compareImageDirs` 兩邊 12／12 位元組全同; 各對現行標準圖皆 12／12 在容差內(位元組全同 11／12、8／12, 其餘為與埠無關之既有亞像素漂移, 基準埠與位移實例之差異檔集相同).
+- **占用者綁定位址**: 占用者綁 `127.0.0.1`、`0.0.0.0`、`::`、`::1` 之 11006 或 8090 共 8 種, 自動換埠皆偵測到並位移至 `[11106, 8190]`, 占用者不動、未被打到.
+- **待辦**: ⓪主控複審; ①`CLAUDE.md`「服務 port 要點」之明文例外(restartBackend 得殺佔用本專案後端 port 者)已不使用, 措辭是否改寫待使用者／主控裁示(本輪不改 `CLAUDE.md`); ②api 層固定監聽埠 8561～8565 與 w-web-api 撞埠(規格 E8)未處理(測試閘 `portGroups` 只列 8563); ③其餘 12 個 e2e 檔(共 14 檔)未在「基準埠被占用」情境下個別實跑(代表性 2 檔＋全套多開 4 個位移實例); ④畫面含埠(E7): 本套件 0 流程(靜態檢查 `src/` 無任何元件渲染 origin／host／port, `store.hostname` 僅定義未使用; 全套多開 4 個位移實例比對全綠), 位元組級等價僅驗 `e2e-init`、`e2e-layout`(其餘 10 個有標準圖之流程未逐一驗); ⑤占用者綁單一位址(如只綁 `::1`)之 e2e 全程跑僅驗 `reserveE2ePorts` 選埠(8 種位址), 未各跑 e2e.
+
 ## 近期進度(2026-11-04 wp70〔任務 20261104193657〕:`openApp` 開頁競爭——`AF-038-delete-grup-counts [cht]` 在 11-04 全連動多開全套出現 `Execution context was destroyed` 之根因與修正; 修正輪＝單輪,未發布,待主控複審)
 
 > 報告 `C:\opensrcOper\dnow\20261104193657\agent-out\wp70-修正報告.md`(證據 `…\wp70-evidence\`); 帳本 R-TEST-OPENAPP-NOPREVISIT-01(`rulebook_test.md` 〈openApp 開頁不預先造訪無 token 頁〉); 探針 `test/tools/probeOpenAppRace.mjs`(非測試案例, 不入 `npm test`).

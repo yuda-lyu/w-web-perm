@@ -16,7 +16,7 @@ import {
     startApi, TOKEN_ADMIN, TOKEN_ADMIN2, TOKEN_MEMBER, TOKEN_PETER, TOKEN_NOFLAG, TOKEN_DENY, TOKEN_BAD, TOKEN_REJECT, TOKEN_VERIFY_THROW,
     callRpc, readTables, selectAllRows, purgeExternalRows, markSrLog, readSrLogSince,
 } from './tools/api-setup.mjs'
-import { restartBackend, genTempSettings } from './tools/e2e-setup.mjs'
+import { restartBackend, genTempSettings, apiBaseUrl } from './tools/e2e-setup.mjs'
 
 const A = assert.strict
 const KTS = ['users', 'grups', 'pemis', 'targets']
@@ -206,7 +206,8 @@ describe('api-callerIdentity (資料通道執行身分完整驗證＋寫入函�
 
         it('CI-A0 前提: member 通過部署方 verifyClientUser(經 /api/getPerm 取得本人權限樹; 自 perm-run01 起資料通道與後台登入另限系統管理者, 見 api-adminOnly)', async function() {
             await memberReady()
-            let r = await fetch(`http://127.0.0.1:11006/api/getPerm?token=${encodeURIComponent(TOKEN_MEMBER)}`)
+            //後端網址取自 apiBaseUrl(基準埠被占用而位移時為實際埠; 2026-11-05 排程第 309 項: 原寫死 127.0.0.1:11006, 位移後會把權杖送到占用該埠之別人的服務)
+            let r = await fetch(`${apiBaseUrl}/api/getPerm?token=${encodeURIComponent(TOKEN_MEMBER)}`)
             let j = await r.json()
             A.equal(j.state, 'success', JSON.stringify(j).slice(0, 200))
             A.equal(j.msg.user.id, 'id-for-member')

@@ -259,26 +259,50 @@
 ### R-E2E-SHARD-01 e2e 檔可在埠位移之臨時實例同時跑; 未設 `E2E_PORT_OFFSET` 時所有埠、設定與行為與導入前相同
 
 - **規則**
-  1. **基準埠只有一處定義**: `test/tools/e2e-setup.mjs` 之 `BACKEND_PORT = 11006`、`FRONTEND_PORT = 8090`(`run-e2e-isolated.mjs` 為 `resolveE2ePort(11006)`); 其餘組埠處(`apiBaseUrl`／`baseUrl`／`appUrl`、臨時設定之 `serverPort`、前端啟動埠、runner 殺埠、`vue.config.js` 之 proxy 目標)一律經 `resolveE2ePort(基準埠)`／`E2E_PORT_OFFSET`, **不做文字取代**. e2e 測試檔不寫死基準埠(經 `apiBaseUrl`／`baseUrl`).
+  1. **基準埠只有一處定義**: `test/tools/e2ePorts.mjs` 之 `BACKEND_PORT = 11006`、`FRONTEND_PORT = 8090`(2026-11-05 wp309 自 `e2e-setup.mjs` 移入, 並於該處呼叫 `reserveE2ePorts`, 見 R-E2E-PORT-01; `e2e-setup.mjs`／`run-e2e-isolated.mjs` 皆自該檔匯入); 其餘組埠處(`apiBaseUrl`／`baseUrl`／`appUrl`、臨時設定之 `serverPort`、前端啟動埠、runner 殺埠、`vue.config.js` 之 proxy 目標)一律經 `resolveE2ePort(基準埠)`／`E2E_PORT_OFFSET`, **不做文字取代**. e2e 測試檔不寫死基準埠(經 `apiBaseUrl`／`baseUrl`).
   2. **未位移(未設、空字串、`0`)＝導入前**: `isPortShifted` 為 false 時 `genTempSettings` 之 overrides 原樣(臨時設定與 `settings.json` 逐鍵相同, 不多 `serverPort`)、`argsOf` 原樣、前端指令列同(`npm run serve -- --port 8090`)、`vue.config.js` proxy 為 `http://localhost:11006`. `npm test` 指令不改.
   3. **位移時後端改讀帶實際埠之臨時設定**: `srv.mjs` 之 `serverPort` 只能由 settings 決定(環境變數與命令列都不能覆寫), 故首次啟動與每次 `restartBackend('./settings.json', …)` 皆經 `argsOf` 改為 `genTempSettings({})`(含 `serverPort`); 測試檔經 `genTempSettings(overrides)` 產生者已含實際埠, 原樣傳. `genTempSettings` 為具名函式匯出(原為 `export { genTempSettings }`), 簽章不變.
   4. **前端以 `createServiceManager` 傳入之實際埠 `port` 啟動**(原寫死 `FRONTEND_PORT`); dev server 繼承 `E2E_PORT_OFFSET`, `vue.config.js` 之 proxy 目標為 `11006 ＋ 位移`(未設為 11006).
   5. **位移量格式錯誤即拋錯**(`abc`、`-100`、`1.5`、超過 65535), 不靜默沿用基準埠(沿用即連到他實例).
   6. **不設 `officialOnly`**: 14 個 e2e 檔之期望值與標準圖不含主機與埠字面(e2e 檔可執行碼對 `11006|8090` 零命中; 需要網址者皆由 `apiBaseUrl`／`baseUrl` 衍生, 如 `e2e-init` 之 `urlRedirect: ${apiBaseUrl}/__e2e-redirect-…`); 位移實例產出與正式實例逐位元相同之證據: `pemis` 流程 48 張兩邊各產到隔離目錄, `compareImageDirs` 48／48 位元組相同(`<evidence>/eqv-pemis-compare.json`). 日後新增 e2e 檔若畫面或期望值含主機與埠, 須列 `officialOnly`.
-  7. **`killForeignOnRestart: true` 維持**(專案明文例外, CLAUDE.md): 埠已隨實例位移, 只殺本實例之後端埠, 不及正式 11006 與他實例; `killOwnSrvProcesses` 以實例自身 `SRV_PATH`(絕對路徑)比對命令列, 不殺他實例之後端.
+  7. **`killForeignOnRestart: true` 維持**(專案明文例外, CLAUDE.md): 埠已隨實例位移, 只殺本實例之後端埠, 不及正式 11006 與他實例; `killOwnSrvProcesses` 以實例自身 `SRV_PATH`(絕對路徑)比對命令列, 不殺他實例之後端. 〔2026-11-05 wp309 更新: 下殺改只動「身分已確認屬本實例」者, 見 R-E2E-PORT-01 規則 3、4; `killOwnSrvProcesses` 另不殺監聽他埠者〕
   8. **排程第 275 項: `test/` 與 `test/tools/` 下每個 `child_process` 呼叫(`spawn`／`spawnSync`／`execSync`／`execFileSync`)皆帶 `windowsHide: true`**(本機有人使用, 啟動服務與測試子行程不得彈出視窗); 補齊後 `test/` 與 `test/tools/` 共 16 檔 38 個呼叫全帶(含 `e2e-setup.mjs` 4 處、新測試檔 3 處、導入前已帶者 7 處; 本輪新補 12 檔 24 處〔19 項置換〕, 為 `seedChild`／`runChild` 與 api／unit 檔).
-  9. **非 e2e 檔不在多開內**: `api-*` 與 `unit-*` 用正式後端 11006 與固定埠(8549、8561～8564 等), 由 `full-suite` 之 `rest` 段在正式目錄單一 mocha 跑, 與 e2e 段**不同時**(兩段各自取鎖, e2e 段獨佔); `api-callerIdentity` 寫死 `127.0.0.1:11006` 屬 api 層, 不改.
+  9. **非 e2e 檔不在多開內**: `api-*` 與 `unit-*` 用正式後端 11006 與固定埠(8549、8561～8564 等), 由 `full-suite` 之 `rest` 段在正式目錄單一 mocha 跑, 與 e2e 段**不同時**(兩段各自取鎖, e2e 段獨佔); ~~`api-callerIdentity` 寫死 `127.0.0.1:11006` 屬 api 層, 不改~~〔2026-11-05 wp309 更正: 單開自動換埠後, 後端可能在 11106 等位移埠, 寫死之 `127.0.0.1:11006` 會把權杖送到占用該埠之別人的服務, 已改 `${apiBaseUrl}`; api 層之固定監聽埠 8549、8561～8565 則列入 `e2ePorts.mjs` 之 `OTHER_TEST_PORTS`, 見 R-E2E-PORT-01〕.
 - **全套跑法(本套件)**: `node C:/opensrcOper/tools/full-suite.mjs C:/opensrc/開源-JS-411-8-w-web-perm/w-web-perm`(內部自取鎖: `rest` 段 `--lock`、`e2e` 段 `--lock-exclusive`, 呼叫端不要再包鎖; 可能等鎖, 以 detached 啟動並分段等待). 離開碼 0 兩段皆綠, 1 任一段紅. 分組預覽 `node node_modules/w-package-tools-e2e/tools/shardE2e.mjs --plan`(不取鎖、不建立任何東西). 耗時寫回 `e2eShard.json`: 全套 e2e 段完成後取各檔耗時 `… shardE2e.mjs --update-durations`(只改 `durations` 欄, 見該段實測). 只跑 e2e 且標準圖不得變動: 工具只跑比對, 不寫標準圖(`E2E_REGEN=1`、`--baseline` 即拋錯). 單檔、單案、標準圖產製仍用原指令(`node test/e2e-<flow>.test.mjs --baseline …`, 正式實例).
 - **等價驗證(首次, 2026-11-04)**: 流程 `pemis`(兩語系 48 張)在正式實例(11006／8090)與位移 100 之臨時實例(11106／8190)各以 `--baseline` 產到隔離目錄(`E2E_BASELINE_OUT_DIR`, 不動 `test/pics`), `compareImageDirs`: A 對 B 48 檔**位元組全相同**(`bytesEqual` 48、`equivalent` 48、`onlyInB` 0); 各對現行 `test/pics/pemis` 皆為 29 檔位元組相同、48 檔在容差內(19 檔 RGBA 相異但 pixelmatch 計數 0, A 與 B 完全相同之檔集, 屬與位移無關之既有漂移, 本輪未動標準圖). 手動實例依技能 `full-run-and-instances` §5.2 建、以套件 `removeE2eInstance` 移除(拆 2 個連結, `test/pics` 與 `node_modules` 快照回驗完好).
 - **盤點指令**(可重跑, 期望值為 2026-11-04 實測):
   ```
-  # 1) 基準埠字面(可執行碼): 期望 test/tools 恰 3 行(e2e-setup 兩常數、run-e2e-isolated 之 resolveE2ePort(11006)), e2e-*.test.mjs 0 行; vue.config.js 1 行(11006 ＋ 位移)
+  # 1) 基準埠字面(可執行碼): 期望 test/tools 恰 2 行(2026-11-05 起皆在 e2ePorts.mjs 之兩個常數; 原為 3 行), e2e-*.test.mjs 0 行; vue.config.js 1 行(11006 ＋ 位移)
   rg -n "\b(11006|8090)\b" test/tools/*.mjs vue.config.js
   rg -n "\b(11006|8090)\b" test/e2e-*.test.mjs        # 僅註解行(e2e-init 檔頭、e2e-layout／e2e-stainfor 之 why 註解)
   # 2) child_process 呼叫皆帶 windowsHide: 由 unit-e2ePortShift PS-007 以括號配對掃描(含 test/tools), 期望掃到 38 處(16 檔)、缺 0
   # 3) 分組計畫涵蓋全部 e2e 檔各一次: node node_modules/w-package-tools-e2e/tools/shardE2e.mjs --plan
   ```
 - **測試**: `test/unit-e2ePortShift.test.mjs`(PS-001～PS-009: 未位移與導入前相同〔未設／空字串／`0` 三種〕、位移 100／400 之埠與臨時設定、`vue.config.js` proxy、格式錯誤拋錯 4 種、基準埠字面站點、`windowsHide` 站點、`e2eShard.json` 與 `--plan` 涵蓋). 全套 e2e 結果見 `sgud/state/state.md` 近期進度(2026-11-04: 第一次全套 e2e 413 案綠、牆鐘 36.1 分; 第二次〔實測 durations 分組〕之 e2e 段待補跑).
+
+## e2e 單開自動換埠與只動本實例之下殺(2026-11-05 wp309〔任務 20261105000800〕, 排程第 309 項; 規格 `C:/opensrcOper/dspec/e2e埠與多套件同跑.md` E1～E8; 套件 `w-package-tools-e2e` >= 1.0.22 README §2.12 `reserveE2ePorts`; 本套件為第一個導入者, 作法當範本)
+
+### R-E2E-PORT-01 基準埠被占用時整組自動位移且絕不下殺占用者; 沒有占用時埠、行為與標準圖皆與導入前相同
+
+- **規則**
+  1. **基準埠與保留只有一處**: `test/tools/e2ePorts.mjs`——`BACKEND_PORT = 11006`、`FRONTEND_PORT = 8090`、`OTHER_TEST_PORTS`、並於載入時一次 `reserveE2ePorts([BACKEND_PORT, FRONTEND_PORT], { avoid: OTHER_TEST_PORTS })`; `e2e-setup.mjs` 與 `run-e2e-isolated.mjs`(及 `spec/evidence/perm-run01-20261025/scripts/run-rest.mjs`)皆自該檔匯入(ES 模組先評估被匯入者, 故早於任何 `resolveE2ePort`／`createServiceManager`; 後於其呼叫即拋錯「保留前已取過實際埠」). 不另寫第二套解析: 位移仍經 `E2E_PORT_OFFSET`, 取埠處同 R-E2E-SHARD-01 規則 1.
+  2. **三種來源**(`reservation.source`): `auto`＝未設 `E2E_PORT_OFFSET` 時自動選定(位移 0、100、200…逐一預約＋實際綁定 127.0.0.1／0.0.0.0／::／::1 驗證, 第一個全空閒者; 沒有占用時即基準埠且 `E2E_PORT_OFFSET` 維持未設); `pinned`＝手動設了 `E2E_PORT_OFFSET`(含 `0`)不換埠, 只預約與告警, **`E2E_PORT_OFFSET=0` 為「沿用本機已起之服務」逃生口**(此時 `restartBackend` 遇他人占用會拋錯, 不殺); `inherited`＝上層已保留(`E2E_PORT_HOLD`: 逐檔 runner 之子行程、`full-suite` 多開各組)沿用其位移, 不偵測.
+  3. **下殺只動身分已確認屬本實例者**: `createServiceManager` 明確帶入 `reservation`(`e2e-setup.mjs`), `killForeignOnRestart: true` 保留但管理器改走 `reservation.killOwnListeners`(身分取自服務就緒後之 `noteOwn` 取樣); `run-e2e-isolated.mjs` 之 `killPortListeners` 已移除(`e2eLib.mjs` 不再轉出), 改 `killOwnBackend(strict)`: 每檔前遇非本實例之監聽者拋錯中止(免下一檔沿用別人之服務), 收尾只印出. 殘留: 上次被 `taskkill /F` 之行程所留預約, 下次開跑依其記下之身分回收(只殺身分相符者).
+  4. **`killOwnSrvProcesses`(reseed／seedExtra 前殺殘留後端)收嚴並匯出**(`e2e-setup.mjs`): ①命令列比對本實例 `srv.mjs` 絕對路徑之完整字串——他套件、他多開實例(複本, 路徑不同)、前綴相近之 `i1`／`i10` 目錄皆不命中; ②命令列同路徑而「正在監聽非本實例後端埠」者不殺(同專案根之另一實例); ③取不到監聽表或表為空不殺; ④監聽判定不看狀態欄——本機 `netstat` 把監聽中之埠列成 `FIN_WAIT_1` 並漏列新起之監聽, `Get-NetTCPConnection` 之 `State` 為空(`-State Listen` 查無), 改取「`RemotePort -eq 0`」之列(同套件 `listenerPids`); 不可對單一 cmdlet 加 `-ErrorAction SilentlyContinue`(取表失敗會變成「全部視為未監聽而照殺」, 獨立審查所指).
+  5. **測試碼無寫死 host:埠**: `api-callerIdentity.test.mjs` 之 `http://127.0.0.1:11006/api/getPerm` 改 `${apiBaseUrl}/api/getPerm`(位移後會把權杖送到占用 11006 之別人的服務; 原規則 R-E2E-SHARD-01 之 9 註「屬 api 層, 不改」已更正). `unit-fetchJson-sdk`／`unit-sdk-tokenSafety` 之 `127.0.0.1:1`／`:99999` 為刻意不可達之失敗案例用埠, `unit-maskLog`／`unit-wrapInjected` 為字串資料, 皆非服務位址. 根目錄 `g_provide*.mjs` 之 `localhost:11006` 為手動開發同步腳本, 不屬測試碼與種子, 本輪未動.
+  6. **api-／unit- 測試寫死之監聽埠** 8549(`wwebpermInitChild`)、8561(`api-ormDiag`)、8562(`unit-ormDiag`)、8563(`api-maskRaw`)、8564／8565(`api-consoleNoValues`)列入 `OTHER_TEST_PORTS`(`avoid`); 現行基準埠以間距 100 位移, 實際埠恆以 06／90 結尾, 不會落在 85xx, 故 `avoid` 現為保險(日後改基準埠或間距才生效); 清單與實際寫死埠之一致由 PR-011 守護. 這些埠本身與他套件之撞埠(8561～8565 與 w-web-api; 規格 E8, 測試閘 `portGroups` 只列 8563)屬另案, 本輪不改.
+  7. **畫面含埠(E7)**: 本套件無. 依據: 2026-11-04 盤點 570 張標準圖 0 含埠(`rulebook_test.md` R-E2E-SHARD-01 規則 6, pemis 48 張位元組全同); 靜態: `src/` 無任何元件渲染 origin／host／port(`store.hostname` 僅定義未使用; `main.js:41` 之 url 只供用戶端連線). 動態: 本輪以位移實例實跑 `e2e-init`、`e2e-layout` 比對全綠, 並以 `E2E_BASELINE_OUT_DIR` 產圖到隔離目錄, 基準埠與位移實例 12／12＋12／12 張位元組全同(`compareImageDirs`); 其餘 10 個有標準圖之流程(`test/pics` 共 12 個流程夾)未逐一驗位元組級. 日後新增 e2e 流程之畫面或期望值若含主機與埠, 須 `reserveE2ePorts(..., { baseOnly: true })` 或比對端 `overlayRegions` 覆蓋, 並於 `e2eShard.json` 列 `officialOnly`.
+  8. **`CLAUDE.md`「服務 port 要點」之明文例外**(restartBackend 得殺佔用本專案後端 port 者)自 2026-11-05 起不再使用(改只殺本實例); 該段措辭是否改寫由使用者／主控裁示, 本輪未改 `CLAUDE.md`.
+- **測試**: `test/unit-e2ePortReserve.test.mjs`(PR-001～PR-012 共 13 案; 與 `unit-e2ePortShift` 之 PS-001～PS-009 共 15 案合計 28 案; 占用情境以真實 http 監聽, 期望位移由「首個空閒位移」動態算出, 不因同一 mocha 行程內 api 後端占著 11006 而 skip); `unit-e2ePortShift` 之子行程設 `E2E_PORT_HOLD` 使位移量對應測試與本機占用無關.
+- **盤點指令**(可重跑, 期望值為 2026-11-05 實測):
+  ```
+  # 1) 依埠或依名稱下殺: 期望 test/ 可執行碼 0 處 killPortListeners(PR-008); taskkill 僅對自己 spawn 之 child.pid 與 killOwnSrvProcesses
+  rg -n "killPortListeners|Stop-Process|pkill|killall" test spec/evidence --glob "*.mjs"
+  # 2) 測試碼寫死之 host:埠(e2e-／api-／tools): 期望 0(PR-010)
+  rg -n "(localhost|127\.0\.0\.1):[0-9]{2,5}" test/e2e-*.test.mjs test/api-*.test.mjs test/tools
+  # 3) 寫死之監聽埠: 期望恰 8549、8561～8565(PR-011)
+  rg -n "\b(PORT|PORT_INIT|port|serverPort)\b\s*[:=]\s*[0-9]{4,5}\b" test
+  ```
 
 ## openApp 開頁不預先造訪無 token 頁(2026-11-04 wp70〔任務 20261104193657〕; 來源: 主控 11-04 全連動多開全套第 0 組之 1 紅 `AF-038-delete-grup-counts [cht]`: `page.evaluate: Execution context was destroyed`, 堆疊 `openApp` ← `withPageLang`; log `C:/opensrcOper/tmp/testall/20261104-cascade5/w-web-perm-parts.e2e-out/group0.log`)
 
