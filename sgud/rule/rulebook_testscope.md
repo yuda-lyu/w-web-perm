@@ -106,7 +106,7 @@
 
 | 改動 | 擴大為 | 理由(證據見證據檔 spec/evidence/R-TEST-SCOPE-01-證據.md 之附錄 A) |
 |---|---|---|
-| `test/tools/e2e-setup.mjs` | 全 11 檔. 若只動單一 helper, 以該 helper 名盤點使用檔即可縮小(例: `getResolvedActiveTargets` 僅 7 檔, `saveBelongAndWaitModal` 僅 3 檔) | 11 檔皆 import(A-14); helper 級盤點: `rg -l "\b<helper>\b" test/e2e-*.test.mjs` |
+| `test/tools/e2e-setup.mjs` | 全 11 檔. 若只動單一 helper, 以該 helper 名盤點使用檔即可縮小(例: `getResolvedActiveTargets` 僅 7 檔, `saveBelongAndWaitModal` 僅 3 檔; **`openApp` 為 13 檔**〔11 檔直接呼叫＋`e2e-ref-cascade`／`e2e-concurrent-edit` 經 `e2eExt.mjs:enterPage`; `e2e-init` 不經它〕, 2026-11-04 wp70 改開頁流程時以 `e2e-array-form`×3＋位移 100×1＋`e2e-layout`＋`e2e-stainfor` 驗, 全套由主控跑) | 11 檔皆 import(A-14); helper 級盤點: `rg -l "\b<helper>\b" test/e2e-*.test.mjs` |
 | `test/tools/e2eLib.mjs`、devDependency `w-package-tools-e2e`／`playwright` 版本 | 全 11 檔, 且 Chromium 換版必然使全部標準圖像素變動(見規則帳本 ADR-020 與 C1 列) | 11 檔皆經 e2e-setup／e2eLib 啟動瀏覽器與比對(A-14) |
 | `test/tools/api-setup.mjs` | `e2e-init`＋`e2e-array-form`＋`e2e-ref-cascade`＋`e2e-external-rows`＋`e2e-targets`(另含全部 `api-*`, 非本表範圍) | **2026-10-22 run10 實測 5 檔 import**(`rg -l "api-setup\.mjs" test/e2e-*.test.mjs`; 原記「僅 init:36、array-form:29」已落後); 改動只涉 `readSrLogSince`／`markSrLog` 者(僅 api 檔使用)這 5 檔不受影響, 改其他匯出(`callRpc`／`restoreTables`／`cleanExternalFixtures`／`purgeExternalRows` 等)才須跑 |
 | `test/tools/baseSeed.mjs`／`seedChild.mjs`／`g_initialTestData.mjs`／`src/schema/**`／`g_*.mjs`(種子與表結構) | 全 11 檔(且種子列數／欄值之變動使全部標準圖與 `BASE_SEED_COUNT` 失配) | `baseSeed.mjs:8` import `src/schema/index.mjs`, `assertPristineSeed` 於每個資料檔 `captureBaseSeedOnce`(e2e-setup.mjs:773)守門; 種子於每檔後端啟動時重建(e2e-setup.mjs:148-151)(A-15) |

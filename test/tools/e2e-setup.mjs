@@ -277,13 +277,20 @@ export async function launchBrowser() {
     return await pkgLaunchBrowser()
 }
 
-//開乾淨頁（清 localStorage token 後以 ?token=sys 進入），回傳已可互動的 page。
+//開乾淨頁（全新 context 以 ?token=sys 進入），回傳已可互動的 page。
+//【wp70 修正 2026-11-04, R-TEST-OPENAPP-NOPREVISIT-01】不先 goto 無 token 之 baseUrl 再 evaluate 清 localStorage:
+//  ①全新 browser.newContext 之 localStorage／cookie 本就是空的(同一 browser 先在 context A 寫入、另開 context B 同源讀取為空; 實測見 test/tools/probeOpenAppRace.mjs 之 fresh 段), 清除無事可做;
+//  ②無 token 之頁面並非靜態頁——w-ui-loginout 等 timeWaitAnimation(2000 ms)後判定無令牌 → App.vue:loginError → window.location.href = urlRedirect:
+//    非 localhost 即時轉址; e2e 前端為 dev server, 模板之 {urlRedirect} 未被代換, 目標成為相對路徑 /%7BurlRedirect%7D(同源 SPA fallback),
+//    頁面自此每約 2.7 s 重複自我重載(實測 14 s 內 5 次, 間隔 2.65～2.72 s)。故 goto 解決後 2 s 內 evaluate 必須已被處理, 否則 evaluate 與導覽提交相撞 →
+//    `page.evaluate: Execution context was destroyed`(11-04 全連動多開全套 AF-038-delete-grup-counts [cht] 之紅燈; 測試行程停滯 ≥2 s 即穩定重現);
+//  ③第一次 goto 就帶 token 則登入成功、無任何自發導覽, 其後僅 waitForFunction(跨導覽安全)。消除競爭本身, 非加長等待或重試。
+//  只刪 evaluate 不夠: 保留「先 goto 無 token 頁」時, 第二次 goto 會被該頁之自發導覽打斷(`Navigation to … is interrupted by another navigation`; 變異實測)。
+//  opts 若日後帶 storageState(現無呼叫端), 須改在文件載入前清除(context.addInitScript), 不可回到先開頁後 evaluate。
+//  重現與回歸: node test/tools/probeOpenAppRace.mjs(經 quiet-run --lock; 規則帳本 R-TEST-OPENAPP-NOPREVISIT-01)。
 export async function openApp(browser, opts = {}) {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, ...opts })
     const page = await context.newPage()
-    //先到 origin 清 localStorage，再帶 token 進入，避免殘留 token 干擾
-    await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 120000 }).catch(() => {})
-    await page.evaluate(() => { try { localStorage.clear() } catch (e) {} })
     await page.goto(appUrl, { waitUntil: 'domcontentloaded', timeout: 120000 })
     //等登入完成 + 譯文就緒才回傳。kpText 在 UpdateWebInfor 後才由 ui.setLang(null) 重算（main.js），
     //故不能只等 webInfor truthy；直接等 $t 譯出非 key 值（且 syncState 完成）確保 kpText 已載入。

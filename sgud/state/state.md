@@ -2,6 +2,20 @@
 
 本檔記本套件**當前已開發功能之最新狀態**;與規則帳本(`sgud/rule/rulebook.md`,藍圖)比對即知尚未做到者,接續工作先讀此檔.2026-10-22 主控遷移為 sgud 配置時建立,先移入原帳本之「已知缺口 / 待辦」;**各功能之完成狀態整理為下一次派工之待辦**(主責 agent 依規則帳本各節之「狀態」行與近期報告彙整至本檔).
 
+## 近期進度(2026-11-04 wp70〔任務 20261104193657〕:`openApp` 開頁競爭——`AF-038-delete-grup-counts [cht]` 在 11-04 全連動多開全套出現 `Execution context was destroyed` 之根因與修正; 修正輪＝單輪,未發布,待主控複審)
+
+> 報告 `C:\opensrcOper\dnow\20261104193657\agent-out\wp70-修正報告.md`(證據 `…\wp70-evidence\`); 帳本 R-TEST-OPENAPP-NOPREVISIT-01(`rulebook_test.md` 〈openApp 開頁不預先造訪無 token 頁〉); 探針 `test/tools/probeOpenAppRace.mjs`(非測試案例, 不入 `npm test`).
+
+- **改動(完成)**: `test/tools/e2e-setup.mjs:openApp` 移除「先 `goto(baseUrl)`(無 token)再 `evaluate` 清 localStorage」, 第一次 `goto` 即 `appUrl`(`?token=sys`); 新增 `test/tools/probeOpenAppRace.mjs`(重現與回歸探針, 含舊版逐字副本作負對照); sgud 同步(帳本新節、`rulebook.md` 索引與 C5 映射列、`rulebook_testscope.md` 之 `e2e-setup` 列註記 `openApp` 為 13 檔). `npm test`、`package.json`、`test/tools/e2eShard.json`、產品碼(`src/`、`server/`、`srv.mjs`)、`settings.json`、標準圖 0 改動; 任何測試案例之語意與斷言未動.
+- **根因(實測)**: 無 token 頁於 `timeWaitAnimation`(2000 ms)後走 `App.vue:loginError` 自發導覽(非 localhost 即時轉址; dev server 之 `{urlRedirect}` 佔位未代換 → 目標 `/%7BurlRedirect%7D`, 同一 SPA 重載); 舊 `openApp` 在 `goto` 解決後 2 s 內須完成 `evaluate`, 測試行程停滯 ≥2 s 即與導覽提交相撞. 修前紅: 阻塞測試行程事件迴圈 ≥2300 ms 為 6／6 `Execution context was destroyed`(≤1800 ms 9／9 綠); 修後 21／21 綠(含 12 s). 自然 CPU 飽和(24 個空轉行程)20／20 未重現——事故當時停滯之來源未證明.
+- **驗證**(皆經 `quiet-run --lock`; 修正後之同一份 `e2e-setup.mjs`):
+  - `e2e-array-form.test.mjs`(含 `AF-038-delete-grup-counts` eng／cht): 正式埠 3 次 83／83 綠(18m40s、17m31s、16m58s), `E2E_PORT_OFFSET=100` 1 次 83／83 綠(17m46s, 後端確為 11106／前端 8190, 正式埠無回應).
+  - 含標準圖比對之檔: `e2e-layout` 6／6、`e2e-stainfor` 16／16 綠; `test/pics` 變更 0 檔、`./testPending/` 零新增(1028 不變)、無 `[baseline-headroom]` 告警.
+  - 非瀏覽器: `unit-e2ePortShift`、`unit-e2e-lifecycle`、`unit-roleName`、`unit-shipTools` 共 46／46 綠(含新增 `test/tools/probeOpenAppRace.mjs` 後之 PS-005 埠字面掃描、PS-007 windowsHide 掃描).
+  - 探針 `probeOpenAppRace.mjs`: `RESULT PASS`(real 6／6 綠、legacy 負對照 stall≥3000 紅 4／4、fresh 空); 對 `openApp` 之變異(加回舊兩行)`RESULT FAIL (4)`, 還原後雜湊與變異前相同.
+  - 未跑: 全套(主控發布前以 `full-suite` 跑)、其餘 11 個 e2e 檔(共 14 檔; 其中 `e2e-init` 不經 `openApp`).
+- **待辦**: ⓪主控複審並於發布前以 `full-suite` 跑全套; ①w-web-sso 有 26 處同形寫法(15 檔; 其無 token 頁為登入表單、無計時導覽, 非同一觸發), 建議主控以 issue 通知; ②是否把「`openApp` 不得先開無 token 頁」升為 `npm test` 內之靜態守護(見報告〈需裁示〉).
+
 ## 近期進度(2026-11-04 wp302〔任務 20261104071854, 排程第 302、275 項〕:e2e 分組多開正式導入＋`child_process` 呼叫補 `windowsHide`; 修正輪＝單輪,未發布,待主控複審)
 
 > 報告 `C:\opensrcOper\dnow\20261104071854\agent-out\wp302-修正報告.md`; 帳本 R-E2E-SHARD-01(`rulebook_test.md` 〈e2e 分組多開〉); 守護 `test/unit-e2ePortShift.test.mjs`(PS-001～PS-009, 15 案); 套件 `w-package-tools-e2e` 1.0.20(`tools/shardE2e.mjs`); 主控工具 `C:/opensrcOper/tools/full-suite.mjs`.
