@@ -32,6 +32,7 @@ import {
     registerCleanupHooks,
     itemsUnionBox,
     waitGridIdle,
+    resolveE2ePort,
     probeStuckTooltip as pkgProbeStuckTooltip
 } from './e2eLib.mjs'
 import { runSeedChild } from './seedChild.mjs'
@@ -50,12 +51,19 @@ const SRV_PATH = join(projRoot, 'srv.mjs')
 //種子旁路追加列之子行程腳本(restartBackend 之 opts.seedExtra; run05)
 const SEED_EXTRA_PATH = join(__dir, 'seedExtraRows.mjs')
 
+//基準埠(正式實例用; 與 vue.config.js 之 proxy 預設 11006、settings.json 之 serverPort 一致)。
+//e2e 多開(排程第 302 項; 套件 tools/shardE2e.mjs): 臨時實例以環境變數 E2E_PORT_OFFSET 整體位移, 實際埠經 resolveE2ePort(基準埠) 取得;
+//  未設 E2E_PORT_OFFSET(含 npm test、run-e2e-isolated、單檔直跑)時實際埠＝基準埠, 一切與導入前相同。
+//  常數維持基準埠: createServiceManager 之 services[].port 寫基準埠(其內部已套用位移), 其餘組埠處(網址、臨時設定之 serverPort)一律經 resolveE2ePort。
 const BACKEND_PORT = 11006
 //perm e2e 用獨立的 8090（避開常駐於 8080 的其他專案 dev server），以 --port 顯式指定確保確定性
 const FRONTEND_PORT = 8090
 
-export const apiBaseUrl = `http://127.0.0.1:${BACKEND_PORT}`
-export const baseUrl = `http://127.0.0.1:${FRONTEND_PORT}`
+//是否為位移實例(E2E_PORT_OFFSET 非空且非 0); 位移時後端須改讀帶實際埠之臨時設定(serverPort 只能由 settings 決定, srv.mjs 不吃環境變數或命令列埠)
+const isPortShifted = resolveE2ePort(BACKEND_PORT) !== BACKEND_PORT
+
+export const apiBaseUrl = `http://127.0.0.1:${resolveE2ePort(BACKEND_PORT)}`
+export const baseUrl = `http://127.0.0.1:${resolveE2ePort(FRONTEND_PORT)}`
 //帶 ?token=sys 讓 w-ui-loginout 以系統管理者(admin)登入；dev/prod build 皆確定登入。
 export const appUrl = `${baseUrl}/?token=sys`
 
@@ -77,7 +85,7 @@ function wipeDbVerified(strict = true) {
         try { fs.rmSync(dbDir, { recursive: true, force: true }) }
         catch (e) { lastErr = e }
         if (!fs.existsSync(dbDir)) return
-        execSync(isWin ? 'ping -n 2 127.0.0.1 >nul' : 'sleep 1', { stdio: 'ignore' })
+        execSync(isWin ? 'ping -n 2 127.0.0.1 >nul' : 'sleep 1', { stdio: 'ignore', windowsHide: true })
     }
     const msg = `無法刪除 ./db（仍有行程持有 lmdb 映射）: ${lastErr ? lastErr.message : '目錄仍存在'}`
     if (strict) throw new Error(`seedDb: ${msg}；續行將產出非 hermetic 之 base seed, 故中止`)
@@ -106,7 +114,7 @@ function markExpectedExit(onlyBackend = false) {
     }
 }
 function spawnSrv(cmd, args, opts = {}) {
-    const child = spawn(cmd, args, { cwd: projRoot, stdio: ['ignore', 'pipe', 'pipe'], ...opts })
+    const child = spawn(cmd, args, { cwd: projRoot, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, ...opts })
     liveChildren.add(child)
     let tail = ''
     const keep = (d) => {
@@ -129,11 +137,23 @@ function spawnSrv(cmd, args, opts = {}) {
 //落點刻意用 test/_tmp/ 而非專案 ./tmp/：./tmp/ 為 AI 代理之暫存區, 隨時可能被整個清除,
 //測試中介資料放該處會在執行途中被刪(如 restartBackend 讀不到臨時 settings)導致假失敗。
 //測完即刪：本進程產生之臨時 settings 由 cleanup() 一併刪除（測試中介資料不得留在 ./test 內）。
-const { genTempSettings, cleanupTempSettings } = createTempSettings({
+const { genTempSettings: genTempSettingsRaw, cleanupTempSettings } = createTempSettings({
     basePath: join(projRoot, 'settings.json'),
     tmpDir: join(fdTest, '_tmp'),
 })
-export { genTempSettings }
+//位移實例(E2E_PORT_OFFSET)之臨時設定一律帶本實例之後端實際埠, overrides 可覆寫(測試檔現無人覆寫 serverPort); 未位移時 overrides 原樣, 臨時設定內容與導入前逐位元相同。
+export function genTempSettings(overrides = {}) {
+    return genTempSettingsRaw(isPortShifted ? { serverPort: resolveE2ePort(BACKEND_PORT), ...overrides } : overrides)
+}
+//後端啟動參數: 未位移時原樣(args 為 [] 或 [settings 路徑], srv.mjs 預設 ./settings.json); 位移時基底設定('./settings.json' 或未給)改走帶實際埠之臨時設定,
+//  已為臨時設定者(測試檔經 genTempSettings 產生, 已含實際埠)原樣。restartBackend('./settings.json', …) 與首次啟動皆經此, 故測試檔不必改。
+function argsOf(args) {
+    if (!isPortShifted) {
+        return args
+    }
+    const a0 = args && args[0]
+    return [!a0 || a0 === './settings.json' ? genTempSettings({}) : a0, ...(args || []).slice(1)]
+}
 
 //服務生命週期（沿用政策 reuse；套件 createServiceManager）：
 //  - 後端：port 沒人 → 先 seed（beforeSpawn phase=start；seed 須在後端開 lmdb 前）再 spawn；restart 帶 hookArg.reseed 時於 port 釋放後、spawn 前重跑 seed。
@@ -165,7 +185,7 @@ const services = createServiceManager({
                     }
                 }
             },
-            spawn: ({ args, env }) => spawnSrv('node', [SRV_PATH, ...args], { env }),
+            spawn: ({ args, env }) => spawnSrv('node', [SRV_PATH, ...argsOf(args)], { env }),
         },
         {
             name: 'frontend',
@@ -173,9 +193,11 @@ const services = createServiceManager({
             readyTimeoutMs: 180000,
             startNote: 'webpack 首編較久',
             //Windows 須經 shell 解析 npm.cmd; shell:true 時以單一指令字串傳入: 帶參數陣列會觸發 Node 24 DEP0190(參數只被串接、不跳脫; 2026-09-30 改, 指令列相同)
-            spawn: () => (isWin
-                ? spawnSrv(`npm run serve -- --port ${FRONTEND_PORT}`, [], { shell: true })
-                : spawnSrv('npm', ['run', 'serve', '--', '--port', String(FRONTEND_PORT)])),
+            //埠取 spawn 收到之實際埠 port(createServiceManager 已套用 E2E_PORT_OFFSET; 未位移時＝FRONTEND_PORT, 指令列與導入前相同)。
+            //  dev server 繼承 E2E_PORT_OFFSET, vue.config.js 之 proxy 目標據以指向本實例之後端。
+            spawn: ({ port }) => (isWin
+                ? spawnSrv(`npm run serve -- --port ${port}`, [], { shell: true })
+                : spawnSrv('npm', ['run', 'serve', '--', '--port', String(port)])),
         },
     ],
     probe: (svc) => probeHttp(svc.url, { timeoutMs: 2500, accept: (st) => st > 0 && st < 500 }),
@@ -205,7 +227,7 @@ function killOwnSrvProcesses() {
     const script = '[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-CimInstance Win32_Process -Filter "name=\'node.exe\'" | Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress'
     let rows = []
     try {
-        const out = execSync(`powershell -NoProfile -EncodedCommand ${Buffer.from(script, 'utf16le').toString('base64')}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+        const out = execSync(`powershell -NoProfile -EncodedCommand ${Buffer.from(script, 'utf16le').toString('base64')}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true }).trim()
         rows = out ? [].concat(JSON.parse(out)) : []
     }
     catch (e) {
@@ -215,7 +237,7 @@ function killOwnSrvProcesses() {
     const pids = rows.filter((r) => r && typeof r.CommandLine === 'string' && r.CommandLine.toLowerCase().includes(target) && r.ProcessId !== process.pid).map((r) => r.ProcessId)
     for (const pid of pids) {
         try {
-            execSync(`taskkill /F /T /PID ${pid}`, { stdio: 'ignore' })
+            execSync(`taskkill /F /T /PID ${pid}`, { stdio: 'ignore', windowsHide: true })
         }
         catch (e) {}
     }

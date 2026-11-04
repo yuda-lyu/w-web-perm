@@ -770,7 +770,7 @@ describe('unit-refAudit (懸空引用稽核與一次性清理)', function() {
 
     describe('離線 CLI(server/tools/authRefsAudit.mjs)', function() {
 
-        let runAudit = (args, cwd = projRoot) => spawnSync(process.execPath, [TOOL_AUDIT, ...args], { encoding: 'utf8', timeout: 30000, cwd })
+        let runAudit = (args, cwd = projRoot) => spawnSync(process.execPath, [TOOL_AUDIT, ...args], { encoding: 'utf8', timeout: 30000, cwd, windowsHide: true })
 
         it('RA-030 --json 輸出等於 buildReport; --clean-out 只含變更之列(id 與新字串); 輸入檔不被修改; --clean-out 之提示走 stderr 不污染 stdout', function() {
             let dir = path.join(TMP, 'cli1')
@@ -1534,7 +1534,7 @@ describe('unit-refAudit (懸空引用稽核與一次性清理)', function() {
             assert.strictEqual(u2.timeUpdate, '2026-01-02 00:00:00')
         })
 
-        let runCli = (cwd, args) => spawnSync(process.execPath, [TOOL_CLEAN, ...args], { encoding: 'utf8', timeout: 30000, cwd })
+        let runCli = (cwd, args) => spawnSync(process.execPath, [TOOL_CLEAN, ...args], { encoding: 'utf8', timeout: 30000, cwd, windowsHide: true })
         let filesOf = (dir, re) => fs.readdirSync(dir).filter((f) => re.test(f))
 
         it('RA-052 g_authRefsClean.mjs --db: 預設只列不改(離開碼 0、零寫入、不產備份); 資料夾不存在中止不憑空建庫; 參數錯誤離開碼 2', async function() {

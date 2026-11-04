@@ -25,7 +25,7 @@ export function runSeedChild({ args, cwd, timeoutMs = 60000 }) {
     return new Promise((resolve, reject) => {
         let child = null
         try {
-            child = spawn('node', args, { cwd, stdio: ['ignore', 'pipe', 'pipe'] })
+            child = spawn('node', args, { cwd, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true })
         }
         catch (err) {
             reject(err)

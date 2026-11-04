@@ -1,0 +1,23 @@
+{
+    "ports": [
+        11006,
+        8090
+    ],
+    "instances": 5,
+    "durations": {
+        "e2e-array-form.test.mjs": 17.06,
+        "e2e-layout.test.mjs": 3.78,
+        "e2e-rela-user-grup.test.mjs": 10.73,
+        "e2e-concurrent-edit.test.mjs": 16.87,
+        "e2e-pemis.test.mjs": 10.95,
+        "e2e-stainfor.test.mjs": 8.24,
+        "e2e-external-rows.test.mjs": 14.4,
+        "e2e-ref-cascade.test.mjs": 4.06,
+        "e2e-targets.test.mjs": 12.99,
+        "e2e-grups.test.mjs": 11.22,
+        "e2e-rela-grup-pemi.test.mjs": 9.31,
+        "e2e-users.test.mjs": 10.42,
+        "e2e-init.test.mjs": 3.04,
+        "e2e-rela-pemi-rule.test.mjs": 5.41
+    }
+}

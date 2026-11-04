@@ -2,6 +2,18 @@
 
 本檔記本套件**當前已開發功能之最新狀態**;與規則帳本(`sgud/rule/rulebook.md`,藍圖)比對即知尚未做到者,接續工作先讀此檔.2026-10-22 主控遷移為 sgud 配置時建立,先移入原帳本之「已知缺口 / 待辦」;**各功能之完成狀態整理為下一次派工之待辦**(主責 agent 依規則帳本各節之「狀態」行與近期報告彙整至本檔).
 
+## 近期進度(2026-11-04 wp302〔任務 20261104071854, 排程第 302、275 項〕:e2e 分組多開正式導入＋`child_process` 呼叫補 `windowsHide`; 修正輪＝單輪,未發布,待主控複審)
+
+> 報告 `C:\opensrcOper\dnow\20261104071854\agent-out\wp302-修正報告.md`; 帳本 R-E2E-SHARD-01(`rulebook_test.md` 〈e2e 分組多開〉); 守護 `test/unit-e2ePortShift.test.mjs`(PS-001～PS-009, 15 案); 套件 `w-package-tools-e2e` 1.0.20(`tools/shardE2e.mjs`); 主控工具 `C:/opensrcOper/tools/full-suite.mjs`.
+
+- **改動(完成)**: `test/tools/e2eLib.mjs` 轉出 `resolveE2ePort`; `test/tools/e2e-setup.mjs` 之 `apiBaseUrl`／`baseUrl`／臨時設定 `serverPort`／前端啟動埠經 `resolveE2ePort`(基準埠常數 11006／8090 不動), 後端經 `argsOf` 於位移時改讀帶實際埠之臨時設定, `genTempSettings` 改具名函式匯出(位移才注入 `serverPort`), `spawnSrv` 預設 `windowsHide`; `test/tools/run-e2e-isolated.mjs` 殺 `resolveE2ePort(11006)`; `vue.config.js` proxy 目標＝`11006＋E2E_PORT_OFFSET`; 新增 `test/tools/e2eShard.json`(`ports` `[11006, 8090]`、`instances` 5、`durations` 取自第一次全套實測; 無 `officialOnly`、無 `exclude`); 排程第 275 項: `test/` 下 12 檔 24 處 `child_process` 呼叫補 `windowsHide: true`(補後 16 檔 38 處全帶). `npm test` 指令與 `package.json` scripts 未動; 產品碼（`src/`、`server/`、`srv.mjs`）、`settings.json`、標準圖 0 改動.
+- **驗證**:
+  - 首次等價驗證(`pemis` 48 張, 正式實例 vs 位移 100 之臨時實例, 隔離目錄): 48／48 位元組相同(`wp302-evidence/eqv-pemis-compare.json`).
+  - 未設 `E2E_PORT_OFFSET`: `e2e-init`(含 `restartBackend(genTempSettings(…))`、`reseed`)正式埠比對模式 20 passing; 新測 PS-001 三種未位移形式皆綠.
+  - 全套第一次(預設分組, 無 `durations`): `rest` 段 4972 passing／0 failing／1 pending(RA-036e 既有略過); `e2e` 段 5 組 413 passing／0 failing, 牆鐘 36.1 分(各組 31.6／36.1／31.5／31.0／8.5 分, 最長組為第 1 組), 序列合計(各檔實測和)138.5 分; 標準圖 0 張改變, `./testPending/` 零新增.
+  - 全套第二次(實測 `durations` 分組, `--plan` 預估牆鐘 28.6 分): `rest` 段 4987 passing／0 failing／1 pending(多 15＝新測); **`e2e` 段未跑**(排獨佔鎖直到本輪 4 小時上限仍未取得, 他套件之獨佔 e2e 在前; 屬 INCONCLUSIVE 非紅; 續做指令見報告 §7).
+- **待辦**: ⓪**補跑全套第二次之 e2e 段**(`quiet-run --lock-exclusive … shardE2e.mjs --out-dir <ev>\full2.e2e-out`, 見報告 §7; `rest` 段已綠不必重跑), 跑完把牆鐘與各組耗時補進本節與報告; ①主控複審; ②耗時欄(`rulebook_testscope.md` 表一)仍為 2026-10-22 單序列值, 以 `e2eShard.json` 之 `durations`(多開下 5 組同時跑之負載值)為準, 兩者不可直接比; ③`test/pics` 有 19 檔（`pemis` 流程）RGBA 與當前輸出不同但 pixelmatch 計數 0（既有亞像素漂移, 與位移無關, 本輪未動標準圖）, 日後全量收集趟再處理; ④`db/wperm/*`（版控內之 lmdb 檔）因測試執行被改寫為測試資料, 屬跑測試的固有副作用, 不屬本輪改動.
+
 ## 近期進度(2026-11-03 pm57〔任務 20261103123942〕:統計(`staEvent`)之桶輸出不含晚於現在所屬桶之未來時間桶——Gitea #57; 修正輪＝單輪,未發布,待主控複審)
 
 > 報告 `C:\opensrcOper\dnow\20261103123942\agent-out\pm57-修正報告.md`; 帳本 R-STA-FUTURE-01(`rulebook_mechanism.md` 〈統計資訊之輸出上界〉); ADR-048; 契約 `spec/流程_統計資訊事件展示.md` 〈補充〉「`getStaEvent` 輸出契約」FB-1～FB-5; 同型 w-web-api #58 已修、w-web-sso #56 另案.

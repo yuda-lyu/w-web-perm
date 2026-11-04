@@ -24,7 +24,7 @@ export function runChild(code, opt = {}) {
         cwd: projRoot,
         encoding: 'utf8',
         timeout: timeoutMs,
-        maxBuffer: 16 * 1024 * 1024,
+        maxBuffer: 16 * 1024 * 1024, windowsHide: true,
     })
     let ms = Date.now() - t0
     let timedOut = (r.error && r.error.code === 'ETIMEDOUT') === true

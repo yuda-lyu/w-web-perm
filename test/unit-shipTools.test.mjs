@@ -44,7 +44,7 @@ const dirTmp = path.join(projRoot, 'test', '_tmp', 'shipTools')
 
 //packList: npm pack --dry-run --json 之出貨清單(正規化為 / 分隔之相對路徑集合); 新舊版 npm 輸出形狀不同(陣列／以套件名為鍵之物件)皆處理
 let packList = () => {
-    let out = execSync('npm pack --dry-run --json', { cwd: projRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 })
+    let out = execSync('npm pack --dry-run --json', { cwd: projRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024, windowsHide: true })
     let j = JSON.parse(out)
     let info = Array.isArray(j) ? j[0] : Object.values(j)[0]
     return new Set(info.files.map((f) => f.path.replace(/\\/g, '/')))
@@ -221,7 +221,7 @@ describe('unit-shipTools (離線維運工具出貨完整性, run08)', function()
             let outs = {}
             let ran = withJunction(projRoot, link, () => {
                 for (let cli of ['nameDupReport', 'authRefsAudit']) {
-                    let r = spawnSync(process.execPath, [path.join('node_modules', 'w-web-perm', 'server', 'tools', `${cli}.mjs`)], { cwd: inst, encoding: 'utf8', timeout: 30000 })
+                    let r = spawnSync(process.execPath, [path.join('node_modules', 'w-web-perm', 'server', 'tools', `${cli}.mjs`)], { cwd: inst, encoding: 'utf8', timeout: 30000, windowsHide: true })
                     outs[cli] = { status: r.status, stdout: r.stdout }
                 }
             })

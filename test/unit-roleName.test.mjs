@@ -75,7 +75,7 @@ let scanCode = (files) => {
 let listTracked = () => {
     let rels = []
     try {
-        rels = execFileSync('git', ['ls-files', '-z'], { cwd: projRoot, encoding: 'buffer', maxBuffer: 1 << 28 }).toString('utf8').split('\0').filter((s) => s)
+        rels = execFileSync('git', ['ls-files', '-z'], { cwd: projRoot, encoding: 'buffer', maxBuffer: 1 << 28, windowsHide: true }).toString('utf8').split('\0').filter((s) => s)
     }
     catch (err) {
         let walk = (dir) => {

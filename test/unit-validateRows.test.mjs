@@ -133,7 +133,7 @@ describe('unit-validateRows (寫入前驗證之判準, ADR-026)', function() {
 
     //判準複製自上游之前提: 全樹只有一份 wsemi(否則 w-serv-orm 用之 clearXSS 可能與本套件不同版)
     it('VR-EQ-002 全樹只有一份 wsemi', function() {
-        let out = execSync('npm ls wsemi --all --parseable', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+        let out = execSync('npm ls wsemi --all --parseable', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true })
         let paths = [...new Set(out.split(/\r?\n/).filter((l) => /[\\/]wsemi$/.test(l.trim())))]
         assert.strict.equal(paths.length, 1, `wsemi 應只有一份, 實得 ${paths.join(', ')}`)
     })

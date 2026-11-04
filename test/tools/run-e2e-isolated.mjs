@@ -19,10 +19,12 @@
 
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
-import { runIsolatedE2e, killPortListeners } from './e2eLib.mjs'
+import { runIsolatedE2e, killPortListeners, resolveE2ePort } from './e2eLib.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url)) //test/tools
-const BACKEND_PORT = 11006
+//後端埠: 基準埠 11006 經 resolveE2ePort 取實際埠(2026-11-04 排程第 302 項; 位移實例下殺的是本實例之後端, 不殺正式 11006);
+//  未設 E2E_PORT_OFFSET 時＝11006, 與導入前相同。套件 shardE2e 不經本 runner(自帶分組與收尾), 位移環境下本 runner 仍須指對埠。
+const BACKEND_PORT = resolveE2ePort(11006)
 
 let { failed } = await runIsolatedE2e({
     projRoot: join(__dirname, '..', '..'),

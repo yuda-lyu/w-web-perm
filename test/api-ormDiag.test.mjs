@@ -140,7 +140,7 @@ describe('api-ormDiag (w-serv-orm 診斷輸出導入 srLog: 只寫 label＋safe,
     after(async function() {
         if (child && child.pid) {
             try {
-                execSync(`taskkill /F /T /PID ${child.pid}`, { stdio: 'ignore' })
+                execSync(`taskkill /F /T /PID ${child.pid}`, { stdio: 'ignore', windowsHide: true })
             }
             catch (e) {}
         }

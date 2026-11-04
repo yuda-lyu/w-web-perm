@@ -156,7 +156,7 @@ describe('api-maskRaw (WWebPerm 之 url 導出之秘密清單接到各 srLog raw
     after(async function() {
         if (child && child.pid) {
             try {
-                execSync(`taskkill /F /T /PID ${child.pid}`, { stdio: 'ignore' })
+                execSync(`taskkill /F /T /PID ${child.pid}`, { stdio: 'ignore', windowsHide: true })
             }
             catch (e) {}
         }

@@ -4,7 +4,8 @@ module.exports = {
     devServer: {
         proxy: {
             '/api': {
-                target: 'http://localhost:11006',
+                //e2e 多開(E2E_PORT_OFFSET, 排程第 302 項)時代理到本實例之後端(11006＋位移); 未設時值為 11006, 與導入前相同
+                target: 'http://localhost:' + (11006 + Number(process.env.E2E_PORT_OFFSET || 0)),
                 pathRewrite: {
                     '^/api': '/api'
                 },

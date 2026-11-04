@@ -21,7 +21,7 @@ const fpWWebPerm = path.join(projRoot, 'server', 'WWebPerm.mjs')
 
 //runChild: 於子行程建構 WWebPerm(cases 見 test/tools/wwebpermInitChild.mjs), 回傳各案結果
 function runChild(cases) {
-    let r = spawnSync(process.execPath, [path.join(projRoot, 'test', 'tools', 'wwebpermInitChild.mjs'), JSON.stringify(cases)], { cwd: projRoot, encoding: 'utf8', timeout: 60000 })
+    let r = spawnSync(process.execPath, [path.join(projRoot, 'test', 'tools', 'wwebpermInitChild.mjs'), JSON.stringify(cases)], { cwd: projRoot, encoding: 'utf8', timeout: 60000, windowsHide: true })
     let ln = (r.stdout || '').split(/\r?\n/).find((l) => l.startsWith('RESULT '))
     assert.ok(ln, `子行程未輸出結果, status=${r.status}, stderr=${String(r.stderr || '').slice(-600)}`)
     return JSON.parse(ln.slice('RESULT '.length))

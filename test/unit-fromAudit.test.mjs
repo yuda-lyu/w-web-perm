@@ -1559,7 +1559,7 @@ describe('unit-fromAudit (來源欄 from 之稽核、型別正規化與整來源
         }
         //startHolder: 子行程開啟資料庫並持有(模擬後端), 回傳 { stop }
         let startHolder = (url) => new Promise((resolve, reject) => {
-            let child = spawn(process.execPath, [HOLDER, url], { stdio: ['pipe', 'pipe', 'pipe'] })
+            let child = spawn(process.execPath, [HOLDER, url], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true })
             let out = ''
             let timer = setTimeout(() => {
                 child.kill()
@@ -1685,8 +1685,8 @@ describe('unit-fromAudit (來源欄 from 之稽核、型別正規化與整來源
             }
         }
         let norm = (rows) => JSON.stringify(Object.fromEntries(TABLES.map((t) => [t, byId(rows[t])])))
-        let runFix = (cwd, args) => spawnSync(process.execPath, [TOOL_FIX, ...args], { encoding: 'utf8', timeout: 90000, cwd })
-        let runPurge = (cwd, args) => spawnSync(process.execPath, [TOOL_PURGE, ...args], { encoding: 'utf8', timeout: 90000, cwd })
+        let runFix = (cwd, args) => spawnSync(process.execPath, [TOOL_FIX, ...args], { encoding: 'utf8', timeout: 90000, cwd, windowsHide: true })
+        let runPurge = (cwd, args) => spawnSync(process.execPath, [TOOL_PURGE, ...args], { encoding: 'utf8', timeout: 90000, cwd, windowsHide: true })
         let filesOf = (dir, re) => fs.readdirSync(dir).filter((f) => re.test(f))
         let out = (r) => r.stdout + r.stderr
         //種入之 users 不含 own undefined(lmdb 編碼器); 缺欄以不給鍵表達
@@ -1942,7 +1942,7 @@ describe('unit-fromAudit (來源欄 from 之稽核、型別正規化與整來源
             }
             let { dir, url } = await seed('use1', fixFx())
             let rows0 = await readDb(url)
-            let child = spawn(process.execPath, [HOLDER, url], { stdio: ['pipe', 'pipe', 'pipe'] })
+            let child = spawn(process.execPath, [HOLDER, url], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true })
             await new Promise((resolve, reject) => {
                 let buf = ''
                 let timer = setTimeout(() => reject(new Error(`holder not ready: ${buf}`)), 30000)
