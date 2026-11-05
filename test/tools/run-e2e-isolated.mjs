@@ -30,10 +30,22 @@ const __dirname = dirname(fileURLToPath(import.meta.url)) //test/tools
 const BACKEND_ACTUAL_PORT = reservation.portOf(BACKEND_PORT)
 
 //只殺本實例之後端監聽者; 有非本實例之監聽者(skipped)不殺: strict 時拋錯中止(每檔前, 免下一檔沿用別人之服務), 否則只印出(收尾, 不遮蔽逐檔結果)
-const killOwnBackend = (strict) => {
-    const r = reservation.killOwnListeners(BACKEND_ACTUAL_PORT)
+//查不到監聽者(r.pids === null)時先重試 3 次; 仍查不到＝無法確認埠上有無別人之服務: 不殺, strict 時同樣中止(2026-11-05 w-web-api 實測: 只印出就續跑, 下一檔會沿用占用者之服務)
+const killOwnBackend = async (strict) => {
+    let r = null
+    for (let i = 0; i < 3; i++) {
+        r = reservation.killOwnListeners(BACKEND_ACTUAL_PORT)
+        if (r.pids !== null) {
+            break
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+    }
     if (r.pids === null) {
-        console.log(`[run-e2e-isolated] 查詢埠 ${BACKEND_ACTUAL_PORT} 監聽者之工具不可用, 未殺`)
+        const msg = `[run-e2e-isolated] 查詢埠 ${BACKEND_ACTUAL_PORT} 監聽者之工具不可用(重試 3 次), 無法確認埠上有無非本實例之監聽者, 未殺`
+        if (strict) {
+            throw new Error(`${msg}; 為免下一檔沿用別人之服務而中止`)
+        }
+        console.log(msg)
     }
     else if (r.skipped.length > 0) {
         const msg = `[run-e2e-isolated] 埠 ${BACKEND_ACTUAL_PORT} 有非本實例之監聽者(PID ${r.skipped.join(', ')}), 不下殺(占用者可能是別的套件正在跑之測試)`
@@ -50,12 +62,12 @@ let { failed } = await runIsolatedE2e({
     testDir: join(__dirname, '..'),
     beforeEachFile: async () => {
         //每檔前殺本實例之後端 → 新 mocha 進程自 seed+spawn 全新後端；前端保持暖機
-        killOwnBackend(true)
+        await killOwnBackend(true)
         await new Promise((resolve) => setTimeout(resolve, 2000))
     },
-    afterAll: () => {
+    afterAll: async () => {
         //收尾殺本實例之後端(前端留給使用者/後續)
-        killOwnBackend(false)
+        await killOwnBackend(false)
     },
 })
 process.exit(failed === 0 ? 0 : 1)
