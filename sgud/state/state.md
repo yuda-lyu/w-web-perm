@@ -51,7 +51,7 @@
 - **改動(完成)**: `server/staLogs/staLogsCore.mjs:buildOutput` 以現在所屬桶為上界(`genPlan` 新回傳 `labelEnd`, 窗非空時即 `kpTime` 最末桶; 窗為空〔`timeLength` 為負, `kpTime` 為空〕時仍有效, 為對部署方草案之強化), 晚於它之資料桶不輸出(`isLaterLabel`: 先比長度再比字串, 年份 ≥ 10000 之標籤字典序反小於 `2026-…`); 現在所屬桶內略晚於現在者保留; 掃描、檔級快取、`scanTableFiles` 不動. 新測 `test/unit-staLogs-futureBucket.test.mjs`(53 案); golden `expected.json` 由產生器 `gen-expected.mjs` 之 `dropFuture` 剔除後重產(hr 2 列、day 1 列, 其餘逐筆同 HEAD), `unit-staEvent-golden` GOLD-001 增未來桶與最末列斷言; README〈Upgrade Notes〉、spec 契約與已知落差、ADR-048 同步.
 - **查證結論**: 缺陷而非設計(出處見 ADR-048 Context; 判定強度之限制見該處: golden 之 `future-30m`／`future-1d` 是否為刻意規格案例無法由 git 歷史證明, 判為改造前行為之指紋).
 - **驗證**: 新測修前(HEAD 副本)2 綠 51 紅、修後 53 綠; 上界判定變異 16 項全被抓(含窗為空——`timeLength` 為負——時上界失效之 M16); 修前修後差異比對: 合法輸入 168 組差異 0、含未來紀錄之輸入 142 組(122 組確有列被剔除)差異恰為晚於現在所屬桶之列; 全套 `npm test` 5385 passing、1 pending(RA-036e 既有略過)、0 failing; 標準圖 0 張重產(本專案 e2e 統計頁皆 `staEventMock`, 不經 `staLogsCore`). 全套結果見報告.
-- **待辦**: ①主控複審並隨全庫連動發布(README 小節標題為「Unreleased」, 版號由主控定); ②下游 rddmanager 之 3 個支援專案之標準圖由其自行處理(issue 載明).
+- **待辦**: ①主控複審並隨全庫連動發布(README 小節標題為「Unreleased」, 版號由主控定); ②下游使用端之 3 個支援專案之標準圖由其自行處理(issue 載明).
 
 ## 近期進度(2026-11-02 pm286〔任務 20261031121854〕:全庫跟跑紅 2 案之修正——用詞與出貨清單斷言對齊 dspec〈自有套件之npm發布範圍〉; 修正輪＝單輪,未發布,待主控複審)
 
@@ -115,7 +115,7 @@
 
 ## 近期進度(2026-10-26 perm-run01〔任務 20261026143318〕:角色名稱統一為「系統管理者」; 修正輪＝單輪,未發布,待主控全套)
 
-> 注意: 來源為整合者 rddmanager 之建議書(Gitea #16)與使用者「全系統角色名稱統一為系統管理者」之裁定; 證據目錄 `spec/evidence/perm-run01-20261026/`(逐張標準圖之舊／新／差異放大圖 `diff/`、清單 `regen-list.json`、腳本 `scripts/`、測試摘要 `run-summaries/`〔原 `logs/` 被 `.gitignore` 忽略故另存〕), 報告 `C:\opensrcOper\dnow\20261026143318\agent-out\perm-run01-修正報告.md`. 只改顯示文字: 欄位鍵名 `isAdmin`、資料、存取規則、`version`、eng 文字皆不動.
+> 注意: 來源為整合者使用端之建議書(Gitea #16)與使用者「全系統角色名稱統一為系統管理者」之裁定; 證據目錄 `spec/evidence/perm-run01-20261026/`(逐張標準圖之舊／新／差異放大圖 `diff/`、清單 `regen-list.json`、腳本 `scripts/`、測試摘要 `run-summaries/`〔原 `logs/` 被 `.gitignore` 忽略故另存〕), 報告 `C:\opensrcOper\dnow\20261026143318\agent-out\perm-run01-修正報告.md`. 只改顯示文字: 欄位鍵名 `isAdmin`、資料、存取規則、`version`、eng 文字皆不動.
 
 - **改動(完成)**: ①`server/procLang.mjs` cht `isAdmin`「是否為系統管理者」→「是否為系統管理者」(「管理使用者」表頭); ②`src/schema/tables/users.mjs` `isAdmin.name` 同改; ③`server/procLang.mjs` cht `userNotAdmin`「僅系統管理者可存取或變更此資料」→「…系統管理者…」; ④`server/tools/fromTools.mjs` 離線工具輸出「列為系統管理者」→「…者」＋其斷言 `test/unit-fromAudit.test.mjs:1484`; ⑤`server/adminCheck.mjs` JSDoc 摘要與 `@returns` 兩行(為使建議書 §2 驗證 2 之 `git grep -n "是否為系統管理者" -- src server` 字面為 0); ⑥spec 引述畫面／訊息文字與案例 description 之處(`流程_多人同時編輯` 訊息對照列〔附留痕〕、`流程_應用啟動與登入` E2E 兩案 description、`流程_後台使用者清單` 一案 description). `git grep -n "系統管理者" -- src server` 現只剩註解(19 行, 皆 `//`／JSDoc; 由 `unit-roleName` RN-S1 以可執行碼盤點證明), `是否為系統管理者` 為 0.
 - **標準圖**: 主控授權重產僅限「差異僅為此用詞」者——受影響流程 5 個(`users`、`external-rows`、`layout`、`rela-user-grup`、`ref-cascade`; 共 226 張)全產到暫存目錄後與 `test/pics` 精確逐張比對: 102 張位元相同、**56 張 cht 圖差異外框恰為表頭最末一字(員→者, 108 像素, 外框 12×11)→ 已覆蓋**(users 32、external-rows 7、rela-user-grup 17)、68 張 eng 圖僅左上 `[60,47]` 1 像素既有渲染雜訊(pixelmatch 0)→ 不動、超出範圍 0 張. 其餘 e2e 流程之標準圖 0 改變.

@@ -1,5 +1,5 @@
 //角色名稱統一為「系統管理者」之顯示文字與站點不變式
-//來源: perm-run01(2026-10-26, 任務 20261026143318; 建議書 rddmanager Gitea #16)改欄位名「是否為系統管理者」; perm-run02(2026-10-26)依使用者 2026-10-26 裁示擴及全 repo——
+//來源: perm-run01(2026-10-26, 任務 20261026143318; 建議書使用端 Gitea #16)改欄位名「是否為系統管理者」; perm-run02(2026-10-26)依使用者 2026-10-26 裁示擴及全 repo——
 //  指系統管理者角色之詞一律為「系統管理者」(舊稱「系統管理」後接「員」者、單獨之「管理」後接「員」者、單獨之「管理＋者」皆改), 與 w-web-sso／w-web-api／w-web-task 同; 英文等其他語系、欄位鍵名 isAdmin、程式識別字、資料不動.
 //
 //受測: server/procLang.mjs(isAdmin／userNotAdmin／anUnexpectedErrorOccurred／srcKeyConflict 之 cht 文字)、src/schema/tables/users.mjs(isAdmin 之 name)、src/ 與 server/ 之可執行碼、git 追蹤之全部文字檔

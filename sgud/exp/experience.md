@@ -101,7 +101,7 @@
 - **測試之「輸入資料」不是期望文字, 全域替換會改到畫面**(本輪實例): `e2e-external-rows` 把「A…未儲存之說明」等草稿字串輸入進儲存格並截圖, 機械替換連同這些資料一併改字, E2E-016-1 兩張紅(643 px)。教訓: 全域改字後, 凡**輸入到 UI 之測試字串**要列為獨立站點(grep 測試檔中被替換之行, 分「註解／標題／期望／輸入資料」四類), 輸入資料類之標準圖用「全產到暫存目錄再逐像素比對」找全, 不只看 mocha 紅燈(差 < 100 px 者不會紅); 本輪只有 external-rows 之 016-1 屬此類, 差異外框僅該行輸入文字, 屬授權範圍而覆蓋。
 - **dist／docs 文字替換後以 `e2e-init` 驗證**(後端 serve dist): 20 案全綠; 改字長度不同之字串使 `dist/w-web-perm.umd.js.map` 於同行後段欄位位移, 不影響執行, 發布重建後恢復。
 
-## 角色名稱統一為「系統管理者」(2026-10-26 perm-run01〔任務 20261026143318〕; 建議書 rddmanager Gitea #16; 證據 `spec/evidence/perm-run01-20261026/`; 報告 `C:\opensrcOper\dnow\20261026143318\agent-out\perm-run01-修正報告.md`)
+## 角色名稱統一為「系統管理者」(2026-10-26 perm-run01〔任務 20261026143318〕; 建議書使用端 Gitea #16; 證據 `spec/evidence/perm-run01-20261026/`; 報告 `C:\opensrcOper\dnow\20261026143318\agent-out\perm-run01-修正報告.md`)
 - **只改文字的修正, 標準圖範圍用「全產到暫存目錄再逐張比對」而不是「跑 mocha 看誰紅」**: 一個字(員→者)之差只有 108 個像素, pixelmatch 計 63～74 < `maxDiffPixels` 100, mocha 比對不會紅, 只靠失敗清單會漏掉全部該更新之圖(且 `--write-mode changed` 同理不寫出)。作法: 把受影響流程以 `E2E_BASELINE_OUT_DIR=<暫存目錄> node test/e2e-<flow>.test.mjs --baseline` 全產, 再以精確像素比對(任一通道不同即計, 取差異外框)與 `test/pics` 逐張對照, 分三類——差異外框恰為該字形(授權範圍, 覆蓋)、eng 圖僅 1 像素雜訊(pixelmatch 0, 不動)、其他(停下回報); 腳本在 `tmp/perm-run01/`, 證據(舊/新/差異三列放大)入 `spec/evidence/perm-run01-20261026/diff/`。
 - **eng 圖於本機重產與現行標準圖有固定 1 像素差**(`[60,47]`, 左上標題字之反鋸齒, pixelmatch 0, 68 張): 既有標準圖與本機 Chromium 渲染之次像素差, 與本次改動無關, 不得因此重產 eng 圖(重產＝換掉已審過之真理)。
 - **哪些流程拍得到表頭**: 「管理使用者」表頭只在使用者頁出現——`e2e-users`(32 張 cht)、`e2e-external-rows`(7)、`e2e-rela-user-grup`(17, 對話框遮罩下仍可見)有; `e2e-layout`、`e2e-ref-cascade` 之 cht 圖共 16 張位元相同(未拍到該欄); 其餘流程不進使用者頁(`e2e-init` 只斷言導覽文字)。
