@@ -4,6 +4,16 @@
 
 - **2026-10-22 抽出歷史經驗**:2026-10-20 以前之各節(e2e 側欄位移、統計頁、升版、授權存檔不變等)移至 `experience_20261022.md`(標題與內容不變);查久遠經驗時再調閱.
 
+## dev server proxy 重用連線與 TIME_WAIT 輕量量測(2026-11-07 pp347〔任務 20261107181536, 排程第 347 項〕; R-E2E-PROXY-01; 姊妹套件 w-web-sso 排程第 324 項先查得; 報告 `C:\opensrcOper\dnow\20261107181536\agent-out\pp347-修正報告.md`; 證據 `…\pp347-evidence\`)
+- **修前／修後切換不必來回改 repo 檔**: vue-cli 之 `loadFileConfig.js:11` 先取環境變數 `VUE_CLI_SERVICE_CONFIG_PATH`(絕對路徑)。「修前」以 `git show HEAD:vue.config.js` 另存副本(`tmp/pp347/vue.config.before.js`)，在跑 mocha 之行程環境設該變數(`e2e-setup.mjs` 以 `spawn('npm run serve')` 不給 `env` 即繼承，dev server 讀到副本)；「修後」不設即用現行檔。起跑前以 `require('@vue/cli-service/lib/util/loadFileConfig.js')(process.cwd())` 印 `fileConfigPath` 與 `/api` proxy 之鍵確認選到哪一份(修前 `target,pathRewrite`、修後 `target,agent,pathRewrite`)；比來回編輯 repo 檔安全(中途中斷不會留半改狀態)。
+- **全機 TIME_WAIT 不能直接歸因給本套件**: 取樣期間同機另有他套件 e2e(本機埠 8091／11108／8080／11005 等)與無關服務(7680)同時產生 TIME_WAIT，修後取樣窗尾甚至被他套件的突發拉到 1,259。歸因一律看**本實例埠**(8090／11006；自動換埠時為位移後之埠，e2e log 開頭印 `[e2e-port]`)，全機數字只當背景；取窗只取 mocha 實際起訖(`runMeasure.mjs` 在 `quiet-run --lock` 內寫 `window.json`，取鎖等待期間之取樣排除)。
+- **兩欄都看、兩側分開算**: 本機埠＝服務埠者為伺服端先關，遠端埠＝服務埠者為用戶端先關。修後伺服端側 −86%，但用戶端側 +47%(608 → 893)：連線改重用後，每案 fresh browser 關閉時瀏覽器關自己的 keep-alive 連線(8090 之 497 ≈ 83 案 × 約 6)，agent 閒置連線逾時由 dev server 關。只報單側或只報全機會得出相反結論。
+- **以新增四元組計量**: TIME_WAIT 存活約 2 分鐘，遠大於 5 秒取樣間隔，故以「本輪新出現之四元組」計新增量，現存數只用來看峰值(同一時刻兩側合計峰值 522 → 118)；取樣窗在 mocha 結束後再延 150 秒以涵蓋尾端。抽樣器 `twSampler.mjs`／彙整 `twSummary.mjs`／執行包裝 `runMeasure.mjs`／鏈 `chain.sh` 之副本隨報告證據保存(repo 內 `tmp/pp347/` 已清)。
+- **本套件 `e2e-array-form` 屬中等請求量**: 修前每案 fresh browser、每頁 2 秒輪詢(`WServBroadcastClient.mjs:26,100`)，83 案共約 3,000 個伺服端先關 TIME_WAIT，遠小於姊妹套件之 12,001 次壓力案例(其 E2E-006)，故絕對改善量小於姊妹；本套件無同型壓力案例。
+- **量測挑檔的依據是推定**: 候選 4 檔 dry-run 共 245 案，`e2e-array-form` 83 案、耗時 17.06 分(`e2eShard.json`)為案例數最多且最長，`e2e-concurrent-edit` 76 案、16.87 分；兩者皆一案一頁，故以案例數與耗時推定請求量，未逐檔實測請求數。
+- **操作面**: ①`mocha --dry-run` 也走 e2e 鎖(只為數案例排了 5 分半，下次改用靜態數 `it`／`CASES`)；②同套件的測試鎖一律依序，探針排在長 e2e 之後會等到 e2e 結束(本輪一次等 14 分才跑到，且第一版探針因埠號隨機而假紅，再排一次)——短探針應在長鏈開跑前或兩輪之間插入；③背景指令與 `quiet-run --timeout` 都把排鎖等待算進去，長鏈一律 detached(`nohup bash tmp/pp347/chain.sh > … &`)分段輪詢；④守門 hook 會擋 `node -e` 內含 `fs.writeFileSync`，彙整腳本一律寫成 `.mjs` 檔(`twSummary.mjs` 加 `--win` 取窗)。
+- **探針需正規化隨機埠**: 比對「修前修後後端收到之請求」時，`host`／`origin`／`x-forwarded-host`／`x-forwarded-port` 帶作業系統配發之隨機埠，須先換成記號再 `deepEqual`，否則恆假紅。
+
 ## e2e 單開自動換埠導入(2026-11-05 wp309〔任務 20261105000800, 排程第 309 項〕; R-E2E-PORT-01; 報告 `C:\opensrcOper\dnow\20261105000800\agent-out\wp309-修正報告.md`; 證據 `…\wp309-evidence\`; 本套件為第一個導入者, 給他套件之範本)
 - **「全綠」不能證明沒殺到別人**: 修前以真實占用者(自建 http 監聽占 11006)跑 `e2e-init`, 20 passing／離開碼 0, 但占用者 PID 已被 `restartBackend` 之 `killForeignOnRestart`(依埠殺任何監聽者)殺死; 逐檔 runner 之 `killPortListeners(11006)` 在第一檔開跑前就殺了它; 占 8090 則是前端「沿用」占用者, `e2e-layout` 失敗且占用者被打到 2 次. 驗收一律看「占用者 PID 存活、仍回應、被測碼打到 0 次」(`tmp/wp309/scenario.mjs` 之形狀: 自建占用者 → 跑被測指令 → 占用者狀態 → 收尾回驗埠釋放), 不看測試綠不綠.
 - **修前紅要在動手改碼之前跑**: 現況碼本身就是「修前」, 先跑三組(占後端埠、占前端埠、runner)存證, 再改; 之後不必另建舊碼副本.

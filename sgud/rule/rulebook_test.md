@@ -339,3 +339,34 @@
 - **驗證指令**: `node C:/opensrcOper/tools/quiet-run.mjs --lock --name probe-openapp -- node test/tools/probeOpenAppRace.mjs`(自起後端與前端、約 2 分; 非測試案例, 不在 `npm test`)。三段: ①`real`(`e2e-setup.openApp`)於 stall 0／3000／6000 ms 各 2 次須全綠; ②`legacy`(舊版逐字副本; 負對照)stall 0 須綠、≥3000 須 `Execution context was destroyed`——**探針自檢**, 若 legacy 不再轉紅代表前提已變, 須重新查證, 不得當作通過; ③`fresh`: 新 context 同源儲存為空(含對照組)。離開碼 0＝三段皆符合。
 - **變異測試**(2026-11-04, 阻塞 0／2300／3000 ms 各 3 次, 對修正處逐段加回舊寫法): 舊版全貌(預先造訪＋evaluate)阻塞 ≥2300 為 6／6 紅(`Execution context was destroyed`); 只加回預先造訪(不含 evaluate)6／6 紅(`goto … interrupted by another navigation`); 只加回 evaluate(不含預先造訪; 在空白頁執行, 無事可做)9／9 綠。證據: 任務資料夾 `agent-out/wp70-evidence/e5-mutant-*.json`。**對真正修正處之變異**: 暫時在 `e2e-setup.mjs:openApp` 加回舊的兩行(`goto(baseUrl)`＋`evaluate`), 隨附探針 `probeOpenAppRace.mjs` 之 `real` 於 stall 3000／6000 共 4／4 紅(`Execution context was destroyed`)、`RESULT FAIL (4)`、離開碼 1; 還原後檔案雜湊與變異前逐位元相同(`sha256 e054bff2…c90e`)、探針 `RESULT PASS`。
 - **同形盤點(姊妹套件, 唯讀)**: w-web-task `openApp` 已於他處以同一成因修正(`fresh context 無殘留 token, 直接帶 ?token=sys`; 另保留 `waitForFunction` 遇 `Execution context was destroyed` 重試一次之防禦寫法); w-web-sso 有 26 處同形(`goto(baseUrl)`＋`localStorage.clear()`, 15 檔), 但其無 token 頁為登入表單, `src` 內僅 `mUI.mjs:368 goUrl` 一處寫 `location.href`(登入成功後), 無計時導覽, 非同一觸發; w-web-api 無同形(`goto` 皆帶 `?token=sys`)。見報告〈同形盤點〉。
+
+## dev server proxy 重用連線(2026-11-07 pp347〔任務 20261107181536〕, 排程第 347 項; 姊妹套件 w-web-sso 於排程第 324 項先查得同型現象〔其 R-E2E-PROXY-01／ADR-105〕, 本套件為下游導入)
+
+### R-E2E-PROXY-01 dev server 之 `/api` proxy 以 keep-alive agent 重用至後端之連線; 不再每個請求於兩段各留一個 TIME_WAIT
+
+起因: 姊妹套件 w-web-sso 查得 dev server 之 `/api` proxy 未給 agent 時, 每個請求於「瀏覽器→dev server」「dev server→後端」兩段各新開一條連線、各留一個 TIME_WAIT(分拆 e2e 時全機峰值 1.8 萬, 同機他測試可能偶發 `connect EADDRINUSE`). 本套件 `vue.config.js` 為同型寫法(修前 `/api` 無 `agent`). 現況與數字見 `sgud/state/state.md`〈第 347 項〉.
+
+- **規則**
+  1. **`/api` proxy 以模組層單一 keep-alive agent 重用至後端之連線**: `vue.config.js` 頂部 `const proxyAgent = new http.Agent({ keepAlive: true })`, `devServer.proxy['/api']` 加 `agent: proxyAgent`; `target`(`11006 ＋ E2E_PORT_OFFSET`, R-E2E-SHARD-01 規則 4)、`pathRewrite` 與其他設定照舊. 理由(實測於已安裝版本 http-proxy 1.18.1、http-proxy-middleware 2.0.10、@vue/cli-service 5.0.9、webpack-dev-server 4.15.2): http-proxy 未給 agent 時 `outgoing.agent = options.agent || false`(`node_modules/http-proxy/lib/http-proxy/common.js:62`)並強制送 `Connection: close`(:69-73), 後端回應之 `connection: close` 又被原樣轉回瀏覽器(`passes/web-outgoing.js:42` `setConnection`), 使每個 `/api` 請求兩段各新開一條連線, 皆由伺服端先關而留 TIME_WAIT. vue-cli 之 `prepareProxy` 以 `Object.assign({}, defaultConfig, config, entry)` 合併(`@vue/cli-service/lib/util/prepareProxy.js:133`), 故 `agent` 原樣傳到 http-proxy.
+  2. **加 agent 不改請求與回應之內容**: `prepareProxy.js:96` 之 Origin 改寫條件 `!proxyReq.agent` 在 Node 下本就恆不成立(`agent:false` 時 Node 另建 Agent 指給 `proxyReq.agent`), 故 Origin 照舊原樣轉給後端. 修前(HEAD 原檔副本)與修後以同一建構路徑逐一比對: 後端收到之方法、路徑、查詢字串(含百分比編碼中文)、內文(含 POST JSON)、除 `connection` 外之全部標頭(含 `Origin`、`Authorization`、`X-Forwarded-*`), 與瀏覽器端收到之狀態碼(200／500／未代理之 404)、標頭(除 `connection`／`keep-alive`／`date`)、內文, 皆逐一相同(探針 `tmp/pp347/probeHeaders.mjs`, 輸出隨報告證據保存).
+  3. **日後 `devServer.proxy` 加其他路徑時同帶 `agent: proxyAgent`**; 只影響開發與 e2e(`vue-cli-service serve` 之 dev server), 正式使用不經此 proxy.
+  4. **判讀 TIME_WAIT 方向**: 伺服端先關之 TIME_WAIT 其**本機埠**為服務埠(遠端為臨時埠); 只看「遠端埠」會漏掉主體. 判讀時本機埠／遠端埠兩欄都看(姊妹套件原始紀錄: 遠端欄 8280×1,772、本機欄 8280×6,552). 量測法見 `sgud/exp/experience.md`〈TIME_WAIT 量測〉.
+  5. **已知限制**: ①每案例 fresh browser, 瀏覽器關閉時之少量連線屬正常; ②agent 之閒置連線依後端 `Keep-Alive: timeout=5` 提示於約 4 秒後由用戶端關閉, 案例間隔較長時仍會新開; ③後端被 `restartBackend` 終止時, 池中連線隨對端關閉而移除, 理論上存在「剛好送在將被關閉之連線上」之毫秒級窗口(本輪修後 e2e 實測 `e2e-array-form` 83 案全綠、全套亦綠, 見 state); ④本輪只量測 `e2e-array-form` 一支(輕量版), 分拆多開下之全機總量未測.
+- **站點全集與判準**(2026-11-07 實測):
+
+  | 站點 | 形態 | 判定 |
+  |---|---|---|
+  | `vue.config.js` `devServer.proxy['/api']` | 修前無 `agent` | **已套**(本規則) |
+  | repo 內其他 proxy／`http-proxy` 使用(`node_modules`、`tmp/`、文件除外) | 無 | 不適用; 僅 `test/unit-devProxyKeepAlive.test.mjs` 為守護測試 |
+
+- **測試**: `test/unit-devProxyKeepAlive.test.mjs`(PX-001～PX-003 共 3 案; 走與 dev server 相同之建構路徑 `prepareProxy` → `createProxyMiddleware`, 後端與 proxy 皆 `listen(0)`, 不受 e2e 埠保留與位移影響): PX-001 N=20 個請求後端只建立 1 條連線; PX-002 回應不帶 `Connection: close` 且 keep-alive 用戶端 N 個請求只用 1 條連線; PX-003 路徑／方法／狀態碼／內文不變. **修前(HEAD 原檔)PX-001 紅(20 ≠ 1)、PX-002 紅(20／20 回應帶 `Connection: close`)、PX-003 綠; 修後 3／3 綠.**
+- **量測(輕量版, 單開 `e2e-array-form`, 83 案; 每 5 秒 `netstat -ano` 抽樣, 以本輪新出現之 TIME_WAIT 四元組計新增量)**: 修前(以 HEAD 原檔副本經環境變數 `VUE_CLI_SERVICE_CONFIG_PATH` 指定)與修後(現行 `vue.config.js`)各跑一次, 皆 83 passing／0 failing(mocha 窗 16.3／15.9 分). 同機另有他套件 e2e 同時在跑(本機埠 8091／11108 等), 全機數字含背景, 歸因看**本實例埠 8090／11006**(兩欄都看): ①同一時刻兩側合計峰值 **522 → 118**; ②伺服端先關側(本機埠為服務埠)峰值 446 → 64, 期間新增 3,029(8090: 1,833, 11006: 1,196) → 421(8090: 129, 11006: 292); ③用戶端先關側(遠端埠為服務埠)峰值 80 → 73, 期間新增 608 → 893(8090: 55 → 497, 11006: 553 → 396); ④兩側合計新增 3,637 → 1,314; ⑤全機峰值(mocha 窗內, 含他套件背景)634 → 264. 用戶端側新增不降反升之**推定**成因(未逐連線證實): 連線改為重用後, 每案 fresh browser 關閉時由瀏覽器關閉其 keep-alive 連線(8090 之 497 ≈ 83 案 × 約 6 條)、agent 閒置連線逾時由 dev server 關閉(限制②), 其數量隨連線數而非請求數增減——改善主體在伺服端先關側(−86%)與同時存在峰值(−77%). 原始樣本與彙整見 `C:\opensrcOper\dnow\20261107181536\agent-out\pp347-evidence\`; 本套件 `e2e-array-form` 每案請求量遠小於姊妹套件之 12,001 次壓力案例, 絕對值亦較小
+- **盤點指令**(可重跑):
+  ```
+  # 1) proxy 設定站點: 期望 vue.config.js 僅 '/api' 一處 proxy 且帶 agent: proxyAgent
+  rg -n "proxy|agent" vue.config.js
+  # 2) 其他 proxy 使用(不含 node_modules 與文件): 期望只剩 test/unit-devProxyKeepAlive.test.mjs
+  rg -n "http-proxy|createProxyMiddleware|proxyTable" --glob "!node_modules/**" --glob "!tmp/**" --glob "!sgud/**" --glob "!spec/**" --glob "!package-lock.json"
+  # 3) 守護測試(修前 PX-001／002 紅, 修後綠)
+  node C:/opensrcOper/tools/quiet-run.mjs --lock --name devProxy -- npx mocha test/unit-devProxyKeepAlive.test.mjs --timeout 60000
+  ```

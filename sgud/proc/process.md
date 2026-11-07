@@ -16,6 +16,12 @@
 - **判斷**: `npm test` 是跨套件批次維護、確認套件能完整測試之統一入口, **字串固定不得改、不加 scripts 變體**; agent 自身要驗證什麼一律自編指令. e2e 檔可在同一 mocha 進程全跑(2026-10-20 起, 規則帳本 R-E2E-ISO-01／ADR-030): 每個用 `resetDb` 的 e2e 檔於每個語系 describe 的 `after` 以 `restoreDbOnce` 還原自己改過的表, `captureBaseSeedOnce` 以主鍵集合守門, 前檔遺留於檔案起點即以可讀訊息失敗. 此前「絕不塞進同一 mocha 進程」(experience「多檔合跑之後端狀態污染」, 原誤標 ADR-017: 前檔改過狀態的後端使列序與 solo 產的 baseline 相反)與第 89 項的 `e2e-users` 24 案失敗, 根因都是「前檔遺留狀態」而非行程共用本身. **新增會改動共用表的 e2e 檔必須對稱收尾**: 用 `resetDb` 者照上述(`unit-e2e-lifecycle` LC-002 守護); 其餘(如 `e2e-array-form`)自行 `before` 擷取、`after` 寫回——`<table>.select` 依主鍵排序而 `updateXxx` 以陣列位置重給 `order`, 寫回前須先依 `order` 排序, 且 `select` 失敗不得當成空表.
 - **處理**: e2e 前端用獨立的 8090(`e2e-setup.mjs` 以 `--port` 顯式指定, 避開常駐 8080 之其他專案 dev server; 8080 只給手動開發), 可先手動起供各檔 reuse(2026-11-05 起須設 `E2E_PORT_OFFSET=0` 才會沿用; 未設時基準埠被占用即整組自動位移, 見 R-E2E-PORT-01); 起跑前 `netstat` 看 11006 / 8090 是誰的, 非自己起的不殺(2026-11-05 起 harness 不再依埠殺任何人: `restartBackend` 與 `run-e2e-isolated` 只殺身分已確認屬本實例者, `CLAUDE.md` 之明文例外已不使用); 全跑走 `npm test`(單一行程)、`node test/tools/run-e2e-isolated.mjs`(逐檔隔離)或單檔; 超過 2 分鐘 `run_in_background`; 同一時間只有一條鏈(重產與 mocha 共用後端與前端). 收尾判準不只綠: port 釋放、`test/_tmp/` 無殘留、`./testPending/` 本輪無新增或已分析、無殘留 chrome.
 
+## TIME_WAIT 偏高(主控監看 `[ports] HIGH`、同機他測試 `connect EADDRINUSE`; 2026-11-07 pp347, R-E2E-PROXY-01)
+
+- **關聯**: `vue.config.js` 之 `devServer.proxy['/api']`(模組層 `proxyAgent`, keep-alive); 規則 R-E2E-PROXY-01(`sgud/rule/rulebook_test.md` 〈dev server proxy 重用連線〉); 守護 `test/unit-devProxyKeepAlive.test.mjs`; 量測法 `sgud/exp/experience.md`〈dev server proxy 重用連線與 TIME_WAIT 輕量量測〉.
+- **判斷**: 修後本套件單開 `e2e-array-form` 之本實例埠 TIME_WAIT 同一時刻兩側合計峰值約 118(修前 522). 再見偏高者先回原始紀錄看**本機埠與遠端埠兩欄**(伺服端先關者本機埠為服務埠, 用戶端先關者遠端埠為服務埠), 再以**本實例埠**(8090／11006 或自動換埠後之位移埠)歸因, 不以全機數字歸因(同機他套件 e2e 亦產生 TIME_WAIT).
+- **處理**: ①確認 `vue.config.js` 之 proxy 仍帶 `agent: proxyAgent`(`rg -n "agent" vue.config.js`)且 `unit-devProxyKeepAlive` 綠; ②仍偏高時以每 5 秒 `netstat -ano`、以新增四元組計之抽樣量測(作法見經驗節); ③不為降 TIME_WAIT 改測試語意(如減少請求次數)、不殺他人行程.
+
 ## 換設定之測試
 
 - **關聯**: `genTempSettings(overrides)` → `test/_tmp/settings-e2e-<pid>-<seq>.json`; `restartBackend(path)`; e2e case 物件之 `settings:{...}`(如 `e2e-users` E2E-012 `modeEditUsers` 三態); `staEventMock`(統計頁確定性資料).

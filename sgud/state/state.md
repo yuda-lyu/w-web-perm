@@ -2,6 +2,18 @@
 
 本檔記本套件**當前已開發功能之最新狀態**;與規則帳本(`sgud/rule/rulebook.md`,藍圖)比對即知尚未做到者,接續工作先讀此檔.2026-10-22 主控遷移為 sgud 配置時建立,先移入原帳本之「已知缺口 / 待辦」;**各功能之完成狀態整理為下一次派工之待辦**(主責 agent 依規則帳本各節之「狀態」行與近期報告彙整至本檔).
 
+## 近期進度(2026-11-07 pp347〔任務 20261107181536, 排程第 347 項〕:dev server `/api` proxy 以 keep-alive agent 重用至後端之連線(R-E2E-PROXY-01, ADR-049); 修正輪＝單輪,未發布,待主控複審)
+
+> 報告 `C:\opensrcOper\dnow\20261107181536\agent-out\pp347-修正報告.md`(證據 `…\pp347-evidence\`); 帳本 R-E2E-PROXY-01(`rulebook_test.md` 〈dev server proxy 重用連線〉); 守護 `test/unit-devProxyKeepAlive.test.mjs`(PX-001～PX-003, 3 案); 姊妹套件 w-web-sso 排程第 324 項先查得同型現象.
+
+- **現況(完成)**: `vue.config.js`(+7 行: 頂部 `require('http')` 與模組層 `new http.Agent({ keepAlive: true })`, `/api` proxy 加 `agent: proxyAgent`; `target`〔11006＋`E2E_PORT_OFFSET`〕、`pathRewrite` 與其他設定不動); 新增 `test/unit-devProxyKeepAlive.test.mjs`. 未動 `src/`、`server/`、`test/tools/`、e2e 檔、標準圖(0 張)、`package.json`、他套件. 未發布、未 commit.
+- **源頭**: http-proxy 1.18.1 未給 agent 時 `agent:false` ＋ 強制 `Connection: close`(`common.js:62-73`), 後端回應之 close 又轉回瀏覽器(`web-outgoing.js:42`) → 每個 `/api` 請求兩段各新開一條連線、伺服端先關(TIME_WAIT 之**本機埠**為服務埠). 本套件修前與姊妹套件同型.
+- **修前紅／修後綠**: `unit-devProxyKeepAlive` 以 HEAD 原檔跑: PX-001 紅(後端連線數 20 ≠ 1)、PX-002 紅(20／20 回應帶 `Connection: close`)、PX-003 綠(1 passing 2 failing); 修後 3／3 綠; 同一指令加跑 `unit-e2ePortShift`(PS-003 讀 proxy 目標) 共 18 passing.
+- **等價探針**: 同建構路徑修前修後比對, 後端收到之 3 個請求(GET 含百分比編碼中文查詢、POST JSON、錯誤路徑; 含 `Origin`、`Authorization`、`X-Forwarded-*`)與瀏覽器端收到之 4 個回應(狀態／標頭／內文, 含 500 與未代理之 404)逐一相同, 差異只在 `Connection`: 修前 `close,close,close,keep-alive`、修後皆 `keep-alive`(第 4 個為未代理之 404, 本機服務自答).
+- **輕量量測(單開 `e2e-array-form`, 83 案; 修前以 `VUE_CLI_SERVICE_CONFIG_PATH` 指向 HEAD 原檔副本; 每 5 秒 `netstat -ano`)**: 兩次皆 83 passing／0 failing; 本實例埠 8090／11006 之 TIME_WAIT 同一時刻兩側合計峰值 **522 → 118**; 伺服端先關側峰值 446 → 64、期間新增 3,029 → 421; 用戶端先關側期間新增 608 → 893(推定為每案瀏覽器關閉其 keep-alive 連線與 agent 閒置逾時); 兩側合計新增 3,637 → 1,314; 全機峰值(mocha 窗內, 含他套件背景)634 → 264. 細節見帳本.
+- **全套(`node C:/opensrcOper/tools/full-suite.mjs <套件根>`, 2026-11-07 21:39 起, 牆鐘 47 分)**: **GREEN**——`rest` 段 5004 passing／0 failing／2 pending(RA-036e 既有略過＋PR-001〔全套 rest 段內 api 後端占著 11006, 無法造「空閒」情境而 skip〕, 與 wp309 同; 含新增 `unit-devProxyKeepAlive` 3 案)15.3 分; `e2e` 段 5 組 413 passing／0 failing／0 pending(組 0 位移 0: 119 案 31.7 分、組 1: 90 案 27.4 分、組 2: 90 案 30.5 分、組 3: 62 案 29.7 分、組 4: 52 案 28.3 分, 共 32 分); 合計 5417 passing; `test/pics` 0 變動、`testPending` 無新增. 全套後僅對 `vue.config.js` 註解字句(不含程式)做一處改動, 並重跑 `unit-devProxyKeepAlive`＋`unit-e2ePortShift` 確認(見報告).
+- **未做／已知限制**: ①只量測 `e2e-array-form` 一支(輕量版), 挑檔依據為案例數與耗時之推定(候選 4 檔 dry-run 共 245 案: array-form 83 案 17.06 分、concurrent-edit 76 案 16.87 分), 未逐檔實測請求數; ②未做分拆多開量測與負載試驗; ③用戶端先關側 TIME_WAIT 之成因為推定(8090 之 497 ≈ 83 案 × 約 6 條), 未逐連線證實; ④agent 閒置連線約 4 秒逾時, 案例間隔較長時仍會新開; ⑤姊妹套件 w-web-api、w-web-task 之 `vue.config.js` 同輪(排程第 347 項)已由各自主責帶 `agent: proxyAgent`(本輪唯讀所見, 未改); w-web-api 註明其 e2e 打 build 後之後端、不經此 proxy, 本套件 e2e 經 dev server proxy(`e2e-setup.mjs` Mode 2, 修前量測的本實例埠 8090／11006 伺服端先關 TIME_WAIT 即證).
+
 ## 近期進度(2026-11-05 wp309〔任務 20261105000800, 排程第 309 項〕:e2e 單開自動換埠(`reserveE2ePorts`)正式導入、依埠下殺全換為只動本實例; 本套件為第一個導入者; 修正輪＝單輪,未發布,待主控複審)
 
 > 報告 `C:\opensrcOper\dnow\20261105000800\agent-out\wp309-修正報告.md`(證據 `…\wp309-evidence\`); 帳本 R-E2E-PORT-01(`rulebook_test.md` 〈e2e 單開自動換埠與只動本實例之下殺〉); 守護 `test/unit-e2ePortReserve.test.mjs`(PR-001～PR-012, 13 案); 規格 `C:/opensrcOper/dspec/e2e埠與多套件同跑.md` E1～E8; 套件 `w-package-tools-e2e` 1.0.22 README §2.12.
