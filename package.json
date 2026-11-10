@@ -1,18 +1,18 @@
 {
   "name": "w-web-perm",
-  "version": "1.1.37",
+  "version": "1.1.38",
   "main": "dist/w-web-perm.umd.js",
   "dependencies": {
     "json5": "^2.2.3",
-    "w-aggrid-vue": "^2.1.24",
-    "w-component-vue": "^2.5.45",
-    "w-data-collector": "^1.0.58",
-    "w-echarts-vue": "^1.0.28",
-    "w-serv-hapi": "^1.1.22",
-    "w-serv-orm": "^1.1.33",
-    "w-syslog": "^1.0.46",
-    "w-ui-loginout": "^1.0.44",
-    "wsemi": "^1.9.54"
+    "w-aggrid-vue": "^2.1.25",
+    "w-component-vue": "^2.5.46",
+    "w-data-collector": "^1.0.59",
+    "w-echarts-vue": "^1.0.29",
+    "w-serv-hapi": "^1.1.23",
+    "w-serv-orm": "^1.1.34",
+    "w-syslog": "^1.0.47",
+    "w-ui-loginout": "^1.0.45",
+    "wsemi": "^1.9.55"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^5.0.8",
@@ -27,9 +27,9 @@
     "eslint-plugin-vue": "^9.10.0",
     "vue": "^2.7.16",
     "vuex": "^3.6.2",
-    "w-orm-lmdb": "^1.0.58",
-    "w-package-tools": "^1.1.24",
-    "w-package-tools-e2e": "^1.0.27",
+    "w-orm-lmdb": "^1.0.59",
+    "w-package-tools": "^1.1.25",
+    "w-package-tools-e2e": "^1.0.28",
     "w-screenctl": "^1.0.39"
   },
   "scripts": {
