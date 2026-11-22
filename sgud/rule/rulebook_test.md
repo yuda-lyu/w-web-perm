@@ -340,6 +340,20 @@
 - **變異測試**(2026-11-04, 阻塞 0／2300／3000 ms 各 3 次, 對修正處逐段加回舊寫法): 舊版全貌(預先造訪＋evaluate)阻塞 ≥2300 為 6／6 紅(`Execution context was destroyed`); 只加回預先造訪(不含 evaluate)6／6 紅(`goto … interrupted by another navigation`); 只加回 evaluate(不含預先造訪; 在空白頁執行, 無事可做)9／9 綠。證據: 任務資料夾 `agent-out/wp70-evidence/e5-mutant-*.json`。**對真正修正處之變異**: 暫時在 `e2e-setup.mjs:openApp` 加回舊的兩行(`goto(baseUrl)`＋`evaluate`), 隨附探針 `probeOpenAppRace.mjs` 之 `real` 於 stall 3000／6000 共 4／4 紅(`Execution context was destroyed`)、`RESULT FAIL (4)`、離開碼 1; 還原後檔案雜湊與變異前逐位元相同(`sha256 e054bff2…c90e`)、探針 `RESULT PASS`。
 - **同形盤點(姊妹套件, 唯讀)**: w-web-task `openApp` 已於他處以同一成因修正(`fresh context 無殘留 token, 直接帶 ?token=sys`; 另保留 `waitForFunction` 遇 `Execution context was destroyed` 重試一次之防禦寫法); w-web-sso 有 26 處同形(`goto(baseUrl)`＋`localStorage.clear()`, 15 檔), 但其無 token 頁為登入表單, `src` 內僅 `mUI.mjs:368 goUrl` 一處寫 `location.href`(登入成功後), 無計時導覽, 非同一觸發; w-web-api 無同形(`goto` 皆帶 `?token=sys`)。見報告〈同形盤點〉。
 
+## e2e 基礎設施核對: 固定埠、起行程不彈視窗、重啟只殺本實例(2026-11-23 twp1, 排程第 275 項; 規格 `C:/opensrcOper/dspec/e2e埠與多套件同跑.md` E1～E5; 全域 §8.3)
+
+派工原文之三點逐一讀碼核實, 結果: **三點皆已由先前各輪完成(wp302、wp309), 本輪不重做; 只補一處隱性缺口(`windowsHide` 之展開次序)**.
+
+| 派工所述 | 現況(讀碼, `test/tools/e2e-setup.mjs`) | 完成於 | 守護測試 |
+|---|---|---|---|
+| 固定埠 | 基準埠 11006／8090 單一定義於 `test/tools/e2ePorts.mjs`, 載入時一次 `reserveE2ePorts([11006, 8090], { avoid: [8549, 8561～8565] })`; `apiBaseUrl`／`baseUrl`／臨時設定之 `serverPort`／前端啟動埠皆經 `resolveE2ePort`; 被占用即整組位移, 不殺占用者 | wp302(位移)、wp309(自動換埠) | `unit-e2ePortReserve`(PR-001～PR-012)、`unit-e2ePortShift`(PS-001～PS-006、PS-008～PS-009) |
+| `spawn` 未設 `windowsHide`(含 `child_process` 全家之每一處) | `test/` 與 `test/tools/` 共 18 檔 45 個 `child_process` 呼叫全帶 `windowsHide: true`(2026-11-23 以 PS-007 之演算法重算; wp302 時為 16 檔 38 處, 其後新增測試與本輪新增之 `unit-staLogs-timeLength` 1 處; 本輪獨立複審另以全 repo 掃描 267 檔得同數, 無 `require`、動態 import 或別名之漏網;`server/`、`src/`、`toolg/`、根目錄 `g_*.mjs`、`srv.mjs` 無 `child_process` 使用; `rg -l "child_process" --glob '*.mjs'` 排除 `node_modules`、`dist`、`docs`、`spec/evidence` 後只有 `test/`); 後端與 dev server 皆經 `spawnSrv`(唯一起行程出口) | wp302 | `unit-e2ePortShift` PS-007 |
+| 重啟時殺該埠之任何監聽者 | 已無依埠下殺: `restartBackend` 經套件服務管理器, 只殺自 spawn 之行程樹(PID)與 `reservation.killOwnListeners`(身分已確認屬本實例: PID 與起始時間相符或沿存活父子鏈走到); `killOwnSrvProcesses`(reseed／seedExtra 前殺本 repo 之殘留後端)比對本 repo `srv.mjs` 之**絕對路徑**命令列並要求「未監聽或監聽本實例後端埠」, 同路徑而監聽他埠者不殺, 查不到監聽表不殺, 一律以 `taskkill /F /T /PID <pid>` 逐 PID; `run-e2e-isolated.mjs` 每檔前只殺本實例後端埠之已確認監聽者, 遇他人占用拋錯中止; `rg -n "killPortListeners" test` 只剩註解與 PR-008 之守護斷言 | wp309 | `unit-e2ePortReserve` PR-007～PR-009、PR-008 |
+| (本輪補) `spawnSrv` 之 `{ …, windowsHide: true, ...opts }` 展開次序使呼叫端傳入之 `windowsHide: false` 可覆寫 | 改為 `{ …, ...opts, windowsHide: true }`(呼叫端現無人傳 `windowsHide`, 行為不變; 為使「每一處不彈視窗」不因日後呼叫端選項而失效) | twp1 | `unit-e2ePortShift` PS-007b(修前紅: 展開次序; 變異: 還原次序即紅) |
+
+- 盤點指令(可重跑): `rg -n "windowsHide" test --glob "*.mjs"`(每個 `child_process` 呼叫一處; PS-007 以括號配對逐呼叫檢查, 不靠此行數)、`rg -n "spawnSrv\(" test/tools/e2e-setup.mjs`(1 定義＋3 呼叫端)、`rg -n "taskkill" test --glob "*.mjs"`(皆為 `/F /T /PID <pid>` 形式, 無 `/IM` 或依名稱／依埠者).
+- 限制: 本輪未於「基準埠被占用」情境對 14 個 e2e 檔逐檔實跑(wp309 已以代表 2 檔＋全套多開實證; 本輪未改任何埠邏輯, 全套 e2e 以多開位移實例實跑通過見 `sgud/state/state.md`).
+
 ## dev server proxy 重用連線(2026-11-07 pp347〔任務 20261107181536〕, 排程第 347 項; 姊妹套件 w-web-sso 於排程第 324 項先查得同型現象〔其 R-E2E-PROXY-01／ADR-105〕, 本套件為下游導入)
 
 ### R-E2E-PROXY-01 dev server 之 `/api` proxy 以 keep-alive agent 重用至後端之連線; 不再每個請求於兩段各留一個 TIME_WAIT

@@ -18,6 +18,7 @@
         "e2e-rela-grup-pemi.test.mjs": 9.31,
         "e2e-users.test.mjs": 10.42,
         "e2e-init.test.mjs": 3.04,
-        "e2e-rela-pemi-rule.test.mjs": 5.41
+        "e2e-rela-pemi-rule.test.mjs": 5.41,
+        "e2e-consoleNoValues.test.mjs": 0.2
     }
 }

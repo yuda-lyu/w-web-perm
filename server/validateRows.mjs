@@ -17,14 +17,18 @@ let isScalar = (x) => x === null || x === undefined || typeof x === 'string' || 
  *
  * 寫入路徑皆「先破壞後寫入」(整表儲存為 del → insert → save, 外部同步為 delAll → insert), 而 ORM(w-serv-orm 1.1.8 起)對下列輸入整批拒絕,
  * 於第一個破壞步驟之後才被拒會造成部分寫入或資料遺失, 故須於任何寫入之前判定:
- * 1. 主鍵 id 有給時須為非空字串或有限數字(NaN、±Infinity 視為未給, 同 w-serv-orm 1.1.11 之補值), 字串之 UTF-8 位元組數不得超過 1978(LMDB 鍵長上限),
+ * 1. 主鍵 id 有給時須為非空字串或有限數字, 字串之 UTF-8 位元組數不得超過 1978(LMDB 鍵長上限),
  *    且批內不得重複(以 String(id) 比對: w-serv-orm 1.1.11 起數字主鍵存為其字串形式, 數字與其字串形式為同一主鍵).
+ *    undefined、null、''(未給)由 ORM 補主鍵, 不檢查. NaN、±Infinity 本函數亦判為未給(判定不改, 見下)——
+ *    但 w-serv-orm 自第 568 項(2026-11-20 起; 已安裝 1.1.52 實測, unit-validateRows VR-009b)對「給了而無效」之主鍵(含 NaN、±Infinity、布林、物件等)
+ *    於任何寫入之前整批 reject(`failed to insert data, invalid id: data[k]`, 零寫入), 不再補值(原 1.1.11 之補值已不成立).
+ *    此路徑經 JSON 之資料通道與外部同步不可達(NaN、±Infinity 於 JSON 序列化後為 null, 即「未給」; VR-009c), 只影響程式內直呼者, 故判定不改(2026-11-23 排程第 570 項更正本註解與測試).
  * 2. 任一字串欄位之值會被 wsemi 之 clearXSS 改寫者(含 HTML 標記, 如「<」後接英文字母)即拒絕——與 w-serv-orm 寫入前之 adjustData 同一函數,
  *    主鍵被改寫時 ORM 拒絕整批, 其他欄位則會被靜默改寫(存值與送入值不同), 兩者皆於此擋下, 使送入值即儲存值.
  * 3. 任一欄位之值須為純量(字串、數字、布林、null、undefined)——物件、陣列、函數、symbol、bigint 一律拒絕(規則帳本 R-FIELD-SCALAR-01):
  *    四表 schema 欄位型別只有 STRING／INTEGER／TEXT(cgrups／cpemis／crules 為 TEXT 存 JSON 字串), 無合法物件型欄位; 修正前預檢只看 isestr(vv),
  *    巢狀字串(如 { description: { value: '<標記>' } })避過預檢而於寫入時被 w-serv-orm 靜默改寫(非拒絕), 「送入值即儲存值」不成立.
- * 本函數為純函數: 不修改輸入、不呼叫 ORM; 主鍵是否必填由呼叫端以 opt.idRequired 指定(未給主鍵之列由 ORM 自動補主鍵者可不要求).
+ * 本函數為純函數: 不修改輸入、不呼叫 ORM; 主鍵是否必填由呼叫端以 opt.idRequired 指定(未給主鍵之列由 ORM 自動補主鍵者可不要求; NaN、±Infinity 於 idRequired 時為 idInvalid).
  * 列物件之欄位一律依自有可列舉字串鍵逐一檢查(規則帳本 R-OBJ-ITER-01): 名為 length 之欄位與其他欄位同為一般欄位, 即使其值為非負整數(0、1、2**32-1)亦然——
  * lodash each 對這類物件會改走索引 0..length-1 而略過全部字串欄位, 且迭代次數即 length 之值; rows 與 rowsIdOnly 須為真陣列(Array.isArray),
  * 以 Symbol.toStringTag 偽稱 Array 之物件不是陣列(rows → rowsInvalid、rowsIdOnly → 視為未給), 不依其 length 迭代.
@@ -55,7 +59,8 @@ function validateRowsBeforeWrite(rows, opt = {}) {
     let kpId = Object.create(null)
     let checkId = (v, k) => {
         let id = get(v, 'id')
-        //有給: 非空字串或有限數字; undefined、null、''、NaN、±Infinity 視為未給(w-serv-orm 1.1.11 對之補值, 2026-10-14 run05); 其他型別(布林、物件)為無效
+        //有給: 非空字串或有限數字; undefined、null、'' 為未給(ORM 補主鍵); NaN、±Infinity 本函數亦視為未給(2026-10-14 run05)——
+        //  w-serv-orm 第 568 項(2026-11-20 起)後上游對之整批 reject 而非補值, 但 JSON 通道不可達(序列化為 null), 判定不改(排程第 570 項更正註解); 其他型別(布林、物件)為無效
         let isNumId = typeof id === 'number'
         let hasId = !(id === undefined || id === null || id === '' || (isNumId && !Number.isFinite(id)))
         if (!hasId) {

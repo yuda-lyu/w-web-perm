@@ -191,6 +191,7 @@ import genPm from 'wsemi/src/genPm.mjs'
 import delay from 'wsemi/src/delay.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import getOwn from '../js/getOwn.mjs'
+import { describeShape, describeErr } from '../js/describeShape.mjs'
 import cvKpToObj from '../js/cvKpToObj.mjs'
 import getKpLossy from '../js/getKpLossy.mjs'
 import fmtLossyMsg from '../js/fmtLossyMsg.mjs'
@@ -813,7 +814,7 @@ export default {
 
                 })
                 .catch((err) => {
-                    console.log('doSave', err)
+                    console.log('doSave', describeErr(err))
                     vo.$alert(vo.$t('anUnexpectedErrorOccurred'), { type: 'error' }) //§5.1: 非預期例外須告知, 不靜默吞 (失敗時 .then 不執行→視窗不關)
                 })
                 .finally(() => {
@@ -878,8 +879,8 @@ export default {
                     rawModeMap = getRawModeMap(kpRaw)
                 }
                 catch (err) {
-                    console.log('cpemis', cpemis)
-                    console.log('err', err)
+                    console.log('cpemis', describeShape(cpemis))
+                    console.log('err', describeErr(err))
                 }
             }
             // console.log('kpPemi', kpPemi)

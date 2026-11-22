@@ -1,0 +1,35 @@
+[quiet-run] Mon Nov 23 2026 03:02:05 GMT+0800 (台北標準時間)
+[quiet-run] cwd: <repo root>
+[quiet-run] cmd: node ./tmp/twp1/measure570.mjs
+
+{"wServOrmVersion":"1.1.52"}
+targets.insert invalid id { n: 1, ks: [ 1 ] }
+{"id":"NaN","fn":"insert","rejected":true,"msg":"failed to insert data, invalid id: data[1]","tableSize":0,"insertCalls":0,"saveCalls":0}
+targets.save invalid id { n: 1, ks: [ 1 ] }
+{"id":"NaN","fn":"save","rejected":true,"msg":"failed to save data, invalid id: data[1]","tableSize":0,"insertCalls":0,"saveCalls":0}
+{"id":"NaN","validateRowsBeforeWrite":null,"idRequired":{"reason":"idInvalid","k":0,"field":"id"}}
+{"id":"NaN","afterJsonRoundTrip":null}
+targets.insert invalid id { n: 1, ks: [ 1 ] }
+{"id":"Infinity","fn":"insert","rejected":true,"msg":"failed to insert data, invalid id: data[1]","tableSize":0,"insertCalls":0,"saveCalls":0}
+targets.save invalid id { n: 1, ks: [ 1 ] }
+{"id":"Infinity","fn":"save","rejected":true,"msg":"failed to save data, invalid id: data[1]","tableSize":0,"insertCalls":0,"saveCalls":0}
+{"id":"Infinity","validateRowsBeforeWrite":null,"idRequired":{"reason":"idInvalid","k":0,"field":"id"}}
+{"id":"Infinity","afterJsonRoundTrip":null}
+targets.insert invalid id { n: 1, ks: [ 1 ] }
+{"id":"-Infinity","fn":"insert","rejected":true,"msg":"failed to insert data, invalid id: data[1]","tableSize":0,"insertCalls":0,"saveCalls":0}
+targets.save invalid id { n: 1, ks: [ 1 ] }
+{"id":"-Infinity","fn":"save","rejected":true,"msg":"failed to save data, invalid id: data[1]","tableSize":0,"insertCalls":0,"saveCalls":0}
+{"id":"-Infinity","validateRowsBeforeWrite":null,"idRequired":{"reason":"idInvalid","k":0,"field":"id"}}
+{"id":"-Infinity","afterJsonRoundTrip":null}
+targets.insert invalid id { n: 1, ks: [ 1 ] }
+{"id":"true","fn":"insert","rejected":true,"msg":"failed to insert data, invalid id: data[1]","tableSize":0,"insertCalls":0,"saveCalls":0}
+targets.save invalid id { n: 1, ks: [ 1 ] }
+{"id":"true","fn":"save","rejected":true,"msg":"failed to save data, invalid id: data[1]","tableSize":0,"insertCalls":0,"saveCalls":0}
+{"id":"true","validateRowsBeforeWrite":{"reason":"idInvalid","k":0,"field":"id"},"idRequired":{"reason":"idInvalid","k":0,"field":"id"}}
+{"id":"true","afterJsonRoundTrip":true}
+targets.insert invalid id { n: 1, ks: [ 1 ] }
+{"id":"{}","fn":"insert","rejected":true,"msg":"failed to insert data, invalid id: data[1]","tableSize":0,"insertCalls":0,"saveCalls":0}
+targets.save invalid id { n: 1, ks: [ 1 ] }
+{"id":"{}","fn":"save","rejected":true,"msg":"failed to save data, invalid id: data[1]","tableSize":0,"insertCalls":0,"saveCalls":0}
+{"id":"{}","validateRowsBeforeWrite":{"reason":"idInvalid","k":0,"field":"id"},"idRequired":{"reason":"idInvalid","k":0,"field":"id"}}
+{"id":"{}","afterJsonRoundTrip":{}}

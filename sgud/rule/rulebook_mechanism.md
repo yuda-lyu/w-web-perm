@@ -64,6 +64,21 @@
 
 - **守護**: `test/unit-staLogs-futureBucket.test.mjs`(53 案: FB-1 16、FB-2 4、FB-3 3、FB-4 6〔最末列 2、`genPlan.labelEnd` 2、窗為空 2〕、FB-5 24〔3 seed × hr／day × `timeLength` -1／0／1／7〕; 環境變數 `STALOGS_CORE_MODULE` 可指向另一份副本供「修前紅」與變異重跑)、`test/unit-staEvent-golden.test.mjs` GOLD-001. 狀態: 已落實(2026-11-03). 重跑變異／差異比對: 見 ADR-048 與 `sgud/exp/experience.md` 同日條.
 
+## 統計之 timeLength 入口檢測(2026-11-23 twp1, 排程第 301 項, R-STA-TIMELENGTH-01, ADR-050; 規格 `C:\opensrcOper\dspec\輸入參數之檢測機制.md`; 比照 w-web-api `staLogsCore.mjs` 之 `errTimeLengthInvalid`)
+
+軸: timeLength 之值(有效: 0、1、7、30、3650、數字字串 `'7'`／`' 7 '`／`'1e1'`／`'+7'`; 無效: `NaN`、`±Infinity`、負數、小數、3651、`100000`、`1e20`、`'abc'`、`''`、空白、`'0x10'`、`'Infinity'`、`'7.5'`、`null`、布林、物件、陣列、`7n`、Symbol、包裝物件、函數、已撤銷之 Proxy、`Date`) × 入口層(`genPlan`、`staLogs`、`staEvent`、`staEvent.callWorker`、`procStaInfor.getStaEvent`〔kpFunExt 之下層〕、mock 模式) × `opt.timeNow`(`NaN`、`±Infinity`、`1e300`、`-1e300`、字串).
+
+- **R-STA-TIMELENGTH-01 `timeLength` 為必須參數, 於入口檢測(N2 非負整數 0～3650, 數字字串收下並以轉換值為準 K4), 無效 reject 固定鍵 `errTimeLengthInvalid`(不回顯值 K9)**: 修前之 `NaN`、`±Infinity`、`'abc'`、`{}`、`1e20`、`-1e9` 使 `genPlan` 之 `while (!tCurr.isAfter(tEnd))` 為同步無窮迴圈(dayjs 對之回 Invalid Date, `isAfter` 恆為 false; 佔死主執行緒, 整個後端停止回應), `100000` 等過大之有效值建出數百萬筆 `kpTime` 而長時間阻塞; w-web-sso 之同名核心同形(2026-11-23 唯讀核對, 未改). 規則:
+  1. 單一擁有者 `staLogsCore.mjs:parseTimeLength(v)`(wsemi `iseint(v, { min: 0, max: MAX_TIME_LENGTH_DAY })` 判定, `MAX_TIME_LENGTH_DAY = 3650` 同 w-web-api): 有效回轉換後 number, 無效回 `null`, 永不拋錯(讀取即拋之值亦回 `null`).
+  2. `genPlan` 第一個動作即 `parseTimeLength`, 先於 `now.subtract` 與 `kpTime` 迴圈; 無效同步 `throw new Error('errTimeLengthInvalid')`; `staLogs()`(回傳 Promise)轉為 `Promise.reject('errTimeLengthInvalid')`(字串鍵, 不同步 throw); single-flight 之鍵用轉換後之 `plan.timeLength`(`7` 與 `'7'` 同一 promise).
+  3. `procStaInfor.getStaEvent`(kpFunExt `getStaEvent` 唯一轉交處)第一個動作即 `parseTimeLength`, 先於快取鍵、mock 與掃描; 無效 reject `errTimeLengthInvalid`(不轉成 `cannotGetStaEvent`, 該鍵保留給掃描失敗); 快取鍵與轉交下游皆用轉換後之 `nDay`.
+  4. `opt.timeNow`(測試掛鉤, 資料通道不可達)須為 `typeof number` 且 `TIME_NOW_MIN(0 = 1970-01-01)` ≤ 值 ≤ `TIME_NOW_MAX(4102444800000 = 2100-01-01)`; 範圍外(`NaN`、`±Infinity`、Date 之極值 ±8.64e15、負 epoch)視為未給改用現在(規格 K3), 否則同樣使 `kpTime` 迴圈無窮. **不可只檢 `dayjs(timeNow).isValid()`**: `timeNow` 為 `8.64e15`／`-8.64e15` 時本身為有效 Date, 其後 `subtract(nDay)`／逐桶 `add(1, unit)` 才溢位成 Invalid Date(2026-11-23 獨立複審實測; 首版只檢 isValid 即漏此二值).
+  5. 語系鍵 `errTimeLengthInvalid` 於 `server/procLang.mjs`(eng `Invalid time length`／cht `時間長度無效`; 同 w-web-api).
+  6. **與 R-STA-FUTURE-01 之關係**: 原 `timeLength` 為負時窗為空(`kpTime` 為空)而上界仍有效(FB-4-empty-window、FB-5 之 -1)——負值改於入口被拒, 該二測試改為「負值被拒」(FB-4-negative-rejected)與 `timeLength ∈ {0, 1, 7}`; `buildOutput` 之「`kpTime` 為空時上界取 `labelEnd`」仍由 FB-1-buildOutput 直測守護(`genPlan` 仍自 `tEnd` 取 `labelEnd`, 不依賴 `kpTime` 非空).
+- **站點全集(2026-11-23; 指令: `rg -n "timeLength" server --glob '*.mjs'`, 另以 TL-006a 釘住檔案全集)**: `WWebPerm.mjs`(kpFunExt `getStaEvent`: 只轉交 `psi.getStaEvent`, 遠端唯一入口)→ `procStaInfor.mjs`(檢測)→ `staLogs/staEvent.callWorker.mjs`／`staLogsCore.callWorker.mjs`／`staEvent.mjs`(轉交)→ `staLogs/staLogsCore.mjs`(`genPlan` 檢測; 核心); `staEventTable` 無 `timeLength`. 全數已覆蓋.
+- **測試**: `unit-staLogs-timeLength`(TL-001 判準全表; TL-002 無效 33 種 × 6 層〔子行程加逾時, 修前同步無窮迴圈之候選被逾時終止〕; TL-003 有效 11 種 × 層; TL-004 single-flight 同鍵; TL-005 `timeNow` 範圍外 13 種〔含 Date 極值〕退回現在＋範圍內 2 種〔epoch 0、2100-01-01〕照常採用; TL-006 站點不變式 a～d)＋`test/tools/timeLengthChild.mjs`; `api-staEventTimeLength`(真後端, 遠端 RPC); 既有 `unit-staLogs-futureBucket`(FB-4／FB-5 依本節第 6 點更改)、`unit-staEvent`、`unit-staEvent-golden`.
+- **不得**: 以 `Number()`／`parseInt`／`+v` 轉換 `timeLength` 後再判斷(`Number('')`、`Number(null)`、`Number([7])` 皆非有效輸入之轉換結果); 於 `kpTime` 迴圈內才檢查; 放寬上限而不處理 `kpTime` 長度(timeLength×24 筆之陣列)。
+
 ## 打包後之可用性(2026-10-14, X1; 對應 w-syslog 審計方案④, 三個 w-web-* 同一作法)
 
 軸: 使用方式(repo 內 src / repo 內 dist / 已安裝之 src 深層匯入 / 已安裝之 dist(`main`) / 被下游再打包 / bundle 被搬離 node_modules 樹而由專案根執行) × 定位方式(頂層 `__filename`/`__dirname`、`import.meta.url`、`new URL(…, import.meta.url)`、相對於模組之檔案路徑) × 時機(模組載入時 / 首次使用時). 打包工具: `toolg/gDistRollup.mjs`(w-package-tools rollupFile, format umd, fdSrc `./server`, fn `WWebPerm.mjs`)——bundle 含 `server/` 與其 import 到之 `src/`(schema、mShare)與未列 external 之相依.

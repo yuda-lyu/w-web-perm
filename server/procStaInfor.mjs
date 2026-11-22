@@ -4,6 +4,7 @@ import isestr from 'wsemi/src/isestr.mjs'
 import cache from 'wsemi/src/cache.mjs'
 import staEvent from './staLogs/staEvent.callWorker.mjs'
 import staEventTable from './staLogs/staEventTable.callWorker.mjs'
+import { parseTimeLength } from './staLogs/staLogsCore.mjs'
 
 
 //mock 之事件名單：
@@ -95,12 +96,20 @@ function proc(opt = {}) {
     let ocGetStaEvent = cache()
     let getStaEvent = async (userId, timeLength = 7, timeInterval = 'hr') => {
 
+        //timeLength 入口檢測(必須參數; 規格〈輸入參數之檢測機制〉, Gitea/排程第 301 項): 先於快取鍵、mock 與任何掃描.
+        //無效(NaN、±Infinity、負數、小數、超過上限、非數字字串、null、物件等)一律 reject 固定鍵 errTimeLengthInvalid(不回顯值), 而非轉成 cannotGetStaEvent(該鍵保留給掃描失敗);
+        //有效者以轉換後之數值為準(K4: 數字字串 '7' 與 7 為同一查詢, 同一快取鍵). 無此閘時 timeLength 為 NaN、'abc'、Infinity、物件會使 staLogsCore.genPlan 之 kpTime 迴圈成為同步無窮迴圈, 佔死整個後端.
+        let nDay = parseTimeLength(timeLength)
+        if (nDay === null) {
+            return Promise.reject('errTimeLengthInvalid')
+        }
+
         //cacheKey: 含 timeLength + timeInterval 避免不同分組互蓋快取
-        let cacheKey = `${timeLength}:${timeInterval}`
+        let cacheKey = `${nDay}:${timeInterval}`
 
         //wsemi ≥1.8.81 cache: 執行中共用 in-flight promise (併發不輪詢); timeFrom:'end' 使 30 秒自掃描完成起算; useCacheWhenError:false 失敗不快取且拋錯
         //(取代原「非陣列即 clear + reject」之繞道), 失敗一律 reject 'cannotGetStaEvent' 讓上層 (kpFunExt) 記 err key
-        let r = await ocGetStaEvent.getProxy(cacheKey, { fun: _getStaEvent, inputs: [timeLength, timeInterval], timeExpired: 30 * 1000, timeFrom: 'end', useCacheWhenError: false }) //快取30秒
+        let r = await ocGetStaEvent.getProxy(cacheKey, { fun: _getStaEvent, inputs: [nDay, timeInterval], timeExpired: 30 * 1000, timeFrom: 'end', useCacheWhenError: false }) //快取30秒
             .catch(() => {
                 return Promise.reject('cannotGetStaEvent')
             })

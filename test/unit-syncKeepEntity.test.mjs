@@ -6,7 +6,7 @@
 //  KE-S1 三個指派欄(users.cgrups／grups.cpemis／pemis.crules)同為後台可寫(Lv1): 外部同步 payload 之列「缺該鍵」時保留庫內值, 「含該鍵」(含 ''／undefined／null)則以外部為準(原則 5);
 //        每次同步清空等於靜默丟棄系統管理者之指派(原則 3). users 之行為不變(unit-syncKeep).
 //  KE-S2 實體身分(群組／權限無登入對應鍵, 不適用 users 之 mappingBy 矛盾檢查): 有 id 者依 id 對到庫內同一 from 之列; id 不在庫內＝新實體, 維持缺鍵之預設('');
-//        無 id 者(含 NaN／Infinity／''／null／布林／物件等無效 id; 寫入時 ORM 補隨機主鍵)依名稱, 與引用連帶(refCascade.fillIdlessIds)同一口徑:
+//        無 id 者(含 NaN／Infinity／''／null／布林／物件等非有效 id; 其中 ''／null／undefined 寫入時由 ORM 補隨機主鍵, NaN／±Infinity／布林／物件於 w-serv-orm 第 568 項〔2026-11-20〕起整批被拒而非補值——該等主鍵經 JSON 通道不可達, 此處仍依名稱判定, 判定不改; 排程第 570 項更正註解)依名稱, 與引用連帶(refCascade.fillIdlessIds)同一口徑:
 //        對庫內同一 from 中 id 未被本批帶用、名稱 === 相同之列, 須恰 1 筆(同名多筆為歷史同名, 不取首筆, 不保留並計入 nConflict); 0 筆＝新實體(不計 nConflict).
 //  KE-S3 收嚴(原則 3): 同 id 但名稱不同(改名)且 cascadeRename 為假(引用不跟著改, 名稱即授權身分)→ 不保留並計入 nConflict; cascadeRename 為 true／缺省 → 改名後保留(引用由級聯改寫, 同一實體);
 //        名稱相同時不論 cascadeRename 皆保留. (外審 sol #1) 改名而新舊名稱有一方非字串(歷史資料)時級聯無從處理(須新舊皆字串, 缺欄視 ''), 保留會使原指向新名(懸空)之引用者增權 → 不保留並 nConflict(KE-016).

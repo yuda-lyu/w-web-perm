@@ -1,6 +1,7 @@
 import getPropKey from './getPropKey.mjs'
 import { fmtWarn, getRefWarns } from './getAuthWarn.mjs'
 import { REF_OF, planRefChanges } from './refCascade.mjs'
+import { describeErr } from './describeShape.mjs'
 
 
 //清單頁「儲存」前之引用連帶預覽(規則帳本 R-PRINCIPLE-00 原則 6、適用表 m／n; R-REF-CASCADE-01; ADR-036):
@@ -176,7 +177,7 @@ function getSavePreview(p) {
         return { plan, ...getCascadePreview(plan, p.$t, kind) }
     }
     catch (err) {
-        console.log('getSavePreview', err)
+        console.log('getSavePreview', describeErr(err))
         return { plan: null, confirmText: '', successText: '' }
     }
 }

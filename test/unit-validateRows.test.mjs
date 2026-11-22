@@ -73,12 +73,54 @@ describe('unit-validateRows (寫入前驗證之判準, ADR-026)', function() {
         assert.strict.equal(validateRowsBeforeWrite([{ id: 'constructor' }, { id: 'toString' }, { id: '__proto__' }, { id: 'hasOwnProperty' }]), null)
     })
 
-    //R-ORM-01(run05): NaN、±Infinity 與未給同視為未給(w-serv-orm 1.1.11 對之補值); idRequired 時即 idInvalid
-    it('VR-009 主鍵為 NaN、±Infinity → 視為未給(不拒、不參與重複); idRequired 時 → idInvalid', function() {
+    //R-ORM-01(run05): 本函數對 NaN、±Infinity 之判定為「視為未給」(判定不改; 2026-11-23 排程第 570 項更正原註「同 w-serv-orm 1.1.11 之補值」——上游自第 568 項〔2026-11-20〕起對之整批 reject 而非補值, 見 VR-009b; JSON 通道不可達, 見 VR-009c); idRequired 時即 idInvalid
+    it('VR-009 主鍵為 NaN、±Infinity → 本函數視為未給(不拒、不參與重複); idRequired 時 → idInvalid', function() {
         assert.strict.equal(validateRowsBeforeWrite([{ id: NaN }, { id: NaN }, { id: Infinity }, { id: -Infinity }]), null)
         assert.strict.equal(validateRowsBeforeWrite([{ id: 'Infinity' }, { id: Infinity }]), null, 'Infinity 不等於其字串形式之主鍵')
         assert.strict.deepEqual(validateRowsBeforeWrite([{ id: NaN }], { idRequired: true }), { reason: 'idInvalid', k: 0, field: 'id' })
         assert.strict.deepEqual(validateRowsBeforeWrite([{ id: -Infinity }], { idRequired: true }), { reason: 'idInvalid', k: 0, field: 'id' })
+    })
+
+    //VR-009b: 上游現行行為(已安裝 w-serv-orm, 第 568 項起): 主鍵「給了而無效」(NaN、±Infinity、布林、物件)於任何寫入之前整批 reject, 零寫入, 不補值——
+    //  與 VR-009 之「本函數視為未給」並存之理由見 VR-009c(此類輸入經 JSON 通道不可達, 只有程式內直呼者可達); 本案守護「註解所述之上游行為」為真, 上游改回補值時此案轉紅而提醒更正註解
+    it('VR-009b 上游(真 procOrm, 已安裝 w-serv-orm)對 NaN、±Infinity、布林、物件主鍵: insert／save 皆整批 reject(invalid id: data[k])、零寫入、不補值', async function() {
+        for (let [nm, id] of [['NaN', NaN], ['Infinity', Infinity], ['-Infinity', -Infinity], ['true', true], ['{}', {}]]) {
+            for (let fn of ['insert', 'save']) {
+                let woItems = { targets: mkTable([]), pemis: mkTable([]), grups: mkTable([]), users: mkTable([]) }
+                let procOrm = mkProcOrm(ds, woItems)
+                let err = null
+                try {
+                    await procOrm('id-u', 'targets', fn, [{ id: 'T-ok', name: 'ok' }, { id, name: 'bad' }])
+                }
+                catch (e) {
+                    err = e
+                }
+                assert.ok(err !== null, `${nm} ${fn}: 應 reject(上游不再補值), 實得 resolve`)
+                let msg = typeof err === 'string' ? err : String(err && err.message) //上游以字串 reject
+                assert.ok(/invalid id: data\[1\]/.test(msg), `${nm} ${fn}: 訊息應為 invalid id: data[1](列其位置、不回顯主鍵), 實得 ${msg.slice(0, 80)}`)
+                assert.strict.equal(woItems.targets.size(), 0, `${nm} ${fn}: 零寫入(含同批之有效列)`)
+                assert.strict.equal(woItems.targets.cnt.insert + woItems.targets.cnt.save, 0, `${nm} ${fn}: 不得呼叫底層 insert／save`)
+            }
+        }
+        //對照: 未給主鍵(undefined、null、'')上游補主鍵並寫入(本函數之「未給」判定所指)
+        for (let id of [undefined, null, '']) {
+            let woItems = { targets: mkTable([]), pemis: mkTable([]), grups: mkTable([]), users: mkTable([]) }
+            let procOrm = mkProcOrm(ds, woItems)
+            await procOrm('id-u', 'targets', 'insert', [{ id, name: 'idless' }])
+            assert.strict.equal(woItems.targets.size(), 1, `未給主鍵(${String(id)}): 應補主鍵並寫入`)
+        }
+    })
+
+    //VR-009c: NaN、±Infinity 無法經 JSON 通道送達(資料通道 obj2u8arr 底層為 JSON.stringify; 外部同步為 JSON)——序列化後為 null, 即「未給」, 本函數與上游皆以未給處理(補主鍵)
+    it('VR-009c NaN、±Infinity 經 JSON 往返後為 null(未給): 本函數通過、上游補主鍵——故「上游對 NaN 整批 reject」之路徑不可經資料通道或外部同步抵達', async function() {
+        for (let v of [NaN, Infinity, -Infinity]) {
+            let back = JSON.parse(JSON.stringify([{ id: v, name: 'x' }]))
+            assert.strict.equal(back[0].id, null, `${String(v)} 經 JSON 往返應為 null`)
+            assert.strict.equal(validateRowsBeforeWrite(back), null)
+            let woItems = { targets: mkTable([]), pemis: mkTable([]), grups: mkTable([]), users: mkTable([]) }
+            await mkProcOrm(ds, woItems)('id-u', 'targets', 'insert', back)
+            assert.strict.equal(woItems.targets.size(), 1, `${String(v)} 往返後(null)上游應補主鍵並寫入`)
+        }
     })
 
     //上游等價: 同一語料經真 procOrm insert → 上游拒絕(主鍵) 或 存值≠送入值(非主鍵) ⇔ 本判準拒絕

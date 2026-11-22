@@ -3,7 +3,7 @@
 //  FB-1 晚於現在所屬桶之資料桶不輸出 (hr / day 皆然; 以其所屬桶標籤判定, 不以紀錄時間是否晚於 timeNow 判定)
 //  FB-2 現在所屬桶內晚於 timeNow 之紀錄照計 (統計執行期間新寫入者不被丟棄); 桶邊界: 本桶最後 1 ms 計入、下一桶第 1 ms 不輸出
 //  FB-3 過濾只在輸出層: 掃描與檔級快取不依 timeNow 上界, 快取開啟時 timeNow 後移至該紀錄之後, 該桶須出現 (反向亦然)
-//  FB-4 輸出最末一列恆為現在所屬桶 (無資料時為 { count: 0 }); 窗內缺桶補零不變; 上界取自「現在所屬桶」(genPlan 之 labelEnd), 窗為空 (timeLength 為負, 窗起點在未來) 時仍有效
+//  FB-4 輸出最末一列恆為現在所屬桶 (無資料時為 { count: 0 }); 窗內缺桶補零不變; 上界取自「現在所屬桶」(genPlan 之 labelEnd), 窗為空 (原 timeLength 為負, 窗起點在未來; 2026-11-23 起負值於入口被拒, 此取法改由 buildOutput 直測守護) 時仍有效
 //  FB-5 無未來紀錄之合法輸入, 輸出與修前相同 (以不依賴桶標籤字串比較之獨立 oracle 驗: 依時間值判定)
 //與 unit-staEvent-golden 分工: golden 以 173 檔 fixture 深比較改造前輸出 (expected 已依本規則剔除未來桶, 見其檔頭), 本檔守未來桶規則之各邊界與快取互動.
 //被測模組: 預設 server/staLogs/staLogsCore.mjs; 環境變數 STALOGS_CORE_MODULE 可指向另一份副本 (「修前紅」對 HEAD 版、變異測試對變異副本重跑同一檔; 副本放 ./tmp/, 且須連同同夾之 filterVpfsByWindow.mjs 等)
@@ -251,15 +251,15 @@ describe('unit-staLogs-futureBucket (輸出之桶以現在所屬桶為上界, R-
         })
     }
 
-    //FB-4: 窗為空 (timeLength 為負, 窗起點在未來, kpTime 為空) 時上界仍有效: 未來紀錄 (晚於窗起點者) 亦不輸出, 不因 kpTime 為空而失效
+    //FB-4: 窗為空 (timeLength 為負, 窗起點在未來, kpTime 為空) 原為有效輸入, 上界仍有效; 2026-11-23 (排程第 301 項) 起 timeLength 於入口限為 0～3650 之整數,
+    //  負值於入口即被拒 (errTimeLengthInvalid; 比照 w-web-api, 規格〈輸入參數之檢測機制〉個數類 N2), 窗為空之輸入不再可由 genPlan／staLogs 抵達;
+    //  「kpTime 為空時上界仍有效」改由 buildOutput 直測 (見 FB-1-buildOutput) 守護, 本案改為守護「負值被拒、不輸出任何列」
     for (let ti of ['hr', 'day']) {
-        it(`FB-4-empty-window-${ti}: timeLength 為負 (kpTime 為空) 時, 晚於現在所屬桶之紀錄不輸出`, async function() {
-            let plan = genPlan(-1, ti, { timeNow: ANCHOR })
-            assert.deepStrictEqual(plan.kpTime, [], '前提: 窗起點在未來, kpTime 為空')
+        it(`FB-4-negative-rejected-${ti}: timeLength 為負於入口被拒 (原窗為空之輸入), 不產出任何列`, async function() {
+            assert.throws(() => genPlan(-1, ti, { timeNow: ANCHOR }), (e) => e.message === 'errTimeLengthInvalid')
             let files = baseFiles()
-            files['misc.log'] = [[ANCHOR + 2 * DAY, 'evFuture'], [ANCHOR + 3 * DAY, 'evFuture']] //皆晚於窗起點 (現在 +1 天), 亦晚於現在所屬桶
-            let r = await run(mkDir(files), ti, {}, -1)
-            assert.deepStrictEqual(r, [])
+            files['misc.log'] = [[ANCHOR + 2 * DAY, 'evFuture'], [ANCHOR + 3 * DAY, 'evFuture']]
+            await assert.rejects(run(mkDir(files), ti, {}, -1), (e) => e === 'errTimeLengthInvalid')
         })
     }
 
@@ -329,7 +329,7 @@ describe('unit-staLogs-futureBucket (輸出之桶以現在所屬桶為上界, R-
     //  同一批紀錄放入單一非 ISO 檔名之檔 (不經檔名層過濾); 400 筆, 時間均勻分布於 timeNow 前 9 天 ~ 後 20 天, 4 種事件
     for (let seed of [1, 7, 20261103]) {
         for (let ti of ['hr', 'day']) {
-            for (let timeLength of [-1, 0, 1, 7]) {
+            for (let timeLength of [0, 1, 7]) { //原含 -1(窗為空); 2026-11-23 起負值於入口被拒, 見 FB-4-negative-rejected 與 unit-staLogs-timeLength
                 it(`FB-5-oracle seed=${seed} ${ti} timeLength=${timeLength}: 輸出等於獨立 oracle (窗內補零 + 計數; 晚於現在所屬桶者不輸出)`, async function() {
                     let rand = mkRand(seed)
                     let evs = ['evA', 'evB', 'evC', 'evD']

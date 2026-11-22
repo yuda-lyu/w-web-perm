@@ -8,6 +8,7 @@ import store from './store/index.mjs'
 import ui from './plugins/mUI.mjs'
 import * as s from './plugins/mShare.mjs'
 import ds from './schema/index.mjs'
+import { describeShape, describeErr } from './js/describeShape.mjs'
 // console.log('ds', ds)
 
 
@@ -17,7 +18,7 @@ Vue.config.productionTip = false
 //$alert
 Vue.prototype.$alert = function() {
     let [msg, type] = arguments
-    console.log(msg, type)
+    console.log('$alert', describeShape(msg), describeShape(type))
     if (msg !== 'close') {
         WAlert(msg, type)
     }
@@ -66,7 +67,7 @@ WServHapiClient({
 
             })
             .catch((err) => {
-                console.log(err)
+                console.log('getWebInfor catch', describeErr(err))
                 //getWebInfor 失敗時, connState 已為 csLogin 但 webInfor 為空 → ready 永遠為 false 會永久卡「已登入」轉圈畫面.
                 //改落到 csErrConn, 讓 LayoutState 顯示「無法連線」狀態畫面 (使用者可見錯誤而非靜默卡死).
                 ui.updateConnState('csErrConn')

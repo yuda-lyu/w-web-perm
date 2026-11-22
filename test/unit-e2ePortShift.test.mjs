@@ -186,8 +186,36 @@ describe('unit-e2ePortShift (e2e 多開之埠位移接線, R-E2E-SHARD-01)', fun
                     }
                 }
             }
-            A.ok(n >= 30, `應掃到 child_process 呼叫(本機 2026-11-04 為 38 處、16 檔), 實得 ${n}`)
+            A.ok(n >= 30, `應掃到 child_process 呼叫(2026-11-04 為 38 處、16 檔; 2026-11-23 為 45 處、18 檔), 實得 ${n}`)
             A.deepEqual(bad, [], `下列呼叫缺 windowsHide: true:\n${bad.join('\n')}`)
+        })
+
+        //排程第 275 項: 「呼叫含 windowsHide: true」不等於「實際生效」——spawnSrv(後端與 dev server 之唯一起行程出口)以 { …, windowsHide: true, ...opts } 展開時, 呼叫端之選項(含 windowsHide: false)會覆寫之
+        it('PS-007b e2e-setup.spawnSrv: windowsHide: true 位於 ...opts 之後(呼叫端選項不得覆寫); 全部呼叫端皆未自帶 windowsHide', function() {
+            let code = sourceLines(path.join(fdTest, 'tools', 'e2e-setup.mjs'), 'code').map((l) => l.text).join('\n')
+            let i0 = code.indexOf('function spawnSrv(')
+            A.ok(i0 >= 0, '找不到 spawnSrv 定義')
+            let m = /\bspawn\(/.exec(code.slice(i0))
+            A.ok(m, 'spawnSrv 內找不到 spawn 呼叫')
+            let inner = takeParen(code, i0 + m.index + m[0].length)
+            A.ok(inner !== null)
+            let iOpts = inner.indexOf('...opts')
+            let iHide = inner.indexOf('windowsHide: true')
+            A.ok(iOpts >= 0 && iHide >= 0, `spawn 選項須含 ...opts 與 windowsHide: true, 實得 ${inner}`)
+            A.ok(iHide > iOpts, `windowsHide: true 須位於 ...opts 之後(否則呼叫端選項可覆寫), 實得 ...opts@${iOpts}、windowsHide@${iHide}`)
+            //呼叫端(排除定義本身)不自帶 windowsHide
+            let re = /(?<![\w$])spawnSrv\(/g
+            let n = 0
+            let mm
+            while ((mm = re.exec(code)) !== null) {
+                if (code.slice(Math.max(0, mm.index - 9), mm.index) === 'function ') {
+                    continue
+                }
+                n++
+                let args = takeParen(code, mm.index + mm[0].length)
+                A.ok(args !== null && !/windowsHide/.test(args), `spawnSrv 之呼叫端不得自帶 windowsHide: ${args}`)
+            }
+            A.ok(n >= 3, `應有 3 個 spawnSrv 呼叫端(後端、前端 Windows／非 Windows), 實得 ${n}`)
         })
     })
 

@@ -1261,7 +1261,9 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             //本函數: 驗連線標頭之 token(getAndVerifyAdminUser: 外部 getUserByToken → perm users 存在且 isActive='y' → 部署方 verifyClientUser(user, apiType) → perm 列 isAdmin='y', R-ADMIN-ONLY-01: 權限後台與資料通道只限系統管理者, 一般使用者查本人權限樹走 /api/getPerm).
 
             //token: Authorization 須為 Bearer 方案(方案名不分大小寫, 與憑證間為單一空白; perm-run01 本輪 P-3, 對照 w-web-api 1.1.16), 其餘(Basic、Token、無方案、多個空白)一律視同無 token.
-            //原以 strdelleft(authorization, 7) 無條件刪前 7 字元而從不驗方案, 'Basic <token>'、'Token <token>' 亦能通過連線閘. 憑證不另限制字元集(token 形狀屬部署方), 但不含空白.
+            //原以 strdelleft(authorization, 7) 無條件刪前 7 字元而從不驗方案: 前綴恰 7 字元者(含空白; 如 'Digest <token>'、'Bearer<Tab><token>'、任意 7 字元)被截得完整權杖而通過連線閘;
+            //  6 字元前綴者('Basic <token>'、'Token <token>')則多截掉權杖首字而得錯誤之權杖, 反而被拒(2026-11-23 排程第 598 項以修前碼起後端實測, 見規則帳本 R-BEARER-01).
+            //憑證不另限制字元集(token 形狀屬部署方), 但不含空白.
             let mBearer = reBearerAuth.exec(isestr(authorization) ? authorization : '')
             let token = (mBearer === null) ? '' : mBearer[1]
             // console.log('token', token)

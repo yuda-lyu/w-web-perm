@@ -115,7 +115,8 @@ function markExpectedExit(onlyBackend = false) {
     }
 }
 function spawnSrv(cmd, args, opts = {}) {
-    const child = spawn(cmd, args, { cwd: projRoot, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, ...opts })
+    //windowsHide 置於 ...opts 之後: 呼叫端傳入之選項不得覆寫(本機有人使用, 後端與 dev server 之主控台視窗一律不彈出; 排程第 275 項、全域 §8.3)
+    const child = spawn(cmd, args, { cwd: projRoot, stdio: ['ignore', 'pipe', 'pipe'], ...opts, windowsHide: true })
     liveChildren.add(child)
     let tail = ''
     const keep = (d) => {

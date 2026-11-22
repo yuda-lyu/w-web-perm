@@ -4,11 +4,26 @@
 
 - **2026-10-22 抽出歷史經驗**:2026-10-20 以前之各節(e2e 側欄位移、統計頁、升版、授權存檔不變等)移至 `experience_20261022.md`(標題與內容不變);查久遠經驗時再調閱.
 
+## twp1(2026-11-23; 排程第 301、598、570、275、206 項; ADR-050)之經驗
+
+- **同步無窮迴圈之修前紅**: 修前會使同行程同步卡死之輸入(`timeLength` 為 `NaN`、`'abc'`、`{}`、`1e20`…), mocha 之逾時計時器無法中斷, 測試必須放子行程並以 `spawnSync(…, { timeout, killSignal: 'SIGKILL', windowsHide: true })` 終止; 子行程每層完成即印一行 JSON, 父行程以「缺行」判定卡在哪一層(`test/tools/timeLengthChild.mjs`). 變異時以環境變數 `TL_CHILD_TIMEOUT_MS` 把卡住候選之等待縮為 5 秒.
+- **修前碼之鏡像根放在 repo 之 `./tmp/<名>/` 之下即可**: `git archive HEAD server | tar -x -C ./tmp/…/mirror`, 其裸名匯入(`wsemi`、`lodash-es`)向上解析到 repo 之 `node_modules`, 不必建目錄連結; 新測試檔缺修前碼之匯出時, 在鏡像之修前檔尾加空殼匯出使測試檔可載入(不改修前行為), 才得到逐案之紅而非整檔載入失敗.
+- **dayjs 之 Invalid Date**: `isAfter`／`isBefore` 對 Invalid Date 恆為 false, 故 `while (!a.isAfter(b))` 為無窮迴圈; **只檢 `isValid()` 不夠**——`timeNow = ±8.64e15` 本身為有效 Date, 其後 `subtract(n, 'day')`／`add(1, 'hour')` 才溢位(獨立複審實測). 對外輸入以範圍檢測(1970～2100 或個數上限)而非有效性檢測; 迴圈長度由輸入決定者(`timeLength×24`)另須上限(3650 天 → 87601 桶約 0.3 秒; `100000` 天為數百萬桶).
+- **`iseint(v, { min, max })`(wsemi 1.9.71)**: 收 `'7'`、`' 7 '`、`'+7'`、`'00012'`、`'1e1'`(→10)、`'1.0'`、`'12.000'`、`'1.5e1'`(→15)、`-0`; 不收 `'7.5'`、`'0x10'`、`'1e400'`、`''`、空白、`new Number(7)`、`7n`、Symbol、陣列、物件、已撤銷 Proxy(`parseTimeLength` 另以 try/catch 保證永不拋錯). 轉換用 `Number(v.trim())`(K4); `-0` 經 `now.subtract(-0)` 無害.
+- **JSON 通道之 `undefined`／`NaN`**: RPC 參數陣列 `[undefined, 'hr']` 序列化為 `[null, 'hr']`, `null` 為無效 `timeLength`(修前被當 0 天); 要測「未給取預設」須傳空陣列 `[]`. `NaN`／`±Infinity` 亦序列化為 `null`(R-ORM-01 之 NaN 主鍵路徑因此只有程式內直呼者可達).
+- **修前碼可在現行依賴下直接起**(第 598 項): `git archive daddd01^ -- server src srv.mjs settings.json 'g_*.mjs' db package.json | tar -x -C ./tmp/<名>`、改其 `settings.json` 之 `serverPort`、`node srv.mjs ./settings.json`(hidden spawn)、以 `fetch` 打 `/api/main`(`obj2u8arr` 編碼; 成功回 `{ success }`, 被拒回 `{ error: 'permission denied' }`)——一支腳本約 10 秒量出各前綴之通過／被拒; 收尾以 `taskkill /F /T /PID` 逐 PID 並回驗埠已釋放.
+- **w-serv-orm `procOrm` 以字串 reject**(`failed to insert data, invalid id: data[1]`), 非 Error 物件; 斷言前先 `typeof err === 'string'`.
+- **Playwright 收集 console 須展開物件引數**: `msg.text()` 對物件只回 `JSHandle@object`, 要斷言「不含使用者資料」須對 `msg.args()` 逐一 `await a.jsonValue()`(`test/e2e-consoleNoValues.test.mjs`); 事件處理器內之非同步須收進 `pending` 陣列, 斷言前 `await Promise.all(pending)`.
+- **掃描器之盲點需另測**: `scanConsoleValueArgs` 只認 `console.(log|error|warn|info|debug)(`; 別名、解構、`console['log']`、`.catch(console.log)`、`console.table`、區塊註解後接呼叫皆看不到; 加 CNVF-002b 並以 CNVF-002c 自測. 掃「console」字樣時須先 `blankStrings`(語系文字內有「permission console」).
+- **變異腳本之做法**(`./tmp/twp1/mutate.mjs`, 已隨結案清除; 作法留此): 每個變異之錨點須在檔內恰出現 1 次否則報錯、改前記 sha256、`finally` 還原後回驗雜湊相同、測試經 `quiet-run --lock` 依序跑並解析 `N passing／N failing`(0 案判 INDETERMINATE, 不判存活).
+- **主控守門 hook 會擋**: `node -e` 寫檔(改用 Write 寫腳本再 `node`)、`printf … >> 檔`、`sleep N` 後接指令(等待改用 `run_in_background` 與任務完成通知)、`cd`.
+- **獨立複審(sonnet 子代理)之實效**: 本輪複審實測找出 4 項真缺口——`timeNow` 極值(`±8.64e15`)仍無窮迴圈、前端掃描器盲點、`safeCtl` 未涵蓋 U+2028／2029／0085／202E、證據檔引用不存在; 提示詞只給任務書與路徑、不給結論, 並要求「區分已實測與讀碼推論」「掃描逾時須以 spawnSync 包起來」.
+
 ## 獨立實操確認(verify01, 2026-10-25)之做法與易誤判點; 全套與外審流程補遺(2026-10-20～11-03 各輪; 2026-11-22 自自動記憶提取)
 - **獨立實操確認之做法**(實操確認者為未參與撰寫之角色, 主控要的是獨立於作者測試之證據; 全綠不等於探測抓得到問題): 不用 repo 之 `srv.mjs` 與其測試權杖, 在 `./tmp/<名>/` 自寫 `deploy.mjs`(自有權杖表)、自有 `run/` 夾(dist 副本＋自有 db/logs, 以 spawn 之 `cwd` 指定), 全程不碰 repo 之 `db/`; 另以 `git archive <舊 commit> server src` 解到 `./tmp` 跑同一套探測當**負對照**, 證明探測有鑑別力(run01 檢查點 10 FAIL、本輪前 31 FAIL、現行 0 FAIL).
 - **注入 ORM 失敗**: `WServOrm` 以 `new WOrm({url, db, cl: 表名})` 建表, 部署方可換包裝版 WOrm(須 function 非箭頭、鍵為 `cl`)來注入失敗, 驗「路由不回 ORM 原文」(sol#5 類).
 - **被拒畫面之語系**: `csErrNotAdmin`／`csErrLogin` 之語系是伺服端注入之網頁語系, `setLang('cht')` 無效(`mUI.getLang` 先讀 window); 驗中文須以 `language:'cht'` 另起部署. `isDev()` 看網址含 `localhost`: 用 127.0.0.1 被拒即轉址, 用 localhost 停 60 秒.
-- **Authorization 之測法**: fetch 會在送出前去除標頭值首尾空白, 無法測「尾端空白」. 舊碼 `strdelleft(auth, 7)` 下 `Basic <t>`／`Token <t>`(6 字元前綴)其實**被拒**(截掉權杖首字), 真正通過的是 7 字元前綴(`Digest <t>`、雙空白、任意 7 字元)——故 R-BEARER-01 條文「修前……使 `Basic <token>` 通過」與 `server/WWebPerm.mjs` 該處註解之敘述不準(README 已正, 見 perm-verify01 報告 N1); 改此兩處時依此更正.
+- **Authorization 之測法**: fetch 會在送出前去除標頭值首尾空白, 無法測「尾端空白」. 舊碼 `strdelleft(auth, 7)` 下 `Basic <t>`／`Token <t>`(6 字元前綴)其實**被拒**(截掉權杖首字), 真正通過的是 7 字元前綴(`Digest <t>`、雙空白、任意 7 字元)——故 R-BEARER-01 條文「修前……使 `Basic <token>` 通過」與 `server/WWebPerm.mjs` 該處註解之敘述不準(README 已正, 見 perm-verify01 報告 N1); **已於 2026-11-23 twp1(第 598 項)以修前碼起後端實測並更正兩處**(證據 `spec/evidence/twp1-20261123/measure598.log`).
 - **權限樹比對**: 權限樹之 `rules` 會列全部標的, 新增外部標的後清單變長; 比對須限種子標的子集.
 - **先用既有 e2e 受影響集當整合探針**(run07): UI 子代理只能做靜態／Node 驗證, 真瀏覽器問題只有 e2e 看得到; 寫完 UI 後主責立刻序列跑改動範圍 e2e(run07 由此發現 array-form 15 案前提失效, 並證明既有標準圖零像素差異), 再派新案例.
 - **新增 `server/tools/*` 檔或把新子夾放進 `server/` 前, 先 Grep 掃整個 `server/` 之靜態不變式**(run08): `unit-validateRows` SITE-NS-001(寫入站點全集; 離線工具於其 tools/ 段登記, 不要求驗證)與 `unit-refCascade` RC-503(server 端不得匯入／使用 JSON5; 用 JSON5 之工具須登記例外清單); 兩者皆在新檔落地後才轉紅, 先找出這類 walk 比跑完整套再逐個失敗省. 改 `syncAndReplaceTabs` 保留邏輯時另看 `unit-syncKeep`(SITE-SK)、`unit-syncKeepEntity`(SITE-KE).

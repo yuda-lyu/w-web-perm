@@ -283,6 +283,7 @@ import { makeBaseline } from '../js/rowDigest.mjs'
 import { refsChanged, planDraftSync, isDraftStale, hasDraftNow } from '../js/draftSync.mjs'
 import { applySavedRows } from '../js/applySaved.mjs'
 import { isCellEditing, bindCellEditingStopRetry } from '../js/cellEditing.mjs'
+import { describeShape, describeErr } from '../js/describeShape.mjs'
 import { fmtVars, getBannerLines, splitCheckedRows, getExternalEdits } from '../js/externalUi.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
 import WSwitch from 'w-component-vue/src/components/WSwitch.vue'
@@ -900,7 +901,7 @@ export default {
 
             //check
             if (size(vo.itemsCheck) !== 1) {
-                console.log(`size(vo.itemsCheck) !== 1`, vo.itemsCheck)
+                console.log(`size(vo.itemsCheck) !== 1`, describeShape(vo.itemsCheck))
                 vo.$alert(`${vo.$t('anUnexpectedErrorOccurred')}`, { type: 'error' })
                 return
             }
@@ -927,7 +928,7 @@ export default {
 
             //check
             if (!iseobj(row)) {
-                console.log(`!iseobj(row)`, row)
+                console.log(`!iseobj(row)`, describeShape(row))
                 vo.$alert(`${vo.$t('anUnexpectedErrorOccurred')}`, { type: 'error' })
                 return
             }
@@ -1148,7 +1149,7 @@ export default {
             return vo.$ui.runSubmit('saveTargets', (unlockBtn) => {
                 return core(unlockBtn)
                     .catch((err) => {
-                        console.log('catch', err)
+                        console.log('catch', describeErr(err))
                         vo.$alert(vo.$t('anUnexpectedErrorOccurred'), { type: 'error' })
                     })
                     .finally(() => {

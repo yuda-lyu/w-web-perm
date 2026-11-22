@@ -1,0 +1,14 @@
+[quiet-run] Mon Nov 23 2026 03:03:36 GMT+0800 (台北標準時間)
+[quiet-run] cwd: <repo root>
+[quiet-run] cmd: node ./tmp/twp1/measure598.mjs
+
+{"auth":"Bearer sys","prefixLen":7,"note":"control: Bearer","result":"pass"}
+{"auth":"Basic sys","prefixLen":6,"note":"6 字元前綴(Basic )","result":"denied(permission denied)"}
+{"auth":"Token sys","prefixLen":6,"note":"6 字元前綴(Token )","result":"denied(permission denied)"}
+{"auth":"ABCDE sys","prefixLen":6,"note":"6 字元任意前綴","result":"denied(permission denied)"}
+{"auth":"Digest sys","prefixLen":7,"note":"7 字元前綴(Digest )","result":"pass"}
+{"auth":"Bearer\tsys","prefixLen":7,"note":"7 字元前綴(Bearer + Tab)","result":"pass"}
+{"auth":"XXXXXXXsys","prefixLen":7,"note":"7 字元任意前綴(無空白)","result":"pass"}
+{"auth":"Bearer  sys","prefixLen":8,"note":"8 字元前綴(Bearer 兩個空白: 截 7 後得 \" sys\")","result":"denied(permission denied)"}
+{"auth":"sys","prefixLen":0,"note":"無前綴(裸權杖)","result":"denied(permission denied)"}
+{"stopped":13268,"portStillOpen":false}

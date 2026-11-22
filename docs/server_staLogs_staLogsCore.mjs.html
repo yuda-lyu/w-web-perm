@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    
+    <meta charset="utf-8">
+    <title>server/staLogs/staLogsCore.mjs - Documentation</title>
+    
+    
+    <script src="scripts/prettify/prettify.js"></script>
+    <script src="scripts/prettify/lang-css.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc.css">
+    <script src="scripts/nav.js" defer></script>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+<input type="checkbox" id="nav-trigger" class="nav-trigger" />
+<label for="nav-trigger" class="navicon-button x">
+  <div class="navicon"></div>
+</label>
+
+<label for="nav-trigger" class="overlay"></label>
+
+<nav >
+    
+    
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="WWebPerm.html">WWebPerm</a></li></ul><h3>Global</h3><ul><li><a href="global.html#SYSTEM_APP_ID_PREFIX">SYSTEM_APP_ID_PREFIX</a></li><li><a href="global.html#activeNames">activeNames</a></li><li><a href="global.html#applyPurgePlan">applyPurgePlan</a></li><li><a href="global.html#applySavedRows">applySavedRows</a></li><li><a href="global.html#auditFrom">auditFrom</a></li><li><a href="global.html#auditRefs">auditRefs</a></li><li><a href="global.html#bindCellEditingStop">bindCellEditingStop</a></li><li><a href="global.html#bindCellEditingStopRetry">bindCellEditingStopRetry</a></li><li><a href="global.html#buildRefDecl">buildRefDecl</a></li><li><a href="global.html#buildReport">buildReport</a></li><li><a href="global.html#buildRowsSend">buildRowsSend</a></li><li><a href="global.html#checkBaseline">checkBaseline</a></li><li><a href="global.html#checkCascadePlan">checkCascadePlan</a></li><li><a href="global.html#checkDbNotInUse">checkDbNotInUse</a></li><li><a href="global.html#checkExternalWrite">checkExternalWrite</a></li><li><a href="global.html#checkMapKeyBatch">checkMapKeyBatch</a></li><li><a href="global.html#checkRawSecrets">checkRawSecrets</a></li><li><a href="global.html#checkRefIdentity">checkRefIdentity</a></li><li><a href="global.html#checkSubject">checkSubject</a></li><li><a href="global.html#checkSubjectIdentity">checkSubjectIdentity</a></li><li><a href="global.html#checkUsersWrite">checkUsersWrite</a></li><li><a href="global.html#cleanOutOf">cleanOutOf</a></li><li><a href="global.html#collectChangedNames">collectChangedNames</a></li><li><a href="global.html#collectNewNames">collectNewNames</a></li><li><a href="global.html#compareBaseline">compareBaseline</a></li><li><a href="global.html#countAndRefs">countAndRefs</a></li><li><a href="global.html#countExternalRows">countExternalRows</a></li><li><a href="global.html#countLoginRows">countLoginRows</a></li><li><a href="global.html#countRefMismatch">countRefMismatch</a></li><li><a href="global.html#countSrcKeyRenumber">countSrcKeyRenumber</a></li><li><a href="global.html#createAuthorizeExec">createAuthorizeExec</a></li><li><a href="global.html#createLegendMeasurer">createLegendMeasurer</a></li><li><a href="global.html#createLockSave">createLockSave</a></li><li><a href="global.html#createRouteResult">createRouteResult</a></li><li><a href="global.html#cvKpToArr">cvKpToArr</a></li><li><a href="global.html#cvKpToObj">cvKpToObj</a></li><li><a href="global.html#decideLegendType">decideLegendType</a></li><li><a href="global.html#describeErr">describeErr</a></li><li><a href="global.html#describeShape">describeShape</a></li><li><a href="global.html#describeUpstream">describeUpstream</a></li><li><a href="global.html#diffRefTargets">diffRefTargets</a></li><li><a href="global.html#dropServerOnlyDiff">dropServerOnlyDiff</a></li><li><a href="global.html#eachOwn">eachOwn</a></li><li><a href="global.html#fetchJson">fetchJson</a></li><li><a href="global.html#fillIdlessIds">fillIdlessIds</a></li><li><a href="global.html#findDupIndex">findDupIndex</a></li><li><a href="global.html#findKeyOtherFrom">findKeyOtherFrom</a></li><li><a href="global.html#findLoginIdClash">findLoginIdClash</a></li><li><a href="global.html#findLoginIdClashDetail">findLoginIdClashDetail</a></li><li><a href="global.html#findLoginUsers">findLoginUsers</a></li><li><a href="global.html#findRefRows">findRefRows</a></li><li><a href="global.html#findTouchedDup">findTouchedDup</a></li><li><a href="global.html#fmtLossyMsg">fmtLossyMsg</a></li><li><a href="global.html#fmtVars">fmtVars</a></li><li><a href="global.html#fmtWarn">fmtWarn</a></li><li><a href="global.html#formatFixReport">formatFixReport</a></li><li><a href="global.html#formatFromAudit">formatFromAudit</a></li><li><a href="global.html#formatPurgeReport">formatPurgeReport</a></li><li><a href="global.html#genLegend">genLegend</a></li><li><a href="global.html#getAddConfirmText">getAddConfirmText</a></li><li><a href="global.html#getAddImpact">getAddImpact</a></li><li><a href="global.html#getBannerLines">getBannerLines</a></li><li><a href="global.html#getCascadePreview">getCascadePreview</a></li><li><a href="global.html#getChangedIdx">getChangedIdx</a></li><li><a href="global.html#getContract">getContract</a></li><li><a href="global.html#getDelConfirmText">getDelConfirmText</a></li><li><a href="global.html#getDelImpact">getDelImpact</a></li><li><a href="global.html#getDelRefCount">getDelRefCount</a></li><li><a href="global.html#getDupRowsInconsistent">getDupRowsInconsistent</a></li><li><a href="global.html#getEffMode">getEffMode</a></li><li><a href="global.html#getExternalEdits">getExternalEdits</a></li><li><a href="global.html#getItemWarnText">getItemWarnText</a></li><li><a href="global.html#getKpLossy">getKpLossy</a></li><li><a href="global.html#getLockFields">getLockFields</a></li><li><a href="global.html#getNameErrs">getNameErrs</a></li><li><a href="global.html#getOwn">getOwn</a></li><li><a href="global.html#getPermUserInfor">getPermUserInfor</a></li><li><a href="global.html#getPropKey">getPropKey</a></li><li><a href="global.html#getRawModeMap">getRawModeMap</a></li><li><a href="global.html#getRawSecrets">getRawSecrets</a></li><li><a href="global.html#getRefRowsExtra">getRefRowsExtra</a></li><li><a href="global.html#getRefState">getRefState</a></li><li><a href="global.html#getRefTarget">getRefTarget</a></li><li><a href="global.html#getRefWarnText">getRefWarnText</a></li><li><a href="global.html#getRefWarns">getRefWarns</a></li><li><a href="global.html#getRowIdxs">getRowIdxs</a></li><li><a href="global.html#getRowState">getRowState</a></li><li><a href="global.html#getRuleEnable">getRuleEnable</a></li><li><a href="global.html#getRuleWarnText">getRuleWarnText</a></li><li><a href="global.html#getRuleWarns">getRuleWarns</a></li><li><a href="global.html#getSavePreview">getSavePreview</a></li><li><a href="global.html#getSavedTables">getSavedTables</a></li><li><a href="global.html#getSyncWarnLines">getSyncWarnLines</a></li><li><a href="global.html#hasDraftNow">hasDraftNow</a></li><li><a href="global.html#hasDupKey">hasDupKey</a></li><li><a href="global.html#hasExternalDiff">hasExternalDiff</a></li><li><a href="global.html#idsOfName">idsOfName</a></li><li><a href="global.html#isAdminRow">isAdminRow</a></li><li><a href="global.html#isAuthMode">isAuthMode</a></li><li><a href="global.html#isBaselineStale">isBaselineStale</a></li><li><a href="global.html#isCellEditing">isCellEditing</a></li><li><a href="global.html#isDraftStale">isDraftStale</a></li><li><a href="global.html#isExtAdminUser">isExtAdminUser</a></li><li><a href="global.html#isExternalRow">isExternalRow</a></li><li><a href="global.html#isJsonLossy">isJsonLossy</a></li><li><a href="global.html#isMain">isMain</a></li><li><a href="global.html#isSameFile">isSameFile</a></li><li><a href="global.html#isSystemAppUser">isSystemAppUser</a></li><li><a href="global.html#joinList">joinList</a></li><li><a href="global.html#joinNames">joinNames</a></li><li><a href="global.html#keepAssignByEntity">keepAssignByEntity</a></li><li><a href="global.html#keepAssignOnMissing">keepAssignOnMissing</a></li><li><a href="global.html#loginIdOf">loginIdOf</a></li><li><a href="global.html#makeBaseline">makeBaseline</a></li><li><a href="global.html#makeRowStates">makeRowStates</a></li><li><a href="global.html#mapKeyOf">mapKeyOf</a></li><li><a href="global.html#mapNameKp">mapNameKp</a></li><li><a href="global.html#markDataReload">markDataReload</a></li><li><a href="global.html#markHasKey">markHasKey</a></li><li><a href="global.html#maskRaw">maskRaw</a></li><li><a href="global.html#maskTok">maskTok</a></li><li><a href="global.html#maskUrl">maskUrl</a></li><li><a href="global.html#mergePickKeysOnly">mergePickKeysOnly</a></li><li><a href="global.html#msgForLog">msgForLog</a></li><li><a href="global.html#msgOfErr">msgOfErr</a></li><li><a href="global.html#newActiveNames">newActiveNames</a></li><li><a href="global.html#pairRowsToSnapshot">pairRowsToSnapshot</a></li><li><a href="global.html#parseRefDecl">parseRefDecl</a></li><li><a href="global.html#parseSubject">parseSubject</a></li><li><a href="global.html#parseTimeLength">parseTimeLength</a></li><li><a href="global.html#pickClientOpt">pickClientOpt</a></li><li><a href="global.html#pickUniqueUser">pickUniqueUser</a></li><li><a href="global.html#planDialogSync">planDialogSync</a></li><li><a href="global.html#planDraftSync">planDraftSync</a></li><li><a href="global.html#planFixFromType">planFixFromType</a></li><li><a href="global.html#planPurgeChain">planPurgeChain</a></li><li><a href="global.html#planPurgeFrom">planPurgeFrom</a></li><li><a href="global.html#planRefChanges">planRefChanges</a></li><li><a href="global.html#putRefEntry">putRefEntry</a></li><li><a href="global.html#putRowsToKp">putRowsToKp</a></li><li><a href="global.html#rawOfErr">rawOfErr</a></li><li><a href="global.html#recordPicks">recordPicks</a></li><li><a href="global.html#refsChanged">refsChanged</a></li><li><a href="global.html#removedActiveNames">removedActiveNames</a></li><li><a href="global.html#resolveShellWorker">resolveShellWorker</a></li><li><a href="global.html#restoreExternalOrder">restoreExternalOrder</a></li><li><a href="global.html#restoreServerFields">restoreServerFields</a></li><li><a href="global.html#reuseDeletedIds">reuseDeletedIds</a></li><li><a href="global.html#rewriteRefs">rewriteRefs</a></li><li><a href="global.html#runAuditFrom">runAuditFrom</a></li><li><a href="global.html#runClean">runClean</a></li><li><a href="global.html#runFixFromType">runFixFromType</a></li><li><a href="global.html#runPurgeFrom">runPurgeFrom</a></li><li><a href="global.html#safeCtl">safeCtl</a></li><li><a href="global.html#snapRefIds">snapRefIds</a></li><li><a href="global.html#splitCheckedRows">splitCheckedRows</a></li><li><a href="global.html#submitGuard">submitGuard</a></li><li><a href="global.html#syncCore">syncCore</a></li><li><a href="global.html#validateRowsBeforeWrite">validateRowsBeforeWrite</a></li><li><a href="global.html#withTabLocks">withTabLocks</a></li><li><a href="global.html#wrapInjected">wrapInjected</a></li><li><a href="global.html#wrapOperOrm">wrapOperOrm</a></li><li><a href="global.html#writeWithCascade">writeWithCascade</a></li></ul>
+    
+</nav>
+
+<div id="main">
+    
+    <h1 class="page-title">server/staLogs/staLogsCore.mjs</h1>
+    
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import fs from 'fs'
+import path from 'path'
+import readline from 'readline'
+import ot from 'dayjs'
+import get from 'lodash-es/get.js'
+import isfun from 'wsemi/src/isfun.mjs'
+import isestr from 'wsemi/src/isestr.mjs'
+import iseint from 'wsemi/src/iseint.mjs'
+import fsTreeFolder from 'wsemi/src/fsTreeFolder.mjs'
+import filterVpfsByWindow from './filterVpfsByWindow.mjs'
+
+
+//staLogsCore: staEvent (時序分桶) 與 staEventTable (近 1 日巢狀窗) 之共用核心 (鏡像 w-web-sso server/staLogs/staLogsCore.mjs, ADR-051)
+//  1. 逐行先比 event 再算時間: time 為 epoch ms 數值 (pino) 直接數值比較, 桶鍵以分鐘整數 memo 查表, 不逐行 dayjs; 就地累加不建陣列
+//  2. 檔級彙總快取 (staEvent): w-syslog 依寫入當下時鐘切檔, 整點跨過後舊檔不再被寫入, 每檔彙總以 (name, size, mtimeMs) 為鍵快取;
+//     檔內最早可計入行 minTimeMs > tStartMs 時窗過濾為 no-op 才沿用, 否則 (邊界檔) 重掃; 當前小時檔 size 變動自然重掃; 快取依 fmt 分開
+//  3. single-flight: 同參數併發呼叫共用同一 in-flight promise
+//  4. staEventTable 之各窗計數依「現在 − 行時間」逐小時取整, 結果隨 now 逐秒變動, 不做檔級快取 (只掃近 25 小時之檔, 由 30 秒 wsemi cache 承接)
+//  5. 資料夾項目略過; 單檔讀取錯誤略過該檔 (不入快取、不整體失敗)
+//  輸出形狀與原 staEvent.mjs / staEventTable.mjs 一致 (golden test: test/unit-staEvent-golden.test.mjs 以改造前實作產出之 expected 深比較)
+//  刻意差異 (僅 staEvent): 無 time (或 time 無法解析) 之行不計入任何桶 (原實作 ot(undefined) 視為 now 而計入當前桶); staEventTable 維持原語意
+//  刻意差異 (僅 staEvent; R-STA-FUTURE-01, ADR-048): 輸出以「現在所屬桶」為上界, 晚於它之未來時間桶不輸出 (原實作無上界); 只在 buildOutput 過濾, 掃描與快取不動
+
+
+//快取: `${fdLog}|${fmt}` → Map(檔名 → { size, mtimeMs, minTimeMs, scanTStartMs, agg }); 沿用須「彙總完整 (minTimeMs > scanTStartMs)」且「整檔在新窗內 (minTimeMs > tStartMs)」
+let kpCache = new Map()
+
+//single-flight: key → promise
+let kpInflight = new Map()
+
+
+function normTimeInterval(timeInterval) {
+    //非 'day' 一律視同 'hr' (原以 ==='day' 決定 fmt、==='hr' 決定 unit, 傳其他值時兩者不一致, 此處收斂為單一判斷)
+    return timeInterval === 'day' ? 'day' : 'hr'
+}
+
+
+function normFdLog(opt) {
+    let fdLog = get(opt, 'fdLog')
+    if (!isestr(fdLog)) {
+        fdLog = './logs'
+    }
+    return fdLog
+}
+
+
+//timeLength 上限(天): 10 年(同 w-web-api). 超過此範圍之查詢無實務意義, 且 kpTime 長度為 timeLength×24 (hr 粒度), 再大單是建陣列即長時間阻塞主執行緒
+const MAX_TIME_LENGTH_DAY = 3650
+
+//opt.timeNow 之有效範圍(ms): 1970-01-01T00:00:00.000Z(epoch 0; log 之 time 為 epoch ms 非負數值) ～ 2100-01-01T00:00:00.000Z(含); 實務範圍, 遠小於 Date 之 ±8.64e15, 使其後 subtract(3650 天)／逐桶 add 皆不溢位, 且標籤年份恆為四位數(任何時區)
+const TIME_NOW_MIN = 0
+const TIME_NOW_MAX = 4102444800000
+
+
+/**
+ * 檢測並轉換 timeLength (往回統計之天數; 規格〈輸入參數之檢測機制〉: 個數類之必須參數, N2 非負整數, 範圍 0～MAX_TIME_LENGTH_DAY)
+ * - 有效: 0～3650 之整數, 或其數字字串(含頭尾空白, 如 '7'、' 7 '; 其後只用轉換後之數值, K4); 回傳轉換後之 number
+ * - 無效(回傳 null): NaN、±Infinity、負數、小數、超過上限、非數字字串、null、布林、物件、陣列、包裝物件、BigInt 等
+ * - 為什麼須在 dayjs subtract 之前擋: dayjs 對 NaN、±Infinity、非數字字串、超出 Date 範圍之值回 Invalid Date, 其 isAfter 恆為 false,
+ *   使 genPlan 之 `while (!tCurr.isAfter(tEnd))` 成為同步無窮迴圈(佔死主執行緒, 整個後端停止回應); 過大之有效值(如 100000)則建出數百萬筆 kpTime 而長時間阻塞
+ * - 永不拋錯、不回顯輸入值; 呼叫端依回傳 null 以固定鍵 errTimeLengthInvalid 失敗(K9)
+ *
+ * @param {*} timeLength 輸入待檢測之值
+ * @returns {Number|null} 回傳有效之天數(number), 無效回傳 null
+ */
+function parseTimeLength(timeLength) {
+    try {
+        if (!iseint(timeLength, { min: 0, max: MAX_TIME_LENGTH_DAY })) {
+            return null
+        }
+        return typeof timeLength === 'string' ? Number(timeLength.trim()) : timeLength
+    }
+    catch (err) {
+        return null //讀取即拋錯之值(已撤銷之 Proxy 等)視為無效, 本函數永不拋錯(規格 V11)
+    }
+}
+
+
+function genPlan(timeLength = 7, timeInterval = 'hr', opt = {}) {
+
+    //timeLength 驗證, 須先於任何以之計算(下方 subtract 與 kpTime 迴圈)
+    let nDay = parseTimeLength(timeLength)
+    if (nDay === null) {
+        throw new Error('errTimeLengthInvalid')
+    }
+
+    //fdLog
+    let fdLog = normFdLog(opt)
+
+    //timeInterval, fmt, unit
+    let ti = normTimeInterval(timeInterval)
+    let fmt = ti === 'day' ? 'YYYY-MM-DD' : 'YYYY-MM-DDTHH'
+    let unit = ti === 'day' ? 'day' : 'hour'
+
+    //now, 測試可由 opt.timeNow (epoch ms) 釘住; 須為 1970～2100 年內之有限毫秒時刻(TIME_NOW_MIN～TIME_NOW_MAX), 其餘(NaN、±Infinity、超出範圍)視為未給改用現在(規格 K3).
+    //  why 範圍而非只檢 isValid: timeNow 本身為有效 Date(如 8.64e15)時, 其後之 subtract(nDay)／add(1, unit) 仍會溢位成 Invalid Date, isAfter 恆為 false, 使下方 kpTime 迴圈無窮(2026-11-23 獨立複審實測 8.64e15、-8.64e15)
+    let timeNow = get(opt, 'timeNow')
+    let isNowOk = typeof timeNow === 'number' &amp;&amp; timeNow >= TIME_NOW_MIN &amp;&amp; timeNow &lt;= TIME_NOW_MAX
+    let now = isNowOk ? ot(timeNow) : ot()
+
+    //tStart
+    let tStart = now.subtract(nDay, 'day')
+    let tStartMs = tStart.valueOf()
+
+    //kpTime, 產生完整的時間區間
+    let tCurr = tStart.startOf(unit)
+    let tEnd = now.startOf(unit)
+    let kpTime = []
+    while (!tCurr.isAfter(tEnd)) {
+        kpTime.push(tCurr.format(fmt))
+        tCurr = tCurr.add(1, unit)
+    }
+
+    //labelEnd, 「現在」所屬桶之標籤 (輸出之上界, 見 buildOutput); 取自 tEnd 而非 kpTime 末項: 不依賴 kpTime 非空 (2026-11-23 起 timeLength 於入口限為 >= 0, kpTime 恆非空; 原 timeLength 為負時窗起點在未來而 kpTime 為空, 上界仍須存在, 此取法保留不動)
+    let labelEnd = tEnd.format(fmt)
+
+    return { fdLog, timeInterval: ti, fmt, unit, tStart, tStartMs, kpTime, labelEnd, timeNow: now.valueOf(), timeLength: nDay }
+}
+
+
+function listFiles(fdLog, tStart, fmt) {
+
+    //vpfs
+    let vpfs = fsTreeFolder(fdLog)
+
+    //剔除資料夾項目 (fsTreeFolder 會列出子資料夾, 對其開讀取串流會 throw)
+    vpfs = vpfs.filter((vpf) => {
+        return !get(vpf, 'isFolder', false)
+    })
+
+    //開檔前剔除窗外檔, 見該模組註解
+    vpfs = filterVpfsByWindow(vpfs, tStart, fmt)
+
+    //stat
+    let files = []
+    for (let vpf of vpfs) {
+        try {
+            let st = fs.statSync(vpf.path)
+            if (!st.isFile()) {
+                continue
+            }
+            files.push({ path: vpf.path, name: vpf.name, size: st.size, mtimeMs: st.mtimeMs })
+        }
+        catch (err) {
+            //列出後即被移除 (cleanLogs) → 略過
+        }
+    }
+
+    return files
+}
+
+
+function createBucketLabeler(fmt) {
+    //以分鐘整數為 memo 鍵 (任何整分鐘偏移之時區皆與逐行 format 等價), 標籤仍由 dayjs 產生
+    let kp = new Map()
+    return (tms) => {
+        let k = Math.floor(tms / 60000)
+        let s = kp.get(k)
+        if (s === undefined) {
+            s = ot(k * 60000).format(fmt)
+            kp.set(k, s)
+        }
+        return s
+    }
+}
+
+
+function toMs(t) {
+    if (typeof t === 'number') {
+        return t
+    }
+    if (isestr(t)) {
+        return ot(t).valueOf() //ISO 字串 (非 w-syslog 之來源) 走慢路徑; 無法解析回 NaN
+    }
+    return NaN
+}
+
+
+function readLines(fp, onLine) {
+    return new Promise((resolve, reject) => {
+        let errTemp = null
+        let stream = fs.createReadStream(fp, { encoding: 'utf8' })
+        let rl = readline.createInterface({
+            input: stream,
+            crlfDelay: Infinity,
+        })
+        rl.on('line', onLine)
+        let onError = (err) => {
+            errTemp = err
+            rl.close()
+        }
+        stream.on('error', onError)
+        rl.on('error', onError) //readline Interface 會把 input 之 error 再拋一次, 未監聽即 unhandled
+        stream.on('close', () => {
+            if (errTemp) {
+                reject(errTemp)
+            }
+            else {
+                resolve()
+            }
+        })
+    })
+}
+
+
+function parseLine(line) {
+    let v = null
+    try {
+        v = JSON.parse(line)
+    }
+    catch (err) {
+        return null
+    }
+    if (v === null || typeof v !== 'object') {
+        return null
+    }
+    return v
+}
+
+
+//掃一檔 (staEvent): 各桶 { count, kp:{event:n} }, 任何帶 event 字串之行皆計入
+async function scanFile(fp, tStartMs, fmt, labeler = null) {
+    if (!isfun(labeler)) {
+        labeler = createBucketLabeler(fmt)
+    }
+
+    let agg = { minTimeMs: null, ev: {} }
+
+    await readLines(fp, (line) => {
+
+        //v
+        let v = parseLine(line)
+        if (v === null) {
+            return
+        }
+
+        //event, 先比對再算時間
+        let e = v.event
+        if (!isestr(e)) {
+            return
+        }
+
+        //tms
+        let tms = toMs(v.time)
+        if (Number.isNaN(tms)) {
+            return //無 time 或無法解析: 不計入 (刻意差異, 見檔頭)
+        }
+
+        //minTimeMs, 對所有可計入之行取最小值 (不論是否在窗內), 供快取有效性判斷
+        if (agg.minTimeMs === null || tms &lt; agg.minTimeMs) {
+            agg.minTimeMs = tms
+        }
+
+        //窗判斷, 對齊原 t.isAfter(tStart)
+        if (!(tms > tStartMs)) {
+            return
+        }
+
+        //accumulate
+        let label = labeler(tms)
+        let b = agg.ev[label]
+        if (b === undefined) {
+            b = { count: 0, kp: {} }
+            agg.ev[label] = b
+        }
+        b.count += 1
+        b.kp[e] = (b.kp[e] || 0) + 1
+
+    })
+
+    return agg
+}
+
+
+//掃描一批檔案 (staEvent), 回傳 [{ name, ok, agg | err }]; 單檔失敗不影響其他檔 (worker 端亦呼叫此函式)
+async function scanFiles(files, tStartMs, fmt) {
+    let labeler = createBucketLabeler(fmt)
+    let rs = []
+    for (let f of files) {
+        try {
+            let agg = await scanFile(f.path, tStartMs, fmt, labeler)
+            rs.push({ name: f.name, ok: true, agg })
+        }
+        catch (err) {
+            rs.push({ name: f.name, ok: false, err: String(get(err, 'message', err)) })
+        }
+    }
+    return rs
+}
+
+
+function mergeAgg(target, agg) {
+    for (let label in agg.ev) {
+        let s = agg.ev[label]
+        let b = target[label]
+        if (b === undefined) {
+            b = { count: 0, kp: {} }
+            target[label] = b
+        }
+        b.count += s.count
+        for (let e in s.kp) {
+            b.kp[e] = (b.kp[e] || 0) + s.kp[e]
+        }
+    }
+    return target
+}
+
+
+//label 是否晚於上界桶 labelEnd: 標籤為定寬 YYYY-MM-DD[THH], 字典序即時間序, 故以字串比較;
+//  年份超過 4 位者 (log 之 time 荒謬大, 如 >= 253402300800000) 標籤較長, 字典序卻可能小於上界 ('10000-…' &lt; '2026-…'), 故先比長度;
+//  超出 Date 範圍者標籤為 'Invalid Date', 字典序大於數字開頭之標籤
+function isLaterLabel(label, labelEnd) {
+    return label.length > labelEnd.length || label > labelEnd
+}
+
+
+function buildOutput(merged, kpTime, labelEnd = null) {
+    //【R-STA-FUTURE-01, ADR-048, Gitea #57】窗內桶補零; 資料桶以「現在所屬桶」為上界, 晚於它之未來時間桶不輸出
+    //  上界 labelEnd 由 genPlan 給 (plan.labelEnd, 現在所屬桶之標籤; 窗非空時即 kpTime 最末桶); 未給 (null) 時取 kpTime 最末桶, kpTime 亦空則不設上界
+    //  紀錄之 time 取寫入當下之真實時鐘, 而「現在」可由 opt.timeNow 釘住 (或時鐘回撥), 兩者不一致時會有晚於現在之紀錄:
+    //  輸出若含其桶, 圖表多出一格未來刻度 (Y 軸隨之被主導), 前端以「陣列末桶即現在」取最近 N 桶亦隨之位移
+    //  上界為「桶」非「時刻」: 現在所屬桶內略晚於現在之紀錄 (統計執行期間新寫入者) 照計
+    //  只在輸出層過濾: 掃描 (scanFile) 與檔級快取不依 timeNow 之上界, 故 timeNow 後移至紀錄之後時該桶仍會出現
+    //  (原註解「對齊原 merge({}, kpTime, gsLog)」: 改造前實作無上界, 重構時連同此缺陷保留, 並非規格; 不得為「對齊改造前實作」而恢復聯集)
+    let kp = {}
+    for (let label of kpTime) {
+        kp[label] = { count: 0 }
+    }
+    if (labelEnd === null &amp;&amp; kpTime.length > 0) {
+        labelEnd = kpTime[kpTime.length - 1]
+    }
+    for (let label in merged) {
+        if (labelEnd !== null &amp;&amp; isLaterLabel(label, labelEnd)) {
+            continue
+        }
+        let b = merged[label]
+        kp[label] = { count: b.count, ...b.kp }
+    }
+    return Object.keys(kp)
+        .sort()
+        .map((time) => ({
+            time,
+            data: kp[time],
+        }))
+}
+
+
+function getCacheKey(fdLog, fmt) {
+    return `${path.resolve(fdLog)}|${fmt}`
+}
+
+
+function getCacheDir(key) {
+    let m = kpCache.get(key)
+    if (!m) {
+        m = new Map()
+        kpCache.set(key, m)
+    }
+    return m
+}
+
+
+function clearCache() {
+    kpCache.clear()
+}
+
+
+function getCacheSize(fdLog = './logs', timeInterval = 'hr') {
+    let fmt = normTimeInterval(timeInterval) === 'day' ? 'YYYY-MM-DD' : 'YYYY-MM-DDTHH'
+    let m = kpCache.get(getCacheKey(fdLog, fmt))
+    return m ? m.size : 0
+}
+
+
+async function run(plan, opt = {}) {
+
+    //useCache
+    let useCache = get(opt, 'useCache') !== false
+
+    //scanFilesFn, callWorker 注入 worker 版
+    let scanFilesFn = get(opt, 'scanFiles')
+    if (!isfun(scanFilesFn)) {
+        scanFilesFn = scanFiles
+    }
+
+    //srLog
+    let srLog = get(opt, 'srLog', null)
+
+    //files
+    let files = listFiles(plan.fdLog, plan.tStart, plan.fmt)
+
+    //cacheDir
+    let cacheDir = getCacheDir(getCacheKey(plan.fdLog, plan.fmt))
+
+    //分流: 快取可沿用 vs 需重掃
+    let toScan = []
+    let kpAgg = {}
+    for (let f of files) {
+        let c = useCache ? cacheDir.get(f.name) : undefined
+        //沿用條件: 檔未變 + 彙總完整 (掃描時無行被窗過濾: minTimeMs > scanTStartMs) + 整檔仍在新窗內 (minTimeMs > 新 tStartMs)
+        //  只檢查後者時, timeLength 由小變大 (tStart 後退) 會沿用以窄窗掃出之不完整彙總 → 靜默漏算
+        let b = c !== undefined &amp;&amp;
+            c.size === f.size &amp;&amp;
+            c.mtimeMs === f.mtimeMs &amp;&amp;
+            (c.minTimeMs === null || (c.minTimeMs > c.scanTStartMs &amp;&amp; c.minTimeMs > plan.tStartMs))
+        if (b) {
+            kpAgg[f.name] = c.agg
+        }
+        else {
+            toScan.push(f)
+        }
+    }
+
+    //淘汰已不存在之檔 (cleanLogs 刪舊檔)
+    if (useCache) {
+        let kpName = new Set(files.map((f) => f.name))
+        for (let name of cacheDir.keys()) {
+            if (!kpName.has(name)) {
+                cacheDir.delete(name)
+            }
+        }
+    }
+
+    //scan
+    let errors = []
+    if (toScan.length > 0) {
+        let rs = await scanFilesFn(toScan.map((f) => ({ path: f.path, name: f.name })), plan.tStartMs, plan.fmt)
+        let kpRs = {}
+        for (let r of rs) {
+            kpRs[r.name] = r
+        }
+        for (let f of toScan) {
+            let r = kpRs[f.name]
+            if (r &amp;&amp; r.ok) {
+                kpAgg[f.name] = r.agg
+                if (useCache) {
+                    cacheDir.set(f.name, { size: f.size, mtimeMs: f.mtimeMs, minTimeMs: r.agg.minTimeMs, scanTStartMs: plan.tStartMs, agg: r.agg })
+                }
+            }
+            else {
+                let err = get(r, 'err', 'no result')
+                errors.push({ name: f.name, err })
+                if (useCache) {
+                    cacheDir.delete(f.name)
+                }
+                if (srLog &amp;&amp; isfun(srLog.warn)) {
+                    srLog.warn({ event: 'fun-staLogs', key: 'staLogsFileSkipped', name: f.name, err })
+                }
+            }
+        }
+    }
+
+    //merge
+    let merged = {}
+    for (let f of files) {
+        let agg = kpAgg[f.name]
+        if (agg) {
+            mergeAgg(merged, agg)
+        }
+    }
+
+    //output
+    let rs = buildOutput(merged, plan.kpTime, plan.labelEnd)
+    return {
+        rs,
+        stat: {
+            nFiles: files.length,
+            nScanned: toScan.length,
+            nCached: files.length - toScan.length,
+            errors,
+        },
+    }
+}
+
+
+//staLogs: staEvent 之核心入口, 回傳 { rs, stat }
+function staLogs(timeLength = 7, timeInterval = 'hr', opt = {}) {
+    //非 async: 併發呼叫須回傳同一個 promise 物件
+
+    //plan (genPlan 對無效 timeLength 同步 throw Error('errTimeLengthInvalid'); 本入口回傳 Promise, 依規格〈輸入參數之檢測機制〉§5.1 一律 reject 固定鍵字串, 不同步 throw、不回顯值,
+    //使 kpFunExt 之 err key 可記 log 且前端可依 lang 查文字)
+    let plan
+    try {
+        plan = genPlan(timeLength, timeInterval, opt)
+    }
+    catch (err) {
+        return Promise.reject(get(err, 'message') === 'errTimeLengthInvalid' ? 'errTimeLengthInvalid' : err)
+    }
+
+    //single-flight (key 用轉換後之 plan.timeLength: 7 與 '7' 為同一查詢, K4)
+    let key = JSON.stringify([path.resolve(plan.fdLog), plan.timeLength, plan.timeInterval, get(opt, 'timeNow', null)])
+    if (kpInflight.has(key)) {
+        return kpInflight.get(key)
+    }
+    let pm = run(plan, opt)
+        .finally(() => {
+            kpInflight.delete(key)
+        })
+    kpInflight.set(key, pm)
+
+    return pm
+}
+
+
+// ---------------------------------------------------------------------------
+// staEventTable: 各 event 近 1日/8hr/4hr/1hr 巢狀窗計數 (語意與原 staEventTable.mjs 逐行一致)
+// ---------------------------------------------------------------------------
+
+//absFloor: dayjs diff 之取整 (負數向零取整), 對齊原 now.diff(ot(v.time), 'hour')
+function absFloor(n) {
+    return n &lt; 0 ? (Math.ceil(n) || 0) : Math.floor(n)
+}
+
+
+//toMsForTable: 對齊原 ot(v.time): 無 time 視為 now; 數值直接用; 字串 dayjs 解析 (無法解析回 NaN → 原 diff 為 NaN → 各窗判斷皆 false, 列仍初始化為 0)
+function toMsForTable(t, nowMs) {
+    if (t === undefined || t === null) {
+        return nowMs
+    }
+    if (typeof t === 'number') {
+        return t
+    }
+    if (typeof t === 'string') {
+        return ot(t).valueOf()
+    }
+    return ot(t).valueOf()
+}
+
+
+//掃一批檔案累計各 event 之巢狀窗計數; 單檔失敗略過 (worker 端亦呼叫此函式)
+async function scanTableFiles(files, nowMs) {
+    let kp = {}
+    let errors = []
+    for (let f of files) {
+        try {
+            await readLines(f.path, (line) => {
+                let v = parseLine(line)
+                if (v === null) {
+                    return
+                }
+                let event = v.event
+                if (!isestr(event)) {
+                    return
+                }
+
+                //dh, 距今幾小時 (對齊 dayjs diff(hour) 之取整)
+                let tms = toMsForTable(v.time, nowMs)
+                let dh = absFloor((nowMs - tms) / 3600000)
+                if (dh &lt; 0 || dh > 24) {
+                    return //超過 1日窗或未來時間略過 (NaN 時兩者皆 false, 與原語意同)
+                }
+
+                //初始化
+                if (!kp[event]) {
+                    kp[event] = { last1Day: 0, last8Hour: 0, last4Hour: 0, last1Hour: 0 }
+                }
+
+                //巢狀窗各自累計 (1hr⊂4hr⊂8hr⊂24hr)
+                if (dh &lt;= 24) {
+                    kp[event].last1Day += 1
+                }
+                if (dh &lt;= 8) {
+                    kp[event].last8Hour += 1
+                }
+                if (dh &lt;= 4) {
+                    kp[event].last4Hour += 1
+                }
+                if (dh &lt;= 1) {
+                    kp[event].last1Hour += 1
+                }
+            })
+        }
+        catch (err) {
+            errors.push({ name: f.name, err: String(get(err, 'message', err)) })
+        }
+    }
+    return { kp, errors }
+}
+
+
+//staTable: staEventTable 之核心入口, 回傳 { rs, stat }
+async function staTable(opt = {}) {
+
+    //fdLog
+    let fdLog = normFdLog(opt)
+
+    //now
+    let timeNow = get(opt, 'timeNow')
+    let now = (typeof timeNow === 'number') ? ot(timeNow) : ot()
+    let nowMs = now.valueOf()
+
+    //scanTableFilesFn, callWorker 注入 worker 版
+    let scanTableFilesFn = get(opt, 'scanTableFiles')
+    if (!isfun(scanTableFilesFn)) {
+        scanTableFilesFn = scanTableFiles
+    }
+
+    //srLog
+    let srLog = get(opt, 'srLog', null)
+
+    //files, 開檔前剔除窗外檔; 用 25h (非 24h) 是因 diff('hour') 取整, 最舊可能到 now-25h, 多留一小時確保不漏讀
+    let files = listFiles(fdLog, now.subtract(25, 'hour'), 'YYYY-MM-DDTHH')
+
+    //scan
+    let { kp, errors } = await scanTableFilesFn(files.map((f) => ({ path: f.path, name: f.name })), nowMs)
+    for (let e of errors) {
+        if (srLog &amp;&amp; isfun(srLog.warn)) {
+            srLog.warn({ event: 'fun-staLogs', key: 'staLogsFileSkipped', name: e.name, err: e.err })
+        }
+    }
+
+    //rs
+    let rs = []
+    for (let event in kp) {
+        rs.push({ event, ...kp[event] })
+    }
+
+    //依 last1Day 由大到小排序
+    rs.sort((a, b) => b.last1Day - a.last1Day)
+
+    return { rs, stat: { nFiles: files.length, errors } }
+}
+
+
+export { staLogs, staTable, genPlan, parseTimeLength, MAX_TIME_LENGTH_DAY, listFiles, scanFile, scanFiles, scanTableFiles, mergeAgg, buildOutput, clearCache, getCacheSize, normTimeInterval }
+export default staLogs
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+    
+    
+</div>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 4.0.5</a> on Mon Nov 23 2026 05:23:38 GMT+0800 (台北標準時間) using the <a href="https://github.com/clenemt/docdash">docdash</a> theme.
+</footer>
+
+<script>prettyPrint();</script>
+<script src="scripts/polyfill.js"></script>
+<script src="scripts/linenumber.js"></script>
+
+
+
+</body>
+</html>

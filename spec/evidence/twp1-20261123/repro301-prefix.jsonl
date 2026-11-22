@@ -1,0 +1,20 @@
+{"name":"str7","ok":true,"nKp":169,"ms":5}
+{"name":"strAbc","hang":true,"note":"timeout 6000ms (無窮迴圈或過慢)"}
+{"name":"strEmpty","ok":true,"nKp":1,"ms":2}
+{"name":"NaN","hang":true,"note":"timeout 6000ms (無窮迴圈或過慢)"}
+{"name":"neg1","ok":true,"nKp":0,"ms":3}
+{"name":"negHuge","hang":true,"note":"timeout 6000ms (無窮迴圈或過慢)"}
+{"name":"Infinity","hang":true,"note":"timeout 6000ms (無窮迴圈或過慢)"}
+{"name":"negInfinity","hang":true,"note":"timeout 6000ms (無窮迴圈或過慢)"}
+{"name":"obj","hang":true,"note":"timeout 6000ms (無窮迴圈或過慢)"}
+{"name":"arr","ok":true,"nKp":1,"ms":2}
+{"name":"nul","ok":true,"nKp":1,"ms":3}
+{"name":"undef","ok":true,"nKp":169,"ms":4}
+{"name":"true","ok":true,"nKp":25,"ms":3}
+{"name":"float1.5","ok":true,"nKp":25,"ms":2}
+{"name":"zero","ok":true,"nKp":1,"ms":3}
+{"name":"int7","ok":true,"nKp":169,"ms":5}
+{"name":"huge1e20","hang":true,"note":"timeout 6000ms (無窮迴圈或過慢)"}
+{"name":"big3650","ok":true,"nKp":87601,"ms":338}
+{"name":"big3651","ok":true,"nKp":87625,"ms":328}
+{"name":"big100000","hang":true,"note":"timeout 6000ms (無窮迴圈或過慢)"}

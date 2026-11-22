@@ -6,6 +6,9 @@
 //cmp 為 WAggridVue 元件實例(含 getApi(): ag-grid GridApi; w-aggrid-vue 2.1.9). 純函數: 不依賴 Vue; 取不到 api(尚未掛載、已銷毀)一律視為「未在編輯」.
 
 
+import { describeErr } from './describeShape.mjs'
+
+
 let apiOf = (cmp) => {
     try {
         let api = (cmp !== null && cmp !== undefined && typeof cmp.getApi === 'function') ? cmp.getApi() : null
@@ -62,7 +65,7 @@ function bindCellEditingStop(cmp, onStop) {
             onStop()
         }
         catch (err) {
-            console.log('cellEditingStopped', err)
+            console.log('cellEditingStopped', describeErr(err))
         }
     })
     return true

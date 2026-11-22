@@ -1309,6 +1309,10 @@ let kpLang = {
         eng: `Failed to load data`,
         cht: `資料載入失敗`,
     },
+    errTimeLengthInvalid: {
+        eng: `Invalid time length`,
+        cht: `時間長度無效`,
+    },
     staTableTitle: {
         eng: `Event Statistics`,
         cht: `事件統計表`,
