@@ -4,6 +4,17 @@
 
 - **2026-10-22 抽出歷史經驗**:2026-10-20 以前之各節(e2e 側欄位移、統計頁、升版、授權存檔不變等)移至 `experience_20261022.md`(標題與內容不變);查久遠經驗時再調閱.
 
+## 獨立實操確認(verify01, 2026-10-25)之做法與易誤判點; 全套與外審流程補遺(2026-10-20～11-03 各輪; 2026-11-22 自自動記憶提取)
+- **獨立實操確認之做法**(實操確認者為未參與撰寫之角色, 主控要的是獨立於作者測試之證據; 全綠不等於探測抓得到問題): 不用 repo 之 `srv.mjs` 與其測試權杖, 在 `./tmp/<名>/` 自寫 `deploy.mjs`(自有權杖表)、自有 `run/` 夾(dist 副本＋自有 db/logs, 以 spawn 之 `cwd` 指定), 全程不碰 repo 之 `db/`; 另以 `git archive <舊 commit> server src` 解到 `./tmp` 跑同一套探測當**負對照**, 證明探測有鑑別力(run01 檢查點 10 FAIL、本輪前 31 FAIL、現行 0 FAIL).
+- **注入 ORM 失敗**: `WServOrm` 以 `new WOrm({url, db, cl: 表名})` 建表, 部署方可換包裝版 WOrm(須 function 非箭頭、鍵為 `cl`)來注入失敗, 驗「路由不回 ORM 原文」(sol#5 類).
+- **被拒畫面之語系**: `csErrNotAdmin`／`csErrLogin` 之語系是伺服端注入之網頁語系, `setLang('cht')` 無效(`mUI.getLang` 先讀 window); 驗中文須以 `language:'cht'` 另起部署. `isDev()` 看網址含 `localhost`: 用 127.0.0.1 被拒即轉址, 用 localhost 停 60 秒.
+- **Authorization 之測法**: fetch 會在送出前去除標頭值首尾空白, 無法測「尾端空白」. 舊碼 `strdelleft(auth, 7)` 下 `Basic <t>`／`Token <t>`(6 字元前綴)其實**被拒**(截掉權杖首字), 真正通過的是 7 字元前綴(`Digest <t>`、雙空白、任意 7 字元)——故 R-BEARER-01 條文「修前……使 `Basic <token>` 通過」與 `server/WWebPerm.mjs` 該處註解之敘述不準(README 已正, 見 perm-verify01 報告 N1); 改此兩處時依此更正.
+- **權限樹比對**: 權限樹之 `rules` 會列全部標的, 新增外部標的後清單變長; 比對須限種子標的子集.
+- **先用既有 e2e 受影響集當整合探針**(run07): UI 子代理只能做靜態／Node 驗證, 真瀏覽器問題只有 e2e 看得到; 寫完 UI 後主責立刻序列跑改動範圍 e2e(run07 由此發現 array-form 15 案前提失效, 並證明既有標準圖零像素差異), 再派新案例.
+- **新增 `server/tools/*` 檔或把新子夾放進 `server/` 前, 先 Grep 掃整個 `server/` 之靜態不變式**(run08): `unit-validateRows` SITE-NS-001(寫入站點全集; 離線工具於其 tools/ 段登記, 不要求驗證)與 `unit-refCascade` RC-503(server 端不得匯入／使用 JSON5; 用 JSON5 之工具須登記例外清單); 兩者皆在新檔落地後才轉紅, 先找出這類 walk 比跑完整套再逐個失敗省. 改 `syncAndReplaceTabs` 保留邏輯時另看 `unit-syncKeep`(SITE-SK)、`unit-syncKeepEntity`(SITE-KE).
+- **全套中途決定改程式碼**(pm57): 已開跑之全套立刻終止重排(凍結碼才算數); 終止後確認無殘留行程、清掉自己遺留之 `test/_tmp/settings-e2e-<pid>-*.json`.
+- **時限規劃**(run06／run07): 規劃輪次先倒推「最終驗證＋報告」所需時間再決定 e2e 範圍; 子代理跑長 e2e 前先講明截止時刻(單輪 4 小時; 單檔約 8 分、array-form 約 16 分級); 時限以實測 `date` 為準(感覺會差很多); e2e 無並行負載時比有負載快約 30%(grups 7 對 10 分).
+
 ## dev server proxy 重用連線與 TIME_WAIT 輕量量測(2026-11-07 pp347〔任務 20261107181536, 排程第 347 項〕; R-E2E-PROXY-01; 姊妹套件 w-web-sso 排程第 324 項先查得; 報告 `C:\opensrcOper\dnow\20261107181536\agent-out\pp347-修正報告.md`; 證據 `…\pp347-evidence\`)
 - **修前／修後切換不必來回改 repo 檔**: vue-cli 之 `loadFileConfig.js:11` 先取環境變數 `VUE_CLI_SERVICE_CONFIG_PATH`(絕對路徑)。「修前」以 `git show HEAD:vue.config.js` 另存副本(`tmp/pp347/vue.config.before.js`)，在跑 mocha 之行程環境設該變數(`e2e-setup.mjs` 以 `spawn('npm run serve')` 不給 `env` 即繼承，dev server 讀到副本)；「修後」不設即用現行檔。起跑前以 `require('@vue/cli-service/lib/util/loadFileConfig.js')(process.cwd())` 印 `fileConfigPath` 與 `/api` proxy 之鍵確認選到哪一份(修前 `target,pathRewrite`、修後 `target,agent,pathRewrite`)；比來回編輯 repo 檔安全(中途中斷不會留半改狀態)。
 - **全機 TIME_WAIT 不能直接歸因給本套件**: 取樣期間同機另有他套件 e2e(本機埠 8091／11108／8080／11005 等)與無關服務(7680)同時產生 TIME_WAIT，修後取樣窗尾甚至被他套件的突發拉到 1,259。歸因一律看**本實例埠**(8090／11006；自動換埠時為位移後之埠，e2e log 開頭印 `[e2e-port]`)，全機數字只當背景；取窗只取 mocha 實際起訖(`runMeasure.mjs` 在 `quiet-run --lock` 內寫 `window.json`，取鎖等待期間之取樣排除)。

@@ -64,3 +64,15 @@
 - **關聯**: `sgud/rule/rulebook.md` R-AUTH-ORDER-01／R-AUTH-LOSSY-01／R-AUTH-LIST-01／R-SYNC-NAME-01; `spec/設計要點與取捨.md` ADR-030／031; experience「授權存檔不變」.
 - **判準(業主／主控)**: w-web-perm 屬產品層, **授權正確性優先; 編輯器存檔「授權不變」, 不得靜默增權(亦不得靜默減權)**. 遇到「無法無損表示」之資料, 處置是**拒存並顯示固定訊息、庫內字串不動**, 不是選一邊寫出; 由資料來源(外部應用)修正.
 - **處理**: ①任何新增的授權字串寫出站點(`JSON.stringify` 一份 `cgrups`／`cpemis`／`crules`)須經 `keepKeyOrder`(以對話框序重寫者)並對帶 mode 者先過 `getKpLossy`; ②判定函數之完備性以原函式 `getUserRules` 為真理窮舉(U ⊆ D、漏判 0), 改 `mergeRules` 或解碼時須重跑 `unit-cvKpToObj` 窮舉; ③清單頁顯示授權資料一律經 `cvKpToObj`(物件形式原樣回傳, 標準圖不變); ④外部同步入口與後台入口之名稱／id 檢查成對(`isestr`)且置於 `delAll` 之前.
+
+## 套件審計之範疇: 套件本體與整合者責任之分界(業主 2026-06 裁示; 2026-11-22 自自動記憶提取)
+
+- **關聯**: 對本套件做審計、資安審查、外審之簡報與報告; 隨套件附之範例入口 `srv.mjs`、範例設定 `settings.json` 與 `g_getSettings.mjs`、測試／種子資料 `db/**`(含其 git 歷史); 帳本見 `sgud/rule/rulebook_security.md`.
+- **判斷**: 審計對象是**套件本體之 code 行為**. 下列三類屬引用此套件之系統(整合者)之責任, 不是套件之資安發現, 不列為待修, 連「待確認」亦不列, 更不丟給業主判斷: ①隨套件附之範例／測試資料(`db/*.mdb` 及其 git 歷史、`settings.json`、種子資料、`g_getSettings.mjs` 之輸出)——供開發者看之範例, 保存／版控／清歷史由整合者決定; ②密鑰與設定如何保存(salt、權杖與金鑰之佔位符、設定檔是否含敏感值)——整合者部署時才填真值; ③部署安全(資料庫檔入 git、`corsOrigins`、權杖經網址傳遞、`srv.mjs` 之開發用捷徑權杖). **仍屬套件範疇**: 套件自身 code 之正確性與邏輯缺陷、套件自己之 log 記錄(如 kpFunExt 失敗未記 err key)、對外契約與文件之一致性; 另自 2026-10 起連線閘與身分驗證之實作本身(`verifyConn`、`getUserIdByToken` 等)亦由套件自行強制(R-ADMIN-ONLY-01、R-CALLER-ID-01), 不在排除之列——排除的只是整合者「如何設定與接線」.
+- **處理**: ①審計前先判定標的是套件還是應用, 是套件則於審計簡報明寫上述三類不列; ②要提醒整合者時只在 ADR 或 README 寫一句「此項由整合者負責」, 不進資安發現清單; ③殷鑑: 審計反覆把『範例 db 入 git』『權杖經網址傳遞』當套件必修, 業主糾正為整合契約與部署責任, 屬誤報且把過濾外包給業主. 原自動記憶另有「整合者之授權接線不算套件缺陷」一項, 與現行 R-ADMIN-ONLY-01／R-CALLER-ID-01 衝突, 不採.
+
+## `@mdi/js` 之依賴宣告(業主 2026-08-19 裁示; 2026-11-22 自自動記憶提取)
+
+- **關聯**: `package.json`; `src/**` 內多處 `import … from '@mdi/js/mdi.js'`; `node_modules/w-component-vue/package.json` 之 dependencies.
+- **判斷**: 自有套件(w-* 系列)之專案**不把 `@mdi/js` 宣告進自家 `package.json`**, 一律由 `w-component-vue` 之 dependencies 統一安裝後提供(統一版本, 避免各專案各自宣告版本範圍而出現多份不同版); 即使 `src/` 下多個檔案直接匯入亦不補宣告. 現況: 本套件 `package.json` 無此項, `w-component-vue` 之 dependencies 列有 `@mdi/js`.
+- **處理**: `npm install` 把 `@mdi/js` 從 `package.json` 移除是預期狀態, 不視為安裝流程之意外、不補回; 要確認可用性只看 `node_modules/w-component-vue/package.json` 之 dependencies 有列 `@mdi/js`. 依賴問題由套件端統一改版, 不在專案端補裝或繞道(全域 §5.1).
