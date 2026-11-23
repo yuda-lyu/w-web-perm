@@ -114,7 +114,8 @@ function genPlan(timeLength = 7, timeInterval = 'hr', opt = {}) {
     //labelEnd, 「現在」所屬桶之標籤 (輸出之上界, 見 buildOutput); 取自 tEnd 而非 kpTime 末項: 不依賴 kpTime 非空 (2026-11-23 起 timeLength 於入口限為 >= 0, kpTime 恆非空; 原 timeLength 為負時窗起點在未來而 kpTime 為空, 上界仍須存在, 此取法保留不動)
     let labelEnd = tEnd.format(fmt)
 
-    return { fdLog, timeInterval: ti, fmt, unit, tStart, tStartMs, kpTime, labelEnd, timeNow: now.valueOf(), timeLength: nDay }
+    //timeNowPinned: opt.timeNow 是否被採用(isNowOk); staLogs 之 single-flight 鍵只在被採用時含 plan.timeNow(採用後之毫秒時刻), 未被採用者(退回現在)與未給同鍵(K4: 檢測之值即使用之值, 與 parseTimeLength 同一口徑)
+    return { fdLog, timeInterval: ti, fmt, unit, tStart, tStartMs, kpTime, labelEnd, timeNow: now.valueOf(), timeNowPinned: isNowOk, timeLength: nDay }
 }
 
 
@@ -487,8 +488,9 @@ function staLogs(timeLength = 7, timeInterval = 'hr', opt = {}) {
         return Promise.reject(get(err, 'message') === 'errTimeLengthInvalid' ? 'errTimeLengthInvalid' : err)
     }
 
-    //single-flight (key 用轉換後之 plan.timeLength: 7 與 '7' 為同一查詢, K4)
-    let key = JSON.stringify([path.resolve(plan.fdLog), plan.timeLength, plan.timeInterval, get(opt, 'timeNow', null)])
+    //single-flight (key 全用 genPlan 檢測並轉換後之值, K4: timeLength 之 7 與 '7' 為同一查詢; opt.timeNow 只在被採用(plan.timeNowPinned)時以採用後之毫秒時刻 plan.timeNow 入鍵,
+    //  被視為未給者(範圍外、非數字、非原始值)與未給同為 null——同義之輸入共用同一飛行中之請求; 不用 opt.timeNow 原值: 原值 JSON 序列化使 1e300 與未給不同鍵、小數毫秒與整毫秒不同鍵, BigInt／循環物件／已撤銷之 Proxy 更使本函數同步拋 TypeError)
+    let key = JSON.stringify([path.resolve(plan.fdLog), plan.timeLength, plan.timeInterval, plan.timeNowPinned ? plan.timeNow : null])
     if (kpInflight.has(key)) {
         return kpInflight.get(key)
     }

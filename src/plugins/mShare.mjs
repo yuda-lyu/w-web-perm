@@ -22,7 +22,7 @@ import getEffMode from '../js/getEffMode.mjs'
 import isAuthMode from '../js/isAuthMode.mjs'
 
 
-//nameOfErr: console 診斷用之錯誤類別名稱(只取識別字形狀之 name, 不取訊息; 非 Error 只回型別); 本檔前後端共用, 故不引用 server/maskLog.mjs 之 describeErr(ADR-047)
+//nameOfErr: console 診斷用之錯誤類別名稱(只取識別字形狀之 name, 不取訊息; 非 Error 只回型別); 本檔前後端共用(ADR-047); 本檔既有之錯誤類別摘要, 比 wsemi getDiagBriefErr 寬(任何 \w{1,40} 之 name 皆放行), 2026-11-23 twp2(排程第 603 項)未納入範圍, 是否改用 getDiagBriefErr 見 ADR-051 待裁示
 let nameOfErr = (err) => {
     let n = null
     try {

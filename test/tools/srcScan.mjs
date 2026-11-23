@@ -109,9 +109,9 @@ export function sourceLines(fp, mode) {
 }
 
 
-//dropMaskCalls: 移除 maskTok(...) / maskUrl(...) / describeShape(...) / describeErr(...) 整段(已遮罩或只印鍵名／型別之引數)
+//dropMaskCalls: 移除 maskTok(...) / maskUrl(...) / getDiagShape(...) / getDiagBriefErr(...) 整段(已遮罩或只印鍵名／型別／錯誤類別之引數; 後二者為 wsemi 共用函數, 規格〈診斷輸出與遮罩〉D1)
 function dropMaskCalls(s) {
-    let re = /\b(maskTok|maskUrl|describeShape|describeErr)\(/
+    let re = /\b(maskTok|maskUrl|getDiagShape|getDiagBriefErr)\(/
     for (let n = 0; n < 100; n++) {
         let m = re.exec(s)
         if (!m) {
@@ -130,7 +130,7 @@ function dropMaskCalls(s) {
 
 /**
  * 盤點 console.log / error / warn / info 呼叫中未經遮罩之權杖引數
- * 判準: 引數(去掉 maskTok / maskUrl / describeShape / describeErr 之整段後)含權杖類識別字 token / tokenSelf / authorization / headers / referer,
+ * 判準: 引數(去掉 maskTok / maskUrl / getDiagShape / getDiagBriefErr 之整段後)含權杖類識別字 token / tokenSelf / authorization / headers / referer,
  * 或含 get(req, 'query') / req.query 者為違規
  *
  * @param {String} fp 輸入檔案路徑
@@ -236,7 +236,7 @@ export function splitTopLevel(s) {
 /**
  * 盤點 console.log / error / warn / info / debug 呼叫中「可能印出資料值」之引數(規則帳本 R-CONSOLE-NOVAL-01; R-DIAG-01 D2、V20)
  * 判準: 每個最外層引數須為下列之一, 否則違規——
- *   ①無插值之字串／樣板字串字面值; ②`typeof 識別字`; ③allowCalls 所列函數之呼叫(預設 describeShape／describeErr／maskTok／maskUrl／nameOfErr; 其引數即其內部保證不輸出值);
+ *   ①無插值之字串／樣板字串字面值; ②`typeof 識別字`; ③allowCalls 所列函數之呼叫(預設 getDiagShape／getDiagBriefErr〔wsemi 共用函數, 只輸出型別／鍵名／筆數／錯誤類別與白名單代碼〕／maskTok／maskUrl／nameOfErr; 其引數即其內部保證不輸出值);
  *   ④allowIds 所列之識別字(須逐一有理由: 固定詞彙或非資料值); ⑤allowExprs 所列之整段運算式; ⑥樣板字串之每個插值皆符合②～⑤或 `識別字.length`(筆數)
  *
  * @param {String} fp 輸入檔案路徑
@@ -249,7 +249,7 @@ export function splitTopLevel(s) {
  */
 export function scanConsoleValueArgs(fp, mode, opt = {}) {
     let allowIds = opt.allowIds || []
-    let allowCalls = opt.allowCalls || ['describeShape', 'describeErr', 'maskTok', 'maskUrl', 'nameOfErr']
+    let allowCalls = opt.allowCalls || ['getDiagShape', 'getDiagBriefErr', 'maskTok', 'maskUrl', 'nameOfErr']
     let allowExprs = opt.allowExprs || []
     let bad = []
 

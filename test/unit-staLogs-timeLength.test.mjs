@@ -4,6 +4,7 @@
 //TL-002 無效 timeLength × 各層入口(genPlan、staLogs、staEvent、staEvent.callWorker、procStaInfor.getStaEvent〔kpFunExt 之下層〕、mock 模式): 一律被拒且為固定鍵 errTimeLengthInvalid(genPlan 為同步 throw Error, 其餘為 reject 字串)
 //TL-003 有效 timeLength × 各層入口: 照常產出(桶數 = 天數 × 24 + 1)
 //TL-004 K4 檢測之值即使用之值: '7' 與 7 共用同一 single-flight(同一 promise)
+//TL-004d 同上之 opt.timeNow 部分(2026-11-23 twp2, 排程第 603 項): single-flight 鍵用 genPlan 採用後之 timeNow(timeNowPinned 且 plan.timeNow), 被視為未給之值與未給為同一查詢
 //TL-005 opt.timeNow 為 NaN、±Infinity、超出 Date 範圍者視為未給(退回現在), 不再使 kpTime 迴圈成為無窮迴圈
 //TL-006 站點不變式: 凡使用 timeLength 之伺服端檔案為已盤點之全集; 檢測先於 subtract／快取鍵; 伺服端唯一對外入口 getStaEvent 只經 psi.getStaEvent
 //
@@ -140,6 +141,117 @@ describe('unit-staLogs-timeLength (統計 timeLength 入口檢測, 排程第 301
     })
 
 
+    //TL-004d K4 檢測之值即使用之值(opt.timeNow 部分; 2026-11-23 twp2, 排程第 603 項): single-flight 之鍵須用 genPlan 採用後之時刻(plan.timeNow 且僅於被採用時), 與 parseTimeLength 同一口徑——
+    //  同一時刻之不同寫法(小數毫秒)為同一查詢、被視為未給之值(範圍外、非數字)與未給為同一查詢(皆退回現在); 不同時刻不得併為同一查詢.
+    //  修前鍵為 JSON.stringify(opt.timeNow 原值): 1e300、-1、2100 年之後、8.64e15、數字字串、布林、物件等各自成鍵(同義之輸入各掃一次); BigInt、循環物件、已撤銷之 Proxy 使 staLogs 同步拋 TypeError(不是 reject)
+    describe('TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)', function() {
+        const X = Date.UTC(2026, 10, 23, 4, 0, 0)
+        let pending = []
+        //call: 同一 fdLog、同一 timeLength／timeInterval 呼叫 staLogs; hasNow 為 false 時不帶 timeNow 鍵(未給)
+        let call = (hasNow, timeNow) => {
+            let o = { fdLog, useCache: false }
+            if (hasNow) {
+                o.timeNow = timeNow
+            }
+            let p = staLogs(7, 'hr', o)
+            pending.push(p)
+            return p
+        }
+        //spin: 空轉至系統時鐘前進(使「退回現在」之 plan.timeNow 毫秒值於兩次呼叫之間必不同; 否則以 plan.timeNow 未經採用判斷直接入鍵之錯誤實作可能因同一毫秒而恰好通過)
+        let spin = () => {
+            let t = Date.now()
+            while (Date.now() === t) {
+                //busy wait ≤ 1 ms
+            }
+        }
+        afterEach(async function() {
+            let ps = pending
+            pending = []
+            await Promise.allSettled(ps) //併發呼叫皆等其結束, 使 in-flight 表於案例間清空
+        })
+
+        //被採用之 timeNow: 同一毫秒時刻之不同寫法共用; 不同時刻、與未給皆不共用
+        it('TL-004d-pinned: 同一毫秒時刻(X、X + 0.4、X + 0.999)為同一 promise; X + 1 毫秒、X + 1 小時、未給 皆為不同 promise', async function() {
+            let p0 = call(true, X)
+            let p1 = call(true, X + 0.4) //Date 取整為 X
+            let p2 = call(true, X + 0.999)
+            A.ok(p0 === p1 && p0 === p2, 'X、X + 0.4、X + 0.999 轉換後皆為 X 毫秒, 應為同一查詢(同一 in-flight promise)')
+            A.ok(call(true, X + 1) !== p0, 'X + 1 毫秒為不同時刻, 不得併為同一查詢')
+            A.ok(call(true, X + 3600000) !== p0, 'X + 1 小時為不同時刻, 不得併為同一查詢')
+            A.ok(call(false) !== p0, '未給(退回現在)與被採用之 X 不得併為同一查詢')
+        })
+
+        //範圍之兩端(含)為被採用: 0 與 -0 為同一時刻
+        it('TL-004d-pinned-edges: epoch 0 與 -0 為同一 promise; 2100-01-01 之前 0.5 毫秒與其前整毫秒為同一 promise; 兩端互不相同; 超過上限 0.5 毫秒者視為未給', async function() {
+            let pa = call(true, 0)
+            let pb = call(true, -0)
+            A.ok(pa === pb, '0 與 -0 為同一時刻')
+            let pc = call(true, 4102444800000 - 1) //上限前 1 毫秒(範圍內)
+            let pd = call(true, 4102444800000 - 0.5) //Date 取整為上限前 1 毫秒
+            A.ok(pc === pd, '範圍內之小數毫秒與其取整後之整毫秒為同一時刻')
+            A.ok(pa !== pc, '1970 與 2100 不得併為同一查詢')
+            let pe = call(true, 4102444800000) //上限本身(含)被採用
+            A.ok(pe !== pc && pe !== pa, '上限本身被採用, 與其前 1 毫秒、1970 皆為不同查詢')
+            spin()
+            let pf = call(true, 4102444800000 + 0.5) //超過上限 0.5 毫秒: 原值判斷在範圍外, 視為未給
+            let pg = call(false)
+            A.ok(pf === pg && pf !== pe, '超過上限者視為未給(退回現在), 與未給同一查詢, 不與上限本身同一查詢')
+        })
+
+        //未被採用者(視為未給, 退回現在): 與未給同一 promise。名稱同 TL-005 之意圖; 範圍外、非數字、非原始值皆列
+        let circ = {}
+        circ.self = circ
+        let revoked = Proxy.revocable({}, {})
+        revoked.revoke()
+        const UNUSED = [
+            ['undefined', () => undefined],
+            ['null', () => null],
+            ['NaN', () => NaN],
+            ['Infinity', () => Infinity],
+            ['neg-Infinity', () => -Infinity],
+            ['1e300', () => 1e300],
+            ['neg-1e300', () => -1e300],
+            ['neg1', () => -1],
+            ['beyond-2100', () => 4102444800001],
+            ['date-max', () => 8.64e15],
+            ['date-min', () => -8.64e15],
+            ['numeric-string', () => String(X)],
+            ['true', () => true],
+            ['object', () => ({})],
+            ['array', () => [X]],
+            ['Date-object', () => new Date(X)],
+            ['bigint', () => 1n],
+            ['symbol', () => Symbol('t')],
+            ['function', () => () => X],
+            ['circular-object', () => circ],
+            ['revoked-proxy', () => revoked.proxy],
+        ]
+        for (let [name, mk] of UNUSED) {
+            it(`TL-004d-unused-${name}: 被視為未給之 timeNow 與未給為同一 promise(且不同步拋錯)`, async function() {
+                let p0 = call(false)
+                spin()
+                let p1 = null
+                A.doesNotThrow(() => {
+                    p1 = call(true, mk())
+                }, 'staLogs 回傳 Promise, 不得因 timeNow 之型別(BigInt、循環、已撤銷之 Proxy)而同步拋錯')
+                A.ok(p0 === p1, `timeNow=${name} 未被採用(退回現在), 應與未給為同一查詢(同一 in-flight promise)`)
+            })
+        }
+
+        //結果層: 併為同一查詢者之結果相同且為採用 X 之 169 桶; 未被採用者之結果為退回現在之 169 桶(不是 NaN 桶等)
+        it('TL-004d-result: 併為同一查詢者之結果相同; timeNow 被採用之結果以 X 為現在, 未被採用者以現在計', async function() {
+            let r0 = await call(true, X)
+            A.equal(r0.rs.length, 169)
+            let lastLabel = r0.rs[r0.rs.length - 1].time
+            A.equal(lastLabel, ot(X).format('YYYY-MM-DDTHH'), '被採用之 timeNow 為現在所屬桶')
+            let rBad = await call(true, 8.64e15)
+            A.equal(rBad.rs.length, 169)
+            let nowLabels = [ot().format('YYYY-MM-DDTHH'), ot().subtract(1, 'hour').format('YYYY-MM-DDTHH')]
+            A.ok(nowLabels.includes(rBad.rs[rBad.rs.length - 1].time), `未被採用者退回現在所屬桶(${nowLabels}), 實得 ${rBad.rs[rBad.rs.length - 1].time}`)
+        })
+    })
+
+
     //有效範圍 1970-01-01(epoch 0)～2100-01-01T00:00:00.000Z(含); 範圍外(含 Date 本身之極值 ±8.64e15, 其後之 subtract／add 溢位成 Invalid Date)視為未給改用現在, 不使 kpTime 迴圈無窮; 範圍內(含兩端)照常使用該時刻
     describe('TL-005 opt.timeNow 為無效時刻者視為未給(退回現在), 不使迴圈無窮; 範圍內者照常使用', function() {
         const FMT = 'YYYY-MM-DDTHH'
@@ -225,6 +337,11 @@ describe('unit-staLogs-timeLength (統計 timeLength 入口檢測, 排程第 301
             //staLogs 入口: genPlan 之 throw 轉為 reject 固定鍵, key 用轉換後之 plan.timeLength
             let bodyStaLogs = code.slice(code.indexOf('function staLogs('), code.indexOf('function absFloor('))
             A.ok(/Promise\.reject\(/.test(bodyStaLogs) && /plan\.timeLength/.test(bodyStaLogs), 'staLogs 須 reject 固定鍵且 single-flight 鍵用 plan.timeLength')
+            //single-flight 鍵之 timeNow 用 genPlan 採用後之值(plan.timeNowPinned 與 plan.timeNow), 不得再讀 opt.timeNow 原值(2026-11-23 twp2)
+            A.ok(/plan\.timeNowPinned\s*\?\s*plan\.timeNow\s*:\s*null/.test(bodyStaLogs), 'single-flight 鍵須含 plan.timeNowPinned ? plan.timeNow : null')
+            A.ok(!/timeNow['"]/.test(bodyStaLogs), 'staLogs 不得再以字串鍵讀 opt.timeNow 原值入鍵(get(opt, \'timeNow\'))')
+            let bodyGenPlan = body
+            A.ok(/timeNowPinned:\s*isNowOk/.test(bodyGenPlan), 'genPlan 須回傳 timeNowPinned: isNowOk(採用判斷與 now 之取得同一口徑)')
         })
 
         it('TL-006c procStaInfor.getStaEvent: parseTimeLength 為函數第一個動作, 先於快取鍵、mock 與掃描; 無效 reject errTimeLengthInvalid; 轉交下游者為轉換後之值', function() {

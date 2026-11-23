@@ -139,7 +139,7 @@ describe('api-consoleNoValues (真後端: 含識別值之使用者物件／請�
         let t4 = await act(() => get('/api/getUserByToken?token=tok-badrole'))
         noSec(t4, 'tok-badrole(isAdmin 非 y／n)')
         A.ok(t4.includes('user (keys: id,name,email,isAdmin)'), `應印鍵名摘要, 實得:\n${t4.slice(0, 500)}`)
-        A.ok(t4.includes('user.isAdmin is not y or n (typeof string)'), `isAdmin 之值應只印型別, 實得:\n${t4.slice(0, 500)}`)
+        A.ok(t4.includes('user.isAdmin is not y or n (string)'), `isAdmin 之值應只印型別(2026-11-23 twp2 起為 wsemi getDiagShape 之 '(string)'; 原自有實作為 '(typeof string)'), 實得:\n${t4.slice(0, 500)}`)
     })
 
     //S1／S3: 外部使用者不在 perm 表(getTokenUser 之 cannotGetUserFromPerm 分支)只印鍵名; mappingBy 為固定詞彙照印
@@ -166,7 +166,7 @@ describe('api-consoleNoValues (真後端: 含識別值之使用者物件／請�
         let q = '/syncAndReplaceTabs?keyTable=users&token=sys'
         let t1 = await act(() => post(q, JSON.stringify(SEC)))
         noSec(t1, 'payload 為字串')
-        A.ok(/payload \((typeof string|keys: none)/.test(t1), `應印型別摘要, 實得:\n${t1.slice(0, 500)}`)
+        A.ok(/payload \((string|keys: none)/.test(t1), `應印型別摘要, 實得:\n${t1.slice(0, 500)}`)
         let t2 = await act(() => post(q, JSON.stringify({ from: 123, note: SEC })))
         noSec(t2, 'from 非字串')
         A.ok(t2.includes('payload (keys: from,note)'), `應印鍵名摘要, 實得:\n${t2.slice(0, 500)}`)
@@ -199,10 +199,10 @@ describe('api-consoleNoValues (真後端: 含識別值之使用者物件／請�
     it('CNV-006-keyTable-type-only', async function() {
         let t1 = await act(() => post(`/syncAndReplaceTabs?keyTable=${SEC}&token=sys`, '{}'))
         noSec(t1, 'keyTable 非白名單')
-        A.ok(t1.includes('unexpected keyTable (typeof string)'), `應印型別, 實得:\n${t1.slice(0, 500)}`)
+        A.ok(t1.includes('unexpected keyTable (string)'), `應印型別, 實得:\n${t1.slice(0, 500)}`)
         let t2 = await act(() => post('/syncAndReplaceTabs?keyTable=&token=sys', '{}'))
         noSec(t2, 'keyTable 為空')
-        A.ok(t2.includes('keyTable (typeof string, empty)'), `應印型別, 實得:\n${t2.slice(0, 500)}`)
+        A.ok(t2.includes('keyTable (string, empty)'), `應印型別, 實得:\n${t2.slice(0, 500)}`)
     })
 
     //——— 權限樹評估(getUserRules)與其共用碼(mShare) ———
@@ -218,8 +218,8 @@ describe('api-consoleNoValues (真後端: 含識別值之使用者物件／請�
         fs.writeFileSync(path.join(fdFault, 'targets.poison'), '1')
         let t = await act(() => get('/api/getPerm?token=sys'))
         noSec(t, 'getUserRules 拋出含識別值之例外')
-        A.ok(t.includes('getUserRules (Error)'), `應印錯誤類別, 實得:\n${t.slice(0, 500)}`)
-        A.ok(t.includes('userId (typeof string)'), `userId 應只印型別, 實得:\n${t.slice(0, 500)}`)
+        A.ok(/getUserRules \{ errType: 'Error' \}/.test(t), `應印錯誤類別(wsemi getDiagBriefErr 之物件 { errType }; 2026-11-23 twp2 起, 原自有實作為字串 '(Error)'), 實得:\n${t.slice(0, 500)}`)
+        A.ok(t.includes('userId (string)'), `userId 應只印型別, 實得:\n${t.slice(0, 500)}`)
     })
 
     //——— 權杖(maskTok 照舊)與連線閘 ———
@@ -319,7 +319,7 @@ describe('api-consoleNoValues-init (建構參數含識別值: 建構期 console 
         A.ok(r && r.threw, `應拋錯, 實得輸出:\n${out.slice(-500)}`)
         let all = r.consoleLines.join('\n') + '\n' + out
         A.ok(!all.includes(SEC), `console 不得含識別值, 實得:\n${all.slice(0, 500)}`)
-        A.ok(r.consoleLines.join('\n').includes('\'WServOrm init error\' \'(Error)\''), `應印錯誤類別, 實得:\n${r.consoleLines.join('\n')}`)
+        A.ok(r.consoleLines.join('\n').includes('\'WServOrm init error\' { errType: \'Error\' }'), `應印錯誤類別(wsemi getDiagBriefErr 之物件 { errType }), 實得:\n${r.consoleLines.join('\n')}`)
     })
 
 })

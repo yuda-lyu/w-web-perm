@@ -33,7 +33,9 @@ import createLockSave from './lockSave.mjs'
 import procLang from './procLang.mjs'
 import srLogInit from './srLog.mjs'
 import procStaInfor from './procStaInfor.mjs'
-import { maskTok, maskUrl, describeShape, describeErr } from './maskLog.mjs'
+import { maskTok, maskUrl } from './maskLog.mjs'
+import getDiagShape from 'wsemi/src/getDiagShape.mjs'
+import getDiagBriefErr from 'wsemi/src/getDiagBriefErr.mjs'
 import wrapInjected from './wrapInjected.mjs'
 import { pickUniqueUser, findLoginUsers, countLoginRows, mapKeyOf } from './keyCheck.mjs'
 import { createAuthorizeExec, wrapOperOrm } from './dataChannel.mjs'
@@ -60,8 +62,8 @@ import { getRawSecrets, msgForLog } from './maskRaw.mjs'
  * 本套件直接呼叫 woItems(不經 procOrm)所取得之錯誤原文(寫入時之讀庫、讀回、外部匯入、引用連帶補償、getPerm 之權限樹讀取、連線閘之使用者反查)驅動訊息可能回顯連線字串, 入 srLog 之 raw／rawRestore／verifyConn 之 msg 前,
  * 經 wsemi 之 maskDiagText 移除連線憑證(秘密清單由 url 導出一次, 經 server/maskRaw.mjs 之 getRawSecrets; 以參數 secrets 傳入 procCore、syncCore、writeWithCascade、createRouteResult, 必帶; R-ORM-DIAG-02); 語系鍵(固定詞彙)與 msg／key 欄位不遮, 只遮原文.
  * 參數(WOrm、url、db、三個注入函數)無效時, console 只印該參數之型別(如 'invalid url object'), 不印其值; 需要 Node >=20.16.
- * 行程標準輸出(console)之診斷一律不印資料值(R-DIAG-01 D2、輸入參數之檢測機制 V20; 規則帳本 R-CONSOLE-NOVAL-01, ADR-047): 請求驗證失敗與認證階段只印使用者物件／請求本體／查詢參數之鍵名或型別(server/maskLog.mjs 之 describeShape,
- * 如 '(keys: id,name)'、'(typeof string)')、錯誤只印類別(describeErr, 如 '(Error)'), 權杖仍經 maskTok、網址經 maskUrl; 錯誤訊息文字只入 srLog(連線憑證經 maskRaw 遮罩).
+ * 行程標準輸出(console)之診斷一律不印資料值(R-DIAG-01 D2、輸入參數之檢測機制 V20; 規則帳本 R-CONSOLE-NOVAL-01, ADR-047): 請求驗證失敗與認證階段只印使用者物件／請求本體／查詢參數之鍵名或型別(wsemi 之 getDiagShape,
+ * 如 '(keys: id,name)'、'(string)')、錯誤只印類別(wsemi 之 getDiagBriefErr, 如 { errType: 'Error' }), 權杖仍經 maskTok、網址經 maskUrl; 錯誤訊息文字只入 srLog(連線憑證經 maskRaw 遮罩).
  *
  * token 種類與等級(使用者 2026-10-24 定案, dspec/使用者身分驗證原則.md 二之一; 規則帳本 R-APP-TOKEN-01): 使用者 token(一般使用者／系統管理者)代表登入者, 等級以 perm users 表之列判定; 應用系統 token(部署方 getUserByToken 回傳 isApp 為 'y')分兩種用途——
  * 使用者用途(以 userId 綁定使用者, 反查回所綁使用者之實際資料與 isApp='y'): 以所綁使用者之 perm users 列判定, 與其使用者 token 相同, 不需特別處理;
@@ -344,7 +346,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         wp = WServOrm(ds, WOrm, url, db, { funLog: genDiagFunLog((o) => srLog.warn(o), { safeKeys: SAFE_KEYS }).funLog })
     }
     catch (err) {
-        console.log('WServOrm init error', describeErr(err)) //console 只印錯誤類別(ADR-047), 訊息文字入 srLog(外來值已由 w-serv-orm 遮憑證)並由下方 throw 上拋
+        console.log('WServOrm init error', getDiagBriefErr(err)) //console 只印錯誤類別(ADR-047), 訊息文字入 srLog(外來值已由 w-serv-orm 遮憑證)並由下方 throw 上拋
         srLog.error({ event: 'WServOrm-init-error', msg: (err && err.message) || 'WServOrmInitFailed' })
         throw err //fail-fast: ORM 初始化失敗直接終止啟動, 不以 wp={} 繼續組裝出「port 起得來但 woItems/procOrm 為 undefined、CRUD 全 crash」的半死伺服器
     }
@@ -431,30 +433,30 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
 
     //checkUser
-    //console 診斷只印使用者物件之鍵名與型別(describeShape), 不印欄位值(R-DIAG-01 D2、V20; ADR-047 取代 ADR-023 殘留「console 印使用者物件」之不修)
+    //console 診斷只印使用者物件之鍵名與型別(wsemi 之 getDiagShape), 不印欄位值(R-DIAG-01 D2、V20; ADR-047 取代 ADR-023 殘留「console 印使用者物件」之不修)
     let checkUser = async(user) => {
         let id = get(user, 'id', '')
         if (!isestr(id)) {
-            console.log('user', describeShape(user))
+            console.log('user', getDiagShape(user))
             srLog.error({ event: 'checkUser-error', msg: 'cannotGetUserId' })
             return Promise.reject(`cannotGetUserId`)
         }
         let email = get(user, 'email', '')
         if (!isestr(email)) {
-            console.log('user', describeShape(user))
+            console.log('user', getDiagShape(user))
             srLog.error({ event: 'checkUser-error', msg: 'cannotGetUserEmail' })
             return Promise.reject(`cannotGetUserEmail`)
         }
         let name = get(user, 'name', '')
         if (!isestr(name)) {
-            console.log('user', describeShape(user))
+            console.log('user', getDiagShape(user))
             srLog.error({ event: 'checkUser-error', msg: 'cannotGetUserName' })
             return Promise.reject(`cannotGetUserName`)
         }
         let isAdmin = get(user, 'isAdmin', '')
         if (isAdmin !== 'y' && isAdmin !== 'n') {
-            console.log('user', describeShape(user))
-            console.log('user.isAdmin is not y or n', describeShape(isAdmin))
+            console.log('user', getDiagShape(user))
+            console.log('user.isAdmin is not y or n', getDiagShape(isAdmin))
             srLog.error({ event: 'checkUser-error', msg: 'cannotGetUserRole' })
             return Promise.reject(`cannotGetUserRole`)
         }
@@ -560,7 +562,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
         //check
         if (!isestr(vSelf)) {
-            console.log('userSelf', describeShape(userSelf))
+            console.log('userSelf', getDiagShape(userSelf))
             console.log('mappingBy', mappingBy)
             srLog.error({ event: 'getTokenUser-error', msg: 'cannotGetUserProp', mappingBy })
             return Promise.reject(`cannotGetUserProp`)
@@ -580,7 +582,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
         //check
         if (!iseobj(userFind)) {
-            console.log('userSelf', describeShape(userSelf))
+            console.log('userSelf', getDiagShape(userSelf))
             console.log('mappingBy', mappingBy)
             srLog.error({ event: 'getTokenUser-error', msg: 'cannotGetUserFromPerm', mappingBy })
             return Promise.reject(`cannotGetUserFromPerm`)
@@ -616,7 +618,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
         //check
         if (!b) {
-            console.log('user', describeShape(user))
+            console.log('user', getDiagShape(user))
             srLog.error({ event: 'getAndVerifyClientUser-error', msg: 'userNoPermission', from })
             return Promise.reject(`userNoPermission`)
         }
@@ -685,7 +687,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
         //check
         if (!b) {
-            console.log('user', describeShape(user))
+            console.log('user', getDiagShape(user))
             srLog.error({ event: 'getAndVerifyAppUser-error', msg: 'userNoPermission', from })
             return Promise.reject(`userNoPermission`)
         }
@@ -733,7 +735,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
         //check
         if (!iseobj(payload)) {
-            console.log('payload', describeShape(payload))
+            console.log('payload', getDiagShape(payload))
             srLog.error({ event: 'parsePayload-error', msg: 'invalidPayload' })
             return Promise.reject(`invalidPayload`)
         }
@@ -743,7 +745,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
         //check
         if (!isestr(from)) {
-            console.log('payload', describeShape(payload))
+            console.log('payload', getDiagShape(payload))
             srLog.error({ event: 'parsePayload-error', msg: 'invalidFromInPayload' })
             return Promise.reject(`invalidFromInPayload`)
         }
@@ -753,7 +755,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
         //check
         if (!isearr(rows)) {
-            console.log('payload', describeShape(payload))
+            console.log('payload', getDiagShape(payload))
             srLog.error({ event: 'parsePayload-error', msg: 'invalidRowsInPayload' })
             return Promise.reject(`invalidRowsInPayload`)
         }
@@ -874,8 +876,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
             kur = getUserRules(userFind, grups, pemis, targets)
         }
         catch (err) {
-            console.log('userId', describeShape(userId))
-            console.log('getUserRules', describeErr(err)) //錯誤訊息可能含授權字串之內容(如 JSON 剖析錯誤附原文片段), 只印類別
+            console.log('userId', getDiagShape(userId))
+            console.log('getUserRules', getDiagBriefErr(err)) //錯誤訊息可能含授權字串之內容(如 JSON 剖析錯誤附原文片段), 只印類別
             srLog.error({ event: 'getGenUserAndRulesByUserId-error', msg: 'cannotGetUserRules', userId })
             return Promise.reject(`cannotGetUserRules`)
         }
@@ -883,7 +885,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
         //check
         if (!iseobj(kur)) {
-            console.log('userId', describeShape(userId))
+            console.log('userId', getDiagShape(userId))
             srLog.error({ event: 'getGenUserAndRulesByUserId-error', msg: 'cannotGetUserRules', userId })
             return Promise.reject(`cannotGetUserRules`)
         }
@@ -933,7 +935,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         fs.writeFileSync(fpEntryOut, c, 'utf8')
     }
     catch (err) {
-        console.log('generate entry error', describeErr(err))
+        console.log('generate entry error', getDiagBriefErr(err))
         console.log(`can not generate ${fnEntryOut}`)
     }
 
@@ -965,7 +967,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                     //check
                     if (!isestr(token)) {
-                        console.log('req.query', describeShape(get(req, 'query')))
+                        console.log('req.query', getDiagShape(get(req, 'query')))
                         console.log('token', maskTok(token))
                         console.log('[API]getUserByToken/check token: invalid token')
                         srLog.error({ event: 'api/getUserByToken-error', msg: 'tokenNoPermission' })
@@ -1013,7 +1015,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                     //check
                     if (!isestr(token)) {
-                        console.log('req.query', describeShape(get(req, 'query')))
+                        console.log('req.query', getDiagShape(get(req, 'query')))
                         console.log('token', maskTok(token))
                         console.log('[API]getPerm/check token: invalid token')
                         srLog.error({ event: 'api/getPerm-error', msg: 'tokenNoPermission' })
@@ -1039,7 +1041,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                     //check
                     if (!isestr(userIdSelf)) {
                         console.log('token', maskTok(token))
-                        console.log('userSelf', describeShape(userSelf))
+                        console.log('userSelf', getDiagShape(userSelf))
                         console.log('[API]getPerm/check userIdSelf: invalid userIdSelf')
                         srLog.error({ event: 'api/getPerm-error', msg: 'tokenNoPermission' })
                         return Promise.reject(`tokenNoPermission`)
@@ -1053,8 +1055,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                     //check
                     if (!iseobj(userWithRulesSelf)) {
                         console.log('token', maskTok(token))
-                        console.log('userSelf', describeShape(userSelf))
-                        console.log('userIdSelf', describeShape(userIdSelf))
+                        console.log('userSelf', getDiagShape(userSelf))
+                        console.log('userIdSelf', getDiagShape(userIdSelf))
                         console.log('[API]getPerm/check userWithRulesSelf: invalid userWithRulesSelf')
                         srLog.error({ event: 'api/getPerm-error', msg: 'tokenNoPermission' })
                         return Promise.reject(`tokenNoPermission`)
@@ -1089,7 +1091,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                     //check
                     if (!isestr(tokenSelf)) {
-                        console.log('req.query', describeShape(get(req, 'query')))
+                        console.log('req.query', getDiagShape(get(req, 'query')))
                         console.log('[API]getPermUserInfor/check tokenSelf: invalid tokenSelf')
                         srLog.error({ event: 'api/getPermUserInfor-error', msg: 'tokenNoPermission' })
                         return Promise.reject(`tokenNoPermission`)
@@ -1101,7 +1103,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                     //check
                     if (!iseobj(userSelf)) {
-                        console.log('req.query', describeShape(get(req, 'query')))
+                        console.log('req.query', getDiagShape(get(req, 'query')))
                         console.log('tokenSelf', maskTok(tokenSelf))
                         console.log('[API]getPermUserInfor/check userSelf: invalid userSelf')
                         srLog.error({ event: 'api/getPermUserInfor-error', msg: 'tokenNoPermission' })
@@ -1114,7 +1116,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                     //check
                     if (!isestr(userIdFind)) {
-                        console.log('req.query', describeShape(get(req, 'query')))
+                        console.log('req.query', getDiagShape(get(req, 'query')))
                         console.log('tokenSelf', maskTok(tokenSelf))
                         console.log('[API]getPermUserInfor/check userIdFind: invalid userIdFind')
                         srLog.error({ event: 'api/getPermUserInfor-error', msg: 'tokenNoPermission' })
@@ -1130,7 +1132,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                     //check
                     if (!iseobj(userWithRulesFind)) {
-                        console.log('userIdFind', describeShape(userIdFind))
+                        console.log('userIdFind', getDiagShape(userIdFind))
                         console.log('[API]getPermUserInfor/check userWithRulesFind: invalid userWithRulesFind')
                         srLog.error({ event: 'api/getPermUserInfor-error', msg: 'userIdNoPermrules' })
                         return Promise.reject(`userIdNoPermrules`)
@@ -1165,7 +1167,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                     //check
                     if (!isestr(token)) {
-                        console.log('req.query', describeShape(get(req, 'query')))
+                        console.log('req.query', getDiagShape(get(req, 'query')))
                         console.log('token', maskTok(token))
                         console.log('[API]syncAndReplaceTabs/check token: invalid token')
                         srLog.error({ event: 'api/syncAndReplaceTabs-error', msg: 'tokenNoPermission' })
@@ -1189,7 +1191,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                     //check userId
                     if (!isestr(userId)) {
                         console.log('token', maskTok(token))
-                        console.log('user', describeShape(user))
+                        console.log('user', getDiagShape(user))
                         console.log('[API]syncAndReplaceTabs/check userId: invalid userId')
                         srLog.error({ event: 'api/syncAndReplaceTabs-error', msg: 'tokenNoPermission' })
                         return Promise.reject(`tokenNoPermission`)
@@ -1200,8 +1202,8 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
 
                     //check
                     if (!isestr(keyTable)) {
-                        console.log('req.query', describeShape(get(req, 'query')))
-                        console.log('keyTable', describeShape(keyTable))
+                        console.log('req.query', getDiagShape(get(req, 'query')))
+                        console.log('keyTable', getDiagShape(keyTable))
                         console.log('[API]syncAndReplaceTabs/check keyTable: invalid keyTable')
                         srLog.error({ event: 'api/syncAndReplaceTabs-error', msg: 'tokenNoPermission' })
                         return Promise.reject(`tokenNoPermission`)
@@ -1210,7 +1212,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
                     //check keyTable
                     let allowedTables = ['targets', 'pemis', 'grups', 'users']
                     if (!allowedTables.includes(keyTable)) {
-                        console.log('[API]syncAndReplaceTabs/check keyTable: unexpected keyTable', describeShape(keyTable))
+                        console.log('[API]syncAndReplaceTabs/check keyTable: unexpected keyTable', getDiagShape(keyTable))
                         srLog.error({ event: 'api/syncAndReplaceTabs-error', msg: 'invalidKeyTable', keyTable })
                         return Promise.reject(`invalidKeyTable`)
                     }
@@ -1427,7 +1429,7 @@ function WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser
         instWServHapiServer = new WServHapiServer(optWServHapiServer)
     }
     catch (err) {
-        console.log('WServHapiServer init error', describeErr(err))
+        console.log('WServHapiServer init error', getDiagBriefErr(err))
         srLog.error({ event: 'WServHapiServer-init-error', msg: (err && err.message) || 'WServHapiServerInitFailed' })
         throw err
     }

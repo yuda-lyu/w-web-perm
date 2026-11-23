@@ -1,0 +1,259 @@
+{
+ "rows": [
+  {
+   "name": "null",
+   "old": "(null)",
+   "new": "(null)",
+   "same": true
+  },
+  {
+   "name": "undefined",
+   "old": "(undefined)",
+   "new": "(undefined)",
+   "same": true
+  },
+  {
+   "name": "string",
+   "old": "(typeof string)",
+   "new": "(string)",
+   "same": false
+  },
+  {
+   "name": "empty string",
+   "old": "(typeof string, empty)",
+   "new": "(string, empty)",
+   "same": false
+  },
+  {
+   "name": "number",
+   "old": "(typeof number)",
+   "new": "(number)",
+   "same": false
+  },
+  {
+   "name": "NaN",
+   "old": "(typeof number)",
+   "new": "(number)",
+   "same": false
+  },
+  {
+   "name": "boolean",
+   "old": "(typeof boolean)",
+   "new": "(boolean)",
+   "same": false
+  },
+  {
+   "name": "function",
+   "old": "(typeof function)",
+   "new": "(function)",
+   "same": false
+  },
+  {
+   "name": "bigint",
+   "old": "(typeof bigint)",
+   "new": "(bigint)",
+   "same": false
+  },
+  {
+   "name": "symbol",
+   "old": "(typeof symbol)",
+   "new": "(symbol)",
+   "same": false
+  },
+  {
+   "name": "array3",
+   "old": "(array, length=3)",
+   "new": "(array, length=3)",
+   "same": true
+  },
+  {
+   "name": "array0",
+   "old": "(array, length=0)",
+   "new": "(array, length=0)",
+   "same": true
+  },
+  {
+   "name": "object keys",
+   "old": "(keys: id,name,email)",
+   "new": "(keys: id,name,email)",
+   "same": true
+  },
+  {
+   "name": "empty object",
+   "old": "(keys: none)",
+   "new": "(keys: none)",
+   "same": true
+  },
+  {
+   "name": "null-proto object",
+   "old": "(keys: token,userId)",
+   "new": "(keys: token,userId)",
+   "same": true
+  },
+  {
+   "name": "class instance",
+   "old": "(keys: a,b)",
+   "new": "(keys: a,b)",
+   "same": true
+  },
+  {
+   "name": "circular",
+   "old": "(keys: a,self)",
+   "new": "(keys: a,self)",
+   "same": true
+  },
+  {
+   "name": "key 60 chars",
+   "old": "(keys: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...)",
+   "new": "(keys: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...)",
+   "same": false
+  },
+  {
+   "name": "key 35 chars",
+   "old": "(keys: yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy)",
+   "new": "(keys: yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy...)",
+   "same": false
+  },
+  {
+   "name": "25 keys",
+   "old": "(keys: k0,k1,k2,k3,k4,k5,k6,k7,k8,k9,k10,k11,k12,k13,k14,k15,k16,k17,k18,k19,...+5)",
+   "new": "(keys: k0,k1,k2,k3,k4,k5,k6,k7,k8,k9,k10,k11,k12,k13,k14,k15,k16,k17,k18,k19,...+5)",
+   "same": true
+  },
+  {
+   "name": "ctl keys C0/DEL/C1/2028/202E",
+   "old": "(keys: a?b,c?d,e?f,g?h,i?j)",
+   "new": "(keys: a?b,c?d,e?f,g?h,i?j)",
+   "same": true
+  },
+  {
+   "name": "zero-width key (Cf)",
+   "old": "(keys: a​b,c﻿d,e­f)",
+   "new": "(keys: a?b,c?d,e?f)",
+   "same": false
+  },
+  {
+   "name": "ownKeys throws (Proxy)",
+   "old": "(typeof object)",
+   "new": "(proxy)",
+   "same": false
+  },
+  {
+   "name": "revoked Proxy",
+   "old": "(typeof object)",
+   "new": "(proxy)",
+   "same": false
+  },
+  {
+   "name": "Map",
+   "old": "(keys: none)",
+   "new": "(map, size=1)",
+   "same": false
+  },
+  {
+   "name": "Set",
+   "old": "(keys: none)",
+   "new": "(set, size=1)",
+   "same": false
+  },
+  {
+   "name": "Uint8Array",
+   "old": "(keys: 0,1,2,3)",
+   "new": "(binary, byteLength=4)",
+   "same": false
+  },
+  {
+   "name": "Date",
+   "old": "(keys: none)",
+   "new": "(date)",
+   "same": false
+  },
+  {
+   "name": "RegExp",
+   "old": "(keys: none)",
+   "new": "(regexp)",
+   "same": false
+  },
+  {
+   "name": "Promise",
+   "old": "(keys: none)",
+   "new": "(promise)",
+   "same": false
+  },
+  {
+   "name": "Error object",
+   "old": "(keys: none)",
+   "new": "(error)",
+   "same": false
+  },
+  {
+   "name": "boxed String",
+   "old": "(keys: 0,1,2,3,4,5,6,7,8)",
+   "new": "(boxed)",
+   "same": false
+  },
+  {
+   "name": "WeakMap",
+   "old": "(keys: none)",
+   "new": "(opaque)",
+   "same": false
+  }
+ ],
+ "errRows": [
+  {
+   "name": "Error",
+   "old": "(Error)",
+   "new": "{\"errType\":\"Error\"}"
+  },
+  {
+   "name": "TypeError",
+   "old": "(TypeError)",
+   "new": "{\"errType\":\"TypeError\"}"
+  },
+  {
+   "name": "Error + code ENOENT",
+   "old": "(Error ENOENT)",
+   "new": "{\"errType\":\"Error\",\"errCode\":\"ENOENT\"}"
+  },
+  {
+   "name": "string(語系鍵)",
+   "old": "(string)",
+   "new": "{\"errType\":\"string\"}"
+  },
+  {
+   "name": "null",
+   "old": "(null)",
+   "new": "{\"errType\":\"null\"}"
+  },
+  {
+   "name": "undefined",
+   "old": "(undefined)",
+   "new": "{\"errType\":\"undefined\"}"
+  },
+  {
+   "name": "{ message }",
+   "old": "(object)",
+   "new": "{\"errType\":\"object\"}"
+  },
+  {
+   "name": "Error with name=SEC",
+   "old": "(Error)",
+   "new": "{\"errType\":\"Error\"}"
+  },
+  {
+   "name": "Proxy get throws",
+   "old": "(Proxy)",
+   "new": "{\"errType\":\"Proxy\"}"
+  },
+  {
+   "name": "revoked Proxy",
+   "old": "(Proxy)",
+   "new": "{\"errType\":\"Proxy\"}"
+  },
+  {
+   "name": "number",
+   "old": "(number)",
+   "new": "{\"errType\":\"number\"}"
+  }
+ ]
+}

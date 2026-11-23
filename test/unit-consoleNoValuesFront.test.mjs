@@ -1,8 +1,9 @@
 //前端瀏覽器 console 不印資料值(排程第 206 項; 規則帳本 R-CONSOLE-NOVAL-01 之前端站點; 規格〈診斷輸出與遮罩〉D2、〈輸入參數之檢測機制〉V20)
-//  承 2026-10-31 perm 輪(伺服端 console 不印值; 裁定當時只改伺服端、不改畫面), 本輪補前端: src/ 下可執行之 console 呼叫(.vue 之 <script>、.js、.mjs)只印固定字面值、typeof、或不含值之摘要函數(describeShape／describeErr), 不印權杖、使用者物件、授權字串、回應內容、錯誤本體.
+//  承 2026-10-31 perm 輪(伺服端 console 不印值; 裁定當時只改伺服端、不改畫面), 本輪補前端: src/ 下可執行之 console 呼叫(.vue 之 <script>、.js、.mjs)只印固定字面值、typeof、或不含值之摘要函數(wsemi 之 getDiagShape／getDiagBriefErr), 不印權杖、使用者物件、授權字串、回應內容、錯誤本體.
+//  2026-11-23 twp2(排程第 603 項): 摘要函數由原本地自有之 describeShape／describeErr(src/js/describeShape.mjs)改為 wsemi 共用函數(規格〈診斷輸出與遮罩〉D1 單一實作), 本地模組已刪.
 //CNVF-001 站點不變式: src/ 下(排除已於 SITE-NV-001 涵蓋之伺服端匯入閉包)每個可執行 console 呼叫之每個引數皆不印值
 //CNVF-002 範圍: 掃描範圍含前端進入檔、全部 .vue 元件與 src/js、src/plugins; 站點全集已盤點(CNVF-002 釘住各檔之站點數, 新增站點須先判定)
-//CNVF-003 單一實作: 前端與伺服端共用同一份 describeShape／describeErr(src/js/describeShape.mjs), server/maskLog.mjs 只轉出; 其依賴閉包不含 Node 內建模組(瀏覽器可載入)
+//CNVF-003 單一實作: 前端與伺服端之摘要函數皆來自 wsemi(getDiagShape／getDiagBriefErr), 本地不得另寫 describeShape／describeErr／safeCtl 等價實作; 呼叫之檔須自 wsemi 匯入; wsemi 之依賴閉包不含 Node 內建模組(瀏覽器可載入)
 //CNVF-004 行為: 前端用之摘要不含值(以識別值植入使用者物件、授權字串、錯誤訊息逐一驗)
 //跑法: npx mocha test/unit-consoleNoValuesFront.test.mjs --timeout 60000
 import assert from 'assert'
@@ -10,9 +11,9 @@ import fs from 'fs'
 import path from 'path'
 import { builtinModules } from 'module'
 import { fileURLToPath } from 'url'
+import getDiagShape from 'wsemi/src/getDiagShape.mjs'
+import getDiagBriefErr from 'wsemi/src/getDiagBriefErr.mjs'
 import { scanConsoleValueArgs, importClosure, sourceLines, blankStrings } from './tools/srcScan.mjs'
-import { describeShape as dsMaskLog, describeErr as deMaskLog } from '../server/maskLog.mjs'
-import { describeShape, describeErr } from '../src/js/describeShape.mjs'
 
 const A = assert.strict
 const projRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -89,7 +90,7 @@ describe('unit-consoleNoValuesFront (前端 console 不印資料值, 排程第 2
         files = walkSrc().filter((fp) => !serverClosure.has(fp))
     })
 
-    it('CNVF-001 前端專用之 src 檔: 每個可執行 console 呼叫之每個引數皆為固定字面值／typeof／describeShape／describeErr(修前 2026-11-23 於 55 處站點中 43 處含未遮罩之引數: 登入成功之使用者物件、登入失敗回應、授權字串、選取列、錯誤本體等)', function() {
+    it('CNVF-001 前端專用之 src 檔: 每個可執行 console 呼叫之每個引數皆為固定字面值／typeof／getDiagShape／getDiagBriefErr(修前 2026-11-23 於 55 處站點中 43 處含未遮罩之引數: 登入成功之使用者物件、登入失敗回應、授權字串、選取列、錯誤本體等)', function() {
         let bad = []
         for (let fp of files) {
             bad.push(...scanConsoleValueArgs(fp, 'code', {}).map((x) => `${rel(fp)} ${x}`))
@@ -135,7 +136,7 @@ describe('unit-consoleNoValuesFront (前端 console 不印資料值, 排程第 2
                 '    methods: {',
                 '        f: function() {',
                 '            console.log(\'user\', user)',
-                '            console.log(\'ok\', describeShape(user), describeErr(err))',
+                '            console.log(\'ok\', getDiagShape(user), getDiagBriefErr(err))',
                 '        },',
                 '    },',
                 '}',
@@ -163,14 +164,67 @@ describe('unit-consoleNoValuesFront (前端 console 不印資料值, 排程第 2
         }
     })
 
-    it('CNVF-003 describeShape／describeErr 單一實作(src/js/describeShape.mjs): maskLog 轉出同一函數; 依賴閉包不含 Node 內建模組', function() {
-        A.ok(dsMaskLog === describeShape && deMaskLog === describeErr, 'server/maskLog.mjs 須轉出 src/js/describeShape.mjs 之同一函數(不另寫等價實作, 規格 D1)')
-        let code = sourceLines(path.join(projRoot, 'server', 'maskLog.mjs'), 'code').map((l) => l.text).join('\n')
-        A.ok(!/function describeShape\(|function describeErr\(/.test(code), 'server/maskLog.mjs 不得自寫 describeShape／describeErr')
-        //閉包(相對匯入): src/js/describeShape.mjs → wsemi 之 isarr、getDiagBriefErr(再往下 _diagCodes／_diagKit／_pmMarkHandled); 不得靜態匯入 Node 內建模組
+    it('CNVF-003 摘要函數單一實作(wsemi getDiagShape／getDiagBriefErr, 規格 D1): 本地無 describeShape／describeErr／safeCtl 之定義或匯入; 呼叫之檔皆自 wsemi 匯入; wsemi 依賴閉包不含 Node 內建模組', function() {
+        //①原本地模組(src/js/describeShape.mjs, 前端與伺服端共用)已刪, 不得復活
+        A.ok(!fs.existsSync(path.join(projRoot, 'src', 'js', 'describeShape.mjs')), 'src/js/describeShape.mjs 已改用 wsemi 共用函數而刪除, 不得復活')
+        //②全部前後端可執行檔(src、server、srv.mjs): 無本地摘要函數之名稱(定義、匯入、呼叫皆無); safeCtl 只許在 server/maskLog.mjs(maskTok 露出字元之控制字元替換, wsemi 無等價之匯出函數), 且不匯出
+        let walkSrvDir = (d, out) => {
+            for (let n of fs.readdirSync(d, { withFileTypes: true })) {
+                let fp = path.join(d, n.name)
+                if (n.isDirectory()) {
+                    walkSrvDir(fp, out)
+                }
+                else if (/\.mjs$/.test(n.name)) {
+                    out.push(fp)
+                }
+            }
+            return out
+        }
+        let allCode = [...walkSrc(), ...walkSrvDir(path.join(projRoot, 'server'), []), path.join(projRoot, 'srv.mjs')]
+        let badLocal = []
+        let nShape = 0
+        let nBrief = 0
+        let shapeFilesSrc = 0
+        for (let fp of allCode) {
+            let r = rel(fp)
+            let ls = sourceLines(fp, 'code')
+            let code = ls.map((l) => l.text).join('\n')
+            if (/\b(describeShape|describeErr)\b/.test(code)) {
+                badLocal.push(`${r} 含 describeShape／describeErr`)
+            }
+            if (/\bsafeCtl\b/.test(code) && r !== 'server/maskLog.mjs') {
+                badLocal.push(`${r} 含 safeCtl(只許 server/maskLog.mjs)`)
+            }
+            if (/\b(function|const|let|var)\s+(getDiagShape|getDiagBriefErr)\b/.test(code)) {
+                badLocal.push(`${r} 自寫 getDiagShape／getDiagBriefErr`)
+            }
+            //③接線: 呼叫者須自 wsemi 之對應模組匯入(預設匯入, 路徑 wsemi/src/<名>.mjs)
+            if (/\bgetDiagShape\(/.test(code)) {
+                nShape++
+                if (r.startsWith('src/')) {
+                    shapeFilesSrc++
+                }
+                if (!ls.some((l) => /^import getDiagShape from 'wsemi\/src\/getDiagShape\.mjs'$/.test(l.text.trim()))) {
+                    badLocal.push(`${r} 呼叫 getDiagShape 但未自 wsemi/src/getDiagShape.mjs 匯入`)
+                }
+            }
+            if (/\bgetDiagBriefErr\(/.test(code)) {
+                nBrief++
+                if (!ls.some((l) => /^import getDiagBriefErr from 'wsemi\/src\/getDiagBriefErr\.mjs'$/.test(l.text.trim()))) {
+                    badLocal.push(`${r} 呼叫 getDiagBriefErr 但未自 wsemi/src/getDiagBriefErr.mjs 匯入`)
+                }
+            }
+        }
+        A.deepEqual(badLocal, [], `摘要函數須為 wsemi 共用函數(單一實作, 規格 D1), 不得另寫等價實作:\n${badLocal.join('\n')}`)
+        A.ok(nShape >= 10 && shapeFilesSrc >= 8 && nBrief >= 10, `接線檔數過少(掃描空轉?): getDiagShape ${nShape} 檔(src ${shapeFilesSrc})、getDiagBriefErr ${nBrief} 檔`)
+        //maskLog 之匯出: 只有 maskTok／maskUrl(摘要函數不再經此轉出)
+        let codeMask = sourceLines(path.join(projRoot, 'server', 'maskLog.mjs'), 'code').map((l) => l.text).join('\n')
+        let mExport = /\bexport\s*\{([^}]*)\}/.exec(codeMask)
+        A.ok(mExport, 'server/maskLog.mjs 須有 export { ... }')
+        A.deepEqual(mExport[1].split(',').map((s) => s.trim()).filter(Boolean), ['maskTok', 'maskUrl'], 'server/maskLog.mjs 只匯出 maskTok／maskUrl')
+        //閉包(相對匯入): wsemi 之 getDiagShape、getDiagBriefErr(往下 _diagKit／_diagCodes／_pmMarkHandled); 不得靜態匯入 Node 內建模組
         let entries = [
-            path.join(projRoot, 'src', 'js', 'describeShape.mjs'),
-            path.join(projRoot, 'node_modules', 'wsemi', 'src', 'isarr.mjs'),
+            path.join(projRoot, 'node_modules', 'wsemi', 'src', 'getDiagShape.mjs'),
             path.join(projRoot, 'node_modules', 'wsemi', 'src', 'getDiagBriefErr.mjs'),
         ]
         let builtins = new Set([...builtinModules, ...builtinModules.map((m) => `node:${m}`)])
@@ -180,7 +234,7 @@ describe('unit-consoleNoValuesFront (前端 console 不印資料值, 排程第 2
                 all.add(fp)
             }
         }
-        A.ok(all.size >= 5, `閉包應至少含 5 檔(describeShape、isarr、getDiagBriefErr 及其私有依賴), 實得 ${all.size}`)
+        A.ok(all.size >= 4, `閉包應至少含 4 檔(getDiagShape、getDiagBriefErr 及其私有依賴 _diagKit／_diagCodes／_pmMarkHandled), 實得 ${all.size}`)
         let hits = []
         for (let fp of all) {
             let t = fs.readFileSync(fp, 'utf8')
@@ -200,40 +254,42 @@ describe('unit-consoleNoValuesFront (前端 console 不印資料值, 排程第 2
         const SEC = 'ZZ-secret-front-5521'
         //登入成功之使用者物件(App.vue)與登入失敗回應: 只列鍵名
         let user = { id: SEC, name: SEC, email: `${SEC}@example.com`, cgrups: JSON.stringify({ [SEC]: 'y' }) }
-        A.equal(describeShape(user), '(keys: id,name,email,cgrups)')
-        A.ok(!describeShape(user).includes(SEC))
-        //授權字串(VeCgrups／VeCpemis／VeCrules 之 console.log('cgrups', cgrups)): 只標型別
-        A.equal(describeShape(JSON.stringify({ [SEC]: 'y' })), '(typeof string)')
+        A.equal(getDiagShape(user), '(keys: id,name,email,cgrups)')
+        A.ok(!getDiagShape(user).includes(SEC))
+        //授權字串(VeCgrups／VeCpemis／VeCrules 之 console.log('cgrups', cgrups)): 只標型別(2026-11-23 twp2 起為 `(string)`, 原自有實作為 `(typeof string)`)
+        A.equal(getDiagShape(JSON.stringify({ [SEC]: 'y' })), '(string)')
         //選取列陣列(LayoutContent*): 只標筆數
-        A.equal(describeShape([{ data: { id: SEC } }, { data: { id: SEC } }]), '(array, length=2)')
-        //錯誤: 伺服端回傳之語系鍵(字串)、Error 本體、帶 code 之錯誤、含識別值之訊息
+        A.equal(getDiagShape([{ data: { id: SEC } }, { data: { id: SEC } }]), '(array, length=2)')
+        //錯誤: 伺服端回傳之語系鍵(字串)、Error 本體、帶 code 之錯誤、含識別值之訊息(getDiagBriefErr 回物件 { errType, errCode?}, 直接作為 console 引數)
         for (let e of [SEC, new Error(SEC), Object.assign(new Error(SEC), { code: 'ENOENT' }), { message: SEC }, { err: SEC }]) {
-            let s = describeErr(e)
-            A.ok(!s.includes(SEC), `describeErr 不得含識別值, 實得 ${s}`)
+            let s = JSON.stringify(getDiagBriefErr(e))
+            A.ok(!s.includes(SEC), `getDiagBriefErr 不得含識別值, 實得 ${s}`)
         }
-        A.equal(describeErr(SEC), '(string)')
-        A.equal(describeErr(new Error(SEC)), '(Error)')
-        //控制字元: C0、DEL、C1(U+0085)、行／段分隔(U+2028、U+2029)、雙向文字控制(U+202E)皆換成 '?', 不可偽造 log 行或改變顯示順序(2026-11-23 獨立複審指出原只換 < 32 與 127)
+        A.deepEqual(getDiagBriefErr(SEC), { errType: 'string' })
+        A.deepEqual(getDiagBriefErr(new Error(SEC)), { errType: 'Error' })
+        A.deepEqual(getDiagBriefErr(Object.assign(new Error(SEC), { code: 'ENOENT' })), { errType: 'Error', errCode: 'ENOENT' })
+        //控制字元: C0、DEL、C1(U+0085)、行／段分隔(U+2028、U+2029)、雙向文字控制(U+202E)皆換成 '?', 不可偽造 log 行或改變顯示順序(2026-11-23 獨立複審指出原只換 < 32 與 127);
+        //  wsemi 另換格式字元(Cf: 零寬空白 U+200B、BOM U+FEFF; 原自有實作不換)
         let ctl = {}
-        for (let [k, x] of [['a', 0x2028], ['c', 0x202e], ['e', 0x85], ['g', 0x2029], ['i', 7], ['k', 0x7f], ['m', 0x2067]]) {
+        for (let [k, x] of [['a', 0x2028], ['c', 0x202e], ['e', 0x85], ['g', 0x2029], ['i', 7], ['k', 0x7f], ['m', 0x2067], ['o', 0x200b], ['q', 0xfeff]]) {
             ctl[`${k}${String.fromCharCode(x)}z`] = 1 //以 fromCharCode 組成, 原始碼不含字面控制字元
         }
-        A.equal(describeShape(ctl), '(keys: a?z,c?z,e?z,g?z,i?z,k?z,m?z)')
+        A.equal(getDiagShape(ctl), '(keys: a?z,c?z,e?z,g?z,i?z,k?z,m?z,o?z,q?z)')
         //一般文字(含中文與全形標點)不受影響
-        A.equal(describeShape({ '名稱': 1, 'user-id': 2 }), '(keys: 名稱,user-id)')
+        A.equal(getDiagShape({ '名稱': 1, 'user-id': 2 }), '(keys: 名稱,user-id)')
         //有界與不拋錯
         let huge = {}
         for (let i = 0; i < 3000; i++) {
             huge[`k${i}${SEC}`] = 1
         }
-        A.ok(describeShape(huge).length < 1500)
+        A.ok(getDiagShape(huge).length < 1500)
         let evil = new Proxy({}, {
             ownKeys: () => {
                 throw new Error(SEC)
             },
         })
-        A.doesNotThrow(() => describeShape(evil))
-        A.ok(!describeShape(evil).includes(SEC))
-        A.doesNotThrow(() => describeErr(evil))
+        A.doesNotThrow(() => getDiagShape(evil))
+        A.ok(!getDiagShape(evil).includes(SEC))
+        A.doesNotThrow(() => getDiagBriefErr(evil))
     })
 })

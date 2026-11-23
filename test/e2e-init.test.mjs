@@ -371,10 +371,12 @@ else {
                         for (const t of info.tabs) {
                             assert.ok(!info.body.includes(t), `不進入殼層: 不應見頁籤「${t}」`)
                         }
-                        //③權杖清空; ②主控台 login error 之物件為 { text: '登入時驗證失敗', msg: 'ambiguousUserFromPerm' }(App.vue:loginError 輸出)
+                        //③權杖清空; ②主控台 login error 為該物件 { text: '登入時驗證失敗', msg: 'ambiguousUserFromPerm' } 之鍵名摘要 `(keys: text,msg)`(App.vue:loginError 輸出; 2026-11-23 起 console 不印資料值,
+                        //  R-CONSOLE-NOVAL-01, 原載為印出物件本身; 拒絕之原因 msg 已由上方後端回應 body.msg 斷言, console 只證明 loginError 被呼叫且不印值)
                         assert.strictEqual(info.token, '', `localStorage wperm:userToken 應被清為空字串, 實得 ${JSON.stringify(info.token)}`)
                         const errs = await Promise.all(loginErrors)
-                        assert.ok(errs.some((e) => e && e.text === '登入時驗證失敗' && e.msg === 'ambiguousUserFromPerm'), `主控台應輸出 login error { text:'登入時驗證失敗', msg:'ambiguousUserFromPerm' }, 實得 ${JSON.stringify(errs)}`)
+                        assert.ok(errs.includes('(keys: text,msg)'), `主控台應輸出 login error (keys: text,msg), 實得 ${JSON.stringify(errs)}`)
+                        assert.ok(!JSON.stringify(errs).includes('ambiguousUserFromPerm') && !JSON.stringify(errs).includes('登入時驗證失敗'), `主控台之 login error 不得印出物件之值(msg／text), 實得 ${JSON.stringify(errs)}`)
                     }
                     finally {
                         await browser.close().catch(() => {})

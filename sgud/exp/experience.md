@@ -4,6 +4,16 @@
 
 - **2026-10-22 抽出歷史經驗**:2026-10-20 以前之各節(e2e 側欄位移、統計頁、升版、授權存檔不變等)移至 `experience_20261022.md`(標題與內容不變);查久遠經驗時再調閱.
 
+## twp2(2026-11-23; 排程第 603 項 w-web-perm 部分; ADR-051)之經驗
+
+- **本地摘要函數改 wsemi 共用函數之做法**: ①先以探測腳本(同一組輸入跑舊本地實作與 wsemi, 對照輸出; `getDiagShape`／`getDiagBriefErr` 於 Node 與瀏覽器之差異以 `util.types` 有無為界)列出字樣改變表, 再改; ②呼叫點以 Write 寫之遷移腳本批次改(匯入行依名稱改寫、呼叫處依詞界取代, 保留各檔原換行格式), 改完 `git diff -U0` 與 `eslint` 對照 HEAD 版之既有錯誤數(`git show HEAD:<檔>` 放 `./tmp/` 以 `--no-ignore --ext .mjs` 跑), 確認新增 0; ③守護測試不遷就: 原「單一實作＝maskLog 轉出同一函數」改為「本地不得有定義、呼叫之檔逐檔自 wsemi 匯入、匯出表只有 `maskTok`／`maskUrl`」, 另以 SITE-NV-007 釘住「已不存在之 `describeShape` 不再是允許之呼叫」(重新引入本地實作即紅).
+- **wsemi 之輸出契約要釘住**: 本套件不再有摘要函數之實作, 但所倚賴之輸出(`(string)`、`(keys: …)`、`{ errType, errCode? }` 只取白名單、控制字元與格式字元換 `?`)寫成 SHAPE／ERR 測試, 於 wsemi 升版改變時即紅; 這些測試於修前碼(HEAD 鏡像)也綠(它們直接測 wsemi), 修前紅由站點不變式與接線測試承擔.
+- **私有函數失去間接守護時要補直接守護**: `safeCtl` 原由 CNVF-004 經 `describeShape` 之鍵名間接守護; 改用 wsemi 後該路徑不再經 `safeCtl`, 其唯一使用者 `maskTok` 之範圍測試只有 `\u007f`／`\u0000`／`\n`／`\r` ——補 MASK-005(範圍兩端與範圍外相鄰字元, 變異 C1～C8 全擊殺)才算接手.
+- **real browser 之 `msg.text()` 對物件引數之表示隨 Playwright 版本而異**(已安裝版為預覽字串 `{errType: string}`, 舊版為 `JSHandle@object`); E2E-CN-002 之 `A.match` 同時接受兩者, 判定依 `jsonValue()`. 此案之失敗為**字串**(w-converhp 用戶端以字串拒絕), 故 `errType` 為 `string`; 變異 E2 之輸出可見真實之瀏覽器錯誤文字 `Network Error. Make sure your space of hard drive is large enough or blocking by browser plugins.`——即修前若印錯誤本體會出現於 console 者.
+- **single-flight 鍵之測法**: 去重以「同步連呼叫、第一個 promise 尚在飛行」為前提(`staLogs` 非 async, 同步註冊), 兩次呼叫之間以 `spin()` 空轉至時鐘前進, 否則「把退回現在之毫秒值入鍵」之錯誤實作(SF2)可能因同一毫秒而恰好通過; 修前紅含 BigInt／循環物件／已撤銷 Proxy 使 `staLogs` 同步拋 `TypeError`(單案即見, 不需子行程). 採用判準之上界是**原值比較**(`timeNow <= 4102444800000`), 故 `4102444800000.5` 不被採用而 `4102444800000 - 0.5` 被採用(首版測試假設相反而紅)——小數邊界之案例以原值判斷為準.
+- **被測前端之來源因 e2e 案例而異(2026-11-23 全套首跑才發現)**: `baseUrl`(dev server 8090)讀 `src/`; `apiBaseUrl`(後端 11006 serve `dist/`, server 注入語系, 如 `e2e-init` 之語系案與 E2E-006)讀**已建置之 `dist/`**. 後果: ①改 `src/` 後這類案例驗不到, 變異只改 `src/` 會存活(E3); ②`dist/` 於提交時才重建, 故前一輪全套對此類案例看的是更舊之建置——twp1 之全套綠、提交重建後 E2E-006 才紅(其斷言要求 console 印出物件, 與 D2 相衝). 做法: `vue-cli-service build --dest ./tmp/<名>/dist-new`(約 50 秒; modern＋legacy 兩份皆含)→ 腳本 `swap-dist.mjs use` 暫時覆蓋 `dist/`(js／css 加入、`index.html` 依 `toolg/genEntry.mjs` 規則〔`/mperm/`→`{sfd}/`〕寫成 `index.tmp`)→ 跑 `e2e-init` 等 → `restore` 以改動前備份還原並逐檔 sha256 回驗, 最後 `git status --short dist` 為空. 備份用 `robocopy dist <備份> /E`(`dist/` 只有 10 檔).
+- **e2e 單檔跑(`e2e-consoleNoValues`)之前端為 dev server(埠 8090, webpack 首編約 15 秒), 不重建 `dist/`**; 全套多開則各實例自建. 起 e2e 前先把 `dist/` 備份(robocopy), 結束後以 `git status --short dist` 核對(本輪單檔 e2e 後 0 變動).
+
 ## twp1(2026-11-23; 排程第 301、598、570、275、206 項; ADR-050)之經驗
 
 - **同步無窮迴圈之修前紅**: 修前會使同行程同步卡死之輸入(`timeLength` 為 `NaN`、`'abc'`、`{}`、`1e20`…), mocha 之逾時計時器無法中斷, 測試必須放子行程並以 `spawnSync(…, { timeout, killSignal: 'SIGKILL', windowsHide: true })` 終止; 子行程每層完成即印一行 JSON, 父行程以「缺行」判定卡在哪一層(`test/tools/timeLengthChild.mjs`). 變異時以環境變數 `TL_CHILD_TIMEOUT_MS` 把卡住候選之等待縮為 5 秒.

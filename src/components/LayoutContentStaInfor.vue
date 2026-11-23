@@ -195,7 +195,7 @@ import WIcon from 'w-component-vue/src/components/WIcon.vue'
 import WIconLoading from 'w-component-vue/src/components/WIconLoading.vue'
 import WTextSelect from 'w-component-vue/src/components/WTextSelect.vue'
 import { GRID_TOP, genLegend, decideLegendType, createLegendMeasurer } from '../js/legendFit.mjs'
-import { describeErr } from '../js/describeShape.mjs'
+import getDiagBriefErr from 'wsemi/src/getDiagBriefErr.mjs'
 
 
 //echarts, 與 WEchartsVue 同一份(iniEcharts 回傳同一命名空間), 供圖例離屏量測使用
@@ -274,7 +274,7 @@ export default {
         //getAndRelaData, 圖與表各自於資料到達時渲染 (先到先畫), 任一 reject 才整頁切為 errMsg
         vo.getAndRelaData()
             .catch((err) => {
-                console.log('getAndRelaData catch', describeErr(err))
+                console.log('getAndRelaData catch', getDiagBriefErr(err))
                 vo.errMsg = vo.$t('getDataError')
             })
 
@@ -460,7 +460,7 @@ export default {
                     vo.updateCharts()
                 })
                 .catch((err) => {
-                    console.log('getStaEvent catch', describeErr(err))
+                    console.log('getStaEvent catch', getDiagBriefErr(err))
                     throw err
                 })
                 .finally(() => {
@@ -480,7 +480,7 @@ export default {
                     vo.eventTable = res
                 })
                 .catch((err) => {
-                    console.log('getStaEventTable catch', describeErr(err))
+                    console.log('getStaEventTable catch', getDiagBriefErr(err))
                     throw err
                 })
                 .finally(() => {
@@ -590,7 +590,7 @@ export default {
             vo.errMsg = ''
             vo.getAndRelaData()
                 .catch((err) => {
-                    console.log('getAndRelaData catch', describeErr(err))
+                    console.log('getAndRelaData catch', getDiagBriefErr(err))
                     vo.errMsg = vo.$t('getDataError')
                 })
 

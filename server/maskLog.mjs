@@ -1,12 +1,28 @@
 import isestr from 'wsemi/src/isestr.mjs'
 import isarr from 'wsemi/src/isarr.mjs'
-import { safeCtl as safe, describeShape, describeErr } from '../src/js/describeShape.mjs'
 
 
-//maskLog: 權杖與網址寫入 console / srLog 前之遮罩(M 契約, spec/設計要點與取捨.md ADR-023); console 診斷不印資料值之形狀摘要 describeShape／describeErr(ADR-047)
-//  describeShape／describeErr 之單一實作在 src/js/describeShape.mjs(2026-11-23 排程第 206 項起前端 console 亦用同一份, 本檔轉出, 伺服端匯入路徑不變)
+//maskLog: 權杖與網址寫入 console / srLog 前之遮罩(M 契約, spec/設計要點與取捨.md ADR-023)
+//  console 診斷不印資料值之形狀摘要與錯誤摘要(ADR-047)不在本檔: 2026-11-23 排程第 603 項起一律用 wsemi 共用函數 getDiagShape／getDiagBriefErr(規格〈診斷輸出與遮罩〉D1 單一實作, 各站點自 wsemi 匯入; ADR-051),
+//  原本檔轉出之 describeShape／describeErr(src/js/describeShape.mjs)已移除
 //四 repo 一致(w-web-sso server/srLog.mjs 之 maskToken 與 src/maskUrl.mjs、w-web-api / w-web-task 之 maskTok), 以同一組測資守護(test/unit-maskLog.test.mjs)
 //why: 原 console 站點原樣印出 token / req.query / authorization(Hapi 對重複之 query 參數給陣列, 型別檢查失敗之分支正是印出處), verifyConn 之 srLog 原樣記 referer
+
+
+/**
+ * 控制字元換 '?': 避免請求端或使用者資料以 CR/LF 偽造 log 行(僅供 maskTok 露出之頭尾字元; wsemi 無等價之匯出函數: getDiagShape 內之同類替換為其私有實作, 見 ADR-051 之建議收錄)
+ * 涵蓋 C0 控制字元(碼位 < 32)、DEL(127)、C1 控制字元(0x80～0x9F, 含 U+0085 NEL)、行／段分隔(U+2028、U+2029)與雙向文字控制(U+202A～U+202E、U+2066～U+2069; 可使檢視器之顯示順序與實際不同)
+ *
+ * @param {String} s 輸入字串
+ * @returns {String} 回傳上列字元已換成 '?' 之字串
+ */
+function safeCtl(s) {
+    return Array.from(s, (c) => {
+        let x = c.charCodeAt(0)
+        let isCtl = x < 32 || (x >= 127 && x <= 159) || x === 0x2028 || x === 0x2029 || (x >= 0x202a && x <= 0x202e) || (x >= 0x2066 && x <= 0x2069)
+        return isCtl ? '?' : c
+    }).join('')
+}
 
 
 /**
@@ -34,7 +50,7 @@ function maskTok(token) {
     if (k === 0) {
         return `(len=${n})`
     }
-    return `${safe(token.slice(0, k))}...${safe(token.slice(-k))}(len=${n})`
+    return `${safeCtl(token.slice(0, k))}...${safeCtl(token.slice(-k))}(len=${n})`
 }
 
 
@@ -73,7 +89,5 @@ function maskUrl(u) {
 
 export {
     maskTok,
-    maskUrl,
-    describeShape,
-    describeErr
+    maskUrl
 }

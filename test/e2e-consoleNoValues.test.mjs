@@ -2,11 +2,13 @@
 //E2E-CN-001: 真瀏覽器以系統管理者登入(?token=sys)並逐頁瀏覽統計、標的、權限、群組、使用者五頁, 收集瀏覽器 console 之全部訊息(含物件引數之內容),
 //  斷言: ①登入成功之 console 為摘要 `login success (keys: …)`(只列鍵名); ②全部訊息不含基準種子之使用者資料(email、使用者 id、名稱); ③不含權杖參數.
 //  修前: App.vue 印出 cloneDeep(data.user)——email、id、名稱、授權字串皆在 console.
+//E2E-CN-002(2026-11-23 twp2, 排程第 603 項): 失敗路徑——資料通道請求失敗時 main.js 之 getWebInfor catch 於 console 只印錯誤類別(wsemi getDiagBriefErr 之物件 { errType, errCode? }), 不含瀏覽器之錯誤訊息文字或網址;
+//  證明 wsemi 之 getDiagBriefErr 於 webpack 打包後之真瀏覽器可載入、可執行(E2E-CN-001 之登入成功路徑走 getDiagShape, 不呼叫 getDiagBriefErr).
 //純語意斷言(無標準圖; 只收集 console, 不改畫面、不截圖、不寫資料庫).
 //act 走 user-facing input(真點左側導覽); 起點為帶 token 之網址(與 openApp 同, 登入由 w-ui-loginout 自動完成).
 //跑法: npx mocha test/e2e-consoleNoValues.test.mjs --reporter list --timeout 300000
 import assert from 'assert'
-import { startServersOnce, launchBrowser, appUrl, clickNavItem, waitUntilExist } from './tools/e2e-setup.mjs'
+import { startServersOnce, launchBrowser, appUrl, baseUrl, clickNavItem, waitUntilExist } from './tools/e2e-setup.mjs'
 
 const A = assert.strict
 
@@ -78,6 +80,59 @@ describe('e2e-consoleNoValues (前端 console 不印資料值, 排程第 206 項
                 }
                 A.ok(!/token=/.test(t), `console 訊息含權杖參數: ${t.slice(0, 200)}`)
             }
+        }
+        finally {
+            await browser.close()
+        }
+    })
+
+    //E2E-CN-002: 失敗路徑——只中止 getWebInfor 之請求(連線、同步、輪詢等其餘請求照常; 全部中止則連線閘後之同步不完成, getWebInfor 根本不會被呼叫), 使 main.js 之 getWebInfor 失敗;
+    //  catch 內之 console 為 `getWebInfor catch` 接 wsemi getDiagBriefErr 之物件 { errType }(或帶白名單代碼 errCode), 不含瀏覽器之錯誤訊息文字(如 Failed to fetch)與網址
+    it('E2E-CN-002 資料通道請求失敗時, getWebInfor 之 catch 於 console 只印錯誤類別, 不含錯誤訊息文字', async function() {
+        let browser = await launchBrowser()
+        try {
+            let context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+            let page = await context.newPage()
+            let texts = []
+            let pending = []
+            page.on('console', (msg) => {
+                pending.push((async () => {
+                    let parts = [msg.text()]
+                    for (let a of msg.args()) {
+                        try {
+                            parts.push(JSON.stringify(await a.jsonValue()))
+                        }
+                        catch (err) {
+                            parts.push('(unserializable)')
+                        }
+                    }
+                    texts.push(parts.join(' | '))
+                })())
+            })
+            await page.route('**/api/main', async (route) => {
+                let buf = route.request().postDataBuffer()
+                if (buf && buf.includes('getWebInfor')) {
+                    await route.abort('failed')
+                    return
+                }
+                await route.continue()
+            })
+            await page.goto(`${baseUrl}/?token=sys&lang=eng`, { waitUntil: 'load', timeout: 30000 })
+            //等 getWebInfor 之 catch 訊息出現(偵測式等待, 上限 40 秒; w-converhp 用戶端重試數次後才以錯誤拒絕)
+            let hit = null
+            let t0 = Date.now()
+            while (hit === null && Date.now() - t0 < 40000) {
+                await Promise.all(pending)
+                hit = texts.find((t) => t.startsWith('getWebInfor catch')) || null
+                if (hit === null) {
+                    await page.waitForTimeout(300)
+                }
+            }
+            A.ok(hit !== null, `應出現 getWebInfor catch 之 console 訊息(40 秒內), 實得 ${JSON.stringify(texts.slice(0, 6))}`)
+            //msg.text() 為 `getWebInfor catch ` 接物件引數之預覽(`{errType: string}`; 舊版 Playwright 為 `JSHandle@object`), 其後接各引數之 jsonValue: 標籤字串與 { errType, errCode? }(類別名只含字母; 代碼只含大寫英數與底線);
+            //  本案資料通道之失敗為字串(w-converhp 用戶端以字串拒絕), 故 errType 為 string; 若為 Error 類別則為 TypeError 等, 皆符合
+            A.match(hit, /^getWebInfor catch (?:JSHandle@object|\{errType: [A-Za-z]+(?:, errCode: [A-Z][A-Z0-9_]+)?\}) \| "getWebInfor catch" \| \{"errType":"[A-Za-z]+"(?:,"errCode":"[A-Z][A-Z0-9_]+")?\}$/, `應只印錯誤類別, 實得 ${hit.slice(0, 200)}`)
+            A.ok(!/Failed to fetch|NetworkError|net::|127\.0\.0\.1|token=/i.test(hit), `getWebInfor 之訊息不得含錯誤訊息文字或網址: ${hit.slice(0, 200)}`)
         }
         finally {
             await browser.close()

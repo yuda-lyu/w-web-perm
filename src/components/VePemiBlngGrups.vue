@@ -216,7 +216,8 @@ import iseobj from 'wsemi/src/iseobj.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import eachOwn from '../js/eachOwn.mjs'
 import getOwn from '../js/getOwn.mjs'
-import { describeShape, describeErr } from '../js/describeShape.mjs'
+import getDiagShape from 'wsemi/src/getDiagShape.mjs'
+import getDiagBriefErr from 'wsemi/src/getDiagBriefErr.mjs'
 import cvKpToObj from '../js/cvKpToObj.mjs'
 import getKpLossy from '../js/getKpLossy.mjs'
 import fmtLossyMsg from '../js/fmtLossyMsg.mjs'
@@ -762,7 +763,7 @@ export default {
                 //mode
                 let mode = get(row, 'mode', '')
                 if (mode !== 'OR' && mode !== 'AND') {
-                    console.log(`非預期: mode應該皆已指定不應觸發`, describeShape(mode))
+                    console.log(`非預期: mode應該皆已指定不應觸發`, getDiagShape(mode))
                     mode = 'OR'
                 }
                 // console.log(g.name, 'mode', mode)
@@ -770,7 +771,7 @@ export default {
                 //enable
                 let enable = get(row, 'enable', '')
                 if (enable !== 'y' && enable !== 'n') {
-                    console.log(`非預期: enable應該皆已指定不應觸發`, describeShape(enable))
+                    console.log(`非預期: enable應該皆已指定不應觸發`, getDiagShape(enable))
                     enable = 'n'
                 }
                 // console.log(g.name, 'enable', enable)
@@ -1344,7 +1345,7 @@ export default {
 
                     })
                     .catch((err) => {
-                        console.log('doSave', describeErr(err))
+                        console.log('doSave', getDiagBriefErr(err))
                         vo.$alert(vo.$t('anUnexpectedErrorOccurred'), { type: 'error' }) //§5.1: 非預期例外須告知, 不靜默吞 (失敗時 .then 不執行→視窗不關)
                     })
                     .finally(() => {

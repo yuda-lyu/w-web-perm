@@ -1,0 +1,548 @@
+[
+ {
+  "id": "SF1",
+  "note": "鍵回到 opt.timeNow 原值",
+  "tests": [
+   "test/unit-staLogs-timeLength.test.mjs"
+  ],
+  "file": "server/staLogs/staLogsCore.mjs",
+  "run": {
+   "status": 17,
+   "np": 9,
+   "nf": 17,
+   "summary": "FAIL",
+   "fails": [
+    "TL-006 站點不變式(全部入口皆經檢測)",
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "SF2",
+  "note": "鍵含 plan.timeNow 但不分是否被採用",
+  "tests": [
+   "test/unit-staLogs-timeLength.test.mjs"
+  ],
+  "file": "server/staLogs/staLogsCore.mjs",
+  "run": {
+   "status": 23,
+   "np": 3,
+   "nf": 23,
+   "summary": "FAIL",
+   "fails": [
+    "TL-006 站點不變式(全部入口皆經檢測)",
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "SF3",
+  "note": "鍵不含 timeNow",
+  "tests": [
+   "test/unit-staLogs-timeLength.test.mjs"
+  ],
+  "file": "server/staLogs/staLogsCore.mjs",
+  "run": {
+   "status": 3,
+   "np": 23,
+   "nf": 3,
+   "summary": "FAIL",
+   "fails": [
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-006 站點不變式(全部入口皆經檢測)"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "SF4",
+  "note": "鍵之 timeNow 取整到小時(過度併合)",
+  "tests": [
+   "test/unit-staLogs-timeLength.test.mjs"
+  ],
+  "file": "server/staLogs/staLogsCore.mjs",
+  "run": {
+   "status": 2,
+   "np": 24,
+   "nf": 2,
+   "summary": "FAIL",
+   "fails": [
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-006 站點不變式(全部入口皆經檢測)"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "SF5",
+  "note": "被採用時仍以原值入鍵(小數毫秒不併)",
+  "tests": [
+   "test/unit-staLogs-timeLength.test.mjs"
+  ],
+  "file": "server/staLogs/staLogsCore.mjs",
+  "run": {
+   "status": 3,
+   "np": 23,
+   "nf": 3,
+   "summary": "FAIL",
+   "fails": [
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-006 站點不變式(全部入口皆經檢測)"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "SF6",
+  "note": "採用判斷放寬為只看 typeof number(範圍外之數字被當採用)",
+  "tests": [
+   "test/unit-staLogs-timeLength.test.mjs"
+  ],
+  "file": "server/staLogs/staLogsCore.mjs",
+  "run": {
+   "status": 11,
+   "np": 15,
+   "nf": 11,
+   "summary": "FAIL",
+   "fails": [
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "SF7",
+  "note": "一律視為採用",
+  "tests": [
+   "test/unit-staLogs-timeLength.test.mjs"
+  ],
+  "file": "server/staLogs/staLogsCore.mjs",
+  "run": {
+   "status": 23,
+   "np": 3,
+   "nf": 23,
+   "summary": "FAIL",
+   "fails": [
+    "TL-006 站點不變式(全部入口皆經檢測)",
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "SF8",
+  "note": "一律視為未採用(釘住之時刻不入鍵)",
+  "tests": [
+   "test/unit-staLogs-timeLength.test.mjs"
+  ],
+  "file": "server/staLogs/staLogsCore.mjs",
+  "run": {
+   "status": 3,
+   "np": 23,
+   "nf": 3,
+   "summary": "FAIL",
+   "fails": [
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-004d single-flight 鍵用採用後之 timeNow(與 parseTimeLength 同一口徑)",
+    "TL-006 站點不變式(全部入口皆經檢測)"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "D1",
+  "note": "登入成功印使用者物件",
+  "tests": [
+   "test/unit-consoleNoValuesFront.test.mjs"
+  ],
+  "file": "src/App.vue",
+  "run": {
+   "status": 1,
+   "np": 5,
+   "nf": 1,
+   "summary": "FAIL",
+   "fails": [
+    "CNVF-001 前端專用之 src 檔"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "D2",
+  "note": "授權字串原樣印出",
+  "tests": [
+   "test/unit-consoleNoValuesFront.test.mjs"
+  ],
+  "file": "src/components/VeCrules.vue",
+  "run": {
+   "status": 1,
+   "np": 5,
+   "nf": 1,
+   "summary": "FAIL",
+   "fails": [
+    "CNVF-001 前端專用之 src 檔"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "D3",
+  "note": "錯誤本體原樣印出",
+  "tests": [
+   "test/unit-consoleNoValuesFront.test.mjs"
+  ],
+  "file": "src/main.js",
+  "run": {
+   "status": 1,
+   "np": 5,
+   "nf": 1,
+   "summary": "FAIL",
+   "fails": [
+    "CNVF-001 前端專用之 src 檔"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "D4",
+  "note": "呼叫 getDiagShape 但未匯入",
+  "tests": [
+   "test/unit-consoleNoValuesFront.test.mjs"
+  ],
+  "file": "src/components/VeCgrups.vue",
+  "run": {
+   "status": 1,
+   "np": 5,
+   "nf": 1,
+   "summary": "FAIL",
+   "fails": [
+    "CNVF-003 摘要函數單一實作(wsemi getDiagShape／getDiagBriefErr, 規格 D1)"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "D5",
+  "note": "以本地函數取代 wsemi 匯入(自寫等價實作)",
+  "tests": [
+   "test/unit-consoleNoValuesFront.test.mjs"
+  ],
+  "file": "src/plugins/mUI.mjs",
+  "run": {
+   "status": 1,
+   "np": 5,
+   "nf": 1,
+   "summary": "FAIL",
+   "fails": [
+    "CNVF-003 摘要函數單一實作(wsemi getDiagShape／getDiagBriefErr, 規格 D1)"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "D6",
+  "note": "復活本地模組檔",
+  "tests": [
+   "test/unit-consoleNoValuesFront.test.mjs"
+  ],
+  "file": "src/js/describeShape.mjs",
+  "run": {
+   "status": 1,
+   "np": 5,
+   "nf": 1,
+   "summary": "FAIL",
+   "fails": [
+    "CNVF-003 摘要函數單一實作(wsemi getDiagShape／getDiagBriefErr, 規格 D1)"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "D7",
+  "note": "maskLog 多匯出 safeCtl",
+  "tests": [
+   "test/unit-consoleNoValuesFront.test.mjs"
+  ],
+  "file": "server/maskLog.mjs",
+  "run": {
+   "status": 1,
+   "np": 5,
+   "nf": 1,
+   "summary": "FAIL",
+   "fails": [
+    "CNVF-003 摘要函數單一實作(wsemi getDiagShape／getDiagBriefErr, 規格 D1)"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "D8",
+  "note": "getUserRules 例外原樣印出(靜態＋真後端)",
+  "tests": [
+   "test/unit-consoleNoValues.test.mjs",
+   "test/api-consoleNoValues.test.mjs"
+  ],
+  "file": "server/WWebPerm.mjs",
+  "run": {
+   "status": 3,
+   "np": 24,
+   "nf": 3,
+   "summary": "FAIL",
+   "fails": [
+    "SITE-NV-001-closure-console-args-no-values",
+    "CNV-008-getUserRules-error-class-only",
+    "CNV-099-whole-output-no-secret"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "D9",
+  "note": "srv.mjs error 事件原樣印出",
+  "tests": [
+   "test/unit-consoleNoValues.test.mjs"
+  ],
+  "file": "srv.mjs",
+  "run": {
+   "status": 1,
+   "np": 13,
+   "nf": 1,
+   "summary": "FAIL",
+   "fails": [
+    "SITE-NV-004-srv-console-args-no-values"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "D10",
+  "note": "掃描器重新允許已不存在之 describeShape",
+  "tests": [
+   "test/unit-consoleNoValues.test.mjs"
+  ],
+  "file": "test/tools/srcScan.mjs",
+  "run": {
+   "status": 1,
+   "np": 13,
+   "nf": 1,
+   "summary": "FAIL",
+   "fails": [
+    "SITE-NV-007-scanner-self-test"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "D11",
+  "note": "伺服端呼叫 getDiagShape 但未匯入",
+  "tests": [
+   "test/unit-consoleNoValuesFront.test.mjs"
+  ],
+  "file": "server/WWebPerm.mjs",
+  "run": {
+   "status": 1,
+   "np": 5,
+   "nf": 1,
+   "summary": "FAIL",
+   "fails": [
+    "CNVF-003 摘要函數單一實作(wsemi getDiagShape／getDiagBriefErr, 規格 D1)"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "C1",
+  "note": "safeCtl 不替換",
+  "tests": [
+   "test/unit-maskLog.test.mjs"
+  ],
+  "file": "server/maskLog.mjs",
+  "run": {
+   "status": 3,
+   "np": 5,
+   "nf": 3,
+   "summary": "FAIL",
+   "fails": [
+    "MASK-001-maskTok-contract-table",
+    "MASK-002-maskTok-empty-and-types",
+    "MASK-005-maskTok-control-chars-in-revealed-parts"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "C2",
+  "note": "C0 上界少一",
+  "tests": [
+   "test/unit-maskLog.test.mjs"
+  ],
+  "file": "server/maskLog.mjs",
+  "run": {
+   "status": 1,
+   "np": 7,
+   "nf": 1,
+   "summary": "FAIL",
+   "fails": [
+    "MASK-005-maskTok-control-chars-in-revealed-parts"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "C3",
+  "note": "C1 上界少一",
+  "tests": [
+   "test/unit-maskLog.test.mjs"
+  ],
+  "file": "server/maskLog.mjs",
+  "run": {
+   "status": 1,
+   "np": 7,
+   "nf": 1,
+   "summary": "FAIL",
+   "fails": [
+    "MASK-005-maskTok-control-chars-in-revealed-parts"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "C4",
+  "note": "DEL 不換",
+  "tests": [
+   "test/unit-maskLog.test.mjs"
+  ],
+  "file": "server/maskLog.mjs",
+  "run": {
+   "status": 2,
+   "np": 6,
+   "nf": 2,
+   "summary": "FAIL",
+   "fails": [
+    "MASK-002-maskTok-empty-and-types",
+    "MASK-005-maskTok-control-chars-in-revealed-parts"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "C5",
+  "note": "段分隔 U+2029 不換",
+  "tests": [
+   "test/unit-maskLog.test.mjs"
+  ],
+  "file": "server/maskLog.mjs",
+  "run": {
+   "status": 1,
+   "np": 7,
+   "nf": 1,
+   "summary": "FAIL",
+   "fails": [
+    "MASK-005-maskTok-control-chars-in-revealed-parts"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "C6",
+  "note": "RLO U+202E 不換",
+  "tests": [
+   "test/unit-maskLog.test.mjs"
+  ],
+  "file": "server/maskLog.mjs",
+  "run": {
+   "status": 1,
+   "np": 7,
+   "nf": 1,
+   "summary": "FAIL",
+   "fails": [
+    "MASK-005-maskTok-control-chars-in-revealed-parts"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "C7",
+  "note": "PDI U+2069 不換",
+  "tests": [
+   "test/unit-maskLog.test.mjs"
+  ],
+  "file": "server/maskLog.mjs",
+  "run": {
+   "status": 1,
+   "np": 7,
+   "nf": 1,
+   "summary": "FAIL",
+   "fails": [
+    "MASK-005-maskTok-control-chars-in-revealed-parts"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "C8",
+  "note": "範圍多換 U+2065",
+  "tests": [
+   "test/unit-maskLog.test.mjs"
+  ],
+  "file": "server/maskLog.mjs",
+  "run": {
+   "status": 1,
+   "np": 7,
+   "nf": 1,
+   "summary": "FAIL",
+   "fails": [
+    "MASK-005-maskTok-control-chars-in-revealed-parts"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ }
+]

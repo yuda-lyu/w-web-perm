@@ -29,7 +29,7 @@ import get from 'lodash-es/get.js'
 import isestr from 'wsemi/src/isestr.mjs'
 import iseobj from 'wsemi/src/iseobj.mjs'
 import isDev from 'wsemi/src/isDev.mjs'
-import { describeShape } from './js/describeShape.mjs'
+import getDiagShape from 'wsemi/src/getDiagShape.mjs'
 import wui from 'w-ui-loginout/src/WUiLoginout.mjs'
 import LoadingWinBar from './components/Common/LoadingWinBar.vue'
 import CheckYesNo from './components/Common/CheckYesNo.vue'
@@ -75,14 +75,14 @@ export default {
         // console.log('lang', lang)
 
         function loginSuccess(data) {
-            console.log('login success', describeShape(data.user))
+            console.log('login success', getDiagShape(data.user))
             vo.$ui.updateConnState('csLogin')
             vo.$ui.updateUserToken(data.token)
             vo.$ui.updateUserSelf(data.user)
         }
 
         function loginError(data) {
-            console.log('login error', describeShape(data))
+            console.log('login error', getDiagShape(data))
             //登入者不是系統管理者(後端 userNotAdmin; 即使部署方放行亦拒絕, R-ADMIN-ONLY-01): 顯示「無權進入權限後台」並停留, 不轉址(轉走則使用者看不到原因); 一般使用者查本人權限樹走 /api/getPerm
             let isNotAdmin = get(data, 'msg') === 'userNotAdmin'
             vo.$ui.updateConnState(isNotAdmin ? 'csErrNotAdmin' : 'csErrLogin')
@@ -92,7 +92,7 @@ export default {
             }
             let urlRedirect = get(window, '___pmwperm___.urlRedirect', '')
             if (!isestr(urlRedirect)) {
-                console.log('invalid urlRedirect', describeShape(urlRedirect))
+                console.log('invalid urlRedirect', getDiagShape(urlRedirect))
                 throw new Error(`invalid urlRedirect`)
             }
             if (isDev()) {

@@ -9,7 +9,7 @@ import waitFun from 'wsemi/src/waitFun.mjs'
 // import WUiDwload from 'w-ui-dwload/src/WUiDwload.mjs'
 import submitGuard from './submitGuard.mjs'
 import { markDataReload } from './dataReloadGuard.mjs'
-import { describeShape } from '../js/describeShape.mjs'
+import getDiagShape from 'wsemi/src/getDiagShape.mjs'
 
 
 let vo = Vue.prototype
@@ -260,7 +260,7 @@ let kpIcon = {
 function getIcon(icon) {
     let c = get(kpIcon, icon, '')
     if (!isestr(c)) {
-        console.log('invalid icon', describeShape(icon))
+        console.log('invalid icon', getDiagShape(icon))
     }
     return c
 }

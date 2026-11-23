@@ -311,7 +311,8 @@ import { refsChanged, planDraftSync, isDraftStale, hasDraftNow } from '../js/dra
 import { applySavedRows } from '../js/applySaved.mjs'
 import { snapRefIds, recordPicks, buildRefDecl, parseRefDecl, countRefMismatch } from '../js/refIdentity.mjs'
 import { isCellEditing, bindCellEditingStopRetry } from '../js/cellEditing.mjs'
-import { describeShape, describeErr } from '../js/describeShape.mjs'
+import getDiagShape from 'wsemi/src/getDiagShape.mjs'
+import getDiagBriefErr from 'wsemi/src/getDiagBriefErr.mjs'
 import { fmtVars, getBannerLines, splitCheckedRows, getExternalEdits } from '../js/externalUi.mjs'
 import WIcon from 'w-component-vue/src/components/WIcon.vue'
 import WSwitch from 'w-component-vue/src/components/WSwitch.vue'
@@ -1096,7 +1097,7 @@ export default {
 
             //check
             if (size(vo.itemsCheck) !== 1) {
-                console.log(`size(vo.itemsCheck) !== 1`, describeShape(vo.itemsCheck))
+                console.log(`size(vo.itemsCheck) !== 1`, getDiagShape(vo.itemsCheck))
                 vo.$alert(`${vo.$t('anUnexpectedErrorOccurred')}`, { type: 'error' })
                 return
             }
@@ -1123,7 +1124,7 @@ export default {
 
             //check
             if (!iseobj(row)) {
-                console.log(`!iseobj(row)`, describeShape(row))
+                console.log(`!iseobj(row)`, getDiagShape(row))
                 vo.$alert(`${vo.$t('anUnexpectedErrorOccurred')}`, { type: 'error' })
                 return
             }
@@ -1175,7 +1176,7 @@ export default {
 
             //check
             if (size(vo.itemsCheck) === 0) {
-                console.log(`size(vo.itemsCheck) === 0`, describeShape(vo.itemsCheck))
+                console.log(`size(vo.itemsCheck) === 0`, getDiagShape(vo.itemsCheck))
                 vo.$alert(`${vo.$t('anUnexpectedErrorOccurred')}`, { type: 'error' })
                 return
             }
@@ -1604,7 +1605,7 @@ export default {
             return vo.$ui.runSubmit('saveGrups', (unlockBtn) => {
                 return core(unlockBtn)
                     .catch((err) => {
-                        console.log('catch', describeErr(err))
+                        console.log('catch', getDiagBriefErr(err))
                         vo.$alert(vo.$t('anUnexpectedErrorOccurred'), { type: 'error' })
                     })
                     .finally(() => {

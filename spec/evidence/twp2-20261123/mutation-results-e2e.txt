@@ -1,0 +1,16 @@
+真瀏覽器變異(twp2, 排程第 603 項): E1、E2 由 mutate-e2e.mjs 一次植入並跑 e2e-consoleNoValues; E3 由 mutate-e2e3.mjs 以變異後之 src 重新建置(vue-cli-service build), 暫時覆蓋 ./dist 後跑 e2e-init E2E-006(該案開啟之頁面由後端 serve ./dist, 不經 dev server), 用畢還原 src 與 ./dist
+
+[E1] src/App.vue  console.log('login success', getDiagShape(data.user)) → console.log('login success', data.user)
+     KILLED by e2e-consoleNoValues E2E-CN-001:
+     AssertionError: login success 應為鍵名摘要, 實得 login success {id: id-for-admin, order: 3, name: admin, email: admin@example.com, description: } | "login success" | {"id":"id-for-admin","order":3,"name":"admin",…
+
+[E2] src/main.js  console.log('getWebInfor catch', getDiagBriefErr(err)) → console.log('getWebInfor catch', err)
+     KILLED by e2e-consoleNoValues E2E-CN-002:
+     AssertionError: 應只印錯誤類別, 實得 getWebInfor catch Network Error. Make sure your space of hard drive is large enough or blocking by browser plugins. | "getWebInfor catch" | "Network Error. Make sure your…
+
+[E3] src/App.vue  console.log('login error', getDiagShape(data)) → console.log('login error', data)
+     首版(只改 src、未重建 dist): SURVIVED——e2e-init E2E-006 看的是後端 serve 之舊建置檔, 變異未進入被測物; 改以變異後之 src 重新建置並覆蓋 ./dist 後:
+     KILLED by e2e-init E2E-006 [eng]／[cht]:
+     AssertionError: 主控台應輸出 login error (keys: text,msg), 實得 [{"text":"登入時驗證失敗","msg":"ambiguousUserFromPerm"}]
+
+還原: src 之 sha256 回驗相同(E1、E2、E3 各項 [restore] OK); ./dist 以改動前之備份還原, 檔數 10、逐檔 sha256 相同.
