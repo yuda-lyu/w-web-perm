@@ -4,6 +4,17 @@
 
 - **2026-10-22 抽出歷史經驗**:2026-10-20 以前之各節(e2e 側欄位移、統計頁、升版、授權存檔不變等)移至 `experience_20261022.md`(標題與內容不變);查久遠經驗時再調閱.
 
+## twp3(2026-11-24; 排程第 609 項 w-web-perm 部分; ADR-052)之經驗
+
+- **盤點「本地型別／錯誤摘要函數」不能只找函數名**: `nameOfErr` 是名稱含 Err 才好找, 另有 `(typeof ${typeof c})` 字面值(沒有函數)、`get(err, 'name')`、`err.constructor.name`、`reName.test(name)` 類寫在別的函數內者(`wrapInjected.describeUpstream`、`fetchJson.errDesc`). 做法: 以「錯誤類別名稱擷取」「`typeof` 組字串」兩個**行為樣式**各寫一條 regex, 對全部非測試可執行檔掃, 命中逐站判讀 console／非 console, 再把「現有命中之檔集合」釘成測試(DLS-013 `RETAINED`: 新增者須先判定並登錄理由); 第一版 regex 對 `['"`]…\(typeof …['"`]` 會在 `msg: (typeof err === 'string')` 這類**不是字串內**之寫法誤報(兩個引號之間夾著運算式), 改為先取出單行字串字面值再判內容.
+- **授權值之鍵是資料名稱**: `getUserRules` 之 `c`(授權字串)與 `kp`(其解析結果)之外層鍵為群組／權限／規則名, 外部應用可寫入物件或陣列代替字串; 修前 `(typeof object)` 不列鍵, 改 `getDiagShape` 預設會新增揭露面——用 `{ keys: false }`(`(object)`、陣列仍有筆數), 以「以識別值為鍵之物件」植入驗證(DLS-002／003a／003e)並以預設值變異(S2／S3／S4)擊殺. 其他站點(使用者物件、請求本體、查詢參數)維持預設列鍵名(主控已定).
+- **資料不可達之防禦分支(`cvKpToArr` 失敗)之測法**: `kp` 為 `JSON5.parse` 之結果, 無法使 `cvKpToArr` 拋錯, 故過去只靠靜態不變式與變異. 現以**鏡像根**: `test/_tmp/diagLocalSummary/src/` 放 `mShare.mjs` 與 `src/js/` 之逐字複本, 只把 `js/cvKpToArr.mjs` 換成必拋之替身(經 `globalThis.__dlsThrow` 切換拋何種錯), 被測之 console 呼叫仍是原碼; 鏡像在 `projRoot` 之下, 裸名匯入向上解析, 不建目錄連結; `before` 建、`after` 刪.
+- **被植入之 `err.name` 之測法**: 真函數無法使 `JSON5.parse` 拋帶任意名稱之錯誤, 但 `JSON5.parse(c)` 以 `String(c)` 轉字串——授權值給物件並令其 `toString` 拋出 `Object.assign(new Error('m'), { name: 'ZZsecret9317' })`, 即可由真函數觸發(DLS-001b); 修前輸出該名稱原樣.
+- **鏡像根之人為紅**: HEAD 鏡像根(`./tmp/twp3/pre/`)不含 `node_modules`, 以 `projRoot/node_modules` 取檔之既有測試(CNVF-003 之 wsemi 閉包)於鏡像根假紅(「閉包應至少含 4 檔…實得 0」), 判讀修前紅時須剔除(本輪 13 紅中另有此 1 案, 不計入).
+- **變異腳本遇 CRLF 檔**: `src/plugins/mShare.mjs` 於工作樹為 CRLF(索引為 LF), 錨點含 `\n` 者報 ANCHOR-0; 錨點一律不含換行(以整行之一段為錨), `dry` 模式先驗; 還原一律寫回讀入之原字串(保留 CRLF)並以 sha256 回驗.
+- **README 與 JSDoc 之範例也是「教人印」之來源**: `error` 事件範例原為 `err && err.name`(部署方會照抄), SITE-NV-005 以 `allowExprs` 放行之; 改 `getDiagBriefErr(err)` 後移除該允許項, 並於範例補匯入行.
+- **以 `apiBaseUrl` 開頁之 e2e 檔只有兩檔**(`rg -c apiBaseUrl test/e2e-*.test.mjs`: `e2e-init` 12 處、`e2e-array-form` 2 處); 其餘 e2e 讀 dev server 之 `src/`. 全套於 `dist/` 原樣跑(`rest` 段之 `unit-roleName` RN-S3 掃 git 追蹤之 `dist/` 文字檔, 不宜在全套期間覆蓋), 另以新建置暫時覆蓋 `dist/` 單跑這兩檔再還原(`spec/evidence/twp3-20261124/swap-dist.mjs` 之 `backup`／`use`／`restore`／`status`).
+
 ## twp2(2026-11-23; 排程第 603 項 w-web-perm 部分; ADR-051)之經驗
 
 - **本地摘要函數改 wsemi 共用函數之做法**: ①先以探測腳本(同一組輸入跑舊本地實作與 wsemi, 對照輸出; `getDiagShape`／`getDiagBriefErr` 於 Node 與瀏覽器之差異以 `util.types` 有無為界)列出字樣改變表, 再改; ②呼叫點以 Write 寫之遷移腳本批次改(匯入行依名稱改寫、呼叫處依詞界取代, 保留各檔原換行格式), 改完 `git diff -U0` 與 `eslint` 對照 HEAD 版之既有錯誤數(`git show HEAD:<檔>` 放 `./tmp/` 以 `--no-ignore --ext .mjs` 跑), 確認新增 0; ③守護測試不遷就: 原「單一實作＝maskLog 轉出同一函數」改為「本地不得有定義、呼叫之檔逐檔自 wsemi 匯入、匯出表只有 `maskTok`／`maskUrl`」, 另以 SITE-NV-007 釘住「已不存在之 `describeShape` 不再是允許之呼叫」(重新引入本地實作即紅).

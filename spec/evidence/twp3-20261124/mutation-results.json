@@ -1,0 +1,434 @@
+[
+ {
+  "id": "N1",
+  "note": "JSON5 失敗站印錯誤本體",
+  "tests": [
+   "test/unit-diagLocalSummary.test.mjs"
+  ],
+  "file": "src/plugins/mShare.mjs",
+  "run": {
+   "status": 3,
+   "np": 8,
+   "nf": 3,
+   "summary": "FAIL",
+   "fails": [
+    "DLS-001-invalid-authorization-text-shape-and-errType",
+    "DLS-001b-planted-err-name-not-printed",
+    "DLS-002-non-string-authorization-no-key-names"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "N2",
+  "note": "JSON5 失敗站印 err.name(字串; 真後端 CNV-007 亦以整行比對)",
+  "tests": [
+   "test/unit-diagLocalSummary.test.mjs",
+   "test/api-consoleNoValues.test.mjs"
+  ],
+  "file": "src/plugins/mShare.mjs",
+  "run": {
+   "status": 5,
+   "np": 7,
+   "nf": 5,
+   "summary": "FAIL",
+   "fails": [
+    "DLS-001-invalid-authorization-text-shape-and-errType",
+    "DLS-001b-planted-err-name-not-printed",
+    "DLS-002-non-string-authorization-no-key-names",
+    "DLS-013-error-name-extraction-files-pinned",
+    "CNV-007-mShare-invalid-authorization-text"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "N3",
+  "note": "JSON5 失敗站復活「識別字形狀之 name 原樣放行」(原 nameOfErr 之行為)",
+  "tests": [
+   "test/unit-diagLocalSummary.test.mjs"
+  ],
+  "file": "src/plugins/mShare.mjs",
+  "run": {
+   "status": 4,
+   "np": 7,
+   "nf": 4,
+   "summary": "FAIL",
+   "fails": [
+    "DLS-001-invalid-authorization-text-shape-and-errType",
+    "DLS-001b-planted-err-name-not-printed",
+    "DLS-002-non-string-authorization-no-key-names",
+    "DLS-013-error-name-extraction-files-pinned"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "N4",
+  "note": "cvKpToArr 失敗站復活「識別字形狀之 name 原樣放行」",
+  "tests": [
+   "test/unit-diagLocalSummary.test.mjs"
+  ],
+  "file": "src/plugins/mShare.mjs",
+  "run": {
+   "status": 6,
+   "np": 5,
+   "nf": 6,
+   "summary": "FAIL",
+   "fails": [
+    "DLS-003a-kp-object-type-only",
+    "DLS-003b-kp-array-count-only",
+    "DLS-003c-kp-scalar-type-only",
+    "DLS-003e-c-object-with-valid-json-text-type-only",
+    "DLS-003d-planted-err-name-and-code-not-printed",
+    "DLS-013-error-name-extraction-files-pinned"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "N5",
+  "note": "cvKpToArr 失敗站印錯誤本體",
+  "tests": [
+   "test/unit-diagLocalSummary.test.mjs"
+  ],
+  "file": "src/plugins/mShare.mjs",
+  "run": {
+   "status": 5,
+   "np": 6,
+   "nf": 5,
+   "summary": "FAIL",
+   "fails": [
+    "DLS-003a-kp-object-type-only",
+    "DLS-003b-kp-array-count-only",
+    "DLS-003c-kp-scalar-type-only",
+    "DLS-003e-c-object-with-valid-json-text-type-only",
+    "DLS-003d-planted-err-name-and-code-not-printed"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "N6",
+  "note": "cvKpToArr 失敗站漏印錯誤類別",
+  "tests": [
+   "test/unit-diagLocalSummary.test.mjs"
+  ],
+  "file": "src/plugins/mShare.mjs",
+  "run": {
+   "status": 5,
+   "np": 6,
+   "nf": 5,
+   "summary": "FAIL",
+   "fails": [
+    "DLS-003a-kp-object-type-only",
+    "DLS-003b-kp-array-count-only",
+    "DLS-003c-kp-scalar-type-only",
+    "DLS-003e-c-object-with-valid-json-text-type-only",
+    "DLS-003d-planted-err-name-and-code-not-printed"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "S1",
+  "note": "JSON5 失敗站復活 `(typeof …)` 字面值",
+  "tests": [
+   "test/unit-diagLocalSummary.test.mjs"
+  ],
+  "file": "src/plugins/mShare.mjs",
+  "run": {
+   "status": 4,
+   "np": 7,
+   "nf": 4,
+   "summary": "FAIL",
+   "fails": [
+    "DLS-001-invalid-authorization-text-shape-and-errType",
+    "DLS-001b-planted-err-name-not-printed",
+    "DLS-002-non-string-authorization-no-key-names",
+    "DLS-011-no-typeof-literal-producers"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "S2",
+  "note": "JSON5 失敗站 c 用預設(列鍵名; 授權值為以資料為鍵之物件時鍵名外洩)",
+  "tests": [
+   "test/unit-diagLocalSummary.test.mjs"
+  ],
+  "file": "src/plugins/mShare.mjs",
+  "run": {
+   "status": 2,
+   "np": 9,
+   "nf": 2,
+   "summary": "FAIL",
+   "fails": [
+    "DLS-001b-planted-err-name-not-printed",
+    "DLS-002-non-string-authorization-no-key-names"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "S3",
+  "note": "cvKpToArr 失敗站 kp 用預設(列鍵名; 鍵為群組／權限／規則名)",
+  "tests": [
+   "test/unit-diagLocalSummary.test.mjs"
+  ],
+  "file": "src/plugins/mShare.mjs",
+  "run": {
+   "status": 4,
+   "np": 7,
+   "nf": 4,
+   "summary": "FAIL",
+   "fails": [
+    "DLS-003a-kp-object-type-only",
+    "DLS-003e-c-object-with-valid-json-text-type-only",
+    "DLS-003d-planted-err-name-and-code-not-printed",
+    "DLS-010-no-local-nameOfErr-mShare-uses-wsemi"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "S4",
+  "note": "cvKpToArr 失敗站 c 用預設(物件授權值之鍵名外洩)",
+  "tests": [
+   "test/unit-diagLocalSummary.test.mjs"
+  ],
+  "file": "src/plugins/mShare.mjs",
+  "run": {
+   "status": 1,
+   "np": 10,
+   "nf": 1,
+   "summary": "FAIL",
+   "fails": [
+    "DLS-003e-c-object-with-valid-json-text-type-only"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "S5",
+  "note": "cvKpToArr 失敗站 kp 復活 `(typeof …)` 字面值",
+  "tests": [
+   "test/unit-diagLocalSummary.test.mjs"
+  ],
+  "file": "src/plugins/mShare.mjs",
+  "run": {
+   "status": 7,
+   "np": 4,
+   "nf": 7,
+   "summary": "FAIL",
+   "fails": [
+    "DLS-003a-kp-object-type-only",
+    "DLS-003b-kp-array-count-only",
+    "DLS-003c-kp-scalar-type-only",
+    "DLS-003e-c-object-with-valid-json-text-type-only",
+    "DLS-003d-planted-err-name-and-code-not-printed",
+    "DLS-010-no-local-nameOfErr-mShare-uses-wsemi",
+    "DLS-011-no-typeof-literal-producers"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "I1",
+  "note": "mShare 呼叫 getDiagShape 但未匯入",
+  "tests": [
+   "test/unit-diagLocalSummary.test.mjs"
+  ],
+  "file": "src/plugins/mShare.mjs",
+  "run": {
+   "status": 9,
+   "np": 2,
+   "nf": 9,
+   "summary": "FAIL",
+   "fails": [
+    "DLS-001-invalid-authorization-text-shape-and-errType",
+    "DLS-001b-planted-err-name-not-printed",
+    "DLS-002-non-string-authorization-no-key-names",
+    "DLS-003a-kp-object-type-only",
+    "DLS-003b-kp-array-count-only",
+    "DLS-003c-kp-scalar-type-only",
+    "DLS-003e-c-object-with-valid-json-text-type-only",
+    "DLS-003d-planted-err-name-and-code-not-printed"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "I2",
+  "note": "mShare 呼叫 getDiagBriefErr 但未匯入",
+  "tests": [
+   "test/unit-diagLocalSummary.test.mjs"
+  ],
+  "file": "src/plugins/mShare.mjs",
+  "run": {
+   "status": 9,
+   "np": 2,
+   "nf": 9,
+   "summary": "FAIL",
+   "fails": [
+    "DLS-001-invalid-authorization-text-shape-and-errType",
+    "DLS-001b-planted-err-name-not-printed",
+    "DLS-002-non-string-authorization-no-key-names",
+    "DLS-003a-kp-object-type-only",
+    "DLS-003b-kp-array-count-only",
+    "DLS-003c-kp-scalar-type-only",
+    "DLS-003e-c-object-with-valid-json-text-type-only",
+    "DLS-003d-planted-err-name-and-code-not-printed"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "I3",
+  "note": "復活本地 nameOfErr 定義(未被呼叫)",
+  "tests": [
+   "test/unit-diagLocalSummary.test.mjs"
+  ],
+  "file": "src/plugins/mShare.mjs",
+  "run": {
+   "status": 2,
+   "np": 9,
+   "nf": 2,
+   "summary": "FAIL",
+   "fails": [
+    "DLS-010-no-local-nameOfErr-mShare-uses-wsemi",
+    "DLS-013-error-name-extraction-files-pinned"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "W1",
+  "note": "掃描器重新允許已刪之 nameOfErr",
+  "tests": [
+   "test/unit-consoleNoValues.test.mjs"
+  ],
+  "file": "test/tools/srcScan.mjs",
+  "run": {
+   "status": 1,
+   "np": 13,
+   "nf": 1,
+   "summary": "FAIL",
+   "fails": [
+    "SITE-NV-007-scanner-self-test"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "W2",
+  "note": "README 範例復活 err && err.name",
+  "tests": [
+   "test/unit-consoleNoValues.test.mjs"
+  ],
+  "file": "README.md",
+  "run": {
+   "status": 1,
+   "np": 13,
+   "nf": 1,
+   "summary": "FAIL",
+   "fails": [
+    "SITE-NV-005-doc-examples-no-values"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "W3",
+  "note": "WWebPerm JSDoc 範例復活 err && err.name",
+  "tests": [
+   "test/unit-consoleNoValues.test.mjs"
+  ],
+  "file": "server/WWebPerm.mjs",
+  "run": {
+   "status": 1,
+   "np": 13,
+   "nf": 1,
+   "summary": "FAIL",
+   "fails": [
+    "SITE-NV-005-doc-examples-no-values"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "X1",
+  "note": "新增檔以 err.name 自錯誤取名稱(DLS-013 限定之檔外)",
+  "tests": [
+   "test/unit-diagLocalSummary.test.mjs"
+  ],
+  "file": "server/zzNewErrName.mjs",
+  "run": {
+   "status": 1,
+   "np": 10,
+   "nf": 1,
+   "summary": "FAIL",
+   "fails": [
+    "DLS-013-error-name-extraction-files-pinned"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "X2",
+  "note": "新增檔產生 `(typeof …)` 字面值(DLS-011)",
+  "tests": [
+   "test/unit-diagLocalSummary.test.mjs"
+  ],
+  "file": "server/zzNewTypeofLit.mjs",
+  "run": {
+   "status": 1,
+   "np": 10,
+   "nf": 1,
+   "summary": "FAIL",
+   "fails": [
+    "DLS-011-no-typeof-literal-producers"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ },
+ {
+  "id": "X3",
+  "note": "新增本地 nameOfErr(DLS-010／013)",
+  "tests": [
+   "test/unit-diagLocalSummary.test.mjs"
+  ],
+  "file": "src/js/zzNewNameOfErr.mjs",
+  "run": {
+   "status": 2,
+   "np": 9,
+   "nf": 2,
+   "summary": "FAIL",
+   "fails": [
+    "DLS-010-no-local-nameOfErr-mShare-uses-wsemi",
+    "DLS-013-error-name-extraction-files-pinned"
+   ]
+  },
+  "verdict": "KILLED",
+  "restored": true
+ }
+]

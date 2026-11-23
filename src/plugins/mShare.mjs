@@ -13,6 +13,8 @@ import sortBy from 'lodash-es/sortBy.js'
 import sep from 'wsemi/src/sep.mjs'
 import isestr from 'wsemi/src/isestr.mjs'
 import haskey from 'wsemi/src/haskey.mjs'
+import getDiagShape from 'wsemi/src/getDiagShape.mjs'
+import getDiagBriefErr from 'wsemi/src/getDiagBriefErr.mjs'
 import eachOwn from '../js/eachOwn.mjs'
 import getOwn from '../js/getOwn.mjs'
 import cvKpToArr from '../js/cvKpToArr.mjs'
@@ -22,17 +24,8 @@ import getEffMode from '../js/getEffMode.mjs'
 import isAuthMode from '../js/isAuthMode.mjs'
 
 
-//nameOfErr: console 診斷用之錯誤類別名稱(只取識別字形狀之 name, 不取訊息; 非 Error 只回型別); 本檔前後端共用(ADR-047); 本檔既有之錯誤類別摘要, 比 wsemi getDiagBriefErr 寬(任何 \w{1,40} 之 name 皆放行), 2026-11-23 twp2(排程第 603 項)未納入範圍, 是否改用 getDiagBriefErr 見 ADR-051 待裁示
-let nameOfErr = (err) => {
-    let n = null
-    try {
-        n = (err instanceof Error) ? err.name : null
-    }
-    catch (e) {
-        n = null
-    }
-    return (typeof n === 'string' && /^\w{1,40}$/.test(n)) ? n : `(typeof ${typeof err})`
-}
+//console 診斷之型別與錯誤類別摘要一律用 wsemi 共用函數 getDiagShape／getDiagBriefErr(規格〈診斷輸出與遮罩〉D1 單一實作; 本檔前後端共用; ADR-047、ADR-052):
+//2026-11-24 twp3(排程第 609 項)起原本檔自有之 nameOfErr(任何 \w{1,40} 之 err.name 皆放行, 比 getDiagBriefErr 寬)與 `(typeof …)` 字面值已刪
 
 
 // //dlm
@@ -232,7 +225,8 @@ function getUserRules(user, grups, pemis, targets) {
         }
         catch (err) {
             //console 只印型別與錯誤類別, 不印授權字串之內容與錯誤訊息(JSON5 之訊息含原文片段; R-DIAG-01 D2, ADR-047)
-            console.log('cvStrToArr: JSON5.parse failed', `(typeof ${typeof c})`, nameOfErr(err))
+            //c 為授權字串(外部應用可寫入物件／陣列), 其鍵為群組／權限／規則名(資料): { keys: false } 物件只標型別, 不列鍵名(同修前只標型別, 不新增揭露面; ADR-052)
+            console.log('cvStrToArr: JSON5.parse failed', getDiagShape(c, { keys: false }), getDiagBriefErr(err))
         }
 
         //arr
@@ -242,7 +236,8 @@ function getUserRules(user, grups, pemis, targets) {
             // console.log('arr', arr)
         }
         catch (err) {
-            console.log('cvStrToArr: cvKpToArr failed', `(typeof ${typeof c})`, `(typeof ${typeof kp})`, nameOfErr(err))
+            //kp 為 JSON5.parse(c) 之結果, 鍵同為群組／權限／規則名(資料): 同上 { keys: false }
+            console.log('cvStrToArr: cvKpToArr failed', getDiagShape(c, { keys: false }), getDiagShape(kp, { keys: false }), getDiagBriefErr(err))
         }
 
         return arr

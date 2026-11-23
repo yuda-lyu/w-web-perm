@@ -96,6 +96,7 @@ import { getRawSecrets, msgForLog } from './maskRaw.mjs'
  * @example
  *
  * import WOrm from 'w-orm-lmdb/src/WOrmLmdb.mjs'
+ * import getDiagBriefErr from 'wsemi/src/getDiagBriefErr.mjs'
  * import WWebPerm from './server/WWebPerm.mjs'
  * import getSettings from './g_getSettings.mjs'
  *
@@ -168,7 +169,7 @@ import { getRawSecrets, msgForLog } from './maskRaw.mjs'
  * let instWWebPerm = WWebPerm(WOrm, url, db, getUserByToken, verifyClientUser, verifyAppUser, opt)
  *
  * instWWebPerm.on('error', (err) => {
- *     console.log('error', err && err.name) //只印錯誤類別名稱, 不印訊息與內容
+ *     console.log('error', getDiagBriefErr(err)) //只印錯誤類別(wsemi之getDiagBriefErr, 如{ errType: 'Error' }), 不印訊息與內容
  * })
  *
  */

@@ -1,0 +1,256 @@
+{
+  "errors": [
+    {
+      "input": "Error",
+      "old": "Error",
+      "new": "{ errType: 'Error' }"
+    },
+    {
+      "input": "TypeError",
+      "old": "TypeError",
+      "new": "{ errType: 'TypeError' }"
+    },
+    {
+      "input": "RangeError",
+      "old": "RangeError",
+      "new": "{ errType: 'RangeError' }"
+    },
+    {
+      "input": "SyntaxError(JSON5.parse 實際拋出)",
+      "old": "SyntaxError",
+      "new": "{ errType: 'SyntaxError' }"
+    },
+    {
+      "input": "AggregateError",
+      "old": "AggregateError",
+      "new": "{ errType: 'AggregateError' }"
+    },
+    {
+      "input": "自訂類別 class MyErr extends Error",
+      "old": "Error",
+      "new": "{ errType: 'Error' }"
+    },
+    {
+      "input": "name 被設為識別字(ZZsecret9317)",
+      "old": "ZZsecret9317",
+      "new": "{ errType: 'Error' }"
+    },
+    {
+      "input": "name 含連字號(ZZ-secret-9317)",
+      "old": "(typeof object)",
+      "new": "{ errType: 'Error' }"
+    },
+    {
+      "input": "name 長 41 字",
+      "old": "(typeof object)",
+      "new": "{ errType: 'Error' }"
+    },
+    {
+      "input": "name 長 40 字",
+      "old": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "new": "{ errType: 'Error' }"
+    },
+    {
+      "input": "帶白名單代碼 code=ENOENT",
+      "old": "Error",
+      "new": "{ errType: 'Error', errCode: 'ENOENT' }"
+    },
+    {
+      "input": "帶白名單外代碼 code=ZZ_SECRET_9317",
+      "old": "Error",
+      "new": "{ errType: 'Error' }"
+    },
+    {
+      "input": "DOMException(TimeoutError)",
+      "old": "TimeoutError",
+      "new": "{ errType: 'Error' }"
+    },
+    {
+      "input": "字串(如伺服端回傳之語系鍵)",
+      "old": "(typeof string)",
+      "new": "{ errType: 'string' }"
+    },
+    {
+      "input": "null",
+      "old": "(typeof object)",
+      "new": "{ errType: 'null' }"
+    },
+    {
+      "input": "undefined",
+      "old": "(typeof undefined)",
+      "new": "{ errType: 'undefined' }"
+    },
+    {
+      "input": "{ message }",
+      "old": "(typeof object)",
+      "new": "{ errType: 'object' }"
+    },
+    {
+      "input": "number",
+      "old": "(typeof number)",
+      "new": "{ errType: 'number' }"
+    },
+    {
+      "input": "Proxy(Error)",
+      "old": "Error",
+      "new": "{ errType: 'Proxy' }"
+    },
+    {
+      "input": "已撤銷之 Proxy",
+      "old": "(typeof object)",
+      "new": "{ errType: 'Proxy' }"
+    }
+  ],
+  "values": [
+    {
+      "input": "字串",
+      "old": "(typeof string)",
+      "new": "(string)",
+      "newDefault": "(string)"
+    },
+    {
+      "input": "空字串",
+      "old": "(typeof string)",
+      "new": "(string, empty)",
+      "newDefault": "(string, empty)"
+    },
+    {
+      "input": "number",
+      "old": "(typeof number)",
+      "new": "(number)",
+      "newDefault": "(number)"
+    },
+    {
+      "input": "NaN",
+      "old": "(typeof number)",
+      "new": "(number)",
+      "newDefault": "(number)"
+    },
+    {
+      "input": "boolean",
+      "old": "(typeof boolean)",
+      "new": "(boolean)",
+      "newDefault": "(boolean)"
+    },
+    {
+      "input": "null",
+      "old": "(typeof object)",
+      "new": "(null)",
+      "newDefault": "(null)"
+    },
+    {
+      "input": "undefined",
+      "old": "(typeof undefined)",
+      "new": "(undefined)",
+      "newDefault": "(undefined)"
+    },
+    {
+      "input": "函式",
+      "old": "(typeof function)",
+      "new": "(function)",
+      "newDefault": "(function)"
+    },
+    {
+      "input": "bigint",
+      "old": "(typeof bigint)",
+      "new": "(bigint)",
+      "newDefault": "(bigint)"
+    },
+    {
+      "input": "symbol",
+      "old": "(typeof symbol)",
+      "new": "(symbol)",
+      "newDefault": "(symbol)"
+    },
+    {
+      "input": "空陣列",
+      "old": "(typeof object)",
+      "new": "(array, length=0)",
+      "newDefault": "(array, length=0)"
+    },
+    {
+      "input": "陣列(3)",
+      "old": "(typeof object)",
+      "new": "(array, length=3)",
+      "newDefault": "(array, length=3)"
+    },
+    {
+      "input": "空物件",
+      "old": "(typeof object)",
+      "new": "(object)",
+      "newDefault": "(keys: none)"
+    },
+    {
+      "input": "物件(鍵為群組名 A、B)",
+      "old": "(typeof object)",
+      "new": "(object)",
+      "newDefault": "(keys: A,B)"
+    },
+    {
+      "input": "物件(25 鍵)",
+      "old": "(typeof object)",
+      "new": "(object)",
+      "newDefault": "(keys: k0,k1,k2,k3,k4,k5,k6,k7,k8,k9,k10,k11,k12,k13,k14,k15,k16,k17,k18,k19,...+5)"
+    },
+    {
+      "input": "null-prototype 物件",
+      "old": "(typeof object)",
+      "new": "(object)",
+      "newDefault": "(keys: A)"
+    },
+    {
+      "input": "類別實例",
+      "old": "(typeof object)",
+      "new": "(object)",
+      "newDefault": "(keys: secretKey)"
+    },
+    {
+      "input": "Map",
+      "old": "(typeof object)",
+      "new": "(map, size=1)",
+      "newDefault": "(map, size=1)"
+    },
+    {
+      "input": "Set",
+      "old": "(typeof object)",
+      "new": "(set, size=1)",
+      "newDefault": "(set, size=1)"
+    },
+    {
+      "input": "Uint8Array(4)",
+      "old": "(typeof object)",
+      "new": "(binary, byteLength=4)",
+      "newDefault": "(binary, byteLength=4)"
+    },
+    {
+      "input": "Date",
+      "old": "(typeof object)",
+      "new": "(date)",
+      "newDefault": "(date)"
+    },
+    {
+      "input": "RegExp",
+      "old": "(typeof object)",
+      "new": "(regexp)",
+      "newDefault": "(regexp)"
+    },
+    {
+      "input": "Promise",
+      "old": "(typeof object)",
+      "new": "(promise)",
+      "newDefault": "(promise)"
+    },
+    {
+      "input": "Proxy(物件)",
+      "old": "(typeof object)",
+      "new": "(proxy)",
+      "newDefault": "(proxy)"
+    },
+    {
+      "input": "已撤銷之 Proxy",
+      "old": "(typeof object)",
+      "new": "(proxy)",
+      "newDefault": "(proxy)"
+    }
+  ]
+}

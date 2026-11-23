@@ -210,7 +210,7 @@ describe('api-consoleNoValues (真後端: 含識別值之使用者物件／請�
     it('CNV-007-mShare-invalid-authorization-text', async function() {
         let t = await act(() => get('/api/getPerm?token=tok-zz2'))
         noSec(t, 'cgrups 為識別值')
-        A.ok(/^cvStrToArr: JSON5\.parse failed \(typeof string\) SyntaxError\s*$/m.test(t), `應只印型別與錯誤類別(整行相符, 不得後接錯誤訊息), 實得:\n${t.slice(0, 500)}`)
+        A.ok(/^cvStrToArr: JSON5\.parse failed \(string\) \{ errType: 'SyntaxError' \}\s*$/m.test(t), `應只印型別與錯誤類別(wsemi getDiagShape／getDiagBriefErr; 2026-11-24 twp3 起, 原本地 nameOfErr 之字樣為 '(typeof string) SyntaxError'; 整行相符, 不得後接錯誤訊息), 實得:\n${t.slice(0, 500)}`)
     })
 
     //S1／S3: 權限樹評估拋出含識別值之例外(經 ORM 縫注入), 只印錯誤類別; userId 只印型別

@@ -240,7 +240,7 @@ describe('unit-consoleNoValues-sites (站點不變式: server 靜態匯入閉包
 
     //部署方會照抄之範例: WWebPerm.mjs JSDoc 與 README.md 之 console 範例不印使用者物件
     it('SITE-NV-005-doc-examples-no-values', function() {
-        let o = { allowIds: [], allowExprs: ['err && err.name', 'from'] } //from: 本套件傳給部署方函數之固定來源名(getPerm／main／getUserByToken 等路由與 apiType), 非使用者資料
+        let o = { allowIds: [], allowExprs: ['from'] } //from: 本套件傳給部署方函數之固定來源名(getPerm／main／getUserByToken 等路由與 apiType), 非使用者資料; 2026-11-24 twp3 起範例之錯誤摘要為 getDiagBriefErr(err)(原 `err && err.name` 不再允許: 名稱可被設為任意字串)
         let bad = [
             ...scanConsoleValueArgs(path.join(projRoot, 'server', 'WWebPerm.mjs'), 'doc', o),
             ...scanConsoleValueArgs(path.join(projRoot, 'README.md'), 'md', o),
@@ -276,10 +276,13 @@ describe('unit-consoleNoValues-sites (站點不變式: server 靜態匯入閉包
                 //2026-11-23 twp2 起摘要函數為 wsemi 之 getDiagShape／getDiagBriefErr; 原自有之 describeShape／describeErr 不再是允許之呼叫(若有人重新引入本地實作, 其站點即紅)
                 'console.log(\'old\', describeShape(user))',
                 'console.log(\'oldErr\', describeErr(err))',
+                //2026-11-24 twp3 起原 mShare 之本地錯誤類別摘要 nameOfErr 已刪(改 getDiagBriefErr), 亦不再是允許之呼叫; `err && err.name` 之運算式亦不是(名稱可被設為任意字串)
+                'console.log(\'oldName\', nameOfErr(err))',
+                'console.log(\'oldExpr\', err && err.name)',
             ]
             fs.writeFileSync(fp, lines.join('\n'), 'utf8')
             let bad = scanConsoleValueArgs(fp, 'code', { allowIds: ['mappingBy'] })
-            A.deepEqual(bad.map((x) => Number(/:(\d+)/.exec(x)[1])), [1, 3, 4, 5, 6, 7, 9, 10], `實得 ${bad.join(' | ')}`)
+            A.deepEqual(bad.map((x) => Number(/:(\d+)/.exec(x)[1])), [1, 3, 4, 5, 6, 7, 9, 10, 11, 12], `實得 ${bad.join(' | ')}`) //`(typeof ${typeof c})` 字面值為合法之樣板插值而不被本掃描器回報, 由 unit-diagLocalSummary DLS-011 另行禁止
         }
         finally {
             fs.rmSync(path.join(projRoot, 'test', '_tmp', 'consoleNoValues-scan'), { recursive: true, force: true })
