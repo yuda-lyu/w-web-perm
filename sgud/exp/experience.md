@@ -4,6 +4,13 @@
 
 - **2026-10-22 抽出歷史經驗**:2026-10-20 以前之各節(e2e 側欄位移、統計頁、升版、授權存檔不變等)移至 `experience_20261022.md`(標題與內容不變);查久遠經驗時再調閱.
 
+## m667c3(2026-11-26; 排程第 667 項 w-web-perm 部分; R-FS-LEVEL-01)之經驗
+
+- **省略第 2 參數之站點於 wsemi 1.9.80 靜默變窮舉**: 無拋錯、無警告, 全套不一定紅; 唯一攔截法是以呼叫形盤點(`git grep` 之呼叫式正規式, 含 md 與範例)加「子資料夾夾具」之測試. 本庫之核心 `listFiles` 已有 GOLD-020(子資料夾內放一檔), 實測對「省略 opt」「`levelLimit: 2`」兩變異皆紅, 故未另補測試; 反之 `test/staLogs-golden/legacy/` 為 golden 產生器, 夾具無子資料夾, 無層數鑑別力, 只能以「鏡像根重產 `expected.json` 逐位相同」證不退化(勿誤記為已驗層數).
+- **舊版 wsemi 遇物件之第 2 參數視為無效層數而取 1 層**: `{ levelLimit: 1 }` 於 1.9.79 以前與 1.9.80 以後皆為第 1 層, 故遷移改寫不必與升版同時發生才安全; 唯一不安全的是「只升版不改寫」.
+- **變異鏡像根之作法(一句話版, 可重寫)**: 於 `./tmp/<案名>/mut/<id>/` 只複製 `server/`、被測測試檔與其夾具(不建連結), 以 repo 之 `node_modules/mocha/bin/mocha.js` 並以鏡像根為工作目錄執行; 裸名匯入向上解析至 repo 之 `node_modules`(`./tmp` 在 repo 內); 每項變異先驗錨點恰命中 1 次、另跑不變異之對照(GREEN)才採信.
+- **`quiet-run --cwd <他庫>` 之完整日誌落在呼叫端工作目錄之 `tmp/quiet-run/`**(實測: 對 w-web-api／w-web-sso 之測試日誌出現在 w-web-perm 之 `tmp/quiet-run/`, 非被測庫); 結案清理須含呼叫端該夾.
+
 ## twp3(2026-11-24; 排程第 609 項 w-web-perm 部分; ADR-052)之經驗
 
 - **盤點「本地型別／錯誤摘要函數」不能只找函數名**: `nameOfErr` 是名稱含 Err 才好找, 另有 `(typeof ${typeof c})` 字面值(沒有函數)、`get(err, 'name')`、`err.constructor.name`、`reName.test(name)` 類寫在別的函數內者(`wrapInjected.describeUpstream`、`fetchJson.errDesc`). 做法: 以「錯誤類別名稱擷取」「`typeof` 組字串」兩個**行為樣式**各寫一條 regex, 對全部非測試可執行檔掃, 命中逐站判讀 console／非 console, 再把「現有命中之檔集合」釘成測試(DLS-013 `RETAINED`: 新增者須先判定並登錄理由); 第一版 regex 對 `['"`]…\(typeof …['"`]` 會在 `msg: (typeof err === 'string')` 這類**不是字串內**之寫法誤報(兩個引號之間夾著運算式), 改為先取出單行字串字面值再判內容.
@@ -51,7 +58,7 @@
 - **全套中途決定改程式碼**(pm57): 已開跑之全套立刻終止重排(凍結碼才算數); 終止後確認無殘留行程、清掉自己遺留之 `test/_tmp/settings-e2e-<pid>-*.json`.
 - **時限規劃**(run06／run07): 規劃輪次先倒推「最終驗證＋報告」所需時間再決定 e2e 範圍; 子代理跑長 e2e 前先講明截止時刻(單輪 4 小時; 單檔約 8 分、array-form 約 16 分級); 時限以實測 `date` 為準(感覺會差很多); e2e 無並行負載時比有負載快約 30%(grups 7 對 10 分).
 
-## dev server proxy 重用連線與 TIME_WAIT 輕量量測(2026-11-07 pp347〔任務 20261107181536, 排程第 347 項〕; R-E2E-PROXY-01; 姊妹套件 w-web-sso 排程第 324 項先查得; 報告 `C:\opensrcOper\dnow\20261107181536\agent-out\pp347-修正報告.md`; 證據 `…\pp347-evidence\`)
+## dev server proxy 重用連線與 TIME_WAIT 輕量量測(2026-11-07 pp347〔任務 20261107181536, 排程第 347 項〕; R-E2E-PROXY-01; 姊妹套件 w-web-sso 排程第 324 項先查得; 報告 `dnow/20261107181536/agent-out/pp347-修正報告.md`; 證據 `…\pp347-evidence\`)
 - **修前／修後切換不必來回改 repo 檔**: vue-cli 之 `loadFileConfig.js:11` 先取環境變數 `VUE_CLI_SERVICE_CONFIG_PATH`(絕對路徑)。「修前」以 `git show HEAD:vue.config.js` 另存副本(`tmp/pp347/vue.config.before.js`)，在跑 mocha 之行程環境設該變數(`e2e-setup.mjs` 以 `spawn('npm run serve')` 不給 `env` 即繼承，dev server 讀到副本)；「修後」不設即用現行檔。起跑前以 `require('@vue/cli-service/lib/util/loadFileConfig.js')(process.cwd())` 印 `fileConfigPath` 與 `/api` proxy 之鍵確認選到哪一份(修前 `target,pathRewrite`、修後 `target,agent,pathRewrite`)；比來回編輯 repo 檔安全(中途中斷不會留半改狀態)。
 - **全機 TIME_WAIT 不能直接歸因給本套件**: 取樣期間同機另有他套件 e2e(本機埠 8091／11108／8080／11005 等)與無關服務(7680)同時產生 TIME_WAIT，修後取樣窗尾甚至被他套件的突發拉到 1,259。歸因一律看**本實例埠**(8090／11006；自動換埠時為位移後之埠，e2e log 開頭印 `[e2e-port]`)，全機數字只當背景；取窗只取 mocha 實際起訖(`runMeasure.mjs` 在 `quiet-run --lock` 內寫 `window.json`，取鎖等待期間之取樣排除)。
 - **兩欄都看、兩側分開算**: 本機埠＝服務埠者為伺服端先關，遠端埠＝服務埠者為用戶端先關。修後伺服端側 −86%，但用戶端側 +47%(608 → 893)：連線改重用後，每案 fresh browser 關閉時瀏覽器關自己的 keep-alive 連線(8090 之 497 ≈ 83 案 × 約 6)，agent 閒置連線逾時由 dev server 關。只報單側或只報全機會得出相反結論。
@@ -61,7 +68,7 @@
 - **操作面**: ①`mocha --dry-run` 也走 e2e 鎖(只為數案例排了 5 分半，下次改用靜態數 `it`／`CASES`)；②同套件的測試鎖一律依序，探針排在長 e2e 之後會等到 e2e 結束(本輪一次等 14 分才跑到，且第一版探針因埠號隨機而假紅，再排一次)——短探針應在長鏈開跑前或兩輪之間插入；③背景指令與 `quiet-run --timeout` 都把排鎖等待算進去，長鏈一律 detached(`nohup bash tmp/pp347/chain.sh > … &`)分段輪詢；④守門 hook 會擋 `node -e` 內含 `fs.writeFileSync`，彙整腳本一律寫成 `.mjs` 檔(`twSummary.mjs` 加 `--win` 取窗)。
 - **探針需正規化隨機埠**: 比對「修前修後後端收到之請求」時，`host`／`origin`／`x-forwarded-host`／`x-forwarded-port` 帶作業系統配發之隨機埠，須先換成記號再 `deepEqual`，否則恆假紅。
 
-## e2e 單開自動換埠導入(2026-11-05 wp309〔任務 20261105000800, 排程第 309 項〕; R-E2E-PORT-01; 報告 `C:\opensrcOper\dnow\20261105000800\agent-out\wp309-修正報告.md`; 證據 `…\wp309-evidence\`; 本套件為第一個導入者, 給他套件之範本)
+## e2e 單開自動換埠導入(2026-11-05 wp309〔任務 20261105000800, 排程第 309 項〕; R-E2E-PORT-01; 報告 `dnow/20261105000800/agent-out/wp309-修正報告.md`; 證據 `…\wp309-evidence\`; 本套件為第一個導入者, 給他套件之範本)
 - **「全綠」不能證明沒殺到別人**: 修前以真實占用者(自建 http 監聽占 11006)跑 `e2e-init`, 20 passing／離開碼 0, 但占用者 PID 已被 `restartBackend` 之 `killForeignOnRestart`(依埠殺任何監聽者)殺死; 逐檔 runner 之 `killPortListeners(11006)` 在第一檔開跑前就殺了它; 占 8090 則是前端「沿用」占用者, `e2e-layout` 失敗且占用者被打到 2 次. 驗收一律看「占用者 PID 存活、仍回應、被測碼打到 0 次」(`tmp/wp309/scenario.mjs` 之形狀: 自建占用者 → 跑被測指令 → 占用者狀態 → 收尾回驗埠釋放), 不看測試綠不綠.
 - **修前紅要在動手改碼之前跑**: 現況碼本身就是「修前」, 先跑三組(占後端埠、占前端埠、runner)存證, 再改; 之後不必另建舊碼副本.
 - **本機 `netstat` 與 `Get-NetTCPConnection` 之狀態欄不可靠**: `netstat -ano` 把監聽中之埠列成 `FIN_WAIT_1`、漏列新起之監聽; `Get-NetTCPConnection` 之 `State` 為空(`-State Listen` 查無). 判「某 PID 是否在監聽、監聽哪些埠」改看 `RemotePort -eq 0` 之列(同套件 `listenerPids` 之作法). 套件文件早已寫明, 自己重寫時仍踩到(第一版以 netstat 解析, 監聽他埠者照殺).
@@ -74,7 +81,7 @@
 - **歷史證據腳本也在掃描範圍**: `spec/evidence/perm-run01-20261025/scripts/run-rest.mjs` 仍匯入已移除之 `killPortListeners`(子代理審查發現), 已改與 runner 同形; 日後移除 `e2eLib` 轉出前, 先 `rg` 整個 repo(含 `spec/evidence`), 不只掃 `test/`.
 - **獨立審查值得做**: 子代理(sonnet, 唯讀)讀 diff 找到 2 項真問題(上述 `SilentlyContinue`、`PR-011` 於 mocha 行程內 import `e2ePorts.mjs` 會實際保留埠)與 1 項漏網站點(`run-rest.mjs`), 約 11 分鐘; 其餘提問(子行程繼承保留下 `killOwnListeners` 是否殺得到)經實測證實可行(`post3-runner` 之子行程沿用 `[11106, 8190]`).
 
-## openApp 開頁競爭: 無 token 預先造訪頁之自發導覽(2026-11-04 wp70〔任務 20261104193657〕; R-TEST-OPENAPP-NOPREVISIT-01; 報告 `C:\opensrcOper\dnow\20261104193657\agent-out\wp70-修正報告.md`; 證據 `…\wp70-evidence\`)
+## openApp 開頁競爭: 無 token 預先造訪頁之自發導覽(2026-11-04 wp70〔任務 20261104193657〕; R-TEST-OPENAPP-NOPREVISIT-01; 報告 `dnow/20261104193657/agent-out/wp70-修正報告.md`; 證據 `…\wp70-evidence\`)
 - **主控初判大方向對, 但轉址目標與觸發條件要實測才寫得對**: 初判「無 token 頁自行跳轉」成立; 實測補正①e2e 前端是 dev server, `public/index.html` 之 `{urlRedirect}` 未被代換, `loginError` 的 `window.location.href = '{urlRedirect}'` 成為相對路徑 `/%7BurlRedirect%7D`(dev server history fallback 回同一個 SPA), 不是 `settings.json` 的外部網址; ②跳轉在 `login...` 後 2.00～2.02 s 發出(= `w-ui-loginout` 的 `timeWaitAnimation` 2000 ms, 不是網路時序); ③**必要條件是測試行程停滯 ≥ 約 2 s**: 阻塞 node 事件迴圈 ≤1800 ms 9／9 綠、≥2300 ms 6／6 紅; 單純 CPU 飽和(24 個空轉行程, openApp 拉長到 12～31 s)20／20 不紅。機制(推測, 由阻塞實驗反推, 未另行證明): 瀏覽器已提交導覽、測試行程卻尚未處理該事件就送出 evaluate, 才會得到此錯; 故重現手段是**同步忙等阻塞測試行程**(接縫包住 `page.goto`, 解決後 `sleepSync`), 不是加 CPU 壓力。
 - **「只拿掉 evaluate」不夠**: 保留預先造訪時, 第二次 `goto(appUrl)` 會被該頁自發導覽打斷(`Navigation to … is interrupted by another navigation to …/%7BurlRedirect%7D`, 阻塞 ≥2300 ms 6／6); 舊碼的 `.catch(() => {})` 只護第一次 goto。所以預先造訪整段須移除; 全新 `browser.newContext` 的 localStorage／cookie 本就是空的(實測 context A 寫入、context B 同源讀為空), 清除是無事可做。
 - **w-web-task 已修同一成因, 但另加了「遇 `Execution context was destroyed` 等 800 ms 重試」**: 屬碰運氣寫法(技能與主控守則不採), 本套件不照搬; 其註解對成因的描述(`isDev()` 為 false → 無 token 登入失敗 → `loginError` 轉址)與本次實測一致, 唯目標不是外部網址。w-web-sso 有 26 處同形(15 檔), 但無 token 頁是登入表單、`src` 只有登入成功後的 `goUrl` 寫 `location.href`, 無計時導覽。
@@ -84,7 +91,7 @@
 - **新增 `test/tools/` 檔須避開兩項既有掃描**(`unit-e2ePortShift`): PS-005 不得含基準埠字面 `11006`／`8090`(一律經 `e2e-setup` 匯出的 `baseUrl`)、PS-007 若 import `child_process` 則每個呼叫須帶 `windowsHide: true`(並使「掃到 ≥30 處」之計數變動); 探針工具因此不用 `child_process`(負對照以內嵌副本取代 `git show HEAD`)。
 - **操作面**: ①長鏈(array-form 每次 18～19 分)以 detached 的 `chain.sh` 依序 `quiet-run --lock` 各取放一次, 另用前景 `until grep` 迴圈分段等(每段 ≤9 分); ②探針用的前後端以 `keeper.mjs` 在 `quiet-run --lock` 內常駐(`keeper.stop` 檔觸發 `cleanup()`), 探針期間不另起 mocha, 結束後釋放才跑測試——同一套件同時只持一槽, 兩者並行會互等; ③`E2E_PORT_OFFSET=100 run …`(函式前綴賦值)在 bash 中會傳給函式內的子行程, 以 `curl` 檢 8190／11106 有回應、8090／11006 無回應確認。
 
-## e2e 分組多開導入(2026-11-04 wp302〔任務 20261104071854, 排程第 302、275 項〕; R-E2E-SHARD-01; 報告 `C:\opensrcOper\dnow\20261104071854\agent-out\wp302-修正報告.md`)
+## e2e 分組多開導入(2026-11-04 wp302〔任務 20261104071854, 排程第 302、275 項〕; R-E2E-SHARD-01; 報告 `dnow/20261104071854/agent-out/wp302-修正報告.md`)
 - **導入清單(se302 報告 §5.0／§5.2)與實況相符, 但有三處要補**: ①`genTempSettings` 原為 `export { genTempSettings }`(解構自 `createTempSettings`), 加 `serverPort` 注入後改為具名函式匯出(簽章不變, 十餘個 api／e2e 檔的 `import { genTempSettings }` 不必改); 位移才注入、未位移 overrides 原樣, 使「未設 `E2E_PORT_OFFSET` 時臨時設定與導入前逐鍵相同」成立(清單的寫法是無條件注入, 值恰為 11006 看似無害, 但鍵集合仍會變). ②清單只列 `e2e-setup.mjs` 之 `windowsHide`, 排程第 275 項實際涵蓋 `test/` 全部 `child_process` 呼叫(本輪新補 12 檔 24 處〔19 項置換〕, `e2e-setup.mjs` 4 處另計; 補後 16 檔 38 處全帶), 以括號配對掃描(`unit-e2ePortShift` PS-007)而非 grep 行盤點, 因單行 grep 抓不到跨行呼叫. ③`vue.config.js` 為 CommonJS, 寫成 `11006 + Number(process.env.E2E_PORT_OFFSET || 0)`; 位移量格式錯誤時 `resolveE2ePort` 已在 e2e-setup 載入時先拋錯, 故此處不另驗(dev server 單獨啟動而位移量為垃圾值屬不支援情境).
 - **位移實例手動建立用 robocopy, 不用 `fs.cpSync`**: 實例放在 `<專案根>/tmp/…` 下時 `fs.cp` 報 `ERR_FS_CP_EINVAL`(不能複製到自身子目錄); `robocopy <專案> <實例> /E /XJD /XD <完整路徑…>` 的排除清單用**完整路徑**(只排除該一夾). 實例內 `db`／`dist`／`settings.json` 一併複製, 啟動時 `seedDb` 刪 `db` 重建; 移除實例一律 `removeE2eInstance`(拆 2 個 junction、回驗 `test/pics` 與 `node_modules` 快照), 不手動遞迴刪.
 - **首次等價驗證用 `E2E_BASELINE_OUT_DIR`＋`--baseline` 直跑單一流程**(不用 `shardE2e`, 它只跑比對、不寫圖): 正式實例與位移實例各產 `pemis` 48 張到不同隔離目錄, `compareImageDirs` 比兩次輸出; 結果 48／48 位元組相同. 各對現行標準圖得 29 檔位元組相同＋19 檔 RGBA 相異但 pixelmatch 計數 0(兩邊檔集完全相同), 表示標準圖與當前 Chromium／sharp 輸出有既有的亞像素漂移、與位移無關; 判準只看「兩次當前輸出」, 不與標準圖比(技能 §5.2 第 7 點).
@@ -92,7 +99,7 @@
 - **全套的瓶頸是測試鎖佇列, 不是 CPU**: 同一時段 w-web-api、w-web-sso 也各跑自己的多開全套(`--lock-exclusive`), 本套件之單一測試指令實測排鎖 25 分鐘; `full-suite` 兩段(`rest`、`e2e`)各排一次, 故預留的時間要含兩次排鎖. **排鎖可超過單次 4 小時預算**: 第二次全套之 `e2e` 段 12:48 起排獨佔鎖, 前面有 w-web-api 與 w-web-sso 之獨佔 e2e(後者因預設分組失衡, 最長組 120 案、全程超過 45 分), 至 13:13 仍輪不到, 本輪 4 小時上限(09:45 起)前不可能跑完約 30 分之 e2e 段, 只得回 CONTINUE; 同時段三套件各排「兩次全套」時, 獨佔鎖是序列化瓶頸. 對策: ①第一次全套就用實測 `durations`(本套件已寫入, 之後的全套預估牆鐘 28.6 分); ②兩次全套之間不要在鎖佇列中閒置, 第二次的 `rest` 段(非獨佔)可先跑完、`e2e` 段在佇列中等; ③排程時把三套件之全套錯開. 為避免「靜態盤點新增檔」被漏跑: `full-suite` 在啟動當下列舉 `test/*.test.mjs`, 啟動後新增的測試檔不在該次 `rest` 段內(本輪 `unit-e2ePortShift` 於第一次全套啟動後才新增, 另以單獨一次涵蓋, 第二次全套含之).
 - **守門 hooks 的實務**: 寫檔一律 Write(含 `./tmp` 腳本); Bash 內 `cat <<EOF > f`、`echo … > f` 會被擋; 啟動 detached 長指令寫成 `.mjs` 啟動器(`tmp/wp302/runFull.mjs`: `spawn(…, { detached: true, windowsHide: true, stdio: [ignore, fd, fd] })` 後 `unref`), 不用 `nohup bash -c '…; echo EXIT $? > f'`.
 
-## 統計之桶輸出不含未來時間桶(2026-11-03 perm pm57〔任務 20261103123942〕; Gitea #57; R-STA-FUTURE-01; ADR-048; 報告 `C:\opensrcOper\dnow\20261103123942\agent-out\pm57-修正報告.md`)
+## 統計之桶輸出不含未來時間桶(2026-11-03 perm pm57〔任務 20261103123942〕; Gitea #57; R-STA-FUTURE-01; ADR-048; 報告 `dnow/20261103123942/agent-out/pm57-修正報告.md`)
 - **同型修正不可直接搬姊妹套件的結論與計數**: w-web-api #58 報告說「e2e 合成 log 無未來紀錄、golden 剔除 2 列」; 本套件 ①e2e 統計頁皆 `staEventMock`(`procStaInfor.mjs:genMockStaEvent` 固定 48 桶), **完全不經 `staLogsCore`**, 標準圖不可能凍入未來桶(證據是程式路徑, 不是目視 `_staref`); ②golden fixture 之 `future-30m`(FIXED 12:34 +30 分＝13:04)在 hr 屬 13 時桶——晚於現在所屬桶 12 時, 故 hr 剔 2 列(`2026-08-31T13`、`2026-09-01T13`)、day 剔 1 列(`2026-09-01`; future-30m 在 day 屬現在所屬日桶而保留), 與姊妹套件之 1／1 不同. 先用 `tmp` 腳本逐列比 HEAD 版與重產版(只應有「剔除」、無「新增／變更」、剩餘列順序同), 再寫進文件.
 - **「修前紅」用 HEAD 副本時, worker 路徑仍用工作樹的 shellWorker**: `resolveShellWorker` 先由 `fpSelf` 往上找最近 `package.json`(副本在 `./tmp/pm57/head/…` 之下, 最近的是 repo 根, 名稱符合)→ 回 repo 的 `server/staLogs/staLogsCore.shellWorker.mjs`. 本次改動只在 `buildOutput`(主執行緒), worker 只做掃描, 故不影響結論; 若將來改動落在 worker 載入的模組, 副本測試要連 worker 一併換(注入 `fpWk`)或改在整份 repo 副本內跑.
 - **前景 `quiet-run --lock` 排鎖會被工具移到背景並於約 10 分鐘後停止**(兩者時限都含排鎖等待): 驗證鏈改為單一 `chain.mjs`(diff → red → green → mutate → full, 前三步不符預期即中止)以 `nohup … quiet-run --lock --timeout <秒> -- node tmp/<名>/chain.mjs` detached 啟動, 全套之 timeout 取「期限 − 現在」; 本次排鎖等待 0 秒(三槽中途釋出一槽)但不可預期.
@@ -100,7 +107,7 @@
 - **標籤字串比較有兩個邊角**: 年份 ≥ 10000 之標籤(`10000-01-01…`)字典序小於 `2026-…`(長度先比); 超出 Date 範圍者標籤為 `'Invalid Date'`. 判定函數 `isLaterLabel` 先比長度(變異 M02 證明非多餘).
 - **檔案換行**: 本 repo 工作樹檔案為 LF(`git ls-files --eol` 回 `i/lf w/lf`), `grep -c $'\r'` 在 Git Bash 下不可靠(計出全部行數), 以 `git ls-files --eol` 為準.
 
-## console 診斷不輸出資料值(2026-10-31 perm〔任務 20261031023204, 排程第 191、165 項〕; R-CONSOLE-NOVAL-01; ADR-047; 報告 `C:\opensrcOper\dnow\20261031023204\agent-out\perm-修正報告.md`)
+## console 診斷不輸出資料值(2026-10-31 perm〔任務 20261031023204, 排程第 191、165 項〕; R-CONSOLE-NOVAL-01; ADR-047; 報告 `dnow/20261031023204/agent-out/perm-修正報告.md`)
 - **站點盤點不能只掃 `server/`: 「被伺服端匯入之 `src` 共用碼」與「文件範例」是兩個漏洞**: 前一輪(mig-perm／mig-perm2)三份站點表只掃 `server/**`、`srv.mjs`、`g_*.mjs`, 漏了 `src/plugins/mShare.mjs`——`getUserRules` 每次 `/api/getPerm` 都走它, 授權字串非法時 `console.log('c', c)` 把使用者／外部應用寫入之整段授權字串印出, 另附 JSON5 錯誤(訊息含原文片段). 這類站點之找法: 以 **`server/WWebPerm.mjs` 之靜態匯入閉包**(`test/tools/srcScan.mjs:importClosure`, 47 檔)為範圍, 而不是依目錄猜; 閉包內任何新站點自動被不變式涵蓋, 不必維護逐檔清單. 文件範例(JSDoc、README)是部署方會照抄之碼, 範例印 `user` 等於教人把個資寫進行程輸出, 同一支掃描器以 `'doc'`／`'md'` 模式掃.
 - **不變式用「引數白名單」而非「禁止清單」**: 禁止清單(token／user／payload…)永遠漏下一個識別字; 白名單(無插值字面值、`typeof X`、`describeShape(…)`、`describeErr(…)`、`maskTok(…)`、`maskUrl(…)`, 加逐一登錄理由之識別字)則新站點印任何其他東西即紅. 自測(SITE-NV-007)用違規樣本證明掃描器不空轉. **允許識別字須按檔分**: `keyTable` 在 schema 模組是常數、在 `WWebPerm` 是請求值, 全域放行會讓 `console.log('keyTable', keyTable)` 靜態漏網(發現於寫完後重算修前違規數 39≠預期 41); 現 `ALLOW_IDS` 帶 `only` 檔樣式.
 - **`maskTok` 露頭尾字元是「照舊」, 測資要避開誤判**: 識別值 `ZZ-secret-9317`(14 字)經 `maskTok` 為 `Z...7(len=14)`, 不含整串, 但 `Basic ZZ-secret-9317` 之遮罩為 `Ba...17(len=20)`——測試斷言 `maskTok` 形狀用 `/\w+\.\.\.\w+\(len=\d+\)/`, 不要寫成 `...(len=` 緊鄰.
@@ -110,7 +117,7 @@
 - **既有之兩個站點不變式隨本輪更新(不是遷就)**: `unit-adminOnlySite` AOS-S7 之白名單寫死 `console.log('user.isAdmin is not y or n', user.isAdmin)`, 本輪該行改印 `describeShape(isAdmin)`, 白名單同步; `unit-e2e-lifecycle` LC-004 以字串 `/syncAndReplaceTabs` 判「建立外部列夾具」, 而 `api-consoleNoValues` 之 payload 站點須經該端點觸發(被拒絕之請求、後端為子行程專屬資料夾、零寫入)——不改寫路徑字串迴避, 改在 LC-004 明列 `ISOLATED_NO_WRITE` 豁免並以條件(自起子行程、不 import `api-setup`)把關(先例 `api-maskRaw` MASKRAW-104 因同一掃描而廢止, 本輪因 payload 為本輪要驗之「請求本體」而不廢止).
 - **鍵名仍是「值」嗎**: 主控裁定允許印鍵名(`(keys: id,name)`), 但鍵名由請求端決定: 本套件以控制字元換 `?`、至多 20 個、單鍵至多 40 字之上限印出; 若把秘密當鍵名傳入仍會出現——已列 ADR-047 已知限制, 不再縮.
 
-## 轉接器帶 SAFE_KEYS 與秘密清單改 wsemi getDiagSecrets(2026-10-30 b-perm〔任務 20261030184428, 排程第 187、192 項之下游部分〕; R-ORM-DIAG-03; ADR-046; w-serv-orm 1.1.23、wsemi 1.9.33; 報告 `C:\opensrcOper\dnow\20261030184428\agent-out\b-perm-修正報告.md`)
+## 轉接器帶 SAFE_KEYS 與秘密清單改 wsemi getDiagSecrets(2026-10-30 b-perm〔任務 20261030184428, 排程第 187、192 項之下游部分〕; R-ORM-DIAG-03; ADR-046; w-serv-orm 1.1.23、wsemi 1.9.33; 報告 `dnow/20261030184428/agent-out/b-perm-修正報告.md`)
 - **升自有相依後第一件事: 掃「本 repo 對自有套件之深層匯入是否都還存在」**: `w-package-tools-e2e` 1.0.11→1.0.12 刪了 `src/parseListenerPids.mjs`, 而 `test/tools/e2eLib.mjs` 仍再匯出它(全 repo 無人使用), 於是**所有經 e2eLib 之測試檔(含全部 e2e 與 e2e-setup 使用者)載入即 `ERR_MODULE_NOT_FOUND`**, 整個 mocha 以 exit 1 結束、零案執行——與測試紅燈不同, 摘要只有一行「Exception during run」。掃法: 用 node 腳本走 `server`／`src`／`test`／根目錄之 .mjs／.js, 以 `^\s*(import|export)\b[^;'\n]*from\s+'((w-[a-z0-9-]+|wsemi)/[^']+)'` 取全部深層匯入, 逐一 `fs.existsSync('node_modules/' + 路徑)`; 本輪 1 筆缺(已刪該再匯出行, 全 repo 無其他引用)。**升版後不先掃就跑全套, 會把排鎖數分鐘後之第一個結果浪費在載入錯誤上**。
 - **接線測試靠「呼叫點運算式原文」重建 funLog 時, 呼叫點多了參數, 重建用之受控識別字也要跟著加**: `test/tools/siteFunLog.mjs` 以 `new Function('genDiagFunLog', 'srLog', 'SAFE_KEYS', 'return ' + expr)` 重建, 呼叫點若引入他處識別字即 ReferenceError, 這正是我們要的(不許測試與生產接線脫鉤); 同一 helper 只放一處, `unit-ormDiag` 與 `unit-ormDiagSafeKeys` 共用。
 - **加了 `safeKeys` 後, 語料「以白名單外任意鍵驅動」之接線案不能再經呼叫點重跑**: A01、A03、A09、A10 用 `a`、`b`、`self`、3000 個鍵驅動 `safe` 之正規化, 經 `safeKeys: SAFE_KEYS` 的接線這些鍵全被丟(預期行為)。正確處置是**登錄為不適用並寫理由**, 同形態改在白名單內之鍵(`n`、`ks`、`msgs`、`tables`…)上驗(SK-W3), 不是放寬斷言或再寫一份不帶 `safeKeys` 之測試專用接線。語料新增 A 案時 `ORMDIAG-000` 仍逼人逐案登錄(本次 A11～A13)。
@@ -118,7 +125,7 @@
 - **變異腳本兩個陷阱(都曾造成假綠)**: ①`String.replace(原文, 新文)` 只換**第一處**, 而原文常同時出現在 JSDoc 與程式碼(`maskRaw.mjs` 之 `getDiagSecrets({ conns: [url] })` 在註解先出現), 變異改到註解, 測試當然全綠——要用帶唯一前綴之原文(`return getDiagSecrets(...)`), 並對每筆變異先確認「原文只出現一次」或明確換全部; ②mocha 之 `--reporter json` 遇斷言錯誤帶 **BigInt** 之 `actual`(本檔 SK-W3 之 `2n`)序列化失敗, 靜默 exit 0 且無輸出檔——腳本若把「無輸出」當「抓到」就是假綠; 改用 `--reporter json-stream`(只序列化 `err.message`), 並要求 `end` 事件才算判定, 載入即失敗者須在變異表明列 `loadFail`。
 - **`quiet-run --lock` 排鎖約 2 分鐘(他套件占槽)**: 背景以 `nohup … &` 啟動、用 Monitor 等 `[quiet-run] exit=` 出現, 等待期間做文件工作; 不要在等鎖期間重複啟動第二個(同套件同時只能持一槽, 會互相排隊)。
 
-## 直接呼叫 woItems 之錯誤原文入 srLog 前移除連線憑證(2026-10-30 mig-perm2〔任務 20261029002013, 承 mig-perm〕; R-ORM-DIAG-02-⑦; ADR-045; T-a 主控裁定選 B; 報告 `C:\opensrcOper\dnow\20261029002013\agent-out\mig-perm2-修正報告.md`)
+## 直接呼叫 woItems 之錯誤原文入 srLog 前移除連線憑證(2026-10-30 mig-perm2〔任務 20261029002013, 承 mig-perm〕; R-ORM-DIAG-02-⑦; ADR-045; T-a 主控裁定選 B; 報告 `dnow/20261029002013/agent-out/mig-perm2-修正報告.md`)
 - **「固定詞彙」之歸類要追到錯誤的『來源呼叫』, 不是看欄位名叫 raw 或 msg**: 前一輪把 `routeResult` 之 raw 與 `verifyConn` 之 msg 歸為「語系鍵／固定詞彙, 不處理」, 但 `getPerm` 之 `getGenUserAndRulesByUserId` 與連線閘之 `getTokenUser` 都直接 `await woItems.xxx.select()`, 其 Error 沿 Promise 鏈一路到這兩個出口才被轉成 key——raw 於是是驅動原文。**判準**: 對每個寫入 srLog 之 `raw`／`msg` 站點, 向上追所有可能的 reject 來源; 只要有一條是 `woItems` 直接呼叫(或任何不經 `procOrm` 之 ORM 方法), 該站點就是外來值出口。站點全集用兩條 Grep 互相對照: ①`woItems(\[[^\]]+\]|\.\w+)\.(select|save|del|delAll|insert)\(` 列出直接呼叫之起點; ②`err && err.message|String\(err\)` 列出把原文寫進 log 之終點; 兩者之間用呼叫鏈接起來, 不可只盯①或②。
 - **遮罩函數之選擇: 只需要文字遮罩就用 `maskDiagText(原文, secrets.reject)`, 不建 `getDiag` 實例**: `getDiag` 之 `diag.mask` 與之等價(同為 reject 清單), 但它同時帶診斷出口、`safeKeys`、`logDetail` 等本套件不用之機制, 建構期還要讀 opt。傳清單時要傳 `secrets.reject` 陣列, **不是**整個 `getDiagSecrets` 結果(`maskDiagText` 對結果物件預設取 `detail`——含單獨帳號與儲存路徑, 會多遮)。
 - **儲存路徑形式之連線字串不可列 `urls`, 要走 `conns`(自動分類)或 `paths`**: 對 w-orm-lmdb 之 `./db` 直接 `getDiagSecrets({ urls: ['./db'] })` 會把整串 `./db` 列入 reject 清單, srLog 之診斷原文裡的儲存路徑全被遮成 `***`, 且與規格 Q3(對外錯誤值不遮儲存路徑)衝突。**(2026-10-30 b-perm 更正作法)** 原本直接 import `w-serv-orm/src/getDiagBrief.mjs` 之 `getUrlSecrets` 以求與 w-serv-orm 同一判準; w-serv-orm 1.1.23 已刪該函數並把 `getDiagBrief.mjs` 轉為內部檔, 現行寫法為 wsemi `getDiagSecrets({ conns: [url] })`(含 `://` 或 `@` 者同 `urls`, 其餘同 `paths`; w-serv-orm 自身亦直接呼叫它, 兩層一致, 單一來源, 不抄一份判準)。SK-M1／M2 鎖「與 wsemi 同一結果」與「路徑形式 reject 為空」。
@@ -129,7 +136,7 @@
 - **新增 api-／e2e- 測試檔前，先看 `unit-e2e-lifecycle` LC-004 與同類『掃整個 test/ 目錄』之站點不變式**: LC-004 以去註解後的程式碼是否出現 `urlSync`／`postSync(`／`/syncAndReplaceTabs` 判定『建立外部列夾具』，要求 api-setup 之收尾輔助。本輪 `api-maskRaw` 的一案經同步端點觸發 syncCore 讀庫(後端是子行程自有資料夾、該案零寫入)，全套才被抓到(5285 過／1 敗)。處置: 該案廢止保留編號，syncCore 讀庫由單元案逐站驗、接線由原始碼靜態斷言＋必帶檢查把關; **不**為迴避掃描而拆字串路徑。同理，改函數簽名前 Grep 該簽名的字面形狀在 `test/` 的出現(本輪另有 `unit-procCore-external` SITE-EX-012 寫死 `lockExternalRows = true }`，把新參數放在預設值參數之前即不動測試)。
 - **測試鎖排隊時間可能超過單次派工之上限**: 本輪入列時兩槽皆被 `npm test` 級長作業佔用且前有 3 個等待者, 預期等待數小時; 一次取鎖之驅動腳本(`tmp/mig-perm2/run-all.mjs`)設計成「取得鎖後依序跑新測試＋受影響檔 → 變異 → 全套, 失敗時等 retry 旗標」, 並以 `go.flag` 讓入列早於檔案定稿; 結果以報告為準。
 
-## 遷移到 wsemi 共用診斷模組(2026-10-29 mig-perm〔任務 20261029002013, 排程第 161 項〕; R-ORM-DIAG-02; ADR-044; wsemi 1.9.31、w-serv-orm 1.1.22; 報告 `C:\opensrcOper\dnow\20261029002013\agent-out\mig-perm-修正報告.md`)
+## 遷移到 wsemi 共用診斷模組(2026-10-29 mig-perm〔任務 20261029002013, 排程第 161 項〕; R-ORM-DIAG-02; ADR-044; wsemi 1.9.31、w-serv-orm 1.1.22; 報告 `dnow/20261029002013/agent-out/mig-perm-修正報告.md`)
 - **「伺服端轉接器」的站點全集不是「全 repo 的 catch」, 先問每個外來值『由誰擁有遮罩』**: 本套件不持有秘密清單(`url` 只是字串參數), 外來值(ORM 建構拋出、ORM 讀寫 reject、擴充函數 reject)由 w-serv-orm 1.1.22 在其 catch 站點經 `diag.err` 遮完才轉出, `procOrm` 對 ORM 引擎失敗一律以固定詞彙 reject(`failed to select data` 等)。於本套件重複包 `diag.err` 既無清單可用、又會切碎固定詞彙(語料 R07)。證明方式是端到端而非讀碼: `api-ormDiag` 之 ORM 縫注入含連線憑證的故障, 斷言 `operOrm-error.raw === 'failed to select data'` 且 srLog 全文與標準輸出無憑證(ORMDIAG-202／204／203); `ormDiagInitChild` 讓 WOrm 建構拋出回顯連線字串的錯誤, 斷言 WWebPerm 拋出之 Error、console、`WServOrm-init-error` 皆無密碼(ORMDIAG-301～303; 對舊 w-serv-orm 1.1.20 三者皆紅)。
 - **共用語料經『呼叫點運算式原文』重跑, 而不是自己再寫一份接線**: `mkSiteFunLog` 由 `sourceLines(WWebPerm.mjs,'code')` 取出 `WServOrm(ds, WOrm, url, db, { funLog: <運算式> })` 的 `<運算式>`, 以 `new Function('genDiagFunLog','srLog', 'return ' + expr)` 建 funLog, 令替身 `srLog.warn` 即語料案例給的 `write`。呼叫點若改成自寫轉接器或漏 `.funLog`, 測試跟著變而變紅(變異 MU01／MU02／MU04)。語料新增 A 案時 `ORMDIAG-000` 比對 `CORPUS_A` 登錄表, 逼人決定適用與否; 不適用者(A05 本套件不保留 close、A07 自訂事件名、A08 write 恆為函數)逐案寫理由。
 - **funLog 引數個數是 noDetail 的可觀察量**: `getDiag` 見 `funLog.noDetail === true` 時以 `funLog(label, safe)` 兩引數呼叫, 否則三引數(帶遮罩後的細節)。測試包一層 spy 時要把 `noDetail` 屬性複製過去(`Object.defineProperty(spy,'noDetail',{ value: f.noDetail, enumerable:true })`), 否則 spy 本身就把 noDetail 弄丟, 測到的是 spy 而非接線。
@@ -139,7 +146,7 @@
 - **測試鎖排隊遇他套件 `--lock-exclusive` 負載試驗(`w-mousekey fdload.sh … exclusive`)會等很久**: 前景呼叫的 10 分鐘上限一到, `quiet-run` 連同排隊項一起被殺(佇列項隨之消失, 不留殘留); 要排鎖就用 `nohup … &` 脫離工具呼叫的時限(`--timeout` 給足), 結束前確認該行程已結束。單行站點掃描這類無埠無負載的驗證, 排不到鎖時可先以邏輯等價的小腳本暫代(`tmp/mig-perm/check-wrap.mjs`), 但要在報告註明並請主控於全套確認。
 - **背景指令與 `Bash` 的 `sleep`**: 前景 `sleep N` 被守門擋; 等背景工作用 `run_in_background` 指令結束後的通知, 或 Monitor 的 until 迴圈。
 
-## w-serv-orm 診斷輸出(opt.funLog)導入 srLog(2026-10-28 perm-run01〔任務 20261028054319, 第 154 項〕; R-ORM-DIAG-01; ADR-043; w-serv-orm 1.1.20、Gitea #12; 報告 `C:\opensrcOper\dnow\20261028054319\agent-out\perm-run01-修正報告.md`)
+## w-serv-orm 診斷輸出(opt.funLog)導入 srLog(2026-10-28 perm-run01〔任務 20261028054319, 第 154 項〕; R-ORM-DIAG-01; ADR-043; w-serv-orm 1.1.20、Gitea #12; 報告 `dnow/20261028054319/agent-out/perm-run01-修正報告.md`)
 - **「遮罩後寫 detail」與「只寫 safe」要依日誌政策二選一, 先找政策出處再選**: 任務給兩條路; 本套件 srLog 一貫「不記列 id／個資值」(`procCore`／`syncCore`／`cascadeWrite` 之 srLog 註解、帳本 R-EXT-OWN-01 第 5 點), 且 detail 是任意結構(失敗列清單、查詢條件快照、引擎錯誤原文、無效參數時的連線字串), 樣式遮罩無從證明完整 → 只寫 `label＋safe`。先 `rg -n "不記.{0,8}(id|個資)" server sgud` 找政策, 再決定, 不先動手寫遮罩器。
 - **真後端上 w-serv-orm 的失敗路徑幾乎全被前置驗證擋下, 不能「自然觸發」**: 資料通道 `users.select` 送壞 find 在 w-serv-webdata 就回 `invalid find[…]`; 寫入的 HTML 標記、過長主鍵、重複 id 在 `procCore`／`syncCore` 就拒(`validateRows`)。探測結果: 以真 srv 後端送 3 種壞 find, srLog 只有 `verifyConn`、沒有任何 ORM 診斷行。要驗「診斷輸出的去向」只能在 ORM 縫(`WOrm` 建構子)注入引擎故障: `test/tools/ormDiagChild.mjs` 以真 `WWebPerm`＋包裝後的 `WOrmLmdb`(targets 表 `select` 一律 reject 帶 `code:'ENOSPC'` 且訊息含主鍵與 email)起獨立後端, 再經真 HTTP 資料通道 `targets.select` 觸發。
 - **子行程種子要用 `genTestData(ds, woItems, { bLog:false })` 自建庫**, 不能借 `seedDb`(綁死 `./db`); 資料通道連線閘需 perm users 表有 `id-for-admin`(`isAdmin:'y'`、`isActive:'y'`)之列, `genTestData` 的種子已含。種子後 `so.closeAll()` 再開 `WWebPerm`(同行程重開 LMDB 目錄)。
@@ -147,7 +154,7 @@
 - **WWebPerm 的前置檢查使 w-serv-orm 的無效參數診斷在 WWebPerm 路徑不可達**: `WWebPerm` 自己先檢查 `WOrm／url／db` 型別(並 `console.log('invalid url', url)`)。因此「建構期診斷」無法作端到端探針, 改用執行期故障。**備查(範圍外, 未改)**: `server/WWebPerm.mjs` 之 `console.log('invalid url', url)`／`'invalid db'`／`'invalid WOrm'`(約 :168-184)在參數無效時印出傳入值本身(url 為物件時可能含連線字串帳密); 與本輪 w-serv-orm 預設不印無效參數值之方向相反, 另案裁示是否改為只印型別。**〔2026-10-29 mig-perm 已改: 6 處皆只印 `typeof`, 見 R-ORM-DIAG-02 ④、`SITE-DIAG-006`〕**
 - **變異驗證用 Write 寫腳本(不用 `node -e`、不用 `sed -i`, 守門 hook 會擋)**: `tmp/perm-run01/mutate.mjs` 對每個變異做「find 恰出現 1 次 → 寫入 → 跑 unit(＋部分加跑 api)→ 還原」, `finally` 與 `process.on('exit')` 雙重還原, 結束比對備份; 12/12 被殺。`safe` 拷貝(`JSON.parse(JSON.stringify)`)一度是存活變異(等價輸出), 補「事後改動上游物件不影響已記錄內容」斷言後被殺。
 - **`db/wperm/**` 為版控中之資料庫檔**, 任何起後端之測試(含探測)都會重新種子而使其顯示 modified, 非本輪改動; 不可用 checkout 還原(禁止), 由主控檢查點處理。
-- **全套 `npm test`(實測約 87 分)經 `--lock` 排隊時, 背景指令之 2 小時上限連「排隊等鎖」一併計**: 12:11 送出、等鎖 22 分(兩槽被他套件 `npm test` 占滿)、12:33 取得鎖, 14:11 被工具終止(e2e 做到 `e2e-rela-user-grup` 一半), quiet-run 行程死亡而鎖檔仍列我方 pid → 以 `quiet-run --release-stale --cwd <repo>` 回收(只回收我方且持有者已結束者)。**下次**: 預估「等鎖＋跑」可能逾 115 分鐘時, 全套改 detached 執行(`nohup … &`, 分段以輸出檔盯)而非 `run_in_background`; 或先 `ls C:/opensrcOper/tmp/locks/*/owner.txt` 看兩槽佔用再決定何時送。被終止後未跑之檔(依字母序為其後之 e2e 檔)與 unit 可分開補跑(unit 不需鎖: `mocha "test/unit-*.test.mjs" --no-parallel`, 約 6 分)。
+- **全套 `npm test`(實測約 87 分)經 `--lock` 排隊時, 背景指令之 2 小時上限連「排隊等鎖」一併計**: 12:11 送出、等鎖 22 分(兩槽被他套件 `npm test` 占滿)、12:33 取得鎖, 14:11 被工具終止(e2e 做到 `e2e-rela-user-grup` 一半), quiet-run 行程死亡而鎖檔仍列我方 pid → 以 `quiet-run --release-stale --cwd <repo>` 回收(只回收我方且持有者已結束者)。**下次**: 預估「等鎖＋跑」可能逾 115 分鐘時, 全套改 detached 執行(`nohup … &`, 分段以輸出檔盯)而非 `run_in_background`; 或先 `ls tmp/locks/*/owner.txt` 看兩槽佔用再決定何時送。被終止後未跑之檔(依字母序為其後之 e2e 檔)與 unit 可分開補跑(unit 不需鎖: `mocha "test/unit-*.test.mjs" --no-parallel`, 約 6 分)。
 
 ## 全 repo 用詞統一為「系統管理者」之機械替換(2026-10-26 perm-run02〔任務 20261026143318〕; R-ROLE-NAME-01; ADR-042; 證據 `spec/evidence/perm-run02-20261026/`)
 - **替換順序與正則是關鍵**: 先處理「舊稱＋者」連用(否則產生疊字「者者」, 本專案有 2 處「…員者」連用之句), 再「系統＋舊稱」、單獨舊稱, 最後以負向後行斷言 `(?<!系統)` 處理單獨之「管理＋者」(不加斷言會把已是「系統管理者」者再冠一個「系統」而連續兩個「系統」). 先 dry-run 輸出逐行清單與疊字統計, 看過前後文才 apply。
@@ -158,13 +165,13 @@
 - **測試之「輸入資料」不是期望文字, 全域替換會改到畫面**(本輪實例): `e2e-external-rows` 把「A…未儲存之說明」等草稿字串輸入進儲存格並截圖, 機械替換連同這些資料一併改字, E2E-016-1 兩張紅(643 px)。教訓: 全域改字後, 凡**輸入到 UI 之測試字串**要列為獨立站點(grep 測試檔中被替換之行, 分「註解／標題／期望／輸入資料」四類), 輸入資料類之標準圖用「全產到暫存目錄再逐像素比對」找全, 不只看 mocha 紅燈(差 < 100 px 者不會紅); 本輪只有 external-rows 之 016-1 屬此類, 差異外框僅該行輸入文字, 屬授權範圍而覆蓋。
 - **dist／docs 文字替換後以 `e2e-init` 驗證**(後端 serve dist): 20 案全綠; 改字長度不同之字串使 `dist/w-web-perm.umd.js.map` 於同行後段欄位位移, 不影響執行, 發布重建後恢復。
 
-## 角色名稱統一為「系統管理者」(2026-10-26 perm-run01〔任務 20261026143318〕; 建議書使用端 Gitea #16; 證據 `spec/evidence/perm-run01-20261026/`; 報告 `C:\opensrcOper\dnow\20261026143318\agent-out\perm-run01-修正報告.md`)
+## 角色名稱統一為「系統管理者」(2026-10-26 perm-run01〔任務 20261026143318〕; 建議書使用端 Gitea #16; 證據 `spec/evidence/perm-run01-20261026/`; 報告 `dnow/20261026143318/agent-out/perm-run01-修正報告.md`)
 - **只改文字的修正, 標準圖範圍用「全產到暫存目錄再逐張比對」而不是「跑 mocha 看誰紅」**: 一個字(員→者)之差只有 108 個像素, pixelmatch 計 63～74 < `maxDiffPixels` 100, mocha 比對不會紅, 只靠失敗清單會漏掉全部該更新之圖(且 `--write-mode changed` 同理不寫出)。作法: 把受影響流程以 `E2E_BASELINE_OUT_DIR=<暫存目錄> node test/e2e-<flow>.test.mjs --baseline` 全產, 再以精確像素比對(任一通道不同即計, 取差異外框)與 `test/pics` 逐張對照, 分三類——差異外框恰為該字形(授權範圍, 覆蓋)、eng 圖僅 1 像素雜訊(pixelmatch 0, 不動)、其他(停下回報); 腳本在 `tmp/perm-run01/`, 證據(舊/新/差異三列放大)入 `spec/evidence/perm-run01-20261026/diff/`。
 - **eng 圖於本機重產與現行標準圖有固定 1 像素差**(`[60,47]`, 左上標題字之反鋸齒, pixelmatch 0, 68 張): 既有標準圖與本機 Chromium 渲染之次像素差, 與本次改動無關, 不得因此重產 eng 圖(重產＝換掉已審過之真理)。
 - **哪些流程拍得到表頭**: 「管理使用者」表頭只在使用者頁出現——`e2e-users`(32 張 cht)、`e2e-external-rows`(7)、`e2e-rela-user-grup`(17, 對話框遮罩下仍可見)有; `e2e-layout`、`e2e-ref-cascade` 之 cht 圖共 16 張位元相同(未拍到該欄); 其餘流程不進使用者頁(`e2e-init` 只斷言導覽文字)。
 - **改語系字串前先 grep 全部同源顯示處**: `userNotAdmin` 之 cht 訊息與 `fromTools` 離線工具之輸出字樣同為「系統管理者」, 前者出現在後台拒絕畫面、後者為操作者所見之報告; 工具輸出有 unit 斷言(`unit-fromAudit:1484`)須同改。
 
-## 應用系統路由相容認定與系統服務用途 `app:` 前綴(2026-10-24 第四輪 perm-run02〔任務 20261024182735〕; 帳本 R-APP-TOKEN-01 補述規則 7～8; ADR-040 Update; 報告 `C:\opensrcOper\dnow\20261024182735\agent-out\perm-run02-修正報告.md`)
+## 應用系統路由相容認定與系統服務用途 `app:` 前綴(2026-10-24 第四輪 perm-run02〔任務 20261024182735〕; 帳本 R-APP-TOKEN-01 補述規則 7～8; ADR-040 Update; 報告 `dnow/20261024182735/agent-out/perm-run02-修正報告.md`)
 - **同一個『是不是系統管理者』問題有兩個相容面, 不要只做一個函數**: 升版相容面(應用系統路由, 舊 sso 之應用系統身分即 `isAdmin='y'`)要寬, 新能力面(系統服務用途, perm-run01 才新增)要嚴; 做成兩個各自單一擁有者的函數(`isExtAdminUser`／`isSystemAppUser`)並用站點守護(AT-S2／S8／S9)禁止第三處自行比對, 比讓一個函數帶旗標分流好。判準改動前先問『這個入口在已發布版本是拒絕還是放行』——拒絕者可以放心收緊, 放行者收緊就是破壞性變更。
 - **矩陣的『等級』不是單一布林**: perm-run01 的 `lvl` 一個旗標對全部入口; 兩套判準後必須拆成 `svc`／`app` 兩欄, 每個斷言點明用哪一欄, 否則『改了判準、測試用錯欄』會靜默通過。拆欄後先讓測試對未修碼紅(30 敗)再改碼。
 - **單元測試對『前綴』類判準要窮舉近似形**: `App:`、`APP:`、前導空白、`xapp:`、`app`、`app-k`、全形冒號、非字串(22 個 id × 13 × 13 格); 變異 MB2～MB5(不分大小寫、`includes`、`trim`、無冒號)只有這一層抓得到, API 層權杖不可能涵蓋。
@@ -174,7 +181,7 @@
 - **變異腳本錨點要驗證恰命中 1 次**: MD5 初版錨點 `if (!b) {\n console.log('user', user)` 命中 2 次(getAndVerifyAppUser 與 getAndVerifyClientUser 同形), 腳本因此報 ERROR 而非靜默套錯; 錨點要含該函數獨有的 srLog 事件名。
 - **`quiet-run --lock` 內不能再用 `>` 重導到檔** (守門 hook 會擋 `echo/cat/printf >`); 要長輸出就讓 quiet-run 自己寫 `tmp/quiet-run/`, 事後 `cp` 摘要入證據目錄; 等待背景結果用前景 `until [ -f x ]; do sleep 5; done`(`timeout` ≤ 570000)而非連續 Monitor。
 
-## 應用系統 token 之配合、應用系統路由系統管理者等級、Bearer、路由失敗不回原文(2026-10-24 第三輪 perm-run01〔任務 20261024182735〕; 帳本 R-APP-TOKEN-01／R-BEARER-01／R-ROUTE-MSG-01; ADR-040; 報告 `C:\opensrcOper\dnow\20261024182735\agent-out\perm-run01-修正報告.md`)
+## 應用系統 token 之配合、應用系統路由系統管理者等級、Bearer、路由失敗不回原文(2026-10-24 第三輪 perm-run01〔任務 20261024182735〕; 帳本 R-APP-TOKEN-01／R-BEARER-01／R-ROUTE-MSG-01; ADR-040; 報告 `dnow/20261024182735/agent-out/perm-run01-修正報告.md`)
 - **「不在 perm 表」不能用登入反查的結果判斷**: `keyCheck.findLoginUsers` 對「恰 1 筆但停用」回 `{ user:null, count:0 }`(登入視同查無, perm-run05); 若拿 `count===0` 當「不在表」, 使用者用途之應用系統 token 綁定的使用者在 perm 被停用時, 會落入系統服務用途而取得系統管理者服務(上游 `isApp='y'`＋`isAdmin='y'` 形狀與系統服務用途完全相同). 另立 `countLoginRows`(同對應規則、不篩 isActive)當「是否在表」之單一判準; 凡「查無」語意被拿來做授權放行的判斷, 先問『停用／刪除／重複』三種狀態各算查無還是在表.
 - **兩種用途靠『是否在 perm 表』區分, 不靠欄位**: 使用者用途(AU)與系統服務用途(AS)在 sso 反查形狀上只差 id 與 email/name 是否為真實使用者; perm 無從直接分辨, 以『在表者一律以 perm 列為準』收斂, 代價是『綁定了不在 perm 表之 sso 系統管理者』的 AU 會被當成 AS(ADR-040 待裁示 ③; 可選收緊 `id` 以 `app:` 開頭).
 - **只拿 userId 字串的縱深防禦(`requireAdmin`)要有『誰驗證過』的憑據**: 框架只把 `getUserIdByToken` 回的 id 交給 kpFunExt; AS 的 id 不在 perm 表, 若以『不在表』當放行會讓『連線後被刪列之系統管理者』退化為放行. 作法: `getUserIdByToken` 對 `verifySystemApp` 產生之物件(WeakSet 憑據, 不憑欄位值)登錄 id, `requireAdmin` 在表者以列為準、不在表者須在登錄中.
@@ -184,7 +191,7 @@
 - **外審額度**: nemotron-3.5-super-vl-free 與 beam-free 於 2026-10-24 18:51 皆回 `AI_APICallError: Free usage limit reached`(`--print-logs --log-level ERROR` 之 stderr 立即可見, 不必等 10 分鐘), 依指示不再派; 同日 sol(gpt-6.1-sol, read-only, `--json --output-last-message`)正常, 17 分鐘內 906KB 事件流, 以 `grep -c agent_message` 與 `tail` 看進度.
 - **測試鎖**: 兩槽被他套件長跑(npm test 約 86 分、變異鏈)占用時, 純 unit 不加 `--lock`(無共享資源); api／e2e 加 `--lock` 排隊. 把『需要後端之全部工作』(base api 全跑／修前紅＋變異／e2e 選測)各合成單一腳本於單次取鎖內循序執行, 避免多次排隊; 變異腳本以 `tmp/perm-run01/evidence/orig/` 備份、`exit` 事件還原、結束再以 `git diff --stat` 與開始時比對.
 
-## 授權合併現況刻畫與改法比較(2026-10-21 run01, 第 101 項; 不改產品程式, 報告 `C:\opensrcOper\dnow\20261021095534\agent-out\run01-刻畫與比較報告.md`)
+## 授權合併現況刻畫與改法比較(2026-10-21 run01, 第 101 項; 不改產品程式, 報告 `dnow/20261021095534/agent-out/run01-刻畫與比較報告.md`)
 - **合併對每個管理對象獨立, 先用它縮空間**: 「第一個 AND 項」由項目順序決定、與鍵無關, 其餘運算逐鍵——故單一管理對象(狀態 y／n／未列 × 模式)的窮舉涵蓋任意個管理對象; 以真函數驗證投影性質(CH-PROJ-001)後, 3 管理對象只窮舉到 3 項、更深結構用 1 管理對象窮舉. 順序相依的精確判據: 某對象上「無 OR ∧ 無 n ∧ ≥1 個 AND 為 y ∧ ≥1 個 AND 未列」.
 - **候選語意不重寫解碼流程, 取真函數回傳的 `grups` 樹重新合併**: `getUserRules` 回傳的 `grups[].data._pemis[].data._rules` 已是解碼＋濾除後的樹; 候選只換 `mergeRules` 並依同一方式展開, 候選 S0(複製的 mergeRules)必須在每一格等於真函數(保真檢查), 比較才在同一棵樹上. 注意 `getUserRules` 會就地寫入傳入的表列(`_pemis`／`_rules`), 每格要用全新物件.
 - **「既有測試受影響」用模組載入掛鉤量**: `node --import register.mjs` 以 `module.register` 的 resolve 掛鉤把 `*/plugins/mShare.mjs` 導向 `tmp/` 內的變異複本(`src/` 零改動); 經 `NODE_OPTIONS=--import=…` 連後端子行程(api 測試所起)一併套用. 複本相對匯入要改絕對 URL, 讀原檔先把 CRLF 轉 LF 再做字串錨點取代(`mShare.mjs` 為 CRLF).
@@ -194,7 +201,7 @@
 - **探測 e2e 元件的最小手法**: 借 `e2e-array-form` 的 `withPage`／`openBelongDialog`／`toggleDialogEnable`／`clickDialogSave`／`saveAndWaitModal`＋`dismissResultModal`(結果 modal 不關會擋住下一個 `gotoXxx`), 以 `callRpc('<表>.select')` 讀庫; 對話框列勾選為 `.ag-selection-checkbox input`, 勾選後工具列多一顆刪除鈕(以前後 `div[role=button] svg path` 差集定位).
 - **事故**: 在一次 Bash 指令內用 `cd` 後, 工具工作目錄跟著改(後續相對路徑全錯, 變異腳本以 `path.resolve('.')` 取根而讀到錯誤目錄); 腳本一律寫死絕對根, 不用 `cd`.
 
-## 授權合併規則改為對稱交集、排序保護移除(2026-10-21 run04, ADR-033; 使用者最終裁示 `R-AUTH-MERGE-00`; 報告 `C:\opensrcOper\dnow\20261021095534\agent-out\run04-修正報告.md`)
+## 授權合併規則改為對稱交集、排序保護移除(2026-10-21 run04, ADR-033; 使用者最終裁示 `R-AUTH-MERGE-00`; 報告 `dnow/20261021095534/agent-out/run04-修正報告.md`)
 
 - **規則一改，先問「它對每種輸入形狀要求什麼」才寫碼**: 裁示只講「未給＝n、先 OR 後 AND」, 但第 4 條(交換律含陣列元素序)連帶逼出兩個裁示沒寫的形狀——同一 `crules` 陣列重複列同名規則(舊: 後者覆蓋, 順序相依)與無規則的 AND 項(舊: 排前全 n、排後無影響)。這類「衍生決定」要在 ADR 與回報明列請使用者確認, 不要默默選。
 - **刻畫測試轉規格時, 保留舊規則為 `mergeLegacy` 而不是刪掉**: 部署前稽核(`authMergeReport --audit`)需要「新規則 vs 舊規則」之差異; 同時以**獨立的集合式參考實作 `mergeSpec`**(不共用 `objOR`／`objAND` 程式碼)做保真比對, 才不會「用被測物驗被測物」。窮舉掃描的檢查項改為 fidelity=0、retract=0(新 ⊆ 舊)、新規則 dependent=0, 舊規則的順序相依 combo 數與差異量固定於 GOLD。
@@ -209,11 +216,11 @@
 - **e2e「UI 寫入 → 換頁 → 開對話框」須等前端 store 同步**: 對話框以開啟當下的 store 列出各列, 資料通道推播晚於成功訊息; AF-013b 於全套中失敗(實得 undefined = 新群組未列出), 單跑 4／4 過、加 CPU 負載後約 3／10 敗(修前後端副本亦有 1／6), 加 `waitUntilExist` 等 `window.$vo.$store.state.grups` 含新列後 8／8 過。不要以放寬斷言或加固定 sleep 處理。負載重現用 `tmp/run04/burn.mjs`(寫死 workers 數), 但「負載」與耗時不成正比(失敗亦出現在 21 秒的快跑), 以多次重跑計次為準。
 - **在 Bash 工具內用 `cd` 會改掉後續呼叫的 cwd**(本輪一次 `cd tmp/quiet-run` 後環境標頭之主目錄跟著變): 要在他處跑指令用 `--cwd`／`git -C`／絕對路徑; 已誤切時以絕對路徑續行, 不用 `cd` 切回(本輪另一次 `cd /c/opensrc` 被工具重設)。
 
-## 關聯對話框容錯／身分配對／屬性鍵與文件校正(2026-10-21 run03; F-22／F-24／F-25; 報告 `C:\opensrcOper\dnow\20261021095534\agent-out\run03-修正報告.md`)
+## 關聯對話框容錯／身分配對／屬性鍵與文件校正(2026-10-21 run03; F-22／F-24／F-25; 報告 `dnow/20261021095534/agent-out/run03-修正報告.md`)
 - **反向關聯對話框有「兩處」索引配對, 只修存檔不夠**: `doSave` 以 `get(users, kr)` 取快照列(F-24 點名), 但 `revRows`(切換 enable／mode 時重算標籤列)也以 `rows[ku]` ↔ `users[ku]` 配對, 且**存檔寫出的內容(`kpGrupNew`)正是由 `revRows` 寫進列的 `grups` 算出**——store 於開框後重排, 只改 `doSave` 仍會把別人的標籤寫進正確的列. 兩處皆須以 id 配對(`pairRowsToSnapshot`); 靜態不變式 SITE-RP-001 掃 `get(users|grups, kr…)` 與 `get(rows, `${ku}…`)` 兩型.
 - **e2e 斷言「其他列沒被改寫」須用授權等價, 不能用字串逐字**: 關聯對話框存檔時凡解碼後內容與欲寫出者不同(陣列形式含停用項、缺 mode 項)即改寫為最小的物件形式並丟停用項(授權不變)——第一版 AF-014 以 `assert.equal(u.cgrups, b.cgrups)` 在修後也紅(`[{"name":"arr-g",…},{M1 停用},{M2 缺 mode}]` → `{"arr-g":{…}}`). 改為 `effectiveSet`(有效啟用元素之「名稱:mode」排序集合). base seed 之授權字串是 JSON5(多行、鍵不加引號), 測試端解析用 `json5` 不用 `JSON.parse`.
 - **修前紅要先在 HEAD 驗, 且驗斷言本身對「修後綠」可滿足**: AF-014 第一次 HEAD 紅是紅在「過嚴之逐字斷言」而非錯綁本身; 放寬斷言後另以「把兩個元件暫時換回 `git show HEAD:…` 版再跑 AF-013／014, 須全紅, 還原後 sha1 相同」(`tmp/run03/mutate-e2e.mjs`)確認新斷言仍抓得到錯綁.
-- **工具陷阱(本輪踩到, 三個)**: ①Git Bash 的 `grep -c $'\r' 檔` 因 MSYS 文字模式吃掉 CR 而對 CRLF 檔回 0 或總行數, 不可用來判行尾——用位元組掃描(`tmp/run03/eol.mjs`); 本 repo 行尾混用(`src/plugins/mShare.mjs` 為 CRLF, 其餘多為 LF), 變異腳本之植入字串須依檔案實際行尾轉換, 否則「植入點命中 0 次」. ②`spawnSync(cmd, args, { shell: true })` 不替引數加引號, `--grep "A|B"` 之 `|` 被 cmd 當管線 → mocha 只跑 `--grep A` 且管線後半「找不到命令」回 255, 變異被判「已殺」是**假陽性**; 含 `|` 之 grep 引數要自行加雙引號, 且以 `exit` 與 `failing` 數雙重確認被殺原因. ③`quiet-run` 之實際路徑是 `C:/opensrcOper/tools/quiet-run.mjs`(非 `C:/opensrc/tools`).
+- **工具陷阱(本輪踩到, 三個)**: ①Git Bash 的 `grep -c $'\r' 檔` 因 MSYS 文字模式吃掉 CR 而對 CRLF 檔回 0 或總行數, 不可用來判行尾——用位元組掃描(`tmp/run03/eol.mjs`); 本 repo 行尾混用(`src/plugins/mShare.mjs` 為 CRLF, 其餘多為 LF), 變異腳本之植入字串須依檔案實際行尾轉換, 否則「植入點命中 0 次」. ②`spawnSync(cmd, args, { shell: true })` 不替引數加引號, `--grep "A|B"` 之 `|` 被 cmd 當管線 → mocha 只跑 `--grep A` 且管線後半「找不到命令」回 255, 變異被判「已殺」是**假陽性**; 含 `|` 之 grep 引數要自行加雙引號, 且以 `exit` 與 `failing` 數雙重確認被殺原因. ③`quiet-run` 之實際路徑是 `tools/quiet-run.mjs`(非 `tools`).
 - **背景跑 e2e 時不得改 `src/`**: 前端為 dev server(webpack 熱更新), 改檔會使進行中之 e2e 讀到半新半舊之碼; 兩個 e2e 行程也不可並行(同一 `./db`). 以「先跑完修前紅 → 再改碼」排序, 文件工作(不動 `src/`、`server/`)可與 e2e 並行.
 - **多文件校正以檔案分工, 以 w-dispatch-ai detached 並行**: ADR 檔一人、`spec/流程_*.md` 分兩組(授權相關 7 檔／清單與導覽 7 檔), 主責同時寫碼; 校正員完成後主責才以「exact-string 替換並斷言恰命中一次」之 node 腳本(`tmp/run03/edit-spec-run03.mjs`, 先備份)把 F-22／24／25 之 spec 文字寫入同三份 spec, 避免編輯衝突. 簡報須明列「待裁示項之語意文字不得更動」之清單(F-01～F-08、F-14、F-23 各對應之 ADR／spec 句).
 - **CLAUDE*.md 在 `.gitignore` 內**: `git diff` 看不到帳本／經驗檔之變更; 給外審之副本含整份檔案, 簡報須點名「帳本三條新規則在檔內、不在 diff」.
@@ -231,7 +238,7 @@
 - **新增錯誤鍵須同時動既有測試之預期**: 把群組／權限之名稱重複由 saveRowFieldDuplicate 改為 nameDuplicate 影響 api-updateTabs 兩案、unit-procCore-updateTabItems UNIT-UTI-006、unit-procCore-writeValidate WV-ERR-003; 先 grep 舊鍵之全部引用(測試與 spec)再改, 並於 ADR 載明為刻意行為變更, 不是放寬測試。
 - **前端與伺服端各有一半時, 只改一邊不算完成**: 「歷史重複不得使所有存檔失敗」之伺服端已容忍, 前端 errItemsByName 仍擋存(src/components 為併行修改範圍未動), 已於 ADR-034 與兩份清單 spec 之〈已知落差〉列為缺陷(待修)交主責, 不當作已解決。
 
-## 引用連帶: 改名級聯與刪除連帶清理(2026-10-22 run06; ADR-036; 報告 `C:\opensrcOper\dnow\20261021095534\agent-out\run06-修正報告.md`)
+## 引用連帶: 改名級聯與刪除連帶清理(2026-10-22 run06; ADR-036; 報告 `dnow/20261021095534/agent-out/run06-修正報告.md`)
 - **「重存即自癒」不成立, 改用補償還原**: 引用端先寫、主體後寫, 任一步例外即以寫入前整列還原引用端; 互換/鏈式/批內新增三形狀因補償而成立. 補償必須是**整列覆寫**(`save(pre, { merge: false })`)——合併寫入無法刪除寫入時新增之鍵(歷史列原無 `userIdUpdate`/`timeUpdate` 者, 外審 sol R4 抓到); 單元替身 `test/tools/unitOrm.mjs` 之 `mkTable.save` 須同步支援 option.merge === false.
 - **log 遮罩要涵蓋「重新拋出後外層又記一次」**: `writeWithCascade` 遮罩了自己記的 raw, 但重拋之原錯誤被 `procCore.errLog`／`syncAndReplaceTabs` 再記一次含引用端 id(sol R5、minimax R1 同抓). 測「log 無個資」要對**整份 srLog 字串**搜尋, 不能只驗某一筆事件.
 - **外審價值**: sol 抓到 3 個高(R1 跨 from 合成 id 撞號、R2 JSON5 非有限數值經 `JSON.stringify` 變 null 而改指別的規則名、R3 離線稽核 `--clean-out` 覆寫輸入); 都是單元測試之產生器產不出的輸入(`Infinity` 字面、他 from 恰有 `__new__0`、輸入輸出同檔). 教訓: 凡來源是 JSON5 而要重新編碼者, 先問「哪些值經 stringify 會變」(非有限數值、`-0`、`undefined`); 合成 id 一律避開**全表**既有 id(不只 pool); 寫檔工具一律先擋「輸出＝輸入」.
@@ -243,7 +250,7 @@
 - **寫帳本/經驗檔不得用 shell 內嵌長文字**: 一次用 `node -e "…"` 內嵌含反引號與反斜線之中文段落, 被 bash 當命令替換而寫入亂碼(需事後截斷重寫); 長文字一律用 Edit/Write 工具(全域 §8.1).
 - **子代理分工心得**: 先寫 `tmp/run06/design-digest.md` 供全部子代理共讀(介面、不變式、守則), 子代理提示詞只寫任務; 純函數測試、伺服端測試、真後端 api、前端、稽核工具、e2e 各一位 sonnet, 變異驗證寫進提示詞(副本上做、repo 不動); 外審採納後以 SendMessage 續派同一位子代理補測試(它有脈絡).
 
-## 外部列受保護與過期快照基準(2026-10-22 run07; ADR-037; F-23／F-26; 設計稿與外審見 `C:\opensrcOper\dnow\20261021095534\agent-out\run04-修正報告.md` 附錄 B)
+## 外部列受保護與過期快照基準(2026-10-22 run07; ADR-037; F-23／F-26; 設計稿與外審見 `dnow/20261021095534/agent-out/run04-修正報告.md` 附錄 B)
 - **基準必須於「草稿建立時」綁定, 不是存檔時取(外審 B.1)**: 設計稿原案以「存檔當下的 store 快照」算基準, 外審以確定性程式證明其不足: 開框後另一端撤銷授權、store 已更新, 存檔當下算出之基準與伺服端相同而放行, 舊對話框內容把撤銷還原——基準證明的是「store 新」, 不是「待存之編輯內容新」. 做法: 基準與「草稿所依據之那份列」同處同時產生(四清單頁 `changeParams`、兩對話框 `show()`), 存檔流程開頭(與 `rows` 同一刻、任何 `await` 之前)擷取副本並以區域變數持有; 靜態不變式 `unit-relDialogs-baseline` SITE-RB-002 守「存檔函式內無 `makeBaseline(`」, RB-SRV-005 以「存檔當下才取基準會通過」對照證明此條必要. 凡設計「版本比對」類機制, 先問「這個版本證明的是哪一份資料之新舊」.
 - **指紋為何排除 `order` 與伺服器管理欄(C-1 缺陷)**: 外部同步每次整來源重寫, 該來源每列之 `timeUpdate`／`timeCreate`／`userId` 全變, 若納入指紋則任何與草稿無關之同步都使草稿作廢; 另儲存依列序重編 `order=k+1`: 他人新增之列若排在其他列之前, 草稿原樣帶回之列的 `order` 被重編而成為「order-only 差異」, 曾被 `checkBaseline` 誤判 `diffStale`(API 子代理以 `unit-procCore-external` EXT-O01 重現: 後台 4＋外部 2 列, 他人新增 X 之 order 為 7 在外部列 70／80 之前, 草稿帶回 `[bo1..bo4, X, ext1, ext2]` 只編 bo2 被拒). 修法: 指紋不含 `order` 與管理欄, 且 `checkBaseline` 對「內容指紋與庫內相同」之修改列不檢查; 外部列 `order` 另由 `restoreExternalOrder` 還原庫內值. 教訓: 「重編序號」類副作用會讓未被使用者改動之列出現在 diff 內, 版本比對須只看內容.
 - **守門與基準之次序: 基準先於外部列守門**(run07 U1 觀察 1): 原次序 `checkExternalWrite` → `checkBaseline` 下, 草稿已過期(外部同步在開啟後改了外部列或移除之, 使送入之外部列與庫內不同)時被判為「外部列不可修改」, 訊息誤導(使用者並沒改外部列); 改為有基準者先 `checkBaseline`(`saveStale`: 請重新載入), 草稿新鮮而仍違規者才由守門拒. 靜態不變式 `unit-procCore-external` SITE-EX-003 守次序; 無基準分支(`hasExternalDiff`)最後. 凡「兩道都會拒」之檢查, 先排「能指出真正原因較根本者」.
@@ -267,7 +274,7 @@
 - **外審的 minimax(opencode)本輪 4 次無報告**: 唯讀鎖 `edit:'deny', bash:'ask'` 下模型只要試 bash 被自動拒絕，`run` 即在 16～36 秒內結束(exit 0, stdout 僅開場白)；改走副本並放開 bash 後，opencode 以**上層 git repo 為專案根**，模型直接讀 repo 本體絕對路徑，有 edit／bash 權限就可能改到工作樹，須在副本內 `git init` 成獨立專案根，且事後以 `git status` 逐檔核對；即便如此仍因 `external_directory` 被自動拒絕而結束。教訓: 外審 minimax 派工前先確認「拒絕後會不會結束 run」，不要假設會繼續。
 - **`cd` 會改掉共用工作目錄(本輪自身違規)**: 為了以「模擬部署根」為 cwd 執行驗證, 用了一次 `cd`, 之後整個工具工作目錄停在 `tmp/run08/inst`(連 PowerShell 工具亦同), 且依全域 §8.1 不得再 `cd` 回來. 補救: `quiet-run.mjs --cwd <repo 根>` 與絕對路徑; 但該空資料夾因為是 cwd 而無法在同一 session 內刪除. 下次要在別處執行驗證, 用 `quiet-run --cwd <目錄>` 或 `node` 的 `spawnSync(..., { cwd })`, 不用 `cd`.
 
-## 外部列夾具之收尾:單一行程全跑之 12 敗同根因(2026-10-22 run09; 帳本 R-TEST-EXT-CLEAN-01; 報告 `C:\opensrcOper\dnow\20261021095534\agent-out\run09-修正報告.md`)
+## 外部列夾具之收尾:單一行程全跑之 12 敗同根因(2026-10-22 run09; 帳本 R-TEST-EXT-CLEAN-01; 報告 `dnow/20261021095534/agent-out/run09-修正報告.md`)
 - **「全套 12 敗」只有一個根因時,先在『同一 mocha 行程、同一檔案順序』重現再動手**: 修前以 `api-* → e2e-external-rows → e2e-init → e2e-ref-cascade → e2e-rela-user-grup → e2e-targets → e2e-users` 單一行程重現(295 過 12 敗, 23 分), 與主控全套之失敗逐項相同(E2E-006×2、ref-cascade 4、rela-user-grup 2、targets run06 段 2、users 2)。重現靠的是 api 檔使**本行程**持有 lmdb 映射(`getWoItems()` import `g_mOrm`), 只跑 e2e-init 單檔是看不到的。
 - **`restartBackend({ reseed:true })` 在單一行程內不是重種**: `wipeDbVerified(strict:false)` 刪不掉 `./db`(EPERM)就退化為 upsert, 只補種子列、**不移除多餘列**; log 有「警告: seedDb 無法刪除 ./db…改在既有 DB 上 upsert」可辨。任何「靠 reseed 清夾具」的收尾在 `npm test` 下都是假的。
 - **外部列(run07 起)用任何系統管理者寫入都刪不掉(`saveExternalRowChanged`), 外部同步端點又拒空 rows(`isearr`, ADR-008)**: 清空整個分區只剩測試框架直接重置(`purgeExternalRows` → `woItems.delAll`)。這是測試資料庫的重置, 不經產品寫入入口, 不放寬 Lv1。收尾要點: 先經資料通道 `select` 偵測、有殘留才 import `g_mOrm`(逐檔隔離時本行程不持有映射, reseed 能真重種, 偵測不到殘留就不碰 lmdb), 移除後再 `select` 回驗, 並可加 `pristine` 以 `assertPristineSeed` 回驗種子主鍵集合。
@@ -277,7 +284,7 @@
 - **mocha 啟動後再編輯 test/ 檔不影響進行中的行程**(模組已載入記憶體): 修前重現跑到一半時編修測試檔, 失敗堆疊仍指向舊行號(e2e-init.test.mjs:399), 可佐證; 但 spec／帳本等「測試執行時才讀」的檔要先確認沒有測試讀它(`rg "readFileSync.*(CLAUDE_|spec)" test` 無命中)。
 - **偶發: `API-RC-044` 在 srLog 30 秒內讀到 0 行**(`waitLines`→`readSrLogSince`): 同一份 api 程式碼三輪(首輪通過、次輪失敗、第三輪通過; 修前重現輪亦通過); 失敗輪之事件其實已於 13:04:35.550 寫入當小時檔, 但測試 30 秒內讀不到任何行; 發生於使用者重開機後約 30 分鐘, 疑與 srLog 落檔可見性/時間有關, 本輪未定因, 見報告。遇到時先重跑該檔確認是偶發, 不要順手放寬 `readSrLogSince` 之 mtime 篩選。**〔已定因並修正, 2026-10-22 run10; 見下節與帳本 R-SRLOG-MARK-01〕**: 根因是測試行程與後端行程兩個 `Date.now()` 時鐘的 1～2 ms 偏差使 `o.time >= t0` 濾掉目標行; 與落檔延遲、mtime、「使用者重開機後」皆無關(上句「疑與落檔可見性有關」「勿動 mtime 篩選」之判斷作廢: mtime 篩選本身無辜, 但整個依時間戳讀法已改為檔案位置)。另: 本段用 `cat >> … <<EOF` 附加經驗檔違反全域 §8.1(應用 Write／Edit), 內容已事後核對完整。
 
-## API-RC-044 偶發失敗之定因: 跨行程時鐘比較(2026-10-22 run10; 帳本 R-SRLOG-MARK-01; 報告 `C:\opensrcOper\dnow\20261021095534\agent-out\run10-修正報告.md`)
+## API-RC-044 偶發失敗之定因: 跨行程時鐘比較(2026-10-22 run10; 帳本 R-SRLOG-MARK-01; 報告 `dnow/20261021095534/agent-out/run10-修正報告.md`)
 - **偶發失敗的取證順序(有效)**: ①先看「事件其實有沒有被寫出」——直接掃全部歷史 log(`logs/*.log`)找該行與其前後空窗, 而不是猜落檔延遲; 本案該行在檔內、時間戳正確、且前一行僅早 2 ms → 問題在「讀的一側」。②用「全歷史 log 找同特徵(某 pid 於該類錯誤行後空窗 ≥ 25 秒)」計數: 只有 2 次(皆 API-RC-044 第一子案), 把「偶發」縮成「特定形狀」。③再逐一排除假設並各留實測: 寫入延遲(旁觀者行程 50 ms 輪詢, 31611 行最大 77 ms)、mtime 落後(他行程持有握把追加, 即時更新)、檔案選錯(hr 檔名與 fdLog 解析無誤)。④最後才驗證最後剩下的假設(跨行程時鐘)。
 - **兩個 node 行程的 `Date.now()` 不可跨行程比大小**: 兩個行程的牆上時鐘在本機實測有約 1～2 ms 的偏差、同一配對內短時間穩定且隨配對而異(成因推測是各行程獨立校準高解析計時器與系統時間, 未查 V8 原始碼證實; 偏差本身是實測事實)。實測 10 個子行程中 6 個出現「伺服端蓋的時間戳早於請求前所取的 t0」(取樣 29.87% 因果倒置); 真後端上 9 組配對中 2 組, 舊式讀法漏讀 72～78% 的請求。凡「測試端 `Date.now()` vs 後端蓋印時間」的 `>=` 比較都是同型缺陷; 要判先後用檔案位置(位元組偏移)或後端自己的單調序號, 不用牆上時鐘。
 - **偶發失敗率低於樣本數時, 用「機制重現」取代「重跑到紅」**: 修前單檔 0/10、`api-*` 同行程 0/3 皆未紅(自然率低: 已知僅 2 次, 一次在 run09 的 3 輪中、一次在主控 final2 全套), 重跑量不出差異; 改寫一支對照腳本在真後端上並列新舊讀法, 逐請求比對(`tmp/run10/repro-clock.mjs`: 每次執行是新的行程配對, 一次就能看到有無漏讀), 才拿到「修前會紅、修後不會」的證據。
@@ -286,7 +293,7 @@
 - **mocha 修前基線要在改碼前跑完**: 迴圈執行器每輪重新載入測試檔, 基線迴圈進行中改 `api-*`／`test/tools/api-setup.mjs` 會污染修前數據; 本輪先建新檔(核心模組、單元測試)與文件, 待修前迴圈結束後才動既有檔。
 - **工具提醒**: Edit 的 `old_string`／`new_string` 結尾的空白會被截掉(本輪 `waitLines(t0, ` → `waitLines(mark, ` 因此變成 `waitLines(mark,(`, 事後以 Grep 全檔核對才抓到並修); `replace_all` 後一定 Grep 驗證, 且字串不要以空白結尾。
 
-## 多人同時編輯改為表級比對＋前端保留草稿(2026-10-22 run11; ADR-037 Update; 帳本 R-BASELINE-01／R-DRAFT-KEEP-01; 報告 `C:\opensrcOper\dnow\20261021095534\agent-out\run11-修正報告.md`)
+## 多人同時編輯改為表級比對＋前端保留草稿(2026-10-22 run11; ADR-037 Update; 帳本 R-BASELINE-01／R-DRAFT-KEEP-01; 報告 `dnow/20261021095534/agent-out/run11-修正報告.md`)
 - **伺服端表級比對可以「不改協定」**: run07 之基準本就是「草稿載入時整表」之 `[[id, digest]]`, 只是伺服端只拿它對「本次將寫入之列」; 改成對庫內整表比(`compareBaseline`)即得表雜湊語意, 前端與 RPC 契約零變動, 舊版客戶端自動得到新行為。指紋欄位(排除 `order` 與四個伺服器管理欄)原本就對; `order` 之判定理由見 ADR-037 決定 20(儲存依列序重給 `order`、外部列 `order` 外部擁有, 納入會誤擋)。不做快取(離線工具直寫 LMDB)。
 - **舊測試之大面積翻新方法**: 改完碼先跑整批相關測試, 把 174 敗依「期望的舊語意」分群(列內容 diffStale→rowChanged、delStale→rowRemoved、addExisted→rowRemoved/rowAdded、「別列被改仍通過」→改為被拒＋重新載入後通過), 再逐群以腳本(`tmp/edit-*.mjs`, 全域規範禁 heredoc 與 sed)精準替換; 每個被翻轉之案另補「重新載入(新基準)後成功」之對照, 證明拒收不是一律拒收。unit-rowDigest 之 checkBaseline 區段(約 470 行)整段改寫為表級(229 案), 隨機預言改為逐 id 比內容(不經指紋)。
 - **清單頁 `changeParams` 是 computed 副作用, 其依賴含 `genOpt` 讀到之一切反應式來源**(語系 `$t`、webInfor、tabKeysShow…): 舊行為＝任何依賴變動皆整頁重建。把「推播時有草稿就保留」改進去時, 不可讓「其他依賴觸發」變成 skip(語系切換後表頭不更新, 且保留分支不呼叫 `genOpt` 會使依賴收縮、之後再切語系不再觸發); 也不可讓 computed 依賴 `isModified`(旗標歸零即重算 → 儲存成功後畫面閃回舊資料)。作法: 其他觸發維持重建(同修改前); 未存編輯旗標以**非響應式鏡像** `syncMark.dirty` 讀取, 由 `watch isModified` 維護; 旗標歸零而 store 於保留期間已變新者(儲存成功之推播先於回應抵達之競爭)由同一 watch 補重建。`syncMark` 在 keep 時不更新, 才不會把「store 已較草稿新」之事實洗掉。
@@ -294,7 +301,7 @@
 - **e2e 等推播的做法**: 用 `waitStoreField`(欄位值)或 store 陣列參照改變(`window.__ref` 先記、再等 `!==`; 外部同步內容未變時沒有欄位值可等; e2e 後端為假時鐘, 時間欄位值不一定改變); 再以 `waitUntilExist` 等橫幅節點。拒收訊息框之文字用 `userSaveUsersFail: saveStale` 串接(同 E2E-011)。
 - **工具提醒**: .vue 為 CRLF、test 與 .mjs 為 LF, 腳本式替換須偵測換行(`s.includes('\r\n')` 時把樣式與替換字串之 `\n` 轉 `\r\n`); 動 `src/` 前須確認沒有 e2e 在跑(webpack dev server 讀工作樹, 中途改檔會污染該輪結果, 本輪即把變異驗證與 e2e 錯開)。
 
-## AF-037 不穩定失敗: 重疊重載使程式端旗標被提早解除(2026-10-23 run12; 帳本 R-RELOAD-GUARD-01、R-DRAFT-KEEP-01 規則 9; 報告 `C:\opensrcOper\dnow\20261021095534\agent-out\run12-修正報告.md`)
+## AF-037 不穩定失敗: 重疊重載使程式端旗標被提早解除(2026-10-23 run12; 帳本 R-RELOAD-GUARD-01、R-DRAFT-KEEP-01 規則 9; 報告 `dnow/20261021095534/agent-out/run12-修正報告.md`)
 - **主控假設被實測推翻**: 假設為「自己存檔之推播落在 `markDataReload` 窗口被當成有草稿而走 keep 分支、顯示橫幅」。帶觀測預載連跑 10 次, 失敗時 `staleNotice` 全程為假, keep 分支根本沒走; 實為存檔成功後約 +300ms(`postSaving` 解除)才到的兩張表推播(權限改名連帶更新群組: grups 與 pemis 相隔約 17ms)使清單頁重建兩次, 第 1 次重建的 1ms 解除計時器在第 2 次重建的 rowsChange 事件前觸發, 旗標被解除而 `isModified` 被設真。**先量時序再下結論**: 失敗率 2/6 的間歇問題, 在不改產品碼的前提下用 `node --import` 預載腳本攔 `chromium.launch`/`newContext`, 注入 `addInitScript` 觀測腳本(store 提交、各旗標 sync watcher、`fapi`/`dg` 起訖), 一輪即可看到完整時序。
 - **觀測腳本不得在 computed 執行期間讀反應式屬性**: 第一版在 `rebuildDraft` 包裝內讀 `vm.systemProcing`/`isModified` 等, 這發生在 `changeParams`(computed)執行中, 使其多出依賴而製造假的重建迴圈(每 12ms 一次, 與真實時序無關)。改為 sync watcher 維護影子旗標、包裝內只讀影子。觀測行為本身可能改變被測行為——先驗證觀測腳本不製造新現象。
 - **觀測放大渲染時間可把 1/3 的間歇失敗放大為 9/10**: 觀測腳本使渲染變慢, 重疊窗口更易命中; 修正後同一放大條件連跑 10 次(20 案)全過, 可當作壓力情境驗證修正(非降級條件, 修正的是旗標邏輯而非等待)。
@@ -305,7 +312,7 @@
 - **不穩定失敗的修正效果要用失敗率講**: 修前 2/6(未觀測)、9/10 輪(放大), 修後 19/20 輪(1 輪為不相關的 `Failed to fetch`, 發生在最末的 `resolvedTargetsOf`、目標斷言已過)、放大條件 10/10 輪全過。另一種失敗形狀混入時, 先看斷言行號是否仍是原斷言, 不把新的單次失敗算成原缺陷未修, 也不憑單次就斷言它無關——附證據檔、列為未歸因。
 - **e2e 層『人為固定窗口』要照實測時序設計放行次序**: 第一版放行(兩筆推播同一個任務內以 `setTimeout 0` 套用)無法命中窗口(舊旗標邏輯變異下 E2E-027 仍綠), 因為 ag-grid 對兩次 `rowDataUpdated` 共用同一個非同步派發佇列, 事件在旗標仍為真時一併處理。實測失敗時序是: 第一次重建之事件已派發、其 1ms 解除計時器尚未觸發, 第二筆才抵達且其渲染耗時遠大於 1ms。第二版放行改為「第一次重建之 Vue 更新(微任務)跑完後才登記第二筆之 `setTimeout 0`」——實測: 還原舊旗標邏輯之變異下 E2E-027 紅 2／2 輪(eng＋cht 皆紅, 失敗斷言即儲存鈕殘留)、修後綠。**單純拿通過的新案例當作『能抓到缺陷』是錯的——一定要做變異驗證(拿掉修正須紅)**。
 
-## 改用共用核心 w-serv-orm 1.1.17 之基準／鎖／存檔回傳列(2026-10-23 perm-run01; ADR-037 Update(perm-run01); 帳本 R-BASELINE-01／R-DRAFT-KEEP-01 改寫、`rulebook_concurrent.md` 新增; 報告 `C:\opensrcOper\dnow\20261022221854\agent-out\perm-run01-實作報告.md`)
+## 改用共用核心 w-serv-orm 1.1.17 之基準／鎖／存檔回傳列(2026-10-23 perm-run01; ADR-037 Update(perm-run01); 帳本 R-BASELINE-01／R-DRAFT-KEEP-01 改寫、`rulebook_concurrent.md` 新增; 報告 `dnow/20261022221854/agent-out/perm-run01-實作報告.md`)
 - **鎖接線刻意「一層一表巢狀」, 不用核心的多表一次宣告**: 核心 `withTabLocks` 以字碼排序取鎖(`grups`<`pemis`<`targets`<`users`), 與本套件階層(targets→pemis→grups→users, R-WRITE-LOCK-02)不同; 兩種次序混用即成環。故 `keyCheck.withTabLocks(lockTabs, keyTables, fn, held)` 自己依階層排序、逐層呼叫核心的單表 `withTabLocks([t], inner)`, 並以 `held` 檢查違反階層即拋 `tab lock order violation`。`lockSave`(操作者雙擊防護)包在表鎖之外, 與表鎖不同鍵空間。
 - **共用核心之 `procOrm(..., { mustExist:true })` 缺列時拒收字串 `'rowNotFound'`**: 前端對外一律映射為 `saveStale`; 後台列寫入用 `mustExist`、`insert` 不帶(新增列本就不存在)。**`mustExist` 不得由客戶端 opt 決定**(`pickClientOpt` 只採 `baseline`／`returnRows`), 否則 API 直打可繞過。
 - **基準格式驗證要在取鎖與任何讀寫之前**(`isBaselineValid`, 否則壞基準會先占用操作者占位或鎖); 舊格式不降級為「無基準」(降級＝悄悄放行), 回 `baselineFormat` 並記 `reason:'baselineFormat'`; 未帶基準(省略/null)才維持可存。
@@ -318,7 +325,7 @@
 - **外審 beam 之進度看 opencode 資料庫**: `opencode run` 的 stdout 到最後才一次輸出, 派工腳本的 `onStdout` 落檔全程為空, 無法以 stdout 靜默判定停滯; 改查 `~/.local/share/opencode/opencode.db` 之 `session`(`directory` 含審查副本路徑、`time_updated`)——`node:sqlite` 唯讀即可, 10 分鐘無更新才終止。
 - **分拆 73KB 規則冊的作法**: 腳本(圍欄感知的 `#`／`##`／`###` 區塊解析)依規則編號分組寫出, 回驗「分拆前後 `###` 節之位元組集合相等」(14 節 72,219 B)與「原 `##` 前言區塊皆保留」; 先備份原檔; 索引與外部引用(`spec` 內指向舊檔之 R-BASELINE-01)同步更新。
 
-## 正反關聯與主體身分檢查(前後端皆做)(2026-10-23 perm-run02; ADR-037 Update(perm-run02); 帳本 R-SUBJECT-ID-01 規則 4 改寫、R-REF-IDENTITY-01 新增; 報告 `C:\opensrcOper\dnow\20261022221854\agent-out\perm-run02-修正報告.md`)
+## 正反關聯與主體身分檢查(前後端皆做)(2026-10-23 perm-run02; ADR-037 Update(perm-run02); 帳本 R-SUBJECT-ID-01 規則 4 改寫、R-REF-IDENTITY-01 新增; 報告 `dnow/20261022221854/agent-out/perm-run02-修正報告.md`)
 - **身分要在「選取當時」取, 不是「頁面載入時」**: 以載入時之名稱→id 快照比對, 會誤拒「頁面載入後他人才新建、我才指派」之合法流程(被引用表未變 → 引用端表基準不變 → 原本放行)。作法: 編輯器開啟當下快照(`snapRefIds`), 回填時只對「本次新增之啟用引用項」記下對應 id(`recordPicks`), 存檔送 `opt.refs`; 複製／貼上等未經編輯器之路徑退回送出當下之 store(只涵蓋送出到寫入之窗口)。
 - **只驗「新增之啟用引用項」**: 新值啟用項減舊值啟用項。未變更之舊引用已於刪除時連帶清理; 停用項不授權; 全驗會誤拒含歷史懸空引用之列。伺服端另驗**宣告完整性**(漏報即拒), 使前端漏報可被發現。
 - **targets 之 id 即名稱, 身分定義即 id**: 外部同步每次 `delAll({from})`＋insert 同 id 重寫, 建立時間不穩定, 不能用 `timeCreate` 區分「刪後同名重建」; crules 欄只驗「已被刪除」(設計事實, 規則 5)。
@@ -332,7 +339,7 @@
 - **外審抓到之真缺陷: 以名稱為鍵、跨列共用之「選取記錄」會被後一列之選取以新快照覆蓋**(sol#1, 高): 兩列先後選同名實體、中間該實體被刪除後同名重建 → 前一列之授權被新實體接管而宣告仍相符; 單測與 e2e 之初版都只測「單列」。**凡是『名稱 → 身分』之累積記錄, 測試必須含「同名、不同時點、不同列」之格**(輸入空間表加『列』軸)。修法取「同名先後選取而身分不同 → 記衝突、宣告無效、前端不放行」(改動最小、更收嚴)。**採納外審修正後再補增量外審**(perm-run01 教訓)——本輪增量輪(sol 6 分鐘、beam 2 分鐘)皆無新發現。
 - **測試只釘『不得寫入』而鍵容許兩種者, 拿掉實作仍過**(sol#2, IDN-113): 凡守門分支之測試都要固定錯誤鍵、reason 與零 I/O, 不要用『鍵∈{A,B}』。
 
-## 登入識別值跨全表唯一(不論 isActive)與 getPermUserInfor 的 userId 依登入對應(2026-10-24 perm-run05; 帳本 R-MAPKEY-05; ADR-038 Update(perm-run05); 報告 `C:\opensrcOper\dnow\20261022221854\agent-out\perm-run05-修正報告.md`)
+## 登入識別值跨全表唯一(不論 isActive)與 getPermUserInfor 的 userId 依登入對應(2026-10-24 perm-run05; 帳本 R-MAPKEY-05; ADR-038 Update(perm-run05); 報告 `dnow/20261022221854/agent-out/perm-run05-修正報告.md`)
 
 - **改共用查詢鍵之語意, 先盤點『以舊鍵呼叫它的夾具』, 且要提防『傳錯鍵仍綠』**: `getPermUserInfor` 的 `userId` 由內部 id 改為登入對應(外部列傳 `srcKey`)後, 以內部 id 查外部使用者的測試夾具(`rg -l "getPermUserInfor|getResolvedActiveTargets" test`)有一類**不會變紅**——斷言『全 n／空權限』者(`api-authMerge` 損壞字串案、`api-keyProp` 壞 JSON)傳錯鍵一樣回空權限, 改前改後都綠、斷言卻已空轉。這類夾具改傳 `srcKey` 後, 在 HEAD 版與新版 server 上同綠, 回跑也分不出對錯; 要靠同檔『斷言非空權限』的對照案(`API-KP-000`、`API-chm-*` 正向案例, 在 HEAD 版上為紅, 見 `red-evidence-api.md`)確認所傳之鍵真的命中。
 - **『被觸及』判定之簽章須含所有決定身分之維度**: 初版簽章只有〔類別＋登入識別值〕, 變異『簽章不含 `from`』竟倖存——只換來源、值與類別都不變的列(同來源兩列同 srcKey 之歷史資料, 其一換 `from`)會漏判成『未被觸及』而放行跨來源撞值。補 UL-016。**凡『只擋被觸及者』的檢查, 簽章維度＝規則中判定撞值所用的全部維度**。
@@ -353,7 +360,7 @@
 - **外審採納後立刻補增量外審值得**: 第一輪採納後我新寫的測試被第二輪抓到 5 個問題（檢查次序案例不具區辨力、未處理 rejection、固定窗口計輪數、README 與 SFS-003 契約不一致、README 漏列 clientId 優先次序）；增量審與 e2e 全跑並行（外審用副本、不佔測試鎖），不增加牆鐘時間。
 - **`api-callerMatrix` 的輪詢入口原只測標頭來源**(註記為框架第 128 項); 框架 1.1.16＋嚴格設定後兩個身分來源皆可測, 但 clientId 與身分綁定——同一 clientId 不可在標頭／本體兩個來源間換身分輪詢, 故 clientId 要含來源(`mx-${k}-h`／`-b`)。輪詢被拒回 `[sys:polling] permission denied`(框架固定訊息), 不在語系鍵全集內, 斷言要另列。
 
-## 權限後台與資料通道只限系統管理者、同批重複 id、RA-037 偶發失敗根因(2026-10-24 第二輪 perm-run01〔任務 20261024105311〕; 帳本 R-ADMIN-ONLY-01／R-WRITE-ID-UNIQ-01／R-TOOL-SAMEFILE-01; ADR-039; 報告 `C:\opensrcOper\dnow\20261024105311\agent-out\perm-run01-修正報告.md`)
+## 權限後台與資料通道只限系統管理者、同批重複 id、RA-037 偶發失敗根因(2026-10-24 第二輪 perm-run01〔任務 20261024105311〕; 帳本 R-ADMIN-ONLY-01／R-WRITE-ID-UNIQ-01／R-TOOL-SAMEFILE-01; ADR-039; 報告 `dnow/20261024105311/agent-out/perm-run01-修正報告.md`)
 
 - **本輪與前一輪同名 `perm-run01`**(2026-10-23, 任務 20261022221854): 證據目錄 `spec/evidence/perm-run01/` 已被前輪占用, 本輪改帶日期 `spec/evidence/perm-run01-20261024/`; 帳本／狀態／ADR 凡寫 `perm-run01` 須同時寫日期或任務編號, 否則讀者會混。
 - **更上游加閘後, 下游舊檢查變成『黑箱不可達』, 對應舊測試要遷移而不是放寬**: 連線閘改為只限系統管理者後, 一般使用者連 `requireAdmin` 都走不到(僅『連線後被降級』之競態可達)。`api-callerIdentity` A 組原斷言 `userNotAdmin` 者改驗新拒絕點(`permission denied`, srLog `verifyConn-error`), `requireAdmin` 本身改以站點守護(AOS-S6)＋變異(M7／M16)＋`unit-procCore-external` SITE-EX-013 涵蓋; 後者原斷言 `isAdmin !== 'y'` 字面, 判準搬到單一擁有者後須改驗 `isAdminRow`(站點守護隨規則形狀更新是正當的, 但要在報告說明)。
@@ -367,7 +374,7 @@
 - **`db/wperm/**` 在版控內**(`.gitignore` 列了 `db` 但已追蹤), 任何測試執行後 `git status` 顯示 modified, 非本輪修改; 勿被它誤導成『改到資料庫』。
 - **外審派工**: sol 20.7 分鐘完成(`timeoutMs` 3600000), 7 條中 4 條採納、3 條為既有政策／範圍外備查; 副本內『攻擊面』類字樣用腳本中性化後 sol 未被內容審查擋; 完成後以 SHA1 清單核對副本未被修改。等待 detached 行程用 `tasklist //FI "PID eq N"`。
 
-## 外部同步 targets 改名之審計(Gitea #48)(2026-11-02 wp48〔任務 20261102131843〕; 帳本 R-REF-CASCADE-01 已知限制①、R-IMPORT-01 規則 4; 報告 `C:\opensrcOper\dnow\20261102131843\agent-out\wp48-審計報告.md`)
+## 外部同步 targets 改名之審計(Gitea #48)(2026-11-02 wp48〔任務 20261102131843〕; 帳本 R-REF-CASCADE-01 已知限制①、R-IMPORT-01 規則 4; 報告 `dnow/20261102131843/agent-out/wp48-審計報告.md`)
 
 - **審計草案用『兩份副本對照』**: 以工作樹之追蹤檔(`git ls-files`)複製 `./tmp/wp48/orig` 與 `./tmp/wp48/draft`, 草案只套 draft, 兩份各跑同一組測試, 以腳本比對失敗標題集合(onlyDraft 即草案引入之回歸)。副本位於 repo 之下, 套件解析往上找到 repo 之 `node_modules`, 不必複製或連結; 但有 5 件 unit 因副本環境而紅(unit-legendFit、unit-roleName RN-S3、unit-shipTools ST-002、unit-sysFuncsSite SFS-003、unit-validateRows VR-EQ-002), 兩份同紅即為環境。mocha 一律 `quiet-run --cwd <副本>`, 否則以 cwd 讀檔之站點測試會讀到工作樹。
 - **建議檔內嵌之 diff 會失去 CR**: `patch --binary` 對 CRLF 檔(`server/provideTabs.mjs`、`src/schema/tables/targets.mjs`)失敗; 不加 `--binary` 可套, 但結果變 LF。實作時要保留原換行。
@@ -377,7 +384,7 @@
 - **ADR 否決理由要回頭驗前提**: ADR-038 決定 51 以「須改引用鍵」否決「系統配 id 並另存名稱欄」, 但 `crules` 可續以名稱引用、`getUserRules` 輸出不變, 前提不成立。
 - **API 測試之後端經 `test/tools/e2e-setup.mjs` 啟動, `spawn` 未設 `windowsHide`, 且會殺 11006 監聽者**: 審計輪若無必要不跑, 或先確認不會跳出視窗。
 
-## 出貨清單斷言對齊 dspec〈自有套件之npm發布範圍〉(2026-11-02 pm286〔任務 20261031121854〕; 帳本 R-SHIP-TOOLS-01、R-ROLE-NAME-01; 報告 `C:\opensrcOper\dnow\20261031121854\agent-out\pm286-修正報告.md`)
+## 出貨清單斷言對齊 dspec〈自有套件之npm發布範圍〉(2026-11-02 pm286〔任務 20261031121854〕; 帳本 R-SHIP-TOOLS-01、R-ROLE-NAME-01; 報告 `dnow/20261031121854/agent-out/pm286-修正報告.md`)
 
 - **斷言『某資料夾不在包內』會隨發布範圍規格變動而成假紅**: 規格原則 1(npm 包＝git 版控之內容)後, 測試只該斷言『不得入包』清單(執行檔／壓縮檔／`bin/` 非 manifest／`CLAUDE*.md`／`tmp/`／`test/_tmp/`／`.env`), 不斷言 `test/`、`spec/` 不在; 判斷式抽成函數並加負向對照(ST-002b), 防復活『不在』斷言與判斷式過鬆。
 - **『在出貨清單內』不等於『可依賴』**: `test/tools/` 隨包後, 工具閉包 `list.has(f)` 擋不住對 `test/` 之依賴; 須對閉包內每個檔明確斷言不在 `test/`、`spec/` 之下(變異證明: 同一變異於舊斷言仍綠、新斷言紅)。

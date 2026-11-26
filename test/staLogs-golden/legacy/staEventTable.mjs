@@ -28,7 +28,7 @@ async function staEventTable(opt = {}) {
     let kp = {}
 
     //vpfs
-    let vpfs = fsTreeFolder(fdLog)
+    let vpfs = fsTreeFolder(fdLog, { levelLimit: 1 }) //wsemi 1.9.80 起須明給第 1 層(未給即窮舉), 保留原只掃第 1 層之語意
     vpfs = filterVpfsByWindow(vpfs, now.subtract(25, 'hour'), 'YYYY-MM-DDTHH') //開檔前剔除窗外檔; 用 25h(非 24h)是因 diff('hour') 取整, 最舊可能到 now-25h, 多留一小時確保不漏讀
 
     //逐檔逐行讀取

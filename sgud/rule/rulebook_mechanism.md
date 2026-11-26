@@ -64,7 +64,7 @@
 
 - **守護**: `test/unit-staLogs-futureBucket.test.mjs`(53 案: FB-1 16、FB-2 4、FB-3 3、FB-4 6〔最末列 2、`genPlan.labelEnd` 2、窗為空 2〕、FB-5 24〔3 seed × hr／day × `timeLength` -1／0／1／7〕; 環境變數 `STALOGS_CORE_MODULE` 可指向另一份副本供「修前紅」與變異重跑)、`test/unit-staEvent-golden.test.mjs` GOLD-001. 狀態: 已落實(2026-11-03). 重跑變異／差異比對: 見 ADR-048 與 `sgud/exp/experience.md` 同日條.
 
-## 統計之 timeLength 入口檢測(2026-11-23 twp1, 排程第 301 項, R-STA-TIMELENGTH-01, ADR-050; 規格 `C:\opensrcOper\dspec\輸入參數之檢測機制.md`; 比照 w-web-api `staLogsCore.mjs` 之 `errTimeLengthInvalid`)
+## 統計之 timeLength 入口檢測(2026-11-23 twp1, 排程第 301 項, R-STA-TIMELENGTH-01, ADR-050; 規格 `dspec/輸入參數之檢測機制.md`; 比照 w-web-api `staLogsCore.mjs` 之 `errTimeLengthInvalid`)
 
 軸: timeLength 之值(有效: 0、1、7、30、3650、數字字串 `'7'`／`' 7 '`／`'1e1'`／`'+7'`; 無效: `NaN`、`±Infinity`、負數、小數、3651、`100000`、`1e20`、`'abc'`、`''`、空白、`'0x10'`、`'Infinity'`、`'7.5'`、`null`、布林、物件、陣列、`7n`、Symbol、包裝物件、函數、已撤銷之 Proxy、`Date`) × 入口層(`genPlan`、`staLogs`、`staEvent`、`staEvent.callWorker`、`procStaInfor.getStaEvent`〔kpFunExt 之下層〕、mock 模式) × `opt.timeNow`(`NaN`、`±Infinity`、`1e300`、`-1e300`、字串).
 
@@ -79,6 +79,24 @@
 - **測試**: `unit-staLogs-timeLength`(TL-001 判準全表; TL-002 無效 33 種 × 6 層〔子行程加逾時, 修前同步無窮迴圈之候選被逾時終止〕; TL-003 有效 11 種 × 層; TL-004 single-flight 同鍵; TL-004d single-flight 之 `timeNow` 部分〔被採用者同毫秒併、不同時刻與未給不併、兩端邊界、被視為未給者 21 種與未給同一 promise 且不同步拋錯、結果層〕; TL-005 `timeNow` 範圍外 13 種〔含 Date 極值〕退回現在＋範圍內 2 種〔epoch 0、2100-01-01〕照常採用; TL-006 站點不變式 a～d)＋`test/tools/timeLengthChild.mjs`; `api-staEventTimeLength`(真後端, 遠端 RPC); 既有 `unit-staLogs-futureBucket`(FB-4／FB-5 依本節第 6 點更改)、`unit-staEvent`、`unit-staEvent-golden`.
 - **不得**: 以 `Number()`／`parseInt`／`+v` 轉換 `timeLength` 後再判斷(`Number('')`、`Number(null)`、`Number([7])` 皆非有效輸入之轉換結果); 於 `kpTime` 迴圈內才檢查; 放寬上限而不處理 `kpTime` 長度(timeLength×24 筆之陣列)。
 
+## 列舉函數之層數(2026-11-26 m667c3, 排程第 667 項, R-FS-LEVEL-01; 對應 wsemi 破壞性變更紀錄第 83 項; 與 w-web-api、w-web-sso 同型)
+
+軸: 呼叫形(省略第 2 參數、數字、`{ levelLimit: n }`、`{ levelLimit: <變數> }`、窮舉) × 函數(`fsTreeFolder`、`fsTreeFolderWithHash`、`fsGetFilesInFolder`、`fsGetFilesWithHashInFolder`、`fsGetFoldersInFolder` 及各 `*Core`) × 站點類別(src、test).
+
+- **R-FS-LEVEL-01 wsemi 列舉函數(1.9.80 起第 2 參數為 `opt = {}`, 未給 `opt.levelLimit` 即窮舉全部層級; 舊版省略第 2 參數＝只列第 1 層)於本庫之呼叫點, 層數一律於呼叫處明給**: 修前形(省略第 2 參數)於 1.9.80 靜默變為窮舉(無拋錯、無警告); 舊版 wsemi 遇物件之第 2 參數亦視為無效層數而取 1 層, 故先改寫再升版或先升版再改寫皆為第 1 層, 唯「只升版不改寫」會靜默窮舉. 規則:
+  1. 統計日誌掃描只列 `fdLog` 下第 1 層(子資料夾內之檔不掃; 資料夾項目於其後剔除): 呼叫寫 `fsTreeFolder(fdLog, { levelLimit: 1 })`. 本庫目前無窮舉之站點; 日後要窮舉者省略 opt 並於註解寫明「窮舉」.
+  2. 不得以數字為第 2 參數(1.9.80 起拋 `invalid opt: must be an object`), 不得傳第 3 個引數(拋 `invalid arguments: must be fd and opt only`), 不得把未檢測之變數傳入 `{ levelLimit: v }`(`null`／無效值於新版為窮舉, 舊版為 1 層).
+  3. 守護: 子資料夾夾具之案(下表)須對「省略 opt(窮舉)」與「`levelLimit: 2`」兩種變異皆轉紅.
+- **站點全集(2026-11-26; 指令: `git grep -nE "\b(fsTreeFolder|fsTreeFolderWithHash|fsGetFilesInFolder|fsGetFilesWithHashInFolder|fsGetFoldersInFolder)(Core)?\s*\(" -- . ':!dist' ':!docs'`; 本庫 3 處呼叫, 皆為 `fsTreeFolder`, 原省略第 2 參數)**:
+
+| 站點 | 類別 | 呼叫 | 判定 | 層數鑑別之測試 |
+|---|---|---|---|---|
+| `server/staLogs/staLogsCore.mjs` `listFiles` | src | `fsTreeFolder(fdLog, { levelLimit: 1 })` | 已套(第 1 層) | `unit-staEvent-golden` GOLD-020(`fdLog` 之副本內建子資料夾 `sub`, 其內放一檔 `2026-08-28T01.log`〔事件 `in-sub`〕, staEvent hr 與 staEventTable 之輸出須與 expected 相同); 變異「省略 opt」「`levelLimit: 2`」皆紅(2026-11-26) |
+| `test/staLogs-golden/legacy/staEvent.mjs` | test(改造前原碼留存, golden 產生器用) | 同上 | 已套(第 1 層) | 無: 夾具 `logs/` 無子資料夾, 只證重產 `expected.json` 逐位不變(sha256 相同, 2026-11-26) |
+| `test/staLogs-golden/legacy/staEventTable.mjs` | 同上 | 同上 | 已套(第 1 層) | 同上 |
+
+- **不得**: 把省略 opt 之呼叫當作「第 1 層」; 於 `listFiles` 後以過濾層數代替 `levelLimit`(會先窮舉整棵樹); 於測試端以 `legacy/` 之輸出當層數之真理(夾具無子資料夾).
+
 ## 打包後之可用性(2026-10-14, X1; 對應 w-syslog 審計方案④, 三個 w-web-* 同一作法)
 
 軸: 使用方式(repo 內 src / repo 內 dist / 已安裝之 src 深層匯入 / 已安裝之 dist(`main`) / 被下游再打包 / bundle 被搬離 node_modules 樹而由專案根執行) × 定位方式(頂層 `__filename`/`__dirname`、`import.meta.url`、`new URL(…, import.meta.url)`、相對於模組之檔案路徑) × 時機(模組載入時 / 首次使用時). 打包工具: `toolg/gDistRollup.mjs`(w-package-tools rollupFile, format umd, fdSrc `./server`, fn `WWebPerm.mjs`)——bundle 含 `server/` 與其 import 到之 `src/`(schema、mShare)與未列 external 之相依.
@@ -87,4 +105,4 @@
 
 ## 〔跨套件規格〕(主控 2026-10-16 依使用者交辦寫入)
 
-- 資料通道只開 select 屬 w-web-perm、w-web-api、w-web-task 共用之裁決(主控 2026-10-14),規格與審查判準見 `C:\opensrcOper\dspec\w-web資料通道最小權限.md`;本帳本之 ADR-015(2026-10-14 Update) 為其落地.要在資料通道重開寫入者,不得自行調整,須經主控或使用者裁示.
+- 資料通道只開 select 屬 w-web-perm、w-web-api、w-web-task 共用之裁決(主控 2026-10-14),規格與審查判準見 `dspec/w-web資料通道最小權限.md`;本帳本之 ADR-015(2026-10-14 Update) 為其落地.要在資料通道重開寫入者,不得自行調整,須經主控或使用者裁示.
